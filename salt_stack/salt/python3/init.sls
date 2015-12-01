@@ -7,3 +7,11 @@ python3-pip:
         - installed
         - require:
             - pkg: python3
+            
+python2.7:
+    pkg:
+        - installed
+        
+python-pip:
+    pkg:
+        - installed
