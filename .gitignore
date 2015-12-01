@@ -55,3 +55,9 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# Packer Files / Support
+*.exe
+*.iso
+packer/output/
+packer/variables/aws-credentials

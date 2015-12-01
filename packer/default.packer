@@ -1,0 +1,51 @@
+{
+    "variables": {
+        "source": "The hostname and minion ID of the VM",
+        "source": null,
+    },
+    
+    "builders": [{
+        "type": "virtualbox-iso",
+        "disk_size": 20000,
+        "guest_os_type": "Ubuntu_64",
+        "guest_additions_mode": "disable",
+        "http_directory": ".",
+        "iso_url": "files/{{user `source`}}.iso",
+        "iso_checksum_type": "none",
+        "ssh_username": "microns",
+        "ssh_password": "microns",
+        "shutdown_command": "sudo shutdown -P now",
+        "ssh_timeout": "Comment: This is set for 20 minutes because the VM runs an upgrade before finishing the install",
+        "ssh_timeout": "20m",
+        "headless": false,
+        "output_directory": "output/virtualbox-default",
+        "vm_name": "virtualbox-default",
+        "boot_command": [
+            "<esc><esc><enter><wait>",
+            "/install/vmlinuz noapic ",
+            "preseed/url=http://{{ .HTTPIP }}:{{ .HTTPPort }}/files/{{user `source`}}.preseed ",
+            "debian-installer=en_US auto locale=en_US kbd-chooser/method=us ",
+            "hostname=default-install ",
+            "fb=false debconf/frontend=noninteractive ",
+            "keyboard-configuration/modelcode=SKIP keyboard-configuration/layout=USA ",
+            "keyboard-configuration/variant=USA console-setup/ask_detect=false ",
+            "initrd=/install/initrd.gz -- <enter>"
+        ]
+    }],
+    
+    "provisioners": [
+        {
+            "type": "file",
+            "source": "files/sudoers.d/microns",
+            "destination": "/tmp/microns"
+        },
+        {
+            "type": "shell",
+            "inline": [
+                "chmod 0440 /tmp/microns",
+                "echo 'microns' | sudo -S chown root /tmp/microns",
+                "echo 'microns' | sudo -S mv /tmp/microns /etc/sudoers.d",
+                "echo 'microns' | sudo -S service sudo restart" ]
+        }
+    ]
+}
