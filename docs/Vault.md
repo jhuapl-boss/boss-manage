@@ -15,14 +15,16 @@ To install the [hvac](https://github.com/ianunruh/hvac) Vault library run `pip3 
 Create the following file as ~/vault/vault.cfg, which sets the location to
 store data and where to listen for connections
 
-`backend "file" {
+```
+backend "file" {
     path = "~/vault/data"
 }
 
 listener "tcp" {
     address = "localhost:8200"
     tls_disable = 1
-}`
+}
+```
 
 ### Running the server
 This document covers running the Vault server in the foreground. If you want to
@@ -37,7 +39,8 @@ other time it is started the vault needs to be unsealed to allow access to the
 encrypted data. Create the following script (~/vault/startup.py) to handle both
 operations and run it each time the Vault server is started.
 
-`#!/usr/bin/env python3
+```python
+#!/usr/bin/env python3
 import hvac
 
 client = hvac.Client(url="http://localhost:8200")
@@ -55,7 +58,7 @@ elif client.is_sealed():
         client.unseal(fh.read())
 else:
     print("Vault is initialized and unsealed")
-`
+```
 
 ### Communicating with Vault
 Once the Vault server is running and unsealed we can store secrets int it. To
@@ -63,7 +66,8 @@ do this we need to authenticate to the server using the *root token* that was
 created during initialization. The following python3 code shows connecting to
 and working with the local Vault server.
 
-`import hvac
+```python
+import hvac
 
 with open("~/vault/vault_token", "r") as fh:
         root_token = fh.read()
@@ -74,7 +78,7 @@ assert client.is_authenticated()
 client.write('secret/foo', baz='bar')
 print(client.read('secret/foo'))
 client.delete('secret/foo')
-`
+```
 
 **Note:** All secrets stored should be stored under "/secret/"  
 **Note:** Secrets can be stored at any depth, ex "/secret/foo/bar/boo"  

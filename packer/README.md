@@ -12,6 +12,7 @@ default.packer
 Used for local development and testing using VirtualBox. It creates an OVF
 image using the Packer virtualbox-iso builder. The only modification that it
 does to the stock minimal install is to configure sudo to be passwordless.
+
 `packer build -var 'source=ubuntu-14.04.2-server-amd64' default.packer`
 
 
