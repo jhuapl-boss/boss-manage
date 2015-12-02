@@ -1,5 +1,7 @@
 include:
     - python3
+    - python.pip3
+    - python.pip
     
 django-prerequirements:
     pkg.installed:
@@ -11,10 +13,14 @@ django-requirements:
         - requirements: salt://boss/files/boss.git/setup/requirements.txt
         - require:
             - pkg: django-prerequirements
-            - pkg: python3-pip
+            - sls: python3
+            - sls: python.pip3
+            - sls: python.pip
             
 django-files:
     file.recurse:
         - name: /srv/www
         - source: salt://boss/files/boss.git/boss
         - include_empty: true
+        - require:
+            - sls: python3

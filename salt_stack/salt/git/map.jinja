@@ -1,0 +1,22 @@
+{% import_yaml "git/defaults.yaml" as default_settings %}
+
+{% set os_family_map = salt['grains.filter_by']({
+    'Arch': {},
+    'RedHat': {},
+    'Debian': {},
+    'Solaris': {},
+    'FreeBSD': {},
+    'Gentoo': {
+        'git': 'dev-vcs/git',
+    },
+    'Suse': {
+        'git': 'git-core',
+    },
+    'Windows': {
+        'git': 'msysgit',
+    },
+}, grain="os_family", merge=salt['pillar.get']('git:lookup')) %}
+
+{% do default_settings.git.update(os_family_map) %}
+
+{% set git_settings = salt['pillar.get']('git', default=default_settings.git, merge=True) %}
