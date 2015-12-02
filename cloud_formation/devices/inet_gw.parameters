@@ -1,0 +1,11 @@
+{
+    "VPCId": {
+        "Description" : "ID of the VPC to be part of",
+        "Type": "AWS::EC2::VPC::Id"
+    },
+    
+    "SubnetId": {
+        "Description" : "ID of the Subnet to be part of",
+        "Type": "AWS::EC2::Subnet::Id"
+    }
+}

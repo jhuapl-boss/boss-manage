@@ -1,0 +1,26 @@
+{
+    "SubnetId": {
+        "Description" : "ID of the Subnet to be part of",
+        "Type": "AWS::EC2::Subnet::Id"
+    },
+    
+    "VaultHostname": {
+        "Description" : "Hostname of the Vault Server",
+        "Type": "String"
+    },
+
+    "VaultAMI": {
+        "Description" : "Name of the Vault AMI to use",
+        "Type": "AWS::EC2::Image::Id"
+    },
+    
+    "VaultIP": {
+        "Description" : "The IP address for the Vault Server. Note: ip address should be within Subnet range",
+        "Type": "String",
+        "MinLength": "7",
+        "MaxLength": "15",
+        "Default": "0.0.0.0",
+        "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})",
+        "ConstraintDescription": "must be a valid IP of the form x.x.x.x."
+    }
+}

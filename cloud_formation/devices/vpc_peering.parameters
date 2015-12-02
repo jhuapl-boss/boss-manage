@@ -1,0 +1,11 @@
+{
+    "VPCId": {
+        "Description" : "ID of the VPC to be part of",
+        "Type": "AWS::EC2::VPC::Id"
+    },
+    
+    "PeerVPCId": {
+        "Description" : "ID of the VPC to peer with",
+        "Type": "AWS::EC2::VPC::Id"
+    }
+}

@@ -1,0 +1,12 @@
+{
+    "VPC" : {
+        "Type" : "AWS::EC2::VPC",
+        "Properties" : {
+            "CidrBlock" : { "Ref" : "IPSubnet" },
+            "Tags" : [ 
+                {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
+                {"Key" : "Name", "Value" : { "Ref" : "Domain"} }
+            ]
+        }
+    }
+}
