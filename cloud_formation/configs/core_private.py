@@ -28,7 +28,7 @@ def create(session, domain):
     args = [
         lib.template_argument("KeyName", keypair),
         lib.template_argument("SubnetId", subnet_id),
-        lib.template_argument("VaultAMI", lib.ami_lookup(session, "vault-master")),
+        lib.template_argument("VaultAMI", lib.ami_lookup(session, "vault")),
         lib.template_argument("VaultHostname", "vault.core.boss"),
         lib.template_argument("VaultIP", hosts.lookup("vault.core.boss")),
     ]
