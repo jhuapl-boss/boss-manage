@@ -78,6 +78,15 @@ def ami_lookup(session, ami_name):
     else:
         return response['Images'][0]['ImageId']
         
+def sg_lookup(session, vpc_id, group_name):
+    client = session.client('ec2')
+    response = client.describe_security_groups(Filters=[{"Name":"vpc-id", "Values":[vpc_id]},
+                                                        {"Name":"group-name", "Values":[group_name]}])
+    if len(response['SecurityGroups']) == 0:
+        return None
+    else:
+        return response['SecurityGroups'][0]['GroupId']
+        
 def keypair_lookup(session):
     client = session.client('ec2')
     response = client.describe_key_pairs()

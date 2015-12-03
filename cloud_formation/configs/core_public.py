@@ -27,10 +27,15 @@ def create(session, domain):
     subnet_id = lib.subnet_id_lookup(session, domain)
     if subnet_id is None:
         raise Exception("Subnet doesn't exists")
+        
+    keypair = lib.keypair_lookup(session)
+    default_sg_id = lib.sg_lookup(session, vpc_id, "default")
     
     args = [
+        lib.template_argument("KeyName", keypair),
         lib.template_argument("VPCId", vpc_id),
         lib.template_argument("SubnetId", subnet_id),
+        lib.template_argument("DefaultSecurityGroup", default_sg_id),
         lib.template_argument("BastionAMI", lib.ami_lookup(session, "amzn-ami-vpc-nat-hvm-2015.03.0.x86_64-ebs")),
         lib.template_argument("BastionHostname", "bastion.core.boss"),
         lib.template_argument("BastionIP", hosts.lookup("bastion.core.boss")),

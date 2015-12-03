@@ -23,7 +23,10 @@ def create(session, domain):
     if subnet_id is None:
         raise Exception("Subnet doesn't exists")
     
+    keypair = lib.keypair_lookup(session)
+    
     args = [
+        lib.template_argument("KeyName", keypair),
         lib.template_argument("SubnetId", subnet_id),
         lib.template_argument("VaultAMI", lib.ami_lookup(session, "vault-master")),
         lib.template_argument("VaultHostname", "vault.core.boss"),
