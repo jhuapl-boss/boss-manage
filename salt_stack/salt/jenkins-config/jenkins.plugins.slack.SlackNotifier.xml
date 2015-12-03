@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<jenkins.plugins.slack.SlackNotifier_-DescriptorImpl plugin="slack@1.8.1">
+  <teamDomain>apl-microns</teamDomain>
+  <token>XAoRfwgxZJhScrKC03VXdgyI</token>
+  <room>#ci</room>
+  <buildServerUrl>http://localhost:8080/</buildServerUrl>
+</jenkins.plugins.slack.SlackNotifier_-DescriptorImpl>

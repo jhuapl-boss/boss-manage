@@ -32,7 +32,7 @@ jenkins:
     - baseurl: http://pkg.jenkins-ci.org/redhat
     - gpgkey: http://pkg.jenkins-ci.org/redhat/jenkins-ci.org.key
     {% elif grains['os_family'] == 'Debian' %}
-    - name: deb http://pkg.jenkins-ci.org/debian binary/
+    - name: deb http://pkg.jenkins-ci.org/debian-stable binary/
     - key_url: http://pkg.jenkins-ci.org/debian/jenkins-ci.org.key
     {% endif %}
     - require_in:

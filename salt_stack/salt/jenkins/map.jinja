@@ -20,6 +20,7 @@
         'jobs': {
             'installed': {},
             'absent': []
-        }
+        },
+        'slack': 'salt://jenkins-config/jenkins.plugins.slack.SlackNotifier.xml'
     },
 }, merge=salt['pillar.get']('jenkins:lookup')) %}
