@@ -119,6 +119,56 @@ def vault_seal(client):
 
     client.seal()
     print("Vault is sealed")
+    
+def vault_status(client):
+    """ Print the current status of the Vault """
+    
+    if not client.is_initialized():
+        print("Vault is not initialized")
+        return
+    else:
+        print("Vault is initialized")
+    
+    if client.is_sealed():
+        print("Vault is sealed")
+        print(client.seal_status)
+        return
+    else:
+        print("Vault is unsealed")
+    
+    if not os.path.exists("vault_token"):
+        print("Need the root token to communicate with the Vault")
+        return
+        
+    with open("vault_token", "r") as fh:
+        client.token = fh.read()
+        if not client.is_authenticated():
+            print("Vault token is not valid, cannot communicate with the Vault")
+            return
+      
+    print()
+    print("Key Status")
+    print(json.dumps(client.key_status))
+    
+    print()
+    print("HA Status")
+    print(json.dumps(client.ha_status))
+    
+    print()
+    print("Secret Backends")
+    print(json.dumps(client.list_secret_backends(), indent=True))
+    
+    print()
+    print("Policies")
+    print(json.dumps(client.list_policies()))
+    
+    print()
+    print("Audit Backends")
+    print(json.dumps(client.list_audit_backends(), indent=True))
+    
+    print()
+    print("Auth Backends")
+    print(json.dumps(client.list_auth_backends(), indent=True))
 
 def create_session(cred_file):
     with open(cred_file, "r") as fh:
@@ -151,7 +201,7 @@ def machine_lookup(session, hostname):
                 return None
     
 def usage():
-    print("Usage: {} <aws-credentials> <ssh_key> <bastion_hostname> <internal_hostname> (ssh|vault-init|vault-unseal|vault-seal)".format(sys.argv[0]))
+    print("Usage: {} <aws-credentials> <ssh_key> <bastion_hostname> <internal_hostname> (ssh|vault-init|vault-unseal|vault-seal|vault-status)".format(sys.argv[0]))
     sys.exit(1)
     
 if __name__ == "__main__":
@@ -176,5 +226,7 @@ if __name__ == "__main__":
         connect_vault(key, private, bastion, vault_unseal)
     elif cmd in ("vault-seal",):
         connect_vault(key, private, bastion, vault_seal)
+    elif cmd in ("vault-status",):
+        connect_vault(key, private, bastion, vault_status)
     else:
         usage()
