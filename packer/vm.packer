@@ -64,7 +64,8 @@
             "type": "salt-masterless",
             "skip_bootstrap": false,
             "bootstrap_args": "-i {{user `name`}} stable 2015.8",
-            "local_state_tree": "../salt_stack/salt"
+            "local_state_tree": "../salt_stack/salt",
+            "local_pillar_roots": "../salt_stack/pillar"
         }
     ]
 }
