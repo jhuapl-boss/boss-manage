@@ -17,9 +17,6 @@ case "$1" in
  start)
    # start the vault server
    daemon $ARGS -- vault server -config=/etc/vault/vault.cfg
-   
-   # initialize and/or unseal the vault (if possible)
-   vault-bootstrap
    ;;
  stop)
    daemon $ARGS --stop

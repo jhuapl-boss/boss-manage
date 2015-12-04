@@ -1,6 +1,3 @@
-include:
-    - vault.client
-
 daemon:
     pkg:
         - installed
@@ -24,18 +21,8 @@ vault-bin:
         - mode: 500
         - require:
             - file: vault-config
-        
-vault-bootstrap:
-    file.managed:
-        - name: /usr/sbin/vault-bootstrap
-        - source: salt://vault/files/bootstrap.py
-        - user: root
-        - group: root
-        - mode: 500
-        - require:
-            - sls: vault.client
 
-vault-service:
+vault-init.d:
     file.managed:
         - name: /etc/init.d/vault
         - source: salt://vault/files/service.sh
@@ -44,4 +31,11 @@ vault-service:
         - mode: 555
         - require:
             - pkg: daemon
-            - file: vault-bootstrap
+            - file: vault-bin
+            
+vault-service:
+    service.running:
+        - name: vault
+        - enable: True
+        - require:
+            - file: vault-init.d
