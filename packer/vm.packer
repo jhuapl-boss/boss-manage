@@ -3,26 +3,26 @@
         "aws_access_key": "If the default value is null, then the user variable will be required",
         "aws_access_key": null,
         "aws_secret_key": null,
-        
+
         "aws_region": "us-east-1",
-        
+
         "aws_instance_type": "t2.micro",
-        
+
         "aws_source_ami": "Ubuntu Server 14.04 LTS (HVM), SSD Volume Type",
         "aws_source_ami": "ami-d05e75b8",
-        
+
         "vb_source_path": "The source OVF image to build upon",
         "vb_source_path": "output/virtualbox-default/virtualbox-default.ovf",
-        
-        
-        
+
+
+
         "name": "The hostname and minion ID of the VM",
         "name": null,
-        
+
         "role": "What type of role is the VM filling (web|db|etc)",
         "role": null
     },
-    
+
     "builders": [{
         "type": "virtualbox-ovf",
         "source_path": "{{user `vb_source_path`}}",
@@ -48,7 +48,7 @@
             "Role": "{{user `role`}}"
         }
     }],
-    
+
     "provisioners": [
         {   "type": "Update the hostname in /etc/hosts, /etc/hostname, and in memory",
             "type": "Install cURL so that salt-masterless can bootstrap Salt",
@@ -64,7 +64,10 @@
             "type": "salt-masterless",
             "skip_bootstrap": false,
             "bootstrap_args": "-i {{user `name`}} stable 2015.8",
-            "local_state_tree": "../salt_stack/salt"
+            "local_state_tree": "../salt_stack/salt",
+            "remote_state_tree": "/srv/salt",
+            "local_pillar_roots": "../salt_stack/pillar",
+            "remote_pillar_roots": "/srv/pillar"
         }
     ]
 }
