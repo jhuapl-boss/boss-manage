@@ -9,7 +9,7 @@ base:
         - vault.client
         - boss.django
 
-    'jenkins-master*':
+    'jenkins*':
         - git
         - python.python3
         - python.pip3
