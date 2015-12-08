@@ -1,5 +1,5 @@
 include:
-    - python3
+    - python.python3
     - python.pip3
     - python.pip
 
@@ -8,6 +8,6 @@ vault-lib:
         - name: hvac
         - bin_env: /usr/bin/pip3
         - require:
-            - sls: python3
+            - sls: python.python3
             - sls: python.pip3
             - sls: python.pip
