@@ -1,3 +1,3 @@
 base:
-  'jenkins-master*':
+  'jenkins*':
     - jenkins
