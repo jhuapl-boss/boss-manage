@@ -8,7 +8,7 @@ import sys
 import time
 from boto3.session import Session
 import json
-import hvac
+import vault
 
 # Needed to prevent ssh from asking about the fingerprint from new machines
 SSH_OPTIONS = "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
@@ -41,136 +41,10 @@ def connect_vault(key, remote, bastion, cmd):
     proc = subprocess.Popen(shlex.split(fwd_cmd))
     time.sleep(1) # wait for the tunnel to be setup
     try:
-        client = hvac.Client(url="http://localhost:8200")
-        cmd(client)
+        cmd()
     finally:
         proc.terminate()
         proc.wait()
-        
-def vault_init(client):
-    """Initialize the Vault, store the unseal keys and root token.
-       Finish by unsealing the new vault."""
-       
-    if client.is_initialized():
-        print("Vault is already initialized")
-        return
-    
-    secrets = 5
-    threashold = 3
-    print("Initializing with {} secrets and {} needed to unseal".format(secrets, threashold))
-    result = client.initialize(secrets, threashold)
-    
-    with open("vault_token", "w") as fh:
-        fh.write(result["root_token"])
-    for i in range(secrets):
-        with open("vault_key." + str(i+1), "w") as fh:
-            fh.write(result["keys"][i])
-       
-    print()
-    print("======== WARNING WARNING WARNING ========")
-    print("= Vault root token and unseal keys were =")
-    print("= written to disk. PROTECT these files. =")
-    print("======== WARNING WARNING WARNING ========")
-    
-    print()
-    print("Unsealing Vault")
-    client.unseal_multi(result["keys"])
-    
-def vault_unseal(client):
-    """Used to reopen an initialized vault using previously saved values"""
-    
-    if not client.is_sealed():
-        print("Vault is already unsealed")
-        return
-        
-    keys = []
-    import glob
-    for f in glob.glob("vault_key.*"):
-        with open(f, "r") as fh:
-            keys.append(fh.read())
-            
-    if len(keys) == 0:
-        print("Could not locate any key files, not unsealing")
-        return
-    
-    res = client.unseal_multi(keys)
-    if res['sealed']:
-        p = res['progress']
-        t = res['t']
-        print("Vault partly unsealed, {} of {} needed keys entered".format(p,t))
-        print("Enter {} more keys to finish unsealing the vault". format(t-p))
-    else:
-        print("Vault unsealed")
-        
-def vault_seal(client):
-    """ Used to quickly reseal a vault if there is any need"""
-    
-    if client.is_sealed():
-        print("Vault is already sealed")
-        return
-    
-    if not os.path.exists("vault_token"):
-        print("Need the root token to seal the vault")
-        return
-        
-    with open("vault_token", "r") as fh:
-        client.token = fh.read()
-        if not client.is_authenticated():
-            print("Vault token is not valid, cannot seal vault")
-            return
-
-    client.seal()
-    print("Vault is sealed")
-    
-def vault_status(client):
-    """ Print the current status of the Vault """
-    
-    if not client.is_initialized():
-        print("Vault is not initialized")
-        return
-    else:
-        print("Vault is initialized")
-    
-    if client.is_sealed():
-        print("Vault is sealed")
-        print(client.seal_status)
-        return
-    else:
-        print("Vault is unsealed")
-    
-    if not os.path.exists("vault_token"):
-        print("Need the root token to communicate with the Vault")
-        return
-        
-    with open("vault_token", "r") as fh:
-        client.token = fh.read()
-        if not client.is_authenticated():
-            print("Vault token is not valid, cannot communicate with the Vault")
-            return
-      
-    print()
-    print("Key Status")
-    print(json.dumps(client.key_status))
-    
-    print()
-    print("HA Status")
-    print(json.dumps(client.ha_status))
-    
-    print()
-    print("Secret Backends")
-    print(json.dumps(client.list_secret_backends(), indent=True))
-    
-    print()
-    print("Policies")
-    print(json.dumps(client.list_policies()))
-    
-    print()
-    print("Audit Backends")
-    print(json.dumps(client.list_audit_backends(), indent=True))
-    
-    print()
-    print("Auth Backends")
-    print(json.dumps(client.list_auth_backends(), indent=True))
 
 def create_session(cred_file):
     with open(cred_file, "r") as fh:
@@ -203,7 +77,8 @@ def machine_lookup(session, hostname):
                 return None
     
 def usage():
-    print("Usage: {} <aws-credentials> <ssh_key> <bastion_hostname> <internal_hostname> (ssh|vault-init|vault-unseal|vault-seal|vault-status)".format(sys.argv[0]))
+    vault_keys = "|".join(vault.COMMANDS.keys())
+    print("Usage: {} <aws-credentials> <ssh_key> <bastion_hostname> <internal_hostname> (ssh|{})".format(sys.argv[0], vault_keys))
     sys.exit(1)
     
 if __name__ == "__main__":
@@ -222,13 +97,7 @@ if __name__ == "__main__":
     
     if cmd in ("ssh",):
         ssh(key, private, bastion)
-    elif cmd in ("vault-init",):
-        connect_vault(key, private, bastion, vault_init)
-    elif cmd in ("vault-unseal",):
-        connect_vault(key, private, bastion, vault_unseal)
-    elif cmd in ("vault-seal",):
-        connect_vault(key, private, bastion, vault_seal)
-    elif cmd in ("vault-status",):
-        connect_vault(key, private, bastion, vault_status)
+    elif cmd in vault.COMMANDS:
+        connect_vault(key, private, bastion, vault.COMMANDS[cmd])
     else:
         usage()
