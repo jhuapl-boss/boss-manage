@@ -10,6 +10,8 @@ from boto3.session import Session
 import json
 import hvac
 
+# Needed to prevent ssh from asking about the fingerprint from new machines
+SSH_OPTIONS = "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 
 def become_tty_fg():
     """ From: http://stackoverflow.com/questions/15200700/how-do-i-set-the-terminal-foreground-process-group-for-a-process-im-running-und
@@ -22,8 +24,8 @@ def become_tty_fg():
     signal.signal(signal.SIGTTOU, hdlr)
 
 def ssh(key, remote, bastion):
-    fwd_cmd = "ssh -i {} -N -L 2222:{}:22 ec2-user@{}".format(key, remote, bastion)
-    ssh_cmd = "ssh -i {} -p 2222 ubuntu@localhost".format(key)
+    fwd_cmd = "ssh -i {} {} -N -L 2222:{}:22 ec2-user@{}".format(key, SSH_OPTIONS, remote, bastion)
+    ssh_cmd = "ssh -i {} {} -p 2222 ubuntu@localhost".format(key, SSH_OPTIONS)
     
     proc = subprocess.Popen(shlex.split(fwd_cmd))
     time.sleep(1) # wait for the tunnel to be setup
@@ -34,7 +36,7 @@ def ssh(key, remote, bastion):
         proc.wait()
     
 def connect_vault(key, remote, bastion, cmd):
-    fwd_cmd = "ssh -i {} -N -L 8200:{}:8200 ec2-user@{}".format(key, remote, bastion)
+    fwd_cmd = "ssh -i {} {} -N -L 8200:{}:8200 ec2-user@{}".format(key, SSH_OPTIONS, remote, bastion)
 
     proc = subprocess.Popen(shlex.split(fwd_cmd))
     time.sleep(1) # wait for the tunnel to be setup
