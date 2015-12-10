@@ -1,11 +1,15 @@
 import os
 import json
 import pprint
+import time
+import hosts
 
 def domain_to_stackname(domain):
     return "".join(map(lambda x: x.capitalize(), domain.split(".")))
 
 def template_argument(key, value, use_previous = False):
+    if value is None:
+        raise Exception("Could not determine argument '{}'".format(key))
     return {"ParameterKey": key, "ParameterValue": value, "UsePreviousValue": use_previous}
 
 def save_template(template, folder, domain):
@@ -13,8 +17,33 @@ def save_template(template, folder, domain):
     
     with open(os.path.join(folder,stack_name + ".template"), "w") as fh:
         fh.write(template)
+
+def cloudformation_create(session, name, template, arguments, wait=True):
+    client = session.client('cloudformation')
+    response = client.create_stack(
+        StackName = name,
+        TemplateBody = template,
+        Parameters = arguments
+    )
     
-    
+    if wait:
+        get_status = lambda r: r['Stacks'][0]['StackStatus']
+        response = client.describe_stacks(StackName=name)
+        if len(response['Stacks']) == 0:
+            print("Problem launching stack")
+        else:
+            print("Waiting for create ", end="", flush=True)
+            while get_status(response) == 'CREATE_IN_PROGRESS':
+                time.sleep(5)
+                print(".", end="", flush=True)
+                response = client.describe_stacks(StackName=name)
+            print(" done")
+
+            if get_status(response) == 'CREATE_COMPLETE':
+                print("Created stack '{}'".format(name))
+            else:
+                print("Status of stack '{}' is '{}'".format(name, get_status(response)))
+
 def create_template(parameters, resources, description=""):
     template = {
         "AWSTemplateFormatVersion" : "2010-09-09",
@@ -33,6 +62,13 @@ def load_devices(*names, index=None):
         _param, _res = load_device(name, index)
         parameters.update(_param)
         resources.update(_res)
+    
+    # With composing multiple devices we may include resources
+    # that are required by another device, if so we don't need
+    # to include them as a parameter anymore
+    for k in resources:
+        if k in parameters:
+            del parameters[k]
         
     return parameters, resources
 
@@ -87,6 +123,26 @@ def sg_lookup(session, vpc_id, group_name):
     else:
         return response['SecurityGroups'][0]['GroupId']
         
+def rt_lookup(session, vpc_id, rt_name):
+    client = session.client('ec2')
+    response = client.describe_route_tables(Filters=[{"Name":"vpc-id", "Values":[vpc_id]},
+                                                     {"Name":"tag:Name", "Values":[rt_name]}])
+                                                     
+    if len(response['RouteTables']) == 0:
+        return None
+    else:
+        return response['RouteTables'][0]['RouteTableId']
+        
+def peering_lookup(session, from_id, to_id):
+    client = session.client('ec2')
+    response = client.describe_vpc_peering_connections(Filters=[{"Name":"requester-vpc-info.vpc-id", "Values":[from_id]},
+                                                                {"Name":"accepter-vpc-info.vpc-id", "Values":[to_id]}])
+                                                                
+    if len(response['VpcPeeringConnections']) == 0:
+        return None
+    else:
+        return response['VpcPeeringConnections'][0]['VpcPeeringConnectionId']
+        
 def keypair_lookup(session):
     client = session.client('ec2')
     response = client.describe_key_pairs()
@@ -102,3 +158,22 @@ def keypair_lookup(session):
             return response['KeyPairs'][idx]['KeyName']
         except:
             print("Invalid Key Pair number, try again")
+            
+def peer_route_update(session, from_vpc, to_vpc):
+    from_id = vpc_id_lookup(session, from_vpc)
+    to_id = vpc_id_lookup(session, to_vpc)
+    peer_id = peering_lookup(session, from_id, to_id)
+    int_rt_id = rt_lookup(session, to_id, "internal")
+    ext_rt_id = rt_lookup(session, to_id, "external")
+    
+    from_cidr = hosts.lookup(from_vpc)
+    
+    resource = session.resource('ec2')
+    rt = resource.RouteTable(int_rt_id)
+    rt.create_route(DestinationCidrBlock=from_cidr,
+                    VpcPeeringConnectionId=peer_id)
+    if ext_rt_id is not None:
+        rt = resource.RouteTable(ext_rt_id)
+        rt.create_route(DestinationCidrBlock=from_cidr,
+                        VpcPeeringConnectionId=peer_id)
+

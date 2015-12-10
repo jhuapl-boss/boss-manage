@@ -88,6 +88,19 @@ def gen_hosts(domain, devices):
     
     subnet_name, vpc_name, tld = domain.split(".")
     
+    for device in expand_devices(devices):
+        device_id = devices[device]
+        ip,name = get_entry(base_net, vpc_name, subnet_name, device, device_id)
+        addresses[ip] = name
+            
+    for hostname in STATIC:
+        addresses[STATIC[hostname]] = hostname
+        
+    return addresses
+    
+def expand_devices(devices):
+    rtn = {}
+    
     for device in devices:
         device_id = devices[device]
         if type(device_id) == range:
@@ -96,18 +109,13 @@ def gen_hosts(domain, devices):
             for i in device_id:
                 i_idx = device_id.index(i)
                 device_name = device + (str(i_idx) if i_idx > 0 else "")
-                ip,name = get_entry(base_net, vpc_name, subnet_name, device_name, i)
-                addresses[ip] = name
+                rtn[device_name] = i
         else:
-            ip,name = get_entry(base_net, vpc_name, subnet_name, device, device_id)
-            addresses[ip] = name
-            
-    for hostname in STATIC:
-        addresses[STATIC[hostname]] = hostname
+            rtn[device_name] = device_id
+
+    return rtn
         
-    return addresses
-        
-def lookup(domain):
+def lookup(domain, devices=None):
     if domain in STATIC:
         return STATIC[domain]
 
@@ -139,10 +147,19 @@ def lookup(domain):
         print("ERROR: '{}' is not a valid Subnet name for VPC '{}'".format(subnet_name, vpc_name))
         return None
     else:
-        vpc_net = get_subnet(vpc_net, SUBNET_CIDR, SUBNETS[subnet_key])
+        subnet_net = get_subnet(vpc_net, SUBNET_CIDR, SUBNETS[subnet_key])
         if len(parts) == 0:
-            return str(vpc_net)
-            
-    if len(parts) != 0:
-        print("ERROR: Can only lookup VPCs or Subnets, cannot lookup Devices (yet)")
+            return str(subnet_net)
+    
+    if len(parts) != 0 and devices is None:
+        print("ERROR: Need devices to lookup device hostname")
         return None
+
+    devices = expand_devices(devices)
+    device_name = get_next()
+    if device_name not in devices:
+        print("ERROR: '{}' is not a valid device name for Subnet '{}'".format(device_name, subnet_name))
+        return None
+    else:
+        device_ip, _ = get_entry(base_net, vpc_name, subnet_name, device_name, devices[device_name])
+        return str(device_ip)

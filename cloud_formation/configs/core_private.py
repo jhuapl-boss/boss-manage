@@ -37,10 +37,4 @@ def create(session, domain):
     template = lib.create_template(parameters, resources)
     stack_name = lib.domain_to_stackname("core." + domain)
     
-    client = session.client('cloudformation')
-    response = client.create_stack(
-        StackName = stack_name,
-        TemplateBody = template,
-        Parameters = args
-    )
-    pprint.pprint(response)
+    lib.cloudformation_create(session, stack_name, template, args)

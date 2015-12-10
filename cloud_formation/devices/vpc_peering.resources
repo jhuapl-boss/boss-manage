@@ -1,12 +1,21 @@
 {
-    "VPC" : {
+    "VPCPeer" : {
         "Type" : "AWS::EC2::VPCPeeringConnection",
         "Properties" : {
             "VpcId" : { "Ref" : "VPCId" },
             "PeerVpcId" : { "Ref" : "PeerVPCId" },
             "Tags" : [ 
-                {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
+                {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} }
             ]
         }
+    },
+    
+    "InternalPeerRoute" : {
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "InternalRouteTable" },
+        "DestinationCidrBlock" : { "Ref" : "PeerVPCSubnet" },
+        "VpcPeeringConnectionId" : { "Ref" : "VPCPeer" }
+      }
     }
 }
