@@ -52,8 +52,11 @@ def create(session, domain):
         lib.template_argument("WebIP",                hosts.lookup("web." + domain, ADDRESSES)),
     ]
     
+    token = lib.generate_token()
+    
     parameters, resources = lib.load_devices(*DEVICES)
     resources.update(ROUTE)
+    lib.add_userdata(resources, "WebServerInstance", token)
     template = lib.create_template(parameters, resources)
     stack_name = lib.domain_to_stackname("production." + domain)
     

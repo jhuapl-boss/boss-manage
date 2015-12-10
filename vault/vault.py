@@ -8,9 +8,23 @@ import json
 
 VAULT_TOKEN = "private/vault_token"
 VAULT_KEY = "private/vault_key."
+NEW_TOKEN = "private/new_token"
 
-def get_client():
-    return hvac.Client(url="http://localhost:8200")
+def get_client(read_token = False):
+    client = hvac.Client(url="http://localhost:8200")
+    
+    if read_token:
+        if not os.path.exists(VAULT_TOKEN):
+            print("Need the root token to communicate with the Vault, exiting...")
+            sys.exit(1)
+            
+        with open(VAULT_TOKEN, "r") as fh:
+            client.token = fh.read()
+            if not client.is_authenticated():
+                print("Vault token is not valid, cannot communicate with the Vault, exiting...")
+                sys.exit(1)
+            
+    return client
 
 def vault_init():
     """Initialize the Vault, store the unseal keys and root token.
@@ -71,20 +85,10 @@ def vault_unseal():
 def vault_seal():
     """ Used to quickly reseal a vault if there is any need"""
     
-    client = get_client()
+    client = get_client(read_token = True)
     if client.is_sealed():
         print("Vault is already sealed")
         return
-    
-    if not os.path.exists(VAULT_TOKEN):
-        print("Need the root token to seal the vault")
-        return
-        
-    with open(VAULT_TOKEN, "r") as fh:
-        client.token = fh.read()
-        if not client.is_authenticated():
-            print("Vault token is not valid, cannot seal vault")
-            return
 
     client.seal()
     print("Vault is sealed")
@@ -92,7 +96,7 @@ def vault_seal():
 def vault_status():
     """ Print the current status of the Vault """
     
-    client = get_client()
+    client = get_client(read_token = True)
     if not client.is_initialized():
         print("Vault is not initialized")
         return
@@ -105,16 +109,6 @@ def vault_status():
         return
     else:
         print("Vault is unsealed")
-    
-    if not os.path.exists(VAULT_TOKEN):
-        print("Need the root token to communicate with the Vault")
-        return
-        
-    with open(VAULT_TOKEN, "r") as fh:
-        client.token = fh.read()
-        if not client.is_authenticated():
-            print("Vault token is not valid, cannot communicate with the Vault")
-            return
       
     print()
     print("Key Status")
@@ -140,11 +134,19 @@ def vault_status():
     print("Auth Backends")
     print(json.dumps(client.list_auth_backends(), indent=True))
 
+def vault_provision():
+    client = get_client(read_token = True)
+    
+    token = client.create_token()
+    with open(NEW_TOKEN, "w") as fh:
+        fh.write(token["auth"]["client_token"])
+    
 COMMANDS = {
     "vault-init": vault_init,
     "vault-unseal": vault_unseal,
     "vault-seal": vault_seal,
     "vault-status": vault_status,
+    "vault-provision": vault_provision,
 }
 
 def usage():

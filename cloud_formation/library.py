@@ -89,6 +89,30 @@ def load_device(name, index=None, device_directory="devices", resources_suffix="
         
     return parameters, resources
 
+def generate_token():
+    import subprocess
+    
+    print("Generating vault access token...", end="", flush=True)
+    result = subprocess.call(["./bastion.py",
+                                "../packer/variables/aws-credentials",
+                                "/home/microns/.ssh/pryordm1-test.pem",
+                                "bastion.core.boss",
+                                "vault.core.boss",
+                                "vault-provision"],
+                             cwd = "../vault/")
+    
+    
+    file = "../vault/private/new_token"
+    with open(file, "r") as fh:
+        token = fh.read()
+    os.remove(file) # prevent someone else reading the token
+    
+    print(" done")
+    return token
+    
+def add_userdata(resources, machine, data):
+    resources[machine]["Properties"]["UserData"] = { "Fn::Base64" : data }
+
 def vpc_id_lookup(session, vpc_domain):
     client = session.client('ec2')
     response = client.describe_vpcs(Filters=[{"Name":"tag:Name", "Values":[vpc_domain]}])
