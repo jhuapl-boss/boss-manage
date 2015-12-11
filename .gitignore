@@ -61,3 +61,7 @@ target/
 *.iso
 packer/output/
 packer/variables/aws-credentials
+
+# Private Files
+*.pem
+vault/private/
