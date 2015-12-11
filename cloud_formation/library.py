@@ -26,6 +26,7 @@ def cloudformation_create(session, name, template, arguments, wait=True):
         Parameters = arguments
     )
     
+    rtn = True
     if wait:
         get_status = lambda r: r['Stacks'][0]['StackStatus']
         response = client.describe_stacks(StackName=name)
@@ -43,6 +44,8 @@ def cloudformation_create(session, name, template, arguments, wait=True):
                 print("Created stack '{}'".format(name))
             else:
                 print("Status of stack '{}' is '{}'".format(name, get_status(response)))
+                rtn = False
+    return rtn
 
 def create_template(parameters, resources, description=""):
     template = {
@@ -89,26 +92,49 @@ def load_device(name, index=None, device_directory="devices", resources_suffix="
         
     return parameters, resources
 
-def generate_token():
+def _call_vault(command, input=None):
     import subprocess
+        
+    cmd = ["./bastion.py",
+            "../packer/variables/aws-credentials",
+            "/home/microns/.ssh/pryordm1-test.pem",
+            "bastion.core.boss",
+            "vault.core.boss",
+            command]
+            
+    proc = subprocess.Popen(cmd,
+                             cwd = "../vault/",
+                             stdin = subprocess.PIPE,
+                             stdout = subprocess.DEVNULL, # Supress output
+                             stderr = subprocess.DEVNULL,
+                             universal_newlines=True)
+                             
+    if input is not None:
+        proc.communicate(input)
+        
+    proc.wait()
+                             
+    return proc.returncode
     
-    print("Generating vault access token...", end="", flush=True)
-    result = subprocess.call(["./bastion.py",
-                                "../packer/variables/aws-credentials",
-                                "/home/microns/.ssh/pryordm1-test.pem",
-                                "bastion.core.boss",
-                                "vault.core.boss",
-                                "vault-provision"],
-                             cwd = "../vault/")
-    
+def generate_token():
+    print("Generating vault access token...")
+    result = _call_vault("vault-provision")
     
     file = "../vault/private/new_token"
     with open(file, "r") as fh:
         token = fh.read()
     os.remove(file) # prevent someone else reading the token
     
-    print(" done")
     return token
+    
+def revoke_token(token):
+    print("Revoking vault access token...")
+    _call_vault("vault-revoke", token + "\n")
+    
+def save_django(db, user, password, host, port):
+    print("Saving Django database access information...")
+    args = "\n".join([db, user, password, host, port])
+    result = _call_vault("vault-django", args)
     
 def add_userdata(resources, machine, data):
     resources[machine]["Properties"]["UserData"] = { "Fn::Base64" : data }
@@ -120,8 +146,7 @@ def vpc_id_lookup(session, vpc_domain):
         return None
     else:
         return response['Vpcs'][0]['VpcId']
-        
-    
+
 def subnet_id_lookup(session, subnet_domain):
     client = session.client('ec2')
     response = client.describe_subnets(Filters=[{"Name":"tag:Name", "Values":[subnet_domain]}])

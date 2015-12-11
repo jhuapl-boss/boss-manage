@@ -10,7 +10,7 @@ ADDRESSES = {
 }
 
 
-DEVICES = ["inet_gw", "web", "vpc_peering"]
+DEVICES = ["inet_gw", "web", "rds", "vpc_peering"]
 
 # vpc_peering adds a route to the internal route table
 # need to add a route to the external route table
@@ -38,6 +38,13 @@ def create(session, domain):
     
     vpc_domain = domain.split(".", 1)[1]
     vpc_id = lib.vpc_id_lookup(session, vpc_domain)
+    def_sg_id = lib.sg_lookup(session, vpc_id, "default")
+    
+    dbname = "boss"
+    hostname = "db." + domain
+    port = "3306"
+    username = "django"
+    password = input("django db password: ")
     
     args = [
         lib.template_argument("KeyName",              lib.keypair_lookup(session)),
@@ -46,13 +53,17 @@ def create(session, domain):
         lib.template_argument("PeerVPCId",            lib.vpc_id_lookup(session, "core.boss")),
         lib.template_argument("PeerVPCSubnet",        hosts.lookup("core.boss")),
         lib.template_argument("InternalRouteTable",   lib.rt_lookup(session, vpc_id, "internal")),
-        lib.template_argument("DefaultSecurityGroup", lib.sg_lookup(session, vpc_id, "default")),
+        lib.template_argument("DefaultSecurityGroup", def_sg_id),
         lib.template_argument("WebAMI",               lib.ami_lookup(session, "web.boss")),
         lib.template_argument("WebHostname",          "web." + domain),
         lib.template_argument("WebIP",                hosts.lookup("web." + domain, ADDRESSES)),
+        lib.template_argument("DBSecurityGroup",      def_sg_id),
+        lib.template_argument("DBHostname",           hostname),
+        lib.template_argument("DBPort",               port),
+        lib.template_argument("DBUsername",           username),
+        lib.template_argument("DBPassword",           password),
+        lib.template_argument("DBName",               dbname),
     ]
-    
-    token = lib.generate_token()
     
     parameters, resources = lib.load_devices(*DEVICES)
     resources.update(ROUTE)
@@ -60,6 +71,14 @@ def create(session, domain):
     template = lib.create_template(parameters, resources)
     stack_name = lib.domain_to_stackname("production." + domain)
     
-    lib.cloudformation_create(session, stack_name, template, args)
+    lib.save_django(dbname, username, password, hostname, port)
+    token = lib.generate_token()
     
-    lib.peer_route_update(session, vpc_domain, "core.boss")
+    rst = lib.cloudformation_create(session, stack_name, template, args)
+    
+    if rst:
+        lib.peer_route_update(session, vpc_domain, "core.boss")
+    else:
+        print("Create Failed, revoking secrets")
+        lib.revoke_token(token)
+        lib.save_django("","","","","")

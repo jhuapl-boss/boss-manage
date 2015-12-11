@@ -5,6 +5,7 @@ import os
 import glob
 import hvac
 import json
+import uuid
 
 VAULT_TOKEN = "private/vault_token"
 VAULT_KEY = "private/vault_key."
@@ -133,20 +134,37 @@ def vault_status():
     print()
     print("Auth Backends")
     print(json.dumps(client.list_auth_backends(), indent=True))
-
+    
 def vault_provision():
     client = get_client(read_token = True)
     
     token = client.create_token()
     with open(NEW_TOKEN, "w") as fh:
         fh.write(token["auth"]["client_token"])
+
+def vault_revoke():
+    client = get_client(read_token = True)
+    token = input("token: ")
     
+    client.revoke_token(token)
+        
+def vault_django():
+    client = get_client(read_token = True)
+    
+    client.write("secret/django", secret_key = str(uuid.uuid4()))
+    db = {}
+    for key in ["name", "user", "password", "host", "port"]:
+        db[key] = input(key + ": ")
+    client.write("secret/django/db", **db)
+        
 COMMANDS = {
     "vault-init": vault_init,
     "vault-unseal": vault_unseal,
     "vault-seal": vault_seal,
     "vault-status": vault_status,
     "vault-provision": vault_provision,
+    "vault-revoke": vault_revoke,
+    "vault-django": vault_django,
 }
 
 def usage():

@@ -1,0 +1,31 @@
+{
+    "DBSecurityGroup": {
+        "Description" : "ID of the Security Group for the DB",
+        "Type": "AWS::EC2::SecurityGroup::Id"
+    },
+    
+    "DBHostname": {
+        "Description" : "Hostname of the Web Server",
+        "Type": "String"
+    },
+    
+    "DBPort": {
+        "Description" : "Hostname of the Web Server",
+        "Type": "String"
+    },
+    
+    "DBUsername": {
+        "Description" : "Hostname of the Web Server",
+        "Type": "String"
+    },
+    
+    "DBPassword": {
+        "Description" : "Hostname of the Web Server",
+        "Type": "String"
+    },
+    
+    "DBName": {
+        "Description" : "Hostname of the Web Server",
+        "Type": "String"
+    }
+}
