@@ -13,12 +13,20 @@
             "DBInstanceIdentifier" : { "Ref" : "DBHostname" },
             "MasterUsername" : { "Ref" : "DBUsername" },
             "MasterUserPassword" : { "Ref" : "DBPassword" },
-            "DBSubnetGroupName" : "",
+            "DBSubnetGroupName" : { "Ref" : "DbServerSubnetGroup" },
             "PubliclyAccessible" : "false",
             "VPCSecurityGroups" : [{ "Ref" : "DBSecurityGroup" }],
             "DBName" : { "Ref" : "DBName" },
             "Port" : { "Ref" : "DBPort" },
             "StorageEncrypted" : "false"
+        }
+    },
+    
+    "DbServerSubnetGroup" : {
+        "Type" : "AWS::RDS::DBSubnetGroup",
+        "Properties" : {
+            "DBSubnetGroupDescription" : { "Ref" : "DBHostname" },
+            "SubnetIds" : [ { "Ref" : "SubnetId" }, { "Ref" : "Subnet2Id" } ]
         }
     }
 }

@@ -185,7 +185,11 @@ def rt_lookup(session, vpc_id, rt_name):
 def peering_lookup(session, from_id, to_id):
     client = session.client('ec2')
     response = client.describe_vpc_peering_connections(Filters=[{"Name":"requester-vpc-info.vpc-id", "Values":[from_id]},
-                                                                {"Name":"accepter-vpc-info.vpc-id", "Values":[to_id]}])
+                                                                {"Name":"requester-vpc-info.owner-id", "Values":["256215146792"]},
+                                                                {"Name":"accepter-vpc-info.vpc-id", "Values":[to_id]},
+                                                                {"Name":"accepter-vpc-info.owner-id", "Values":["256215146792"]},
+                                                                {"Name":"status-code", "Values":["active"]},
+                                                                ])
                                                                 
     if len(response['VpcPeeringConnections']) == 0:
         return None
@@ -212,6 +216,7 @@ def peer_route_update(session, from_vpc, to_vpc):
     from_id = vpc_id_lookup(session, from_vpc)
     to_id = vpc_id_lookup(session, to_vpc)
     peer_id = peering_lookup(session, from_id, to_id)
+    print("peer {} -> {} = {}".format(from_id, to_id, peer_id))
     int_rt_id = rt_lookup(session, to_id, "internal")
     ext_rt_id = rt_lookup(session, to_id, "external")
     

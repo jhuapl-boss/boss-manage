@@ -1,4 +1,14 @@
 {
+    "SubnetId": {
+        "Description" : "ID of the Subnet to be part of",
+        "Type": "AWS::EC2::Subnet::Id"
+    },
+    
+    "Subnet2Id": {
+        "Description" : "ID of the Subnet to be part of",
+        "Type": "AWS::EC2::Subnet::Id"
+    },
+    
     "DBSecurityGroup": {
         "Description" : "ID of the Security Group for the DB",
         "Type": "AWS::EC2::SecurityGroup::Id"

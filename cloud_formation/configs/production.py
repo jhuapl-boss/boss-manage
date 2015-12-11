@@ -50,6 +50,7 @@ def create(session, domain):
         lib.template_argument("KeyName",              lib.keypair_lookup(session)),
         lib.template_argument("VPCId",                vpc_id),
         lib.template_argument("SubnetId",             lib.subnet_id_lookup(session, domain)),
+        lib.template_argument("Subnet2Id",             lib.subnet_id_lookup(session, "b.production.boss")),
         lib.template_argument("PeerVPCId",            lib.vpc_id_lookup(session, "core.boss")),
         lib.template_argument("PeerVPCSubnet",        hosts.lookup("core.boss")),
         lib.template_argument("InternalRouteTable",   lib.rt_lookup(session, vpc_id, "internal")),
@@ -58,27 +59,33 @@ def create(session, domain):
         lib.template_argument("WebHostname",          "web." + domain),
         lib.template_argument("WebIP",                hosts.lookup("web." + domain, ADDRESSES)),
         lib.template_argument("DBSecurityGroup",      def_sg_id),
-        lib.template_argument("DBHostname",           hostname),
+        lib.template_argument("DBHostname",           hostname.replace('.','-')),
         lib.template_argument("DBPort",               port),
         lib.template_argument("DBUsername",           username),
         lib.template_argument("DBPassword",           password),
         lib.template_argument("DBName",               dbname),
     ]
     
-    parameters, resources = lib.load_devices(*DEVICES)
-    resources.update(ROUTE)
-    lib.add_userdata(resources, "WebServerInstance", token)
-    template = lib.create_template(parameters, resources)
-    stack_name = lib.domain_to_stackname("production." + domain)
-    
     lib.save_django(dbname, username, password, hostname, port)
     token = lib.generate_token()
     
-    rst = lib.cloudformation_create(session, stack_name, template, args)
-    
-    if rst:
-        lib.peer_route_update(session, vpc_domain, "core.boss")
-    else:
-        print("Create Failed, revoking secrets")
+    try:
+        parameters, resources = lib.load_devices(*DEVICES)
+        resources.update(ROUTE)
+        lib.add_userdata(resources, "WebServerInstance", token)
+        template = lib.create_template(parameters, resources)
+        stack_name = lib.domain_to_stackname("production." + domain)
+        
+        rst = lib.cloudformation_create(session, stack_name, template, args)
+        
+        if rst:
+            lib.peer_route_update(session, vpc_domain, "core.boss")
+        else:
+            print("Create Failed, revoking secrets")
+            lib.revoke_token(token)
+            lib.save_django("","","","","")
+    except:
+        print("Error detected, revoking secrets")
         lib.revoke_token(token)
         lib.save_django("","","","","")
+        raise
