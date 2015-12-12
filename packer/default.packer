@@ -1,10 +1,11 @@
 {
     "variables": {
         "source": "The hostname and minion ID of the VM",
-        "source": null,
+        "source": null
     },
     
-    "builders": [{
+    "builders": [
+    	{
         "type": "virtualbox-iso",
         "disk_size": 20000,
         "guest_os_type": "Ubuntu_64",
@@ -30,8 +31,9 @@
             "keyboard-configuration/modelcode=SKIP keyboard-configuration/layout=USA ",
             "keyboard-configuration/variant=USA console-setup/ask_detect=false ",
             "initrd=/install/initrd.gz -- <enter>"
-        ]
-    }],
+        	]
+    	}
+    ],
     
     "provisioners": [
         {
