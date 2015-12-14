@@ -62,7 +62,6 @@ if __name__ == '__main__':
                         default = os.environ.get("AWS_CREDENTIALS"),
                         type = argparse.FileType('r'),
                         help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
-    
     parser.add_argument("action",
                         choices = ["create","generate"],
                         metavar = "action",

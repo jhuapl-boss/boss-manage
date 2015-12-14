@@ -6,6 +6,7 @@ internal machine from the bastion host.
 SSH_OPTIONS - Extra command line options that are passed to every SSH call
 """
 
+import argparse
 import subprocess
 import shlex
 import os
@@ -74,12 +75,11 @@ def connect_vault(key, remote, bastion, cmd):
         proc.terminate()
         proc.wait()
 
-def create_session(cred_file):
+def create_session(cred_fh):
     """Read the AWS from the given JSON formated file and then create a boto3
     connection to AWS with those credentials.
     """
-    with open(cred_file, "r") as fh:
-        credentials = json.load(fh)
+    credentials = json.load(cred_fh)
         
     session = Session(aws_access_key_id = credentials["aws_access_key"],
                       aws_secret_access_key = credentials["aws_secret_key"],
@@ -93,7 +93,7 @@ def machine_lookup(session, hostname):
     """
     client = session.client('ec2')
     response = client.describe_instances(Filters=[{"Name":"tag:Name", "Values":[hostname]},
-                                                  {"Name":"instance-state-name", "Values":["running"]}])\
+                                                  {"Name":"instance-state-name", "Values":["running"]}])
 
     item = response['Reservations']
     if len(item) == 0:
@@ -110,32 +110,55 @@ def machine_lookup(session, hostname):
                 return item['PrivateIpAddress']
             else:
                 return None
-    
-def _usage():
-    """Usage statement for this script, with commands determined by 'ssh' and
-    vault.COMMANDS.
-    """
-    vault_keys = "|".join(vault.COMMANDS.keys())
-    print("Usage: {} <aws-credentials> <ssh_key> <bastion_hostname> <internal_hostname> (ssh|{})".format(sys.argv[0], vault_keys))
-    sys.exit(1)
-    
+
 if __name__ == "__main__":
-    if len(sys.argv) < 6:
-        _usage()
+    def create_help(header, options):
+        """Create formated help."""
+        return "\n" + header + "\n" + \
+               "\n".join(map(lambda x: "  " + x, options)) + "\n"
+
+    commands = ["ssh"]
+    commands.extend(vault.COMMANDS.keys())
+    commands_help = create_help("command supports the following:", commands)
+
+    parser = argparse.ArgumentParser(description = "Script creating SSH Tunnels and connecting to internal VMs",
+                                     formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     epilog=commands_help)
+    parser.add_argument("--aws-credentials", "-a",
+                        metavar = "<file>",
+                        default = os.environ.get("AWS_CREDENTIALS"),
+                        type = argparse.FileType('r'),
+                        help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
+    parser.add_argument("--ssh-key", "-s",
+                        metavar = "<file>",
+                        default = os.environ.get("SSH_KEY"),
+                        help = "SSH private key to use when connecting to AWS instances (default: SSH_KEY)")
+    parser.add_argument("bastion", help="Hostname of the EC2 bastion server to create SSH Tunnels on")
+    parser.add_argument("internal", help="Hostname of the EC2 internal server to create the SSH Tunnels to")
+    parser.add_argument("command",
+                        choices = commands,
+                        metavar = "command",
+                        help = "Command to execute")
+
+    args = parser.parse_args()
     
-    cred_file = sys.argv[1]
-    key = sys.argv[2]
-    bastion = sys.argv[3]
-    private = sys.argv[4]
-    cmd = sys.argv[5]
+    if args.aws_credentials is None:
+        parser.print_usage()
+        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
+        sys.exit(1)
+    if args.ssh_key is None:
+        parser.print_usage()
+        print("Error: SSH key not provided and SSH_KEY is not defined")
+        sys.exit(1)
+
+    session = create_session(args.aws_credentials)
+    bastion = machine_lookup(session, args.bastion)
+    private = machine_lookup(session, args.private)
     
-    session = create_session(cred_file)
-    bastion = machine_lookup(session, bastion)
-    private = machine_lookup(session, private)
-    
-    if cmd in ("ssh",):
-        ssh(key, private, bastion)
-    elif cmd in vault.COMMANDS:
-        connect_vault(key, private, bastion, vault.COMMANDS[cmd])
+    if args.command in ("ssh",):
+        ssh(args.key, private, bastion)
+    elif args.command in vault.COMMANDS:
+        connect_vault(args.key, private, bastion, vault.COMMANDS[args.command])
     else:
-        _usage()
+        parser.print_usage()
+        sys.exit(1)

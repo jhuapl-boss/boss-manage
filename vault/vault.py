@@ -9,6 +9,7 @@ NEW_TOKEN - The location to store a new new access token for the Vault
 COMMANDS - A dictionary of available commands and the functions to call
 """
 
+import argparse
 import sys
 import os
 import glob
@@ -233,19 +234,27 @@ COMMANDS = {
     "vault-django": vault_django,
 }
 
-def _usage():
-    """Usage statement for this script, with commands determined by COMMANDS."""
-    vault_keys = "|".join(COMMANDS.keys())
-    print("Usage: {} ({})".format(sys.argv[0], vault_keys))
-    sys.exit(1)
-
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        _usage()
+    def create_help(header, options):
+        """Create formated help."""
+        return "\n" + header + "\n" + \
+               "\n".join(map(lambda x: "  " + x, options)) + "\n"
 
-    cmd = sys.argv[1]
-    
-    if cmd in COMMANDS:
-        COMMANDS[cmd]()
+    commands = list(COMMANDS.keys())
+    commands_help = create_help("command supports the following:", commands)
+
+    parser = argparse.ArgumentParser(description = "Script for manipulating Vault instances",
+                                     formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     epilog=commands_help)
+    parser.add_argument("command",
+                        choices = commands,
+                        metavar = "command",
+                        help = "Command to execute")
+
+    args = parser.parse_args()
+
+    if args.command in COMMANDS:
+        COMMANDS[args.command]()
     else:
-        _usage()
+        parser.print_usage()
+        sys.exit(1)

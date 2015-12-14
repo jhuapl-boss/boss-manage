@@ -125,8 +125,8 @@ def _call_vault(command, input=None):
     import subprocess
         
     cmd = ["./bastion.py",
-            "../packer/variables/aws-credentials",
-            "/home/microns/.ssh/pryordm1-test.pem",
+            "-a", "../packer/variables/aws-credentials",
+            "-s", "/home/microns/.ssh/pryordm1-test.pem",
             "bastion.core.boss",
             "vault.core.boss",
             command]
