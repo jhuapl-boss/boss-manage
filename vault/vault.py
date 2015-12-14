@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
 
+"""A library and script for manipulating a Vault instance.
+
+VAULT_TOKEN - The location to store and read the Vault's root token
+VAULT_KEY - The prefix location to store and read the Vault's crypto keys
+NEW_TOKEN - The location to store a new new access token for the Vault
+
+COMMANDS - A dictionary of available commands and the functions to call
+"""
+
 import sys
 import os
 import glob
@@ -7,11 +16,21 @@ import hvac
 import json
 import uuid
 
+"""Location to store and read the Vault's Root Token"""
 VAULT_TOKEN = "private/vault_token"
 VAULT_KEY = "private/vault_key."
 NEW_TOKEN = "private/new_token"
 
 def get_client(read_token = False):
+    """Open a connection to the Vault located at http://localhost:8200
+    
+    If read_token == True then read the token from VAULT_TOKEN and verify
+    that the client is authenticated to the Vault.
+    
+    Exits (sys.exit) if read_token and VAULT_TOKEN does not exists
+    Exits (sys.exit) if read_token and VAULT_TOKEN does not contain a valid
+                     token
+    """
     client = hvac.Client(url="http://localhost:8200")
     
     if read_token:
@@ -28,8 +47,12 @@ def get_client(read_token = False):
     return client
 
 def vault_init():
-    """Initialize the Vault, store the unseal keys and root token.
-       Finish by unsealing the new vault."""
+    """Initialize a Vault. Connect using get_client() and if the Vault is not
+    initialized then initialize it with 5 secrets and a threashold of 3. The
+    keys are stored as VAULT_KEY and root token is stored as VAULT_TOKEN.
+    
+    After initializing the Vault it is unsealed for use.
+    """
        
     client = get_client()
     if client.is_initialized():
@@ -58,7 +81,13 @@ def vault_init():
     client.unseal_multi(result["keys"])
     
 def vault_unseal():
-    """Used to reopen an initialized vault using previously saved values"""
+    """Unseal a sealed Vault. Connect using get_client() and if the Vault is
+    not sealed read all of the keys defined by VAULT_KEY and unseal.
+    
+    If there are not enough keys to completely unseal the Vault, print a
+    status message about how many more keys are required to finish the
+    process.
+    """
     
     client = get_client()
     if not client.is_sealed():
@@ -84,7 +113,12 @@ def vault_unseal():
         print("Vault unsealed")
         
 def vault_seal():
-    """ Used to quickly reseal a vault if there is any need"""
+    """Seal an unsealed Vault. Connect using get_client(True) and if the Vault
+    is unsealed, seal it.
+    
+    Used to quickly protect a Vault without having to stop the Vault service
+    on a protected VM.
+    """
     
     client = get_client(read_token = True)
     if client.is_sealed():
@@ -95,7 +129,17 @@ def vault_seal():
     print("Vault is sealed")
     
 def vault_status():
-    """ Print the current status of the Vault """
+    """Print the status of a Vault. Connect using get_client(True) and print
+    the status of the following items (if available):
+     * Initializing status
+     * Seal status
+     * Key status
+     * High Availability status
+     * Secret backends
+     * Policies
+     * Audit backends
+     * Auth backends
+    """
     
     client = get_client(read_token = True)
     if not client.is_initialized():
@@ -136,6 +180,9 @@ def vault_status():
     print(json.dumps(client.list_auth_backends(), indent=True))
     
 def vault_provision():
+    """Create a new Vault access token. Connect using get_client(True),
+    request a new access token (default policy), and save it to NEW_TOKEN.
+    """
     client = get_client(read_token = True)
     
     token = client.create_token()
@@ -143,12 +190,31 @@ def vault_provision():
         fh.write(token["auth"]["client_token"])
 
 def vault_revoke():
+    """Revoke a Vault access token. Connect using get_client(True), read the
+    token (using input()), and then revoke the token.
+    """
     client = get_client(read_token = True)
     token = input("token: ")
     
     client.revoke_token(token)
         
 def vault_django():
+    """Provision a Vault with credentials for a Django webserver. Connect
+    using get_client(True) and provision the following information:
+     * Generate a secret key and store under 'secret/django secret_key=`
+     * Prompt the user (using input()) for the
+       - Database Name
+       - Database Username
+       - Database Password
+       - Database Hostname
+       - Database Port
+       and store under
+       - 'secret/django/db name='
+       - 'secret/django/db user='
+       - 'secret/django/db password='
+       - 'secret/django/db host='
+       - 'secret/django/db port='
+    """
     client = get_client(read_token = True)
     
     client.write("secret/django", secret_key = str(uuid.uuid4()))
@@ -167,18 +233,19 @@ COMMANDS = {
     "vault-django": vault_django,
 }
 
-def usage():
+def _usage():
+    """Usage statement for this script, with commands determined by COMMANDS."""
     vault_keys = "|".join(COMMANDS.keys())
     print("Usage: {} ({})".format(sys.argv[0], vault_keys))
     sys.exit(1)
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        usage()
+        _usage()
 
     cmd = sys.argv[1]
     
     if cmd in COMMANDS:
         COMMANDS[cmd]()
     else:
-        usage()
+        _usage()

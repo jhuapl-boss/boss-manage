@@ -1,3 +1,8 @@
+"""Create the private parts of the core environment.
+
+DEVICES - the different device configurations to include in the template.
+"""
+
 import library as lib
 import hosts
 import pprint
@@ -5,10 +10,12 @@ import pprint
 DEVICES = ["vault"]
 
 def verify_domain(domain):
+    """Verify that the given domain is valid in the format 'subnet.vpc.tld'."""
     if len(domain.split(".")) != 3: # subnet.vpc.tld
         raise Exception("Not a valiid Subnet domain name")
 
 def generate(folder, domain):
+    """Generate the CloudFormation template and save to disk."""
     verify_domain(domain)
     
     parameters, resources = lib.load_devices(*DEVICES)
@@ -17,6 +24,9 @@ def generate(folder, domain):
     lib.save_template(template, folder, "core." + domain)
 
 def create(session, domain):
+    """Lookup all of the needed arguments, and create the CloudFormation
+    stack.
+    """
     verify_domain(domain)
 
     subnet_id = lib.subnet_id_lookup(session, domain)

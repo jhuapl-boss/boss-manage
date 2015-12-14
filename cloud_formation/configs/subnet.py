@@ -1,3 +1,8 @@
+"""Create a Subnet.
+
+DEVICES - the different device configurations to include in the template.
+"""
+
 import pprint
 import json
 import os
@@ -7,10 +12,12 @@ import hosts
 DEVICES = ["subnet"]
 
 def verify_domain(domain):
-    if len(domain.split(".")) != 3: # subnet.vpc.tld
+    """Verify that the given domain is valid in the format 'subnet.vpc.tld'."""
+    if len(domain.split(".")) != 3:
         raise Exception("Not a valiid Subnet domain name")
 
 def generate(folder, domain):
+    """Generate the CloudFormation template and save to disk."""
     verify_domain(domain)
     
     parameters, resources = lib.load_devices(*DEVICES)
@@ -19,6 +26,9 @@ def generate(folder, domain):
     lib.save_template(template, folder, domain)
 
 def create(session, domain):
+    """Verify that the referenced VPC already exist and that the referenced
+    Subnet does not already exist. Then create the CloudFormation stack.
+    """
     verify_domain(domain)
 
     vpc_domain = domain.split(".", 1)[1]

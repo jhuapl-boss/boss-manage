@@ -1,3 +1,5 @@
+"""Library for common methods that are used by the different configs scripts."""
+
 import os
 import json
 import pprint
@@ -5,20 +7,32 @@ import time
 import hosts
 
 def domain_to_stackname(domain):
+    """Create a CloudFormation Stackname from domain name by removing '.' and
+    capitalizing each part of the domain.
+    """
     return "".join(map(lambda x: x.capitalize(), domain.split(".")))
 
 def template_argument(key, value, use_previous = False):
+    """Create a JSON dictionary formated as a CloudFlormation template
+    argument.
+    
+    use_previous is passed as UserPreviousValue to CloudFlormation.
+    """
     if value is None:
         raise Exception("Could not determine argument '{}'".format(key))
     return {"ParameterKey": key, "ParameterValue": value, "UsePreviousValue": use_previous}
 
 def save_template(template, folder, domain):
+    """Save the given template to disk."""
     stack_name = domain_to_stackname(domain)
     
     with open(os.path.join(folder,stack_name + ".template"), "w") as fh:
         fh.write(template)
 
 def cloudformation_create(session, name, template, arguments, wait=True):
+    """Create the CloudFlormation stack and (optionally) wait for the Stack
+    to finish being created.
+    """
     client = session.client('cloudformation')
     response = client.create_stack(
         StackName = name,
@@ -48,6 +62,7 @@ def cloudformation_create(session, name, template, arguments, wait=True):
     return rtn
 
 def create_template(parameters, resources, description=""):
+    """Create the JSON CloudFlormation dictionary from the component parts."""
     template = {
         "AWSTemplateFormatVersion" : "2010-09-09",
         "Description" : description,
@@ -58,6 +73,10 @@ def create_template(parameters, resources, description=""):
     return json.dumps(template, indent=4)
 
 def load_devices(*names, index=None):
+    """For each name call load_device() and merge the results together. If
+    any of the keys in the resources also appear in the parameters remove
+    them from parameters.
+    """
     parameters = {}
     resources = {}
     
@@ -76,6 +95,12 @@ def load_devices(*names, index=None):
     return parameters, resources
 
 def load_device(name, index=None, device_directory="devices", resources_suffix=".resources", parameters_suffix=".parameters"):
+    """Read and JSON parse the resource and parameter files for the named
+    device.
+    
+    If index is not None, then '{I}' will be replaced with the value of
+    index before JSON parsing.
+    """
     resources_path = os.path.join(device_directory, name + resources_suffix)
     with open(resources_path, "r") as fh:
         data = fh.read()
@@ -93,6 +118,10 @@ def load_device(name, index=None, device_directory="devices", resources_suffix="
     return parameters, resources
 
 def _call_vault(command, input=None):
+    """Call ../vault/bastion.py with a list of hardcoded AWS / SSH arguments.
+    This is a common function for any other function that needs to populate
+    or provision Vault when starting up new VMs.
+    """
     import subprocess
         
     cmd = ["./bastion.py",
@@ -117,6 +146,10 @@ def _call_vault(command, input=None):
     return proc.returncode
     
 def generate_token():
+    """Generate a new access token to Vault using the 'vault-provision'
+    command. The resulting token is read from its file on disk and then
+    the file is removed to prevent anyone else from reading the token.
+    """
     print("Generating vault access token...")
     result = _call_vault("vault-provision")
     
@@ -128,18 +161,28 @@ def generate_token():
     return token
     
 def revoke_token(token):
+    """Revoke an access token to Vault using the 'vault-revoke'
+    command.
+    """
     print("Revoking vault access token...")
     _call_vault("vault-revoke", token + "\n")
     
 def save_django(db, user, password, host, port):
+    """Provision Vault with Django database credentials using the
+    'vault-django' command.
+    """
     print("Saving Django database access information...")
     args = "\n".join([db, user, password, host, port])
     result = _call_vault("vault-django", args)
     
 def add_userdata(resources, machine, data):
+    """Locate the specified machine in the resources dictionary and add the
+    data as Base64 encoded UserData.
+    """
     resources[machine]["Properties"]["UserData"] = { "Fn::Base64" : data }
 
 def vpc_id_lookup(session, vpc_domain):
+    """Lookup the Id for the VPC with the given domain name."""
     client = session.client('ec2')
     response = client.describe_vpcs(Filters=[{"Name":"tag:Name", "Values":[vpc_domain]}])
     if len(response['Vpcs']) == 0:
@@ -148,6 +191,7 @@ def vpc_id_lookup(session, vpc_domain):
         return response['Vpcs'][0]['VpcId']
 
 def subnet_id_lookup(session, subnet_domain):
+    """Lookup the Id for the Subnet with the given domain name."""
     client = session.client('ec2')
     response = client.describe_subnets(Filters=[{"Name":"tag:Name", "Values":[subnet_domain]}])
     if len(response['Subnets']) == 0:
@@ -156,6 +200,7 @@ def subnet_id_lookup(session, subnet_domain):
         return response['Subnets'][0]['SubnetId']
         
 def ami_lookup(session, ami_name):
+    """Lookup the Id for the AMI with the given name."""
     client = session.client('ec2')
     response = client.describe_images(Filters=[{"Name":"name", "Values":[ami_name]}])
     if len(response['Images']) == 0:
@@ -164,6 +209,7 @@ def ami_lookup(session, ami_name):
         return response['Images'][0]['ImageId']
         
 def sg_lookup(session, vpc_id, group_name):
+    """Lookup the Id for the VPC Security Group with the given name."""
     client = session.client('ec2')
     response = client.describe_security_groups(Filters=[{"Name":"vpc-id", "Values":[vpc_id]},
                                                         {"Name":"group-name", "Values":[group_name]}])
@@ -173,6 +219,7 @@ def sg_lookup(session, vpc_id, group_name):
         return response['SecurityGroups'][0]['GroupId']
         
 def rt_lookup(session, vpc_id, rt_name):
+    """Lookup the Id for the VPC Route Table with the given name."""
     client = session.client('ec2')
     response = client.describe_route_tables(Filters=[{"Name":"vpc-id", "Values":[vpc_id]},
                                                      {"Name":"tag:Name", "Values":[rt_name]}])
@@ -183,6 +230,7 @@ def rt_lookup(session, vpc_id, rt_name):
         return response['RouteTables'][0]['RouteTableId']
         
 def peering_lookup(session, from_id, to_id):
+    """Lookup the Id for the Peering Connection between the two VPCs."""
     client = session.client('ec2')
     response = client.describe_vpc_peering_connections(Filters=[{"Name":"requester-vpc-info.vpc-id", "Values":[from_id]},
                                                                 {"Name":"requester-vpc-info.owner-id", "Values":["256215146792"]},
@@ -197,6 +245,7 @@ def peering_lookup(session, from_id, to_id):
         return response['VpcPeeringConnections'][0]['VpcPeeringConnectionId']
         
 def keypair_lookup(session):
+    """Print the valid key pairs for the session and ask the user which to use."""
     client = session.client('ec2')
     response = client.describe_key_pairs()
     print("Key Pairs")
@@ -213,6 +262,7 @@ def keypair_lookup(session):
             print("Invalid Key Pair number, try again")
             
 def peer_route_update(session, from_vpc, to_vpc):
+    """Update the peer VPC's routing tables with routes to the originating VPC."""
     from_id = vpc_id_lookup(session, from_vpc)
     to_id = vpc_id_lookup(session, to_vpc)
     peer_id = peering_lookup(session, from_id, to_id)

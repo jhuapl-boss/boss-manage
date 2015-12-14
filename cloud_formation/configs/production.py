@@ -1,3 +1,10 @@
+"""Create the production environment.
+
+ADDRESSES - the dictionary of production hostnames and subnet indexes.
+DEVICES - the different device configurations to include in the template.
+ROUTE - an extra route for the new VPC Peering connection.
+"""
+
 import library as lib
 import hosts
 import pprint
@@ -22,10 +29,12 @@ ROUTE = {"ExternalPeerRoute" : {"Type" : "AWS::EC2::Route",
                                 }}}
 
 def verify_domain(domain):
+    """Verify that the given domain is valid in the format 'subnet.vpc.tld'."""
     if len(domain.split(".")) != 3: # subnet.vpc.tld
         raise Exception("Not a valiid Subnet domain name")
 
 def generate(folder, domain):
+    """Generate the CloudFormation template and save to disk."""
     verify_domain(domain)
     
     parameters, resources = lib.load_devices(*DEVICES)
@@ -34,6 +43,10 @@ def generate(folder, domain):
     lib.save_template(template, folder, "production." + domain)
 
 def create(session, domain):
+    """Lookup all of the needed arguments, generate an access token to Vault,
+    store Django database credentials, create the CloudFormation stack, and
+    then update the peer VPC's route tables.
+    """
     verify_domain(domain)
     
     vpc_domain = domain.split(".", 1)[1]
@@ -50,7 +63,7 @@ def create(session, domain):
         lib.template_argument("KeyName",              lib.keypair_lookup(session)),
         lib.template_argument("VPCId",                vpc_id),
         lib.template_argument("SubnetId",             lib.subnet_id_lookup(session, domain)),
-        lib.template_argument("Subnet2Id",             lib.subnet_id_lookup(session, "b.production.boss")),
+        lib.template_argument("Subnet2Id",            lib.subnet_id_lookup(session, "b.production.boss")),
         lib.template_argument("PeerVPCId",            lib.vpc_id_lookup(session, "core.boss")),
         lib.template_argument("PeerVPCSubnet",        hosts.lookup("core.boss")),
         lib.template_argument("InternalRouteTable",   lib.rt_lookup(session, vpc_id, "internal")),

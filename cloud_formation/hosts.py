@@ -1,4 +1,17 @@
-#!/usr/bin/env python3
+"""Library for looking up IP subnets and IP addresses by name.
+
+TLD - The Top Level Domain name for internal naming.
+BASE_IP / ROOT_CIDR - The top level subnet in which to start numbering.
+VPC_CIDR - The CIDR number for VPCs.
+SUBNET_CIDR - The CIDR number for Subnets.
+
+NOTE: BASE_CIDR < VPC_CIDR < SUBNET_CIDR
+
+VPCS - A dictionary of names and Subnet number for each valid VPC.
+SUBNETS - A dictionary of names and Subnet number for each valid Subnet.
+STATIC - A dictionary of hostnames and IP address that are static and should
+         always be available 
+"""
 
 ##
 # User configurable section. Changes here will change how addresses are generated
@@ -61,28 +74,36 @@ import sys
 from ipaddress import IPv4Network
 
 def get_subnet(network, subnet_cidr, subnet_id):
-    """ Subnet a IPv4Network and select subnet number <subnet_id>. """
+    """Subnet a IPv4Network and select subnet number <subnet_id>."""
     if type(network) != IPv4Network:
         network = IPv4Network(network)
         
     return list(network.subnets(new_prefix=subnet_cidr))[subnet_id]
     
 def get_ip(network, vpc_id, subnet_id, device_id):
-    """ Given a starting network, find the vpc_id and subnet_id subnets, and then select ip address number <device_id>. """
+    """Given a starting network, find the vpc_id and subnet_id subnets, and
+    then select ip address number <device_id>.
+    """
     vpc_net = get_subnet(network, VPC_CIDR, vpc_id)
     sub_net = get_subnet(vpc_net, SUBNET_CIDR, subnet_id)
     device_ip = list(sub_net)[device_id]
     return device_ip
     
 def get_entry(network, vpc_name, subnet_name, device_name, device_id):
-    """ Given a starting network and the hostname components of a device, generate the IP address and full hostname. """
+    """Given a starting network and the hostname components of a device,
+    generate the IP address and full hostname.
+    """
     ip = get_ip(network, VPCS[vpc_name], SUBNETS[(vpc_name, subnet_name)], device_id)
     name = ".".join([device_name, subnet_name, vpc_name, TLD])
     
     return ip, name
 
 def gen_hosts(domain, devices):
-    """ Itterate through all SUBNETS and devices enteries to generate the entire set of IP addresses and full hostnames for every device. """
+    """Itterate through all devices enteries to generate the set of IP
+    addresses and full hostnames for every device.
+    
+    STATIC enteries are added to the results before being returned.
+    """
     base_net = IPv4Network(BASE_IP + "/" + str(ROOT_CIDR))
     addresses = {}
     
@@ -99,6 +120,11 @@ def gen_hosts(domain, devices):
     return addresses
     
 def expand_devices(devices):
+    """Expand the range() and [] values in devices. Each value in the list
+    gets a unique hostname with the first hostname being the dictionary key
+    all following hostnames adding an incrementing number (web, web2, web3,
+    ...) .
+    """
     rtn = {}
     
     for device in devices:
@@ -116,6 +142,12 @@ def expand_devices(devices):
     return rtn
         
 def lookup(domain, devices=None):
+    """Locate the subnet or IP address for the given domain name.
+    
+    If the domain is not a VPC or Subnet and is not in STATIC then devices is
+    required to be specified and the dictionary is used to complete the
+    lookup.
+    """
     if domain in STATIC:
         return STATIC[domain]
 

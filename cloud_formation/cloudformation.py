@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+"""A driver script for creating AWS CloudFormation Stacks."""
+
 import argparse
 import sys
 import os
@@ -18,21 +20,31 @@ create subnet.vpc.boss instance
 """
 
 def create_session(credentials):
+    """Read the AWS from the credentials dictionary and then create a boto3
+    connection to AWS with those credentials.
+    """
     session = Session(aws_access_key_id = credentials["aws_access_key"],
                       aws_secret_access_key = credentials["aws_secret_key"],
                       region_name = 'us-east-1')
     return session
     
 def create_config(session, domain, config):
+    """Import 'configs.<config>' and then call the create() function with
+    <session> and <domain>.
+    """
     module = importlib.import_module("configs." + config)
     module.create(session, domain)
     
 def generate_config(domain, config):
+    """Import 'configs.<config>' and then call the generate() function with
+    'templates' directory and <domain>.
+    """
     module = importlib.import_module("configs." + config)
     module.generate("templates", domain)
 
 if __name__ == '__main__':
     def create_help(header, options):
+        """Create formated help."""
         return "\n" + header + "\n" + \
                "\n".join(map(lambda x: "  " + x, options)) + "\n"
 
