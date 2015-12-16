@@ -150,15 +150,16 @@ if __name__ == "__main__":
         parser.print_usage()
         print("Error: SSH key not provided and SSH_KEY is not defined")
         sys.exit(1)
+    # Add check to make sure ssh_key exists
 
     session = create_session(args.aws_credentials)
     bastion = machine_lookup(session, args.bastion)
-    private = machine_lookup(session, args.private)
+    private = machine_lookup(session, args.internal)
     
     if args.command in ("ssh",):
-        ssh(args.key, private, bastion)
+        ssh(args.ssh_key, private, bastion)
     elif args.command in vault.COMMANDS:
-        connect_vault(args.key, private, bastion, vault.COMMANDS[args.command])
+        connect_vault(args.ssh_key, private, bastion, vault.COMMANDS[args.command])
     else:
         parser.print_usage()
         sys.exit(1)
