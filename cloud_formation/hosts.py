@@ -52,6 +52,8 @@ SUBNETS = {
     
     ("development", "pryordm1") : 1,
     
+    ("test", "internal") : 0,
+    ("test", "external") : 1,
     ("test", "test") : 255,
 }
 

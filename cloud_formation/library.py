@@ -18,8 +18,6 @@ def template_argument(key, value, use_previous = False):
     
     use_previous is passed as UserPreviousValue to CloudFlormation.
     """
-    if value is None:
-        raise Exception("Could not determine argument '{}'".format(key))
     return {"ParameterKey": key, "ParameterValue": value, "UsePreviousValue": use_previous}
 
 def save_template(template, folder, domain):
@@ -183,6 +181,8 @@ def add_userdata(resources, machine, data):
 
 def vpc_id_lookup(session, vpc_domain):
     """Lookup the Id for the VPC with the given domain name."""
+    if session is None: return None
+    
     client = session.client('ec2')
     response = client.describe_vpcs(Filters=[{"Name":"tag:Name", "Values":[vpc_domain]}])
     if len(response['Vpcs']) == 0:
@@ -192,6 +192,8 @@ def vpc_id_lookup(session, vpc_domain):
 
 def subnet_id_lookup(session, subnet_domain):
     """Lookup the Id for the Subnet with the given domain name."""
+    if session is None: return None
+    
     client = session.client('ec2')
     response = client.describe_subnets(Filters=[{"Name":"tag:Name", "Values":[subnet_domain]}])
     if len(response['Subnets']) == 0:
@@ -201,6 +203,8 @@ def subnet_id_lookup(session, subnet_domain):
         
 def ami_lookup(session, ami_name):
     """Lookup the Id for the AMI with the given name."""
+    if session is None: return None
+    
     client = session.client('ec2')
     response = client.describe_images(Filters=[{"Name":"name", "Values":[ami_name]}])
     if len(response['Images']) == 0:
@@ -210,6 +214,8 @@ def ami_lookup(session, ami_name):
         
 def sg_lookup(session, vpc_id, group_name):
     """Lookup the Id for the VPC Security Group with the given name."""
+    if session is None: return None
+    
     client = session.client('ec2')
     response = client.describe_security_groups(Filters=[{"Name":"vpc-id", "Values":[vpc_id]},
                                                         {"Name":"group-name", "Values":[group_name]}])
@@ -220,6 +226,8 @@ def sg_lookup(session, vpc_id, group_name):
         
 def rt_lookup(session, vpc_id, rt_name):
     """Lookup the Id for the VPC Route Table with the given name."""
+    if session is None: return None
+    
     client = session.client('ec2')
     response = client.describe_route_tables(Filters=[{"Name":"vpc-id", "Values":[vpc_id]},
                                                      {"Name":"tag:Name", "Values":[rt_name]}])
@@ -231,6 +239,8 @@ def rt_lookup(session, vpc_id, rt_name):
         
 def peering_lookup(session, from_id, to_id):
     """Lookup the Id for the Peering Connection between the two VPCs."""
+    if session is None: return None
+    
     client = session.client('ec2')
     response = client.describe_vpc_peering_connections(Filters=[{"Name":"requester-vpc-info.vpc-id", "Values":[from_id]},
                                                                 {"Name":"requester-vpc-info.owner-id", "Values":["256215146792"]},
@@ -246,6 +256,8 @@ def peering_lookup(session, from_id, to_id):
         
 def keypair_lookup(session):
     """Print the valid key pairs for the session and ask the user which to use."""
+    if session is None: return None
+    
     client = session.client('ec2')
     response = client.describe_key_pairs()
     print("Key Pairs")
@@ -263,6 +275,8 @@ def keypair_lookup(session):
             
 def peer_route_update(session, from_vpc, to_vpc):
     """Update the peer VPC's routing tables with routes to the originating VPC."""
+    if session is None: return None
+    
     from_id = vpc_id_lookup(session, from_vpc)
     to_id = vpc_id_lookup(session, to_vpc)
     peer_id = peering_lookup(session, from_id, to_id)
