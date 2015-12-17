@@ -1,4 +1,5 @@
 import os
+import time
 import json
 import hosts
 import library as lib
@@ -54,6 +55,17 @@ class Arg:
         return Arg(key, parameter, argument)
         
     @staticmethod
+    def Port(key, value, description=""):
+        parameter =  {
+            "Description" : description,
+            "Type": "Number",
+            "MinValue": "1",
+            "MaxValue": "65535"
+        }
+        argument = lib.template_argument(key, value)
+        return Arg(key, parameter, argument)
+        
+    @staticmethod
     def CIDR(key, value, description=""):
         parameter = {
             "Description" : description,
@@ -68,7 +80,7 @@ class Arg:
         return Arg(key, parameter, argument)
         
     @staticmethod
-    def VPC(id, description=""):
+    def VPC(key, value, description=""):
         parameter = {
             "Description" : description,
             "Type": "AWS::EC2::VPC::Id"
@@ -77,7 +89,7 @@ class Arg:
         return Arg(key, parameter, argument)
     
     @staticmethod
-    def Subnet(id, description=""):
+    def Subnet(key, value, description=""):
         parameter = {
             "Description" : description,
             "Type": "AWS::EC2::Subnet::Id"
@@ -109,6 +121,17 @@ class Arg:
         parameter = {
             "Description" : description,
             "Type": "AWS::EC2::SecurityGroup::Id"
+        }
+        argument = lib.template_argument(key, value)
+        return Arg(key, parameter, argument)
+    
+    @staticmethod    
+    def RouteTable(key, value, description=""):
+        parameter = {
+            "Description" : description,
+            "Type" : "For whatever reason CloudFormation does not recognize RouteTable::Id",
+            "Type" : "AWS::EC2::RouteTable::Id",
+            "Type" : "String"
         }
         argument = lib.template_argument(key, value)
         return Arg(key, parameter, argument)
@@ -206,7 +229,7 @@ class CloudFormationConfiguration:
                             "Domain of the VPC '{}'".format(key))
         self.add_arg(domain)
 
-    def add_subnet(self, key="Subnet", vpc="VPC"):
+    def add_subnet(self, key="Subnet", vpc="VPC", az=None):
         self.resources[key] = {
             "Type" : "AWS::EC2::Subnet",
             "Properties" : {
@@ -219,13 +242,17 @@ class CloudFormationConfiguration:
             }
         }
         
+        if az is not None:
+            self.resources[key]["Properties"]["AvailabilityZone"] = az
+        
         subnet = Arg.CIDR(key + "Subnet", self.subnet_subnet, 
                           "Subnet of the Subnet '{}'".format(key))
         self.add_arg(subnet)
         domain = Arg.String(key + "Domain", self.subnet_domain,
                             "Domain of the Subnet '{}'".format(key))
         self.add_arg(domain)
-        
+    
+    # ??? save hostname : keypair somewhere?
     def add_ec2_instance(self, key, hostname, ami, keypair, subnet="Subnet", type_="m3.medium", iface_check=False, public_ip=False, security_groups=None, user_data=None):
         """
             security_groups = [security group, ...]
@@ -275,6 +302,63 @@ class CloudFormationConfiguration:
                     "IP Address of the EC2 Instance '{}'".format(key))
         self.add_arg(ip)
     
+    def add_rds_db(self, key, hostname, port, db_name, username, password, subnets, type_="db.t2.micro", storage="5", security_groups=None):
+        self.resources[key] = {
+            "Type" : "AWS::RDS::DBInstance",
+            
+            "Properties" : {
+                "Engine" : "mysql",
+                "LicenseModel" : "general-public-license",
+                "EngineVersion" : "5.6.23",
+                "DBInstanceClass" : type_,
+                "MultiAZ" : "false",
+                "StorageType" : "standard",
+                "AllocatedStorage" : storage,
+                "DBInstanceIdentifier" : { "Ref" : key + "Hostname" },
+                "MasterUsername" : { "Ref" : key + "Username" },
+                "MasterUserPassword" : { "Ref" : key + "Password" },
+                "DBSubnetGroupName" : { "Ref" : key + "SubnetGroup" },
+                "PubliclyAccessible" : "false",
+                "DBName" : { "Ref" : key + "DBName" },
+                "Port" : { "Ref" : key + "Port" },
+                "StorageEncrypted" : "false"
+            }
+        }
+            
+        self.resources[key + "SubnetGroup"] = {
+            "Type" : "AWS::RDS::DBSubnetGroup",
+            "Properties" : {
+                "DBSubnetGroupDescription" : { "Ref" : key + "Hostname" },
+                "SubnetIds" : [{ "Ref" : subnet } for subnet in subnets]
+            }
+        }
+        
+        if security_groups is not None:
+            sgs = []
+            for sg in security_groups:
+                sgs.append({ "Ref" : sg })
+            self.resources[key]["Properties"]["VPCSecurityGroups"] = sgs
+        
+        hostname_ = Arg.String(key + "Hostname", hostname.replace('.','-'),
+                               "Hostname of the RDS DB Instance '{}'".format(key))
+        self.add_arg(hostname_)
+        
+        port_ = Arg.Port(key + "Port", port,
+                         "DB Server Port for the RDS DB Instance '{}'".format(key))
+        self.add_arg(port_)
+        
+        name_ = Arg.String(key + "DBName", db_name,
+                           "Name of the intial database on the RDS DB Instance '{}'".format(key))
+        self.add_arg(name_)
+        
+        username_ = Arg.String(key + "Username", username,
+                               "Master Username for RDS DB Instance '{}'".format(key))
+        self.add_arg(username_)
+        
+        password_ = Arg.String(key + "Password", password,
+                               "Master User Password for RDS DB Instance '{}'".format(key))
+        self.add_arg(password_)
+    
     def add_security_group(self, key, name, rules, vpc="VPC"):
         """
             rules = [(protocol, from, to, cidr)]
@@ -292,10 +376,14 @@ class CloudFormationConfiguration:
             "SecurityGroupIngress" : ingress,
              "Tags" : [
                 {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
-                {"Key" : "Name", "Value" : name + "." + self.vpc_domain }
+                {"Key" : "Name", "Value" : { "Fn::Join" : [ ".", [name, { "Ref" : vpc + "Domain" }]]}}
             ]
           }
         }
+        
+        domain = Arg.String(vpc + "Domain", self.vpc_domain,
+                            "Domain of the VPC '{}'".format(vpc))
+        self.add_arg(domain)
         
     def add_route_table(self, key, name, vpc="VPC", subnets=["Subnet"]):
         """
@@ -308,10 +396,14 @@ class CloudFormationConfiguration:
             "VpcId" : {"Ref" : vpc},
             "Tags" : [
                 {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
-                {"Key" : "Name", "Value" : name + "." + self.vpc_domain }
+                {"Key" : "Name", "Value" : { "Fn::Join" : [ ".", [name, { "Ref" : vpc + "Domain" }]]}}
             ]
           }
         }
+        
+        domain = Arg.String(vpc + "Domain", self.vpc_domain,
+                            "Domain of the VPC '{}'".format(vpc))
+        self.add_arg(domain)
         
         for subnet in subnets:
             key_ = key + "SubnetAssociation" + str(subnets.index(subnet))
@@ -326,13 +418,15 @@ class CloudFormationConfiguration:
           }
         }
         
-    def add_route_table_route(self, key, route_table, cidr, gateway=None, peer=None, depends_on=None):
+    def add_route_table_route(self, key, route_table, cidr="0.0.0.0/0", gateway=None, peer=None, depends_on=None):
+        """
+            cidr  if None use "0.0.0.0/0" else use cidr
+        """
         self.resources[key] = {
           "Type" : "AWS::EC2::Route",
           "Properties" : {
             "RouteTableId" : { "Ref" : route_table },
-            "DestinationCidrBlock" : key + "Cidr",
-            "GatewayId" : { "Ref" : "InternetGateway" }
+            "DestinationCidrBlock" : { "Ref" : key + "Cidr" },
           }
         }
         
@@ -354,11 +448,14 @@ class CloudFormationConfiguration:
                         "Destination CIDR Block for Route '{}'".format(key))
         self.add_arg(cidr)
         
-    def add_internet_gateway(self, key, vpc="VPC"):
+    def add_internet_gateway(self, key, name="internet", vpc="VPC"):
         self.resources[key] = {
           "Type" : "AWS::EC2::InternetGateway",
           "Properties" : {
-            "Tags" : [ {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} } ]
+            "Tags" : [
+                {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
+                {"Key" : "Name", "Value" : { "Fn::Join" : [ ".", [name, { "Ref" : vpc + "Domain" }]]}}
+            ]
           }
         }
         
@@ -369,3 +466,27 @@ class CloudFormationConfiguration:
              "InternetGatewayId" : { "Ref" : key }
            }
         }
+        
+        domain = Arg.String(vpc + "Domain", self.vpc_domain,
+                            "Domain of the VPC '{}'".format(vpc))
+        self.add_arg(domain)
+        
+    def add_vpc_peering(self, key, vpc, peer_vpc):
+        self.resources[key] = {
+            "Type" : "AWS::EC2::VPCPeeringConnection",
+            "Properties" : {
+                "VpcId" : { "Ref" : key + "VPC" },
+                "PeerVpcId" : { "Ref" : key + "PeerVPC" },
+                "Tags" : [ 
+                    {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} }
+                ]
+            }
+        }
+        
+        vpc_ = Arg.VPC(key + "VPC", vpc,
+                       "Originating VPC for the peering connection")
+        self.add_arg(vpc_)
+        
+        peer_vpc_ = Arg.VPC(key + "PeerVPC", peer_vpc,
+                            "Destination VPC for the peering connection")
+        self.add_arg(peer_vpc_)

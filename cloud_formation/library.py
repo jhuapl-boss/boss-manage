@@ -1,10 +1,20 @@
 """Library for common methods that are used by the different configs scripts."""
 
+import sys
 import os
 import json
 import pprint
 import time
+import getpass
+
 import hosts
+
+# Add a reference to boss-manage/vault/ so that we can import those files
+cur_dir = os.path.dirname(os.path.realpath(__file__))
+vault_dir = os.path.normpath(os.path.join(cur_dir, "..", "vault"))
+sys.path.append(vault_dir)
+import bastion
+import vault
 
 def domain_to_stackname(domain):
     """Create a CloudFormation Stackname from domain name by removing '.' and
@@ -20,165 +30,36 @@ def template_argument(key, value, use_previous = False):
     """
     return {"ParameterKey": key, "ParameterValue": value, "UsePreviousValue": use_previous}
 
-def save_template(template, folder, domain):
-    """Save the given template to disk."""
-    stack_name = domain_to_stackname(domain)
-    
-    with open(os.path.join(folder,stack_name + ".template"), "w") as fh:
-        fh.write(template)
-
-def cloudformation_create(session, name, template, arguments, wait=True):
-    """Create the CloudFlormation stack and (optionally) wait for the Stack
-    to finish being created.
-    """
-    client = session.client('cloudformation')
-    response = client.create_stack(
-        StackName = name,
-        TemplateBody = template,
-        Parameters = arguments
-    )
-    
-    rtn = True
-    if wait:
-        get_status = lambda r: r['Stacks'][0]['StackStatus']
-        response = client.describe_stacks(StackName=name)
-        if len(response['Stacks']) == 0:
-            print("Problem launching stack")
-        else:
-            print("Waiting for create ", end="", flush=True)
-            while get_status(response) == 'CREATE_IN_PROGRESS':
-                time.sleep(5)
-                print(".", end="", flush=True)
-                response = client.describe_stacks(StackName=name)
-            print(" done")
-
-            if get_status(response) == 'CREATE_COMPLETE':
-                print("Created stack '{}'".format(name))
-            else:
-                print("Status of stack '{}' is '{}'".format(name, get_status(response)))
-                rtn = False
-    return rtn
-
-def create_template(parameters, resources, description=""):
-    """Create the JSON CloudFlormation dictionary from the component parts."""
-    template = {
-        "AWSTemplateFormatVersion" : "2010-09-09",
-        "Description" : description,
-        "Parameters": parameters,
-        "Resources": resources
-    }
-    
-    return json.dumps(template, indent=4)
-
-def load_devices(*names, index=None):
-    """For each name call load_device() and merge the results together. If
-    any of the keys in the resources also appear in the parameters remove
-    them from parameters.
-    """
-    parameters = {}
-    resources = {}
-    
-    for name in names:
-        _param, _res = load_device(name, index)
-        parameters.update(_param)
-        resources.update(_res)
-    
-    # With composing multiple devices we may include resources
-    # that are required by another device, if so we don't need
-    # to include them as a parameter anymore
-    for k in resources:
-        if k in parameters:
-            del parameters[k]
-        
-    return parameters, resources
-
-def load_device(name, index=None, device_directory="devices", resources_suffix=".resources", parameters_suffix=".parameters"):
-    """Read and JSON parse the resource and parameter files for the named
-    device.
-    
-    If index is not None, then '{I}' will be replaced with the value of
-    index before JSON parsing.
-    """
-    resources_path = os.path.join(device_directory, name + resources_suffix)
-    with open(resources_path, "r") as fh:
-        data = fh.read()
-        if index is not None:
-            data = data.replace("{I}", index)
-        resources = json.loads(data)
-    
-    parameters_path = os.path.join(device_directory, name + parameters_suffix)
-    with open(parameters_path, "r") as fh:
-        data = fh.read()
-        if index is not None:
-            data = data.replace("{I}", index)
-        parameters = json.loads(data)
-        
-    return parameters, resources
-
-def _call_vault(command, input=None):
+def keypair_to_file(keypair):
+    file = os.path.expanduser("~/.ssh/{}.pem".format(keypair))
+    if not os.path.exists(file):
+        print("Error: SSH Key '{}' does not exist".format(file))
+        return None
+    return file
+ 
+def call_vault(session, bastion_key, bastion_host, vault_host, command, *args):
     """Call ../vault/bastion.py with a list of hardcoded AWS / SSH arguments.
     This is a common function for any other function that needs to populate
     or provision Vault when starting up new VMs.
     """
-    import subprocess
+    bastion_ip = bastion.machine_lookup(session, bastion_host)
+    vault_ip = bastion.machine_lookup(session, vault_host)
+    def cmd():
+        # Have to dynamically lookup the function because vault.COMMANDS
+        # references the command line version of the commands we want to execute
+        vault.__dict__[command.replace('-','_')](*args, machine=vault_host)
         
-    cmd = ["./bastion.py",
-            "-a", "../packer/variables/aws-credentials",
-            "-s", "/home/microns/.ssh/pryordm1-test.pem",
-            "bastion.core.boss",
-            "vault.core.boss",
-            command]
-            
-    proc = subprocess.Popen(cmd,
-                             cwd = "../vault/",
-                             stdin = subprocess.PIPE,
-                             stdout = subprocess.DEVNULL, # Supress output
-                             stderr = subprocess.DEVNULL,
-                             universal_newlines=True)
-                             
-    if input is not None:
-        proc.communicate(input)
-        
-    proc.wait()
-                             
-    return proc.returncode
-    
-def generate_token():
-    """Generate a new access token to Vault using the 'vault-provision'
-    command. The resulting token is read from its file on disk and then
-    the file is removed to prevent anyone else from reading the token.
-    """
-    print("Generating vault access token...")
-    result = _call_vault("vault-provision")
-    
-    file = "../vault/private/new_token"
-    with open(file, "r") as fh:
-        token = fh.read()
-    os.remove(file) # prevent someone else reading the token
-    
-    return token
-    
-def revoke_token(token):
-    """Revoke an access token to Vault using the 'vault-revoke'
-    command.
-    """
-    print("Revoking vault access token...")
-    _call_vault("vault-revoke", token + "\n")
-    
-def save_django(db, user, password, host, port):
-    """Provision Vault with Django database credentials using the
-    'vault-django' command.
-    """
-    print("Saving Django database access information...")
-    args = "\n".join([db, user, password, host, port])
-    result = _call_vault("vault-django", args)
-    
-def add_userdata(resources, machine, data):
-    """Locate the specified machine in the resources dictionary and add the
-    data as Base64 encoded UserData.
-    """
-    resources[machine]["Properties"]["UserData"] = { "Fn::Base64" : data }
-
+    bastion.connect_vault(bastion_key, vault_ip, bastion_ip, cmd)
+ 
+def password(what):
+    while True:
+        pass_ = getpass.getpass("{} Password: ".format(what))
+        pass__ = getpass.getpass("Verify {} Password: ".format(what))
+        if pass_ == pass__:
+            return pass_
+        else:
+            print("Passwords didn't match, try again.")
+ 
 def vpc_id_lookup(session, vpc_domain):
     """Lookup the Id for the VPC with the given domain name."""
     if session is None: return None
@@ -273,25 +154,3 @@ def keypair_lookup(session):
         except:
             print("Invalid Key Pair number, try again")
             
-def peer_route_update(session, from_vpc, to_vpc):
-    """Update the peer VPC's routing tables with routes to the originating VPC."""
-    if session is None: return None
-    
-    from_id = vpc_id_lookup(session, from_vpc)
-    to_id = vpc_id_lookup(session, to_vpc)
-    peer_id = peering_lookup(session, from_id, to_id)
-    print("peer {} -> {} = {}".format(from_id, to_id, peer_id))
-    int_rt_id = rt_lookup(session, to_id, "internal")
-    ext_rt_id = rt_lookup(session, to_id, "external")
-    
-    from_cidr = hosts.lookup(from_vpc)
-    
-    resource = session.resource('ec2')
-    rt = resource.RouteTable(int_rt_id)
-    rt.create_route(DestinationCidrBlock=from_cidr,
-                    VpcPeeringConnectionId=peer_id)
-    if ext_rt_id is not None:
-        rt = resource.RouteTable(ext_rt_id)
-        rt.create_route(DestinationCidrBlock=from_cidr,
-                        VpcPeeringConnectionId=peer_id)
-

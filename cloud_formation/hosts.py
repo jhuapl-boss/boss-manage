@@ -39,6 +39,8 @@ VPCS = {
     "production": 1,
     
     "development": 250,
+    "test-core": 253,
+    "test-production": 254,
     "test": 255,
 }
 
@@ -52,8 +54,10 @@ SUBNETS = {
     
     ("development", "pryordm1") : 1,
     
-    ("test", "internal") : 0,
-    ("test", "external") : 1,
+    ("test-core", "internal") : 0,
+    ("test-core", "external") : 1,
+    ("test-production", "a") : 0,
+    ("test-production", "b") : 1,
     ("test", "test") : 255,
 }
 
@@ -65,6 +69,10 @@ STATIC = {
     "bastion.core.boss": "10.0.1.4",
     "vault.core.boss": "10.0.0.5",
     "auth.core.boss": "10.0.0.6",
+    
+    
+    "bastion.test-core.boss": "10.253.1.4",
+    "vault.test-core.boss": "10.253.0.5",
 }
 
 
