@@ -20,6 +20,20 @@ import vault
 # Needed to prevent ssh from asking about the fingerprint from new machines
 SSH_OPTIONS = "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 
+def create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user="ec2-user"):
+    fwd_cmd_fmt = "ssh -i {} {} -N -L {}:{}:{} {}@{}"
+    fwd_cmd = fwd_cmd_fmt.format(key,
+                                 SSH_OPTIONS,
+                                 local_port,
+                                 remote_ip,
+                                 remote_port,
+                                 bastion_user,
+                                 bastion_ip)
+                                 
+    proc = subprocess.Popen(shlex.split(fwd_cmd))
+    time.sleep(1) # wait for the tunnel to be setup
+    return proc
+
 def become_tty_fg():
     """A helper function for subprocess.call(preexec_fn=) that makes the
     called command to become the foreground process in the terminal,
@@ -36,7 +50,7 @@ def become_tty_fg():
     os.tcsetpgrp(tty, os.getpgrp())
     signal.signal(signal.SIGTTOU, hdlr)
 
-def ssh(key, remote, bastion):
+def ssh(key, remote_ip, bastion_ip):
     """Create an SSH tunnel from the local machine to bastion that gets
     forwarded to remote. Launch a second SSH connection (using
     become_tty_fg) through the SSH tunnel to the remote machine.
@@ -46,18 +60,16 @@ def ssh(key, remote, bastion):
     NOTE: This command uses fixed port numbers, so only one instance of this
           command can be launched on a single machine at the same time.
     """
-    fwd_cmd = "ssh -i {} {} -N -L 2222:{}:22 ec2-user@{}".format(key, SSH_OPTIONS, remote, bastion)
     ssh_cmd = "ssh -i {} {} -p 2222 ubuntu@localhost".format(key, SSH_OPTIONS)
     
-    proc = subprocess.Popen(shlex.split(fwd_cmd))
-    time.sleep(1) # wait for the tunnel to be setup
+    proc = create_tunnel(key, 2222, remote_ip, 22, bastion_ip)
     try:
         ret = subprocess.call(shlex.split(ssh_cmd), close_fds=True, preexec_fn=become_tty_fg)
     finally:
         proc.terminate()
         proc.wait()
     
-def connect_vault(key, remote, bastion, cmd):
+def connect_vault(key, remote_ip, bastion_ip, cmd):
     """Create an SSH tunnel from the local machine to bastion that gets
     forwarded to remote. Call a command and then destroy the SSH tunnel.
     The SSH Tunnel forwards port 8200, the Vault default port.
@@ -65,10 +77,8 @@ def connect_vault(key, remote, bastion, cmd):
     NOTE: Currently the commands that are passed to this function are
           defined in vault.py.
     """
-    fwd_cmd = "ssh -i {} {} -N -L 8200:{}:8200 ec2-user@{}".format(key, SSH_OPTIONS, remote, bastion)
-
-    proc = subprocess.Popen(shlex.split(fwd_cmd))
-    time.sleep(1) # wait for the tunnel to be setup
+    
+    proc = create_tunnel(key, 8200, remote_ip, 8200, bastion_ip)
     try:
         cmd()
     finally:
@@ -150,7 +160,10 @@ if __name__ == "__main__":
         parser.print_usage()
         print("Error: SSH key not provided and SSH_KEY is not defined")
         sys.exit(1)
-    # Add check to make sure ssh_key exists
+    if not os.path.exists(args.ssh_key):
+        parser.print_usage()
+        print("Error: SSH key '{}' does not exist".format(args.ssh_key))
+        sys.exit(1)
 
     session = create_session(args.aws_credentials)
     bastion = machine_lookup(session, args.bastion)
@@ -159,7 +172,7 @@ if __name__ == "__main__":
     if args.command in ("ssh",):
         ssh(args.ssh_key, private, bastion)
     elif args.command in vault.COMMANDS:
-        connect_vault(args.ssh_key, private, bastion, vault.COMMANDS[args.command])
+        connect_vault(args.ssh_key, private, bastion, lambda: vault.COMMANDS[args.command](args.internal))
     else:
         parser.print_usage()
         sys.exit(1)

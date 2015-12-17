@@ -18,11 +18,22 @@ import json
 import uuid
 
 """Location to store and read the Vault's Root Token"""
-VAULT_TOKEN = "private/vault_token"
-VAULT_KEY = "private/vault_key."
-NEW_TOKEN = "private/new_token"
+VAULT_TOKEN = "vault_token"
+VAULT_KEY = "vault_key."
+NEW_TOKEN = "new_token"
 
-def get_client(read_token = False):
+_CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
+def get_path(machine, filename):
+    if machine is None:
+        machine = ""
+        
+    path = os.path.join(_CURRENT_DIR, "private", machine, filename)
+    
+    os.makedirs(os.path.dirname(path), exist_ok = True)
+    
+    return path
+
+def get_client(read_token = False, machine = None):
     """Open a connection to the Vault located at http://localhost:8200
     
     If read_token == True then read the token from VAULT_TOKEN and verify
@@ -35,11 +46,12 @@ def get_client(read_token = False):
     client = hvac.Client(url="http://localhost:8200")
     
     if read_token:
-        if not os.path.exists(VAULT_TOKEN):
+        token_file = get_path(machine, VAULT_TOKEN)
+        if not os.path.exists(token_file):
             print("Need the root token to communicate with the Vault, exiting...")
             sys.exit(1)
             
-        with open(VAULT_TOKEN, "r") as fh:
+        with open(token_file, "r") as fh:
             client.token = fh.read()
             if not client.is_authenticated():
                 print("Vault token is not valid, cannot communicate with the Vault, exiting...")
@@ -47,7 +59,7 @@ def get_client(read_token = False):
             
     return client
 
-def vault_init():
+def vault_init(machine = None, secrets = 5, threashold = 3):
     """Initialize a Vault. Connect using get_client() and if the Vault is not
     initialized then initialize it with 5 secrets and a threashold of 3. The
     keys are stored as VAULT_KEY and root token is stored as VAULT_TOKEN.
@@ -55,20 +67,20 @@ def vault_init():
     After initializing the Vault it is unsealed for use.
     """
        
-    client = get_client()
+    client = get_client(machine = machine)
     if client.is_initialized():
         print("Vault is already initialized")
         return
-    
-    secrets = 5
-    threashold = 3
+
     print("Initializing with {} secrets and {} needed to unseal".format(secrets, threashold))
     result = client.initialize(secrets, threashold)
     
-    with open(VAULT_TOKEN, "w") as fh:
+    token_file = get_path(machine, VAULT_TOKEN)
+    key_file = get_path(machine, VAULT_KEY)
+    with open(token_file, "w") as fh:
         fh.write(result["root_token"])
     for i in range(secrets):
-        with open(VAULT_KEY + str(i+1), "w") as fh:
+        with open(key_file + str(i+1), "w") as fh:
             fh.write(result["keys"][i])
        
     print()
@@ -81,7 +93,7 @@ def vault_init():
     print("Unsealing Vault")
     client.unseal_multi(result["keys"])
     
-def vault_unseal():
+def vault_unseal(machine = None):
     """Unseal a sealed Vault. Connect using get_client() and if the Vault is
     not sealed read all of the keys defined by VAULT_KEY and unseal.
     
@@ -90,13 +102,14 @@ def vault_unseal():
     process.
     """
     
-    client = get_client()
+    client = get_client(machine = machine)
     if not client.is_sealed():
         print("Vault is already unsealed")
         return
         
+    key_file = get_path(machine, VAULT_KEY)
     keys = []
-    for f in glob.glob(VAULT_KEY + "*"):
+    for f in glob.glob(key_file + "*"):
         with open(f, "r") as fh:
             keys.append(fh.read())
             
@@ -113,7 +126,7 @@ def vault_unseal():
     else:
         print("Vault unsealed")
         
-def vault_seal():
+def vault_seal(machine = None):
     """Seal an unsealed Vault. Connect using get_client(True) and if the Vault
     is unsealed, seal it.
     
@@ -121,7 +134,7 @@ def vault_seal():
     on a protected VM.
     """
     
-    client = get_client(read_token = True)
+    client = get_client(read_token = True, machine = machine)
     if client.is_sealed():
         print("Vault is already sealed")
         return
@@ -129,7 +142,7 @@ def vault_seal():
     client.seal()
     print("Vault is sealed")
     
-def vault_status():
+def vault_status(machine = None):
     """Print the status of a Vault. Connect using get_client(True) and print
     the status of the following items (if available):
      * Initializing status
@@ -142,7 +155,7 @@ def vault_status():
      * Auth backends
     """
     
-    client = get_client(read_token = True)
+    client = get_client(read_token = False, machine = machine)
     if not client.is_initialized():
         print("Vault is not initialized")
         return
@@ -155,7 +168,9 @@ def vault_status():
         return
     else:
         print("Vault is unsealed")
-      
+    
+    # read in the Vault access token
+    client = get_client(read_token = True, machine = machine)
     print()
     print("Key Status")
     print(json.dumps(client.key_status))
@@ -180,26 +195,35 @@ def vault_status():
     print("Auth Backends")
     print(json.dumps(client.list_auth_backends(), indent=True))
     
-def vault_provision():
+def vault_provision(machine = None):
     """Create a new Vault access token. Connect using get_client(True),
     request a new access token (default policy), and save it to NEW_TOKEN.
     """
-    client = get_client(read_token = True)
+    client = get_client(read_token = True, machine = machine)
     
     token = client.create_token()
-    with open(NEW_TOKEN, "w") as fh:
-        fh.write(token["auth"]["client_token"])
+    return token["auth"]["client_token"]
+        
+def _vault_provision(machine = None):
+    token = vault_provision(machine)
+    
+    token_file = get_path(machine, NEW_TOKEN)
+    with open(token_file, "w") as fh:
+        fh.write(token)
 
-def vault_revoke():
+def vault_revoke(token, machine = None):
     """Revoke a Vault access token. Connect using get_client(True), read the
     token (using input()), and then revoke the token.
     """
-    client = get_client(read_token = True)
-    token = input("token: ")
+    client = get_client(read_token = True, machine = machine)
     
     client.revoke_token(token)
-        
-def vault_django():
+    
+def _vault_revoke(machine = None):
+    token = input("token: ") # prompt for token or ready fron NEW_TOKEN (or REVOKE_TOKEN)?
+    vault_revoke(token)
+    
+def vault_django(db_name, username, password, hostname, port, machine = None):
     """Provision a Vault with credentials for a Django webserver. Connect
     using get_client(True) and provision the following information:
      * Generate a secret key and store under 'secret/django secret_key=`
@@ -216,22 +240,33 @@ def vault_django():
        - 'secret/django/db host='
        - 'secret/django/db port='
     """
-    client = get_client(read_token = True)
+    client = get_client(read_token = True, machine = machine)
     
     client.write("secret/django", secret_key = str(uuid.uuid4()))
-    db = {}
-    for key in ["name", "user", "password", "host", "port"]:
-        db[key] = input(key + ": ")
+    db = {
+        "name": db_name,
+        "user": username,
+        "password": password,
+        "host": hostname,
+        "port": port
+    }
     client.write("secret/django/db", **db)
+        
+def _vault_django(machine = None):
+    args = []
+    for key in ["name", "user", "password", "host", "port"]:
+        args.append(input(key + ": "))
+        
+    vault_django(*args, machine = machine)
         
 COMMANDS = {
     "vault-init": vault_init,
     "vault-unseal": vault_unseal,
     "vault-seal": vault_seal,
     "vault-status": vault_status,
-    "vault-provision": vault_provision,
-    "vault-revoke": vault_revoke,
-    "vault-django": vault_django,
+    "vault-provision": _vault_provision,
+    "vault-revoke": _vault_revoke,
+    "vault-django": _vault_django,
 }
 
 if __name__ == '__main__':
@@ -246,6 +281,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Script for manipulating Vault instances",
                                      formatter_class=argparse.RawDescriptionHelpFormatter,
                                      epilog=commands_help)
+    parser.add_argument("--machine", "-m", help = "The name of the Vault server, used to read/write tokens and keys.")
     parser.add_argument("command",
                         choices = commands,
                         metavar = "command",
@@ -254,7 +290,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.command in COMMANDS:
-        COMMANDS[args.command]()
+        COMMANDS[args.command](args.machine)
     else:
         parser.print_usage()
         sys.exit(1)
