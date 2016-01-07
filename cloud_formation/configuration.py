@@ -1,6 +1,8 @@
 import os
 import time
 import json
+import io
+import configparser
 import hosts
 import library as lib
 
@@ -20,10 +22,6 @@ that they want...
 
 def bool_str(val):
     return "true" if val else "false"
-
-class Ref:
-    def __init__(self, key):
-        pass
         
 class Arg:
     def __init__(self, key, parameter, argument):
@@ -36,6 +34,16 @@ class Arg:
         parameter =  {
             "Description" : description,
             "Type": "String"
+        }
+        argument = lib.template_argument(key, value)
+        return Arg(key, parameter, argument)
+        
+    @staticmethod
+    def Password(key, value, description=""):
+        parameter =  {
+            "Description" : description,
+            "Type": "String",
+            "NoEcho": "true"
         }
         argument = lib.template_argument(key, value)
         return Arg(key, parameter, argument)
@@ -253,7 +261,7 @@ class CloudFormationConfiguration:
         self.add_arg(domain)
     
     # ??? save hostname : keypair somewhere?
-    def add_ec2_instance(self, key, hostname, ami, keypair, subnet="Subnet", type_="m3.medium", iface_check=False, public_ip=False, security_groups=None, user_data=None):
+    def add_ec2_instance(self, key, hostname, ami, keypair, subnet="Subnet", type_="t2.micro", iface_check=True, public_ip=False, security_groups=None, user_data=None, meta_data=None, depends_on=None):
         """
             security_groups = [security group, ...]
         """
@@ -278,11 +286,17 @@ class CloudFormationConfiguration:
             }
         }
         
+        if depends_on is not None:
+            self.resources[key]["DependsOn"] = depends_on
+        
         if security_groups is not None:
             sgs = []
             for sg in security_groups:
                 sgs.append({ "Ref" : sg })
             self.resources[key]["Properties"]["NetworkInterfaces"][0]["GroupSet"] = sgs
+        
+        if meta_data is not None:
+            self.resources[key]["Metadata"] = meta_data
             
         if user_data is not None:
             self.resources[key]["Properties"]["UserData"] = { "Fn::Base64" : user_data }
@@ -355,8 +369,8 @@ class CloudFormationConfiguration:
                                "Master Username for RDS DB Instance '{}'".format(key))
         self.add_arg(username_)
         
-        password_ = Arg.String(key + "Password", password,
-                               "Master User Password for RDS DB Instance '{}'".format(key))
+        password_ = Arg.Password(key + "Password", password,
+                                 "Master User Password for RDS DB Instance '{}'".format(key))
         self.add_arg(password_)
     
     def add_security_group(self, key, name, rules, vpc="VPC"):
@@ -490,3 +504,18 @@ class CloudFormationConfiguration:
         peer_vpc_ = Arg.VPC(key + "PeerVPC", peer_vpc,
                             "Destination VPC for the peering connection")
         self.add_arg(peer_vpc_)
+
+class UserData:
+    def __init__(self, config_file = "../salt_stack/salt/boss/files/boss.config.default"):
+        self.config = configparser.ConfigParser()
+        self.config.read(config_file)
+        
+    def __getitem__(self, key):
+        return self.config[key]
+        
+    def __str__(self):
+        buffer = io.StringIO()
+        self.config.write(buffer)
+        data = buffer.getvalue()
+        buffer.close()
+        return data

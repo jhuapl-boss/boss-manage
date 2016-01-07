@@ -80,7 +80,7 @@ def connect_vault(key, remote_ip, bastion_ip, cmd):
     
     proc = create_tunnel(key, 8200, remote_ip, 8200, bastion_ip)
     try:
-        cmd()
+        return cmd()
     finally:
         proc.terminate()
         proc.wait()

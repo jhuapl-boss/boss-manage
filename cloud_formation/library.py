@@ -47,9 +47,9 @@ def call_vault(session, bastion_key, bastion_host, vault_host, command, *args):
     def cmd():
         # Have to dynamically lookup the function because vault.COMMANDS
         # references the command line version of the commands we want to execute
-        vault.__dict__[command.replace('-','_')](*args, machine=vault_host)
+        return vault.__dict__[command.replace('-','_')](*args, machine=vault_host)
         
-    bastion.connect_vault(bastion_key, vault_ip, bastion_ip, cmd)
+    return bastion.connect_vault(bastion_key, vault_ip, bastion_ip, cmd)
  
 def password(what):
     while True:
@@ -99,7 +99,8 @@ def sg_lookup(session, vpc_id, group_name):
     
     client = session.client('ec2')
     response = client.describe_security_groups(Filters=[{"Name":"vpc-id", "Values":[vpc_id]},
-                                                        {"Name":"group-name", "Values":[group_name]}])
+                                                        {"Name":"tag:Name", "Values":[group_name]}])
+                                                        
     if len(response['SecurityGroups']) == 0:
         return None
     else:
@@ -117,6 +118,18 @@ def rt_lookup(session, vpc_id, rt_name):
         return None
     else:
         return response['RouteTables'][0]['RouteTableId']
+        
+def rt_name_default(session, vpc_id, new_rt_name):
+    """Find the default VPC Route Table and give it a name so that it can be referenced latter.
+    Needed because by default the Route Table does not have a name and rt_lookup() will not find it. """
+
+    client = session.client('ec2')
+    response = client.describe_route_tables(Filters=[{"Name":"vpc-id", "Values":[vpc_id]}])
+    rt_id = response['RouteTables'][0]['RouteTableId'] # TODO: verify that Tags does not already have a name tag
+
+    resource = session.resource('ec2')
+    rt = resource.RouteTable(rt_id)
+    response = rt.create_tags(Tags=[{"Key": "Name", "Value": new_rt_name}])
         
 def peering_lookup(session, from_id, to_id):
     """Lookup the Id for the Peering Connection between the two VPCs."""

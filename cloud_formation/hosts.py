@@ -39,8 +39,6 @@ VPCS = {
     "production": 1,
     
     "development": 250,
-    "test-core": 253,
-    "test-production": 254,
     "test": 255,
 }
 
@@ -54,10 +52,10 @@ SUBNETS = {
     
     ("development", "pryordm1") : 1,
     
-    ("test-core", "internal") : 0,
-    ("test-core", "external") : 1,
-    ("test-production", "a") : 0,
-    ("test-production", "b") : 1,
+    ("test", "internal") : 0,
+    ("test", "external") : 1,
+    ("test", "a") : 2,
+    ("test", "b") : 3,
     ("test", "test") : 255,
 }
 
@@ -71,9 +69,20 @@ STATIC = {
     "auth.core.boss": "10.0.0.6",
     
     
-    "bastion.test-core.boss": "10.253.1.4",
-    "vault.test-core.boss": "10.253.0.5",
+    "bastion.test.boss": "10.255.1.4",
+    "vault.test.boss": "10.255.0.5",
 }
+
+
+HOSTS = """
+# Core Machines
+{TLD_IP}.{VPC_IP}.{EXTERNAL_SUBNET}.{BASTION_IP}\tbastion.{VPC}.{TLD} bastion
+{TLD_IP}.{VPC_IP}.{INTERNAL_SUBNET}.{VAULT_IP}\tvault.{VPC}.{TLD} vault
+
+# Production Machines
+{TLD_IP}.{VPC_IP}.{EXTERNAL_SUBNET}.{API_IP}\tapi.{VPC}.{TLD} api
+"""
+
 
 
 ##

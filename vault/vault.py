@@ -223,7 +223,7 @@ def _vault_revoke(machine = None):
     token = input("token: ") # prompt for token or ready fron NEW_TOKEN (or REVOKE_TOKEN)?
     vault_revoke(token)
     
-def vault_django(db_name, username, password, hostname, port, machine = None):
+def vault_django(db_name, username, password, port, machine = None):
     """Provision a Vault with credentials for a Django webserver. Connect
     using get_client(True) and provision the following information:
      * Generate a secret key and store under 'secret/django secret_key=`
@@ -237,7 +237,6 @@ def vault_django(db_name, username, password, hostname, port, machine = None):
        - 'secret/django/db name='
        - 'secret/django/db user='
        - 'secret/django/db password='
-       - 'secret/django/db host='
        - 'secret/django/db port='
     """
     client = get_client(read_token = True, machine = machine)
@@ -254,7 +253,7 @@ def vault_django(db_name, username, password, hostname, port, machine = None):
         
 def _vault_django(machine = None):
     args = []
-    for key in ["name", "user", "password", "host", "port"]:
+    for key in ["name", "user", "password", "port"]:
         args.append(input(key + ": "))
         
     vault_django(*args, machine = machine)

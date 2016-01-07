@@ -17,49 +17,57 @@ ADDRESSES = {
     "db": range(20, 30),
 }
        
-def create_config(session, domain, keypair=None, api_token=None, db_config=None):
+def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     config = configuration.CloudFormationConfiguration(domain, ADDRESSES)
 
     if config.subnet_domain is not None:
         raise Exception("Invalid VPC domain name")
         
-    if session is not None and lib.vpc_id_lookup(session, domain) is not None:
-        raise Exception("VPC already exists, exiting...")    
-    # Allow production to be launched into an existing VPC (a core one)?
+    vpc_id = lib.vpc_id_lookup(session, domain)
+    if session is not None and vpc_id is None:
+        raise Exception("VPC does not exists, exiting...")
+        
+    config.add_arg(configuration.Arg.VPC("VPC", vpc_id,
+                                         "ID of VPC to create resources in"))
     
-    config.add_vpc()
+    external_subnet_id = lib.subnet_id_lookup(session, "external." + domain)
+    config.add_arg(configuration.Arg.Subnet("ExternalSubnet",
+                                            external_subnet_id,
+                                            "ID of External Subnet to create resources in"))
+                                            
+    internal_sg_id = lib.sg_lookup(session, vpc_id, "internal." + domain)
+    config.add_arg(configuration.Arg.SecurityGroup("InternalSecurityGroup",
+                                                   internal_sg_id,
+                                                   "ID of internal Security Group"))
     
     config.subnet_domain = "a." + domain
     config.subnet_subnet = hosts.lookup(config.subnet_domain)
-    config.add_subnet("ASubnet")
+    config.add_subnet("ASubnet", az="us-east-1b")
     
     config.subnet_domain = "b." + domain
     config.subnet_subnet = hosts.lookup(config.subnet_domain)
     config.add_subnet("BSubnet", az="us-east-1c") # BSubnet needs to be in a different AZ from ASubnet
     
+    user_data_ = { "Fn::Join" : ["", [user_data, "\n[aws]\ndb = ", { "Fn::GetAtt" : [ "DB", "Endpoint.Address" ] }, "\n"]]}
+    
     config.add_ec2_instance("API",
-                            "api.a." + domain,
-                            lib.ami_lookup(session, "web.boss"),
+                            "api.external." + domain,
+                            lib.ami_lookup(session, "api.boss"),
                             keypair,
-                            subnet = "ASubnet",
+                            public_ip = True,
+                            subnet = "ExternalSubnet",
                             security_groups = ["InternalSecurityGroup", "InternetSecurityGroup"],
-                            user_data = api_token)
-                            
-    def db_key(key):
-        return None if db_config is None else db_config[key]
+                            user_data = user_data_,
+                            depends_on = "DB") # make sure the DB is launched before we start
 
     config.add_rds_db("DB",
-                      "db.a." + domain,
-                      db_key("port"),
-                      db_key("name"),
-                      db_key("user"),
-                      db_key("password"),
+                      "db." + domain,
+                      db_config.get("port"),
+                      db_config.get("name"),
+                      db_config.get("user"),
+                      db_config.get("password"),
                       ["ASubnet", "BSubnet"],
                       security_groups = ["InternalSecurityGroup"])
-                            
-    config.add_security_group("InternalSecurityGroup",
-                              "internal",
-                              [("-1", "-1", "-1", "10.0.0.0/8")])
                               
     config.add_security_group("InternetSecurityGroup",
                               "internet",
@@ -68,51 +76,45 @@ def create_config(session, domain, keypair=None, api_token=None, db_config=None)
                                 ("tcp", "80", "80", "0.0.0.0/0"),
                                 ("tcp", "443", "443", "0.0.0.0/0")
                               ])
-                              
-    config.add_route_table("InternetRouteTable",
-                           "internet",
-                           subnets = ["ASubnet"])
-                           
-    config.add_route_table_route("InternetRoute",
-                                 "InternetRouteTable",
-                                 gateway = "InternetGateway",
-                                 depends_on = "AttachInternetGateway")
-                                 
-    config.add_internet_gateway("InternetGateway")
-                              
+    
     return config
-                                
   
 def generate(folder, domain):
-    name = lib.domain_to_stackname(domain)
+    name = lib.domain_to_stackname("production." + domain)
     config = create_config(None, domain)
     config.generate(name, folder)
                           
 def create(session, domain):
     keypair = lib.keypair_lookup(session)
-    core_vpc = input("Core VPC: ")
     
     def call_vault(command, *args):
         return lib.call_vault(session,
                               lib.keypair_to_file(keypair),
-                              "bastion." + core_vpc,
-                              "vault." + core_vpc,
+                              "bastion." + domain,
+                              "vault." + domain,
                               command, *args)
     
     db = {
         "name":"boss",
         "user":"testuser",
         "password": lib.password("Django DB"),
-        "host":"db.a." + domain,
         "port": "3306"
     }
     
     api_token = call_vault("vault-provision")
-    call_vault("vault-django", db["name"], db["user"], db["password"], db["host"], db["port"])
+    user_data = configuration.UserData()
+    # CAUTION: This hard codes the Vault address in the config file passed and will cause
+    #          problems if the template is saved and launched with a different Vault IP
+    user_data["vault"]["url"] = "http://{}:8200".format(hosts.lookup("vault." + domain))
+    user_data["vault"]["token"] = api_token
+    user_data["system"]["fqdn"] = "api.external." + domain
+    user_data = str(user_data)
+    
+    call_vault("vault-django", db["name"], db["user"], db["password"], db["port"])
 
     try:
-        name = lib.domain_to_stackname(domain)
-        config = create_config(session, domain, keypair, api_token, db)
+        name = lib.domain_to_stackname("production." + domain)
+        config = create_config(session, domain, keypair, user_data, db)
         
         success = config.create(session, name)
         if not success:
@@ -121,7 +123,7 @@ def create(session, domain):
         print("Error detected, revoking secrets")
         # currently no command for deleting data from Vault, just override it
         try:
-            call_vault("vault-django", "", "", "", "", "")
+            call_vault("vault-django", "", "", "", "")
         except:
             print("Error revoking Django credentials")
         try:
