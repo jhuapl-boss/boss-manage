@@ -1,0 +1,6 @@
+[system]
+fqdn = 
+
+[vault]
+url = http://vault:8200
+token =
