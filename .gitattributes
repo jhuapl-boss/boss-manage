@@ -1,5 +1,0 @@
-# Enforce LF line endings even on Windows.
-* text eol=lf
-
-# Tell Git vault is a binary file.
-salt_stack/salt/vault/files/vault binary
