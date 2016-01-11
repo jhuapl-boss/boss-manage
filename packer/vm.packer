@@ -26,7 +26,7 @@
     "builders": [{
         "type": "virtualbox-ovf",
         "source_path": "{{user `vb_source_path`}}",
-        "guest_additions_mode": "disable",
+        "guest_additions_mode": "upload",
         "ssh_username": "microns",
         "ssh_password": "microns",
         "shutdown_command": "sudo -S shutdown -P now",
@@ -62,6 +62,33 @@
             ]
         },
         {
+            "type": "shell",
+            "inline_shebang": "/bin/bash -e",
+            "inline": [
+                "if [[ $PACKER_BUILDER_TYPE =~ virtualbox-.* ]]",
+                "then",
+                "echo 'Get packages necessary for VirtualBox Guest Additions.'",
+                "sudo apt-get -y install dkms build-essential linux-headers-$(uname -r)",
+                "fi"
+            ]
+        },
+        {
+            "type": "shell",
+            "inline_shebang": "/bin/bash -e",
+            "inline": [
+                "if [[ $PACKER_BUILDER_TYPE =~ virtualbox-.* ]]",
+                "then",
+                "echo 'Compile and install Guest Additions.'",
+                "mkdir ~/guestAdditions",
+                "sudo mount ~/VBoxGuestAdditions.iso ~/guestAdditions",
+                "sudo sh ~/guestAdditions/VBoxLinuxAdditions.run || echo \"VBoxLinuAdditions.run exited $? and is suppressed.\"",
+                "sudo umount ~/guestAdditions",
+                "rmdir ~/guestAdditions",
+                "rm ~/VBoxGuestAdditions.iso",
+                "fi"
+            ]
+        },
+        {
             "type": "salt-masterless",
             "skip_bootstrap": false,
             "bootstrap_args": "-i {{user `name`}} stable 2015.8",
@@ -70,5 +97,11 @@
             "local_pillar_roots": "../salt_stack/pillar",
             "remote_pillar_roots": "/srv/pillar"
         }
-    ]
+    ],
+    "post-processors": [{
+        "type": "vagrant",
+        "keep_input_artifact": true,
+        "only": ["virtualbox-ovf"],
+        "output": "output/vagrant-virtualbox-{{user `name`}}.box"
+        }]
 }
