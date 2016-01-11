@@ -32,10 +32,6 @@ vault-init.d:
         - require:
             - pkg: daemon
             - file: vault-bin
-            
-vault-service:
-    service.running:
-        - name: vault
-        - enable: True
-        - require:
-            - file: vault-init.d
+    cmd.run:
+        - name: update-rc.d vault defaults 99
+        - user: root
