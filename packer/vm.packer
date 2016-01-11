@@ -58,7 +58,7 @@
                 "sudo sed -i \"s/`hostname`/{{user `name`}}/\" /etc/hosts",
                 "sudo sh -c 'echo {{user `name`}} > /etc/hostname'",
                 "sudo hostname -F /etc/hostname",
-                "sudo apt-get -y install curl"
+                "sudo apt-get -y install curl=7.35.0-1ubuntu2.5"
             ]
         },
         {
