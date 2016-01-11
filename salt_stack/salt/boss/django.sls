@@ -5,7 +5,11 @@ include:
     
 django-prerequirements:
     pkg.installed:
-        - name: libmysqlclient-dev
+        - pkgs:
+            - libmysqlclient-dev
+            - nginx
+            - uwsgi
+            - uwsgi-plugin-python3
     
 django-requirements:
     pip.installed:
@@ -24,3 +28,27 @@ django-files:
         - include_empty: true
         - require:
             - sls: python.python3
+            
+nginx-config:
+    file.managed:
+        - name: /etc/nginx/sites-available/boss
+        - source: salt://boss/files/boss.git/boss_nginx.conf
+        
+nginx-enable-config:
+    file.symlink:
+        - name: /etc/nginx/sites-enabled/boss
+        - target: /etc/nginx/sites-available/boss
+        
+nginx-disable-default:
+    file.absent:
+        - name: /etc/nginx/sites-enabled/default
+        
+uwsgi-config:
+    file.managed:
+        - name: /etc/uwsgi/apps-available/boss.ini
+        - source: salt://boss/files/boss.git/boss_uwsgi.ini
+
+uwsgi-enable-config:
+    file.symlink:
+        - name: /etc/uwsgi/apps-enabled/boss.ini
+        - target: /etc/uwsgi/apps-available/boss.ini

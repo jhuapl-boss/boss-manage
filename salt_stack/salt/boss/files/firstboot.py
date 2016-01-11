@@ -32,8 +32,12 @@ import urllib.request
 import subprocess
 import shlex
 import os
+import sys
 import configparser
-from boss_utils import CONFIG_FILE, Vault
+from boss_utils import CONFIG_FILE, Vault, BossConfig
+
+def execute(cmd):
+    subprocess.call(shlex.split(cmd))
 
 USERDATA_URL = "http://169.254.169.254/latest/user-data"
 METADATA_URL = "http://169.254.169.254/latest/meta-data/"
@@ -50,14 +54,17 @@ def save_user_data():
         fh.write(user_data)
         
 def read_vault_token():
-    vault = Vault()
-    new_token = vault.read("/cubbyhole", "token")
-    vault.logout()
-    
-    config = vault.config
-    config[Vault.VAULT_SECTION][Vault.VAULT_TOKEN_KEY] = new_token
-    with open(CONFIG_FILE, "w") as fh:
-        config.write(fh)
+    config = BossConfig()
+    token = config[Vault.VAULT_SECTION][Vault.VAULT_TOKEN_KEY]
+    if len(token) > 0:
+        vault = Vault()
+        new_token = vault.read("/cubbyhole", "token")
+        vault.logout()
+        
+        config = vault.config
+        config[Vault.VAULT_SECTION][Vault.VAULT_TOKEN_KEY] = new_token
+        with open(CONFIG_FILE, "w") as fh:
+            config.write(fh)
         
 def set_hostname():
     logging.info("set_hostname()")
@@ -90,7 +97,16 @@ def set_hostname():
         fh.truncate()
     
     logging.info("Calling hostname")
-    subprocess.call(shlex.split("hostname -F /etc/hostname"))
+    execute("hostname -F /etc/hostname")
+    
+def configure_django():
+    file = "/srv/www/manage.py"
+    if os.path.exists(file):
+        logging.info("manage.py collectstatic")
+        execute("python3 {} collectstatic --noinput".format(file))
+        
+        logging.info("manage.py migrate")
+        execute("python3 {} migrate".format(file))
     
 if __name__ == '__main__':
     logging.info("CONFIG_FILE = \"{}\"".format(CONFIG_FILE))
@@ -103,3 +119,7 @@ if __name__ == '__main__':
     save_user_data()
     #read_vault_token()
     set_hostname()
+    configure_django()
+    
+    service_name = os.path.basename(sys.argv[0])
+    execute("update-rc.d -f {} remove".format(service_name))
