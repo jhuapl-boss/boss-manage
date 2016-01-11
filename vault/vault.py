@@ -21,6 +21,7 @@ import uuid
 VAULT_TOKEN = "vault_token"
 VAULT_KEY = "vault_key."
 NEW_TOKEN = "new_token"
+PROVISIONER_TOKEN = "vault_token" # Not finished yet "provisioner_token"
 
 _CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 def get_path(machine, filename):
@@ -33,7 +34,7 @@ def get_path(machine, filename):
     
     return path
 
-def get_client(read_token = False, machine = None):
+def get_client(read_token = None, machine = None):
     """Open a connection to the Vault located at http://localhost:8200
     
     If read_token == True then read the token from VAULT_TOKEN and verify
@@ -45,8 +46,8 @@ def get_client(read_token = False, machine = None):
     """
     client = hvac.Client(url="http://localhost:8200")
     
-    if read_token:
-        token_file = get_path(machine, VAULT_TOKEN)
+    if read_token is not None:
+        token_file = get_path(machine, read_token)
         if not os.path.exists(token_file):
             print("Need the root token to communicate with the Vault, exiting...")
             sys.exit(1)
@@ -93,6 +94,30 @@ def vault_init(machine = None, secrets = 5, threashold = 3):
     print("Unsealing Vault")
     client.unseal_multi(result["keys"])
     
+def vault_configure(machine = None):
+    client = get_client(read_token = VAULT_TOKEN, machine = machine)
+    
+    # Audit Backend
+    audit_options = {
+        'low_raw': 'True',
+    }
+    #client.enable_audit_backend('syslog', options=audit_options)
+    
+    # Policies
+    for policy in glob.glob("policies/*.hcl"):
+        name = os.path.basename(policy).split('.')[0]
+        with open(policy, 'r') as fh:
+            client.set_policy(name, fh.read())
+        
+        if name == "provisioner":
+            token_file = get_path(machine, PROVISIONER_TOKEN)
+            token = client.create_token(policies=[name])
+            with open(token_file, "w") as fh:
+                fh.write(token['auth']['client_token'])
+    
+    # AWS Backend
+    # PKI Backend
+    
 def vault_unseal(machine = None):
     """Unseal a sealed Vault. Connect using get_client() and if the Vault is
     not sealed read all of the keys defined by VAULT_KEY and unseal.
@@ -134,7 +159,7 @@ def vault_seal(machine = None):
     on a protected VM.
     """
     
-    client = get_client(read_token = True, machine = machine)
+    client = get_client(read_token = VAULT_TOKEN, machine = machine)
     if client.is_sealed():
         print("Vault is already sealed")
         return
@@ -155,7 +180,7 @@ def vault_status(machine = None):
      * Auth backends
     """
     
-    client = get_client(read_token = False, machine = machine)
+    client = get_client(machine = machine)
     if not client.is_initialized():
         print("Vault is not initialized")
         return
@@ -170,7 +195,7 @@ def vault_status(machine = None):
         print("Vault is unsealed")
     
     # read in the Vault access token
-    client = get_client(read_token = True, machine = machine)
+    client = get_client(read_token = VAULT_TOKEN, machine = machine)
     print()
     print("Key Status")
     print(json.dumps(client.key_status))
@@ -199,7 +224,7 @@ def vault_provision(machine = None):
     """Create a new Vault access token. Connect using get_client(True),
     request a new access token (default policy), and save it to NEW_TOKEN.
     """
-    client = get_client(read_token = True, machine = machine)
+    client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
     
     token = client.create_token()
     return token["auth"]["client_token"]
@@ -215,7 +240,7 @@ def vault_revoke(token, machine = None):
     """Revoke a Vault access token. Connect using get_client(True), read the
     token (using input()), and then revoke the token.
     """
-    client = get_client(read_token = True, machine = machine)
+    client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
     
     client.revoke_token(token)
     
@@ -231,7 +256,6 @@ def vault_django(db_name, username, password, port, machine = None):
        - Database Name
        - Database Username
        - Database Password
-       - Database Hostname
        - Database Port
        and store under
        - 'secret/django/db name='
@@ -239,14 +263,13 @@ def vault_django(db_name, username, password, port, machine = None):
        - 'secret/django/db password='
        - 'secret/django/db port='
     """
-    client = get_client(read_token = True, machine = machine)
+    client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
     
     client.write("secret/django", secret_key = str(uuid.uuid4()))
     db = {
         "name": db_name,
         "user": username,
         "password": password,
-        "host": hostname,
         "port": port
     }
     client.write("secret/django/db", **db)
@@ -260,6 +283,7 @@ def _vault_django(machine = None):
         
 COMMANDS = {
     "vault-init": vault_init,
+    "vault-configure": vault_configure,
     "vault-unseal": vault_unseal,
     "vault-seal": vault_seal,
     "vault-status": vault_status,
