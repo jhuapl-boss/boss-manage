@@ -68,7 +68,8 @@ See https://www.vagrantup.com for more information on Vagrant.
 
 **Note:** If you end up regenerating the Vagrant box via Packer, be sure to
 delete the cached version before running ````vagrant up```` again.  Otherwise,
-you won't be using the latest version of the VM.
+you won't be using the latest version of the VM.  The cached version is stored
+in *~/.vagrant.d/boxes/name-of-the-Vagrant-box*.
 
 
 Building an AWS AMI
