@@ -10,8 +10,8 @@ the first time.
 default.packer
 --------------
 Used for local development and testing using VirtualBox. It creates an OVF
-image using the Packer virtualbox-iso builder. The only modification that it
-does to the stock minimal install is to configure sudo to be passwordless.
+image using the Packer virtualbox-iso builder.  This minimal install
+configures sudo to be passwordless and installs VirtualBox Guest Additions.
 
 `packer build -var 'source=ubuntu-14.04.2-server-amd64' default.packer`
 
@@ -34,13 +34,13 @@ amazon-ebs (which creates a custom AMI image).
           but the credentials variables can be empty.
 
 
-Builing VirtualBox Images
+Building VirtualBox Images
 -------------------------
 To build a virtual box OVF there are two parts. The first part it to install
-Ubuntu using *default.packer*. First you need to download the [iso](http://releases.ubuntu.com/14.04.3/ubuntu-14.04.2-server-amd64.iso)
+Ubuntu using *default.packer*. First you need to download the [iso](http://releases.ubuntu.com/14.04.3/ubuntu-14.04.3-server-amd64.iso)
 and put it in the *packer/files/*. Then run *default.packer* as described above.
 This will install Ubuntu into an OVF that will then be configured as desired.
-This was broken into two steps to make it quicker to itterate SaltStack and
+This was broken into two steps to make it quicker to iterate SaltStack and
 other configuration changes.
 
 Once default.packer completes and creates *output/virtualbox-default/virtualbox-default.ovf*
@@ -51,6 +51,24 @@ populated / configured OVF in *output/virtualbox-<machine-type>/<machine-type>.o
 
 **Note:** If there are problems with Packer saving the results, make sure the
           *output/* directory exists.
+
+Along with the VirtualBox image, a Vagrant box is also placed in the the
+*output/* folder.  Vagrant is meant for developers and devOps work.  It
+generates a reproducible development environment based on the a VM image.  It
+was the first product to come out of Hashicorp (also the creators of Packer and
+Vault).  Once the Vagrant box is configured, you simply type ````vagrant up````
+to spin up your development environment.  
+
+Vagrant automatically maps a shared folder */vagrant* to your working folder
+(the location of the *Vagrantfile* config file) on your host machine, so you
+can use your favorite editor.  A simple example *Vagrantfile* is included
+in the same folder as this README.
+
+See https://www.vagrantup.com for more information on Vagrant.
+
+**Note:** If you end up regenerating the Vagrant box via Packer, be sure to
+delete the cached version before running ````vagrant up```` again.  Otherwise,
+you won't be using the latest version of the VM.
 
 
 Building an AWS AMI
