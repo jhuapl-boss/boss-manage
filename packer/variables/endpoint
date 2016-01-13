@@ -1,4 +1,4 @@
 {
-    "name": "api",
-    "role": "api"
+    "name": "endpoint",
+    "role": "endpoint"
 }

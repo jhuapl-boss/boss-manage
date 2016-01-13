@@ -31,7 +31,7 @@ def create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_u
                                  bastion_ip)
                                  
     proc = subprocess.Popen(shlex.split(fwd_cmd))
-    time.sleep(1) # wait for the tunnel to be setup
+    time.sleep(3) # wait for the tunnel to be setup
     return proc
 
 def become_tty_fg():

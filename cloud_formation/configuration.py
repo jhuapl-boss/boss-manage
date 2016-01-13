@@ -373,6 +373,41 @@ class CloudFormationConfiguration:
                                  "Master User Password for RDS DB Instance '{}'".format(key))
         self.add_arg(password_)
     
+    def add_dynamo_db(self, key, name, attributes, key_schema, throughput):
+        """
+            attributes = {AttributeName : AttributeType, ...}
+            key_schema = {AttributeName : KeyType, ...}
+            throughput = (ReadCapacity, WriteCapacity)
+                ReadCapacity is the minimum number of consistent reads of items per second
+                             before Amazon DynamoDB balances the loads
+                WriteCapacity is the minimum number of consistent writes of items per second
+                              before Amazon DynamoDB balances the loads
+        """
+        attr_defs = []
+        for key in attributes:
+            attr_defs.append({"AttributeName": key, "AttributeType": attributes[key]})
+            
+        key_schema_ = []
+        for key in key_schema:
+            key_schema_.append({"AttributeName": key, "KeyType": attributes[key]})
+    
+        self.resources[key] = {
+            "Type" : "AWS::DynamoDB::Table",
+            "Properties" : {
+                "TableName" : { "Ref" : key + "TableName" },
+                "AttributeDefinitions" : attr_defs,
+                "KeySchema" : key_schema_,
+                "ProvisionedThroughput" : {
+                    "ReadCapacityUnits" : int(throughput[0]),
+                    "WriteCapacityUnits" : int(throughput[1])
+                }
+            }
+        }
+        
+        table_name = Arg.String(key + "TableName", name,
+                                "Name of the DynamoDB table created by instance '{}'".format(key))
+        self.add_arg(table_name)
+    
     def add_security_group(self, key, name, rules, vpc="VPC"):
         """
             rules = [(protocol, from, to, cidr)]
@@ -506,7 +541,12 @@ class CloudFormationConfiguration:
         self.add_arg(peer_vpc_)
 
 class UserData:
-    def __init__(self, config_file = "../salt_stack/salt/boss/files/boss.config.default"):
+    """A wrapper class around configparse.ConfigParser that automatically loads
+    the default boss.config file and provide the ability to return the
+    configuration file as a string. (ConfigParser can only write to a file
+    object)
+    """
+    def __init__(self, config_file = "../salt_stack/salt/boss-tools/files/boss.config.default"):
         self.config = configparser.ConfigParser()
         self.config.read(config_file)
         

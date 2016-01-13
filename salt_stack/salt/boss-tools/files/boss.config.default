@@ -1,5 +1,6 @@
 [system]
 fqdn = 
+type = 
 
 [vault]
 url = http://vault:8200

@@ -33,6 +33,7 @@ def create_config(session, domain):
     #          problems if the template is saved and launched with a different Vault IP
     user_data["vault"]["url"] = "http://{}:8200".format(hosts.lookup("vault." + domain))
     user_data["system"]["fqdn"] = "vault." + domain
+    user_data["system"]["type"] = "vault"
     
     config.add_ec2_instance("Vault",
                             "vault." + domain,
@@ -86,8 +87,8 @@ def create(session, domain):
         lib.rt_name_default(session, vpc_id, "internal." + domain)
         
         try:
-            print("Waiting 2 minutes for VMs to start...")
-            time.sleep(120)
+            print("Waiting 2.5 minutes for VMs to start...")
+            time.sleep(150)
             print("Initializing Vault...")
             lib.call_vault(session,
                            lib.keypair_to_file(keypair),
