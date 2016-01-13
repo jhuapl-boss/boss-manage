@@ -3,13 +3,13 @@
         "source": "The hostname and minion ID of the VM",
         "source": null
     },
-    
+
     "builders": [
     	{
         "type": "virtualbox-iso",
         "disk_size": 20000,
         "guest_os_type": "Ubuntu_64",
-        "guest_additions_mode": "disable",
+        "guest_additions_mode": "upload",
         "http_directory": ".",
         "iso_url": "files/{{user `source`}}.iso",
         "iso_checksum_type": "none",
@@ -34,7 +34,7 @@
         	]
     	}
     ],
-    
+
     "provisioners": [
         {
             "type": "file",
@@ -48,6 +48,33 @@
                 "echo 'microns' | sudo -S chown root /tmp/microns",
                 "echo 'microns' | sudo -S mv /tmp/microns /etc/sudoers.d",
                 "echo 'microns' | sudo -S service sudo restart" ]
+        },
+        {
+            "type": "shell",
+            "inline_shebang": "/bin/bash -e",
+            "inline": [
+                "if [[ $PACKER_BUILDER_TYPE =~ virtualbox-.* ]]",
+                "then",
+                "echo 'Get packages necessary for VirtualBox Guest Additions.'",
+                "sudo apt-get -y install dkms build-essential linux-headers-$(uname -r)",
+                "fi"
+            ]
+        },
+        {
+            "type": "shell",
+            "inline_shebang": "/bin/bash -e",
+            "inline": [
+                "if [[ $PACKER_BUILDER_TYPE =~ virtualbox-.* ]]",
+                "then",
+                "echo 'Compile and install Guest Additions.'",
+                "mkdir ~/guestAdditions",
+                "sudo mount ~/VBoxGuestAdditions.iso ~/guestAdditions",
+                "sudo sh ~/guestAdditions/VBoxLinuxAdditions.run || echo \"VBoxLinuAdditions.run exited $? and is suppressed.\"",
+                "sudo umount ~/guestAdditions",
+                "rmdir ~/guestAdditions",
+                "rm ~/VBoxGuestAdditions.iso",
+                "fi"
+            ]
         }
     ]
 }
