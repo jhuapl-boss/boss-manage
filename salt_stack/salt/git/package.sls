@@ -8,3 +8,4 @@ include:
 git:
   pkg.installed:
     - name: {{ git_settings.git }}
+    - version: {{ git_settings.pkg_version }}

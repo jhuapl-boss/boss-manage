@@ -13,9 +13,12 @@ Vagrant.configure(2) do |config|
   # Every Vagrant development environment requires a box. You can search for
   # boxes at https://atlas.hashicorp.com/search.
 
-  config.vm.define "example" do |example|
-    # Point this at the actual Vagrant box.
-    example.vm.box = "output/vagrant-virtualbox-example.box"
+  config.vm.define "vault" do |vault|
+    vault.vm.box = "packer/output/vagrant-virtualbox-vault.box"
+  end
+
+  config.vm.define "endpoint" do |endpoint|
+    endpoint.vm.box = "packer/output/vagrant-virtualbox-endpoint.box"
   end
 
   # We use the microns account instead of vagrant for login.
