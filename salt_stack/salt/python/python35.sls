@@ -32,4 +32,4 @@ python35:
     - cwd: /tmp
     - shell: /bin/bash
     - timeout: 600
-    #- unless: test -x /usr/local/bin/python3.5 && test -x /usr/local/bin/pip3.5
+    - unless: test -x /usr/local/bin/python3.5 && test -x /usr/local/bin/pip3.5
