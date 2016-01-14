@@ -62,7 +62,7 @@ def password(what):
             print("Passwords didn't match, try again.")
             
 def generate_password(length = 16):
-    chars = string.ascii_letters + string.digits + string.punctuation
+    chars = string.ascii_letters + string.digits #+ string.punctuation
     return "".join([chars[c % len(chars)] for c in os.urandom(length)])
  
 def vpc_id_lookup(session, vpc_domain):
