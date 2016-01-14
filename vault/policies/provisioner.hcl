@@ -1,18 +1,18 @@
 #
-path "/auth/token/lookup-self" {
+path "auth/token/lookup-self" {
     policy = "read"
 }
 
 # Handle token provisioning
-path "/auth/token/create" {
+path "auth/token/create" {
     policy = "write"
 }
 
-path "/auth/token/revoke/" {
+path "auth/token/revoke/" {
     policy = "write"
 }
 
 # Handle Endpoint server provisioning
-path "/secret/endpoint/*" {
+path "secret/endpoint/*" {
     policy = "write"
 }
