@@ -26,7 +26,10 @@ python35:
         cd /tmp
         rm -rf $VERSION
         rm $VERSION.tgz
+        cd /usr/local/bin
+        ln -s python3.5 python3
+        ln -s pip3.5 pip3
     - cwd: /tmp
     - shell: /bin/bash
     - timeout: 600
-    - unless: test -x /usr/local/bin/python3.5 && test -x /usr/local/bin/pip3.5
+    #- unless: test -x /usr/local/bin/python3.5 && test -x /usr/local/bin/pip3.5
