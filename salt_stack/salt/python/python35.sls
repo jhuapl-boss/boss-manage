@@ -1,0 +1,32 @@
+# Build Python 3.5.x from source and install to /usr/local/bin.
+# pip3.5.x is also installed during the build process.
+#
+# The JUSTVERSION variable in the install script specifies the specific Python
+# version installed.
+#
+# Redirecting output to /dev/null is essential.  Salt hung when run
+# w/o redirecting output.
+
+python35:
+  pkg.installed:
+    - pkgs:
+        - zlib1g-dev: 1:1.2.8.dfsg-1ubuntu1
+        - libssl-dev: 1.0.1f-1ubuntu2.16
+  cmd.run:
+    - name: |
+        cd /tmp
+        JUSTVERSION="3.5.1"
+        VERSION="Python-"$JUSTVERSION
+        curl -O https://www.python.org/ftp/python/3.5.1/$VERSION.tgz
+        tar -zxvf $VERSION.tgz > /dev/null
+        cd $VERSION
+        sudo -H ./configure > /dev/null
+        sudo -H make > /dev/null
+        sudo -H make altinstall > /dev/null
+        cd /tmp
+        rm -rf $VERSION
+        rm $VERSION.tgz
+    - cwd: /tmp
+    - shell: /bin/bash
+    - timeout: 600
+    - unless: test -x /usr/local/bin/python3.5 && test -x /usr/local/bin/pip3.5
