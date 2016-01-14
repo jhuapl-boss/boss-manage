@@ -28,26 +28,26 @@ logging.info("Configured sys.excepthook")
 ### END setting up exception hook
 
 import os
-import boss
+import bossutils
 
         
 def read_vault_token():
-    config = boss.configuration.BossConfig()
-    token = config[boss.vault.VAULT_SECTION][boss.vault.VAULT_TOKEN_KEY]
+    config = bossutils.configuration.BossConfig()
+    token = config[bossutils.vault.VAULT_SECTION][bossutils.vault.VAULT_TOKEN_KEY]
     if len(token) > 0:
-        vault = boss.vault.Vault()
+        vault = bossutils.vault.Vault()
         vault.rotate_token()
         
 def set_hostname():
     logging.info("set_hostname()")
-    config = boss.configuration.BossConfig()
+    config = bossutils.configuration.BossConfig()
     
     with open("/etc/hostname", "r") as fh:
         current_hostname = fh.read().strip()
     
     fqdn = config["system"]["fqdn"]
     hostname = fqdn.split(".")[0]
-    ip = boss.utils.read_url(boss.utils.METADATA_URL + "local-ipv4")
+    ip = bossutils.utils.read_url(bossutils.utils.METADATA_URL + "local-ipv4")
     
     logging.info("Modifying /etc/hosts")
     with open("/etc/hosts", "r+") as fh:
@@ -68,17 +68,17 @@ def set_hostname():
         fh.truncate()
     
     logging.info("Calling hostname")
-    boss.utils.execute("hostname -F /etc/hostname")
+    bossutils.utils.execute("hostname -F /etc/hostname")
     
 if __name__ == '__main__':
-    logging.info("CONFIG_FILE = \"{}\"".format(boss.configuration.CONFIG_FILE))
+    logging.info("CONFIG_FILE = \"{}\"".format(bossutils.configuration.CONFIG_FILE))
     logging.info("Creating /etc/boss (if it does not exist)")
-    base_dir = os.path.dirname(boss.configuration.CONFIG_FILE)
+    base_dir = os.path.dirname(bossutils.configuration.CONFIG_FILE)
     os.makedirs(base_dir, exist_ok = True)
 
-    boss.configuration.download_and_save()
+    bossutils.configuration.download_and_save()
     #read_vault_token()
     set_hostname()
     
     service_name = os.path.basename(sys.argv[0])
-    boss.utils.execute("update-rc.d -f {} remove".format(service_name))
+    bossutils.utils.execute("update-rc.d -f {} remove".format(service_name))

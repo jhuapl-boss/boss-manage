@@ -5,8 +5,8 @@ include:
 
 python-lib:
     file.recurse:
-        - name: /usr/lib/python3/dist-packages/boss
-        - source: salt://boss-tools/files/boss-tools.git/boss
+        - name: /usr/lib/python3/dist-packages/bossutils
+        - source: salt://boss-tools/files/boss-tools.git/bossutils
         - include_empty: true
         - user: root
         - group: root

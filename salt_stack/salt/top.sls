@@ -1,10 +1,10 @@
 base:
     'vault':
         - vault.server
-        - boss-tools.boss
+        - boss-tools.bossutils
 
     'endpoint':
-        - boss-tools.boss
+        - boss-tools.bossutils
         - boss.django
 
     'jenkins*':

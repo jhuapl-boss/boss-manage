@@ -2,6 +2,7 @@ include:
     - python.python3
     - python.pip3
     - python.pip
+    - boss-tools.bossutils
     
 django-prerequirements:
     pkg.installed:

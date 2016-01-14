@@ -28,19 +28,19 @@ logging.info("Configured sys.excepthook")
 ### END setting up exception hook
     
 import os
-import boss
+import bossutils
     
 def configure_django():
     file = "/srv/www/manage.py"
     if os.path.exists(file):
         logging.info("manage.py collectstatic")
-        boss.utils.execute("python3 {} collectstatic --noinput".format(file))
+        bossutils.utils.execute("python3 {} collectstatic --noinput".format(file))
         
         logging.info("manage.py migrate")
-        boss.utils.execute("python3 {} migrate".format(file))
+        bossutils.utils.execute("python3 {} migrate".format(file))
     
 if __name__ == '__main__':
     configure_django()
     
     service_name = os.path.basename(sys.argv[0])
-    boss.utils.execute("update-rc.d -f {} remove".format(service_name))
+    bossutils.utils.execute("update-rc.d -f {} remove".format(service_name))
