@@ -99,9 +99,11 @@ def create(session, domain):
     db = {
         "name":"boss",
         "user":"testuser",
-        "password": lib.password("Django DB"),
+        "password": lib.generate_password(),
         "port": "3306"
     }
+    
+    print(db)
     
     endpoint_token = call_vault("vault-provision", "endpoint")
     user_data = configuration.UserData()

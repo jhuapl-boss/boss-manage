@@ -6,6 +6,7 @@ import json
 import pprint
 import time
 import getpass
+import string
 
 import hosts
 
@@ -59,6 +60,10 @@ def password(what):
             return pass_
         else:
             print("Passwords didn't match, try again.")
+            
+def generate_password(length = 16):
+    chars = string.ascii_letters + string.digits + string.punctuation
+    return "".join([chars[c % len(chars)] for c in os.urandom(length)])
  
 def vpc_id_lookup(session, vpc_domain):
     """Lookup the Id for the VPC with the given domain name."""
