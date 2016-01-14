@@ -21,5 +21,5 @@ firstboot:
         - group: root
         - mode: 555
     cmd.run:
-        - name: update-rc.d boss-lib-firstboot defaults 90
+        - name: update-rc.d boss-lib-firstboot defaults 10
         - user: root
