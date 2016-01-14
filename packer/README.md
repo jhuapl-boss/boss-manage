@@ -52,6 +52,9 @@ populated / configured OVF in *output/virtualbox-<machine-type>/<machine-type>.o
 **Note:** If there are problems with Packer saving the results, make sure the
           *output/* directory exists.
 
+Vagrant
+-------
+
 Along with the VirtualBox image, a Vagrant box is also placed in the the
 *output/* folder.  Vagrant is meant for developers and devOps work.  It
 generates a reproducible development environment based on the a VM image.  It
@@ -61,8 +64,16 @@ to spin up your development environment.
 
 Vagrant automatically maps a shared folder */vagrant* to your working folder
 (the location of the *Vagrantfile* config file) on your host machine, so you
-can use your favorite editor.  A simple example *Vagrantfile* is included
-in the same folder as this README.
+can use your favorite editor.  A working *Vagrantfile* is included
+in root folder of this repo.  It will start both an endpoint and vault instance
+when you type ````vagrant up````.  To start one or the other, type
+````vagrant up vault```` or ````vagrant up endpoint````.
+
+To ssh into one of the Vagrant boxes, type ````vagrant ssh <box name>````.
+
+To put a Vagrant box to sleep, type ````vagrant suspend <box name>````.
+
+When you no longer need a Vagrant box or you want to start fresh, type ````vagrant destroy <box name>````.
 
 See https://www.vagrantup.com for more information on Vagrant.
 

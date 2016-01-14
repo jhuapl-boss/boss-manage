@@ -1,6 +1,7 @@
 daemon:
     pkg:
         - installed
+        - version: 0.6.4-1
 
 vault-config:
     file.managed:

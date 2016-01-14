@@ -1,13 +1,11 @@
 include:
-    - python.python3
-    - python.pip3
+    - python.python35
     - python.pip
 
 boto3:
     pip.installed:
-        - name: boto3
-        - bin_env: /usr/bin/pip3
+        - name: boto3==1.2.3
+        - bin_env: /usr/local/bin/pip3
         - require:
-            - sls: python.python3
-            - sls: python.pip3
+            - sls: python.python35
             - sls: python.pip

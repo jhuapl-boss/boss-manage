@@ -1,44 +1,43 @@
 include:
-    - python.python3
-    - python.pip3
+    - python.python35
     - python.pip
     - boss-tools.bossutils
-    
+
 django-prerequirements:
     pkg.installed:
         - pkgs:
-            - libmysqlclient-dev
-            - nginx
-            - uwsgi
-            - uwsgi-plugin-python3
-    
+            - libmysqlclient-dev: 5.5.46-0ubuntu0.14.04.2
+            - nginx: 1.4.6-1ubuntu3.3
+            - uwsgi: 1.9.17.1-5build5
+            - uwsgi-plugin-python3: 1.9.17.1-5build5
+
 django-requirements:
     pip.installed:
-        - bin_env: /usr/bin/pip3
+        - bin_env: /usr/local/bin/pip3
         - requirements: salt://boss/files/boss.git/requirements.txt
         - require:
             - pkg: django-prerequirements
-            
+
 django-files:
     file.recurse:
         - name: /srv/www
         - source: salt://boss/files/boss.git
         - include_empty: true
-            
+
 nginx-config:
     file.managed:
         - name: /etc/nginx/sites-available/boss
         - source: salt://boss/files/boss.git/boss_nginx.conf
-        
+
 nginx-enable-config:
     file.symlink:
         - name: /etc/nginx/sites-enabled/boss
         - target: /etc/nginx/sites-available/boss
-        
+
 nginx-disable-default:
     file.absent:
         - name: /etc/nginx/sites-enabled/default
-        
+
 uwsgi-config:
     file.managed:
         - name: /etc/uwsgi/apps-available/boss.ini
