@@ -110,7 +110,8 @@ def vault_configure(machine = None):
     
     # Policies
     provisioner_policies = []
-    for policy in glob.glob("policies/*.hcl"):
+    path = os.path.join(_CURRENT_DIR, "policies", "*.hcl")
+    for policy in glob.glob(path):
         name = os.path.basename(policy).split('.')[0]
         with open(policy, 'r') as fh:
             client.set_policy(name, fh.read())
