@@ -9,8 +9,7 @@ base:
 
     'jenkins*':
         - git
-        - python.python3
-        - python.pip3
+        - python.python35
 # Install 2.7.x pip so Salt's pip module can run.
         - python.pip
         - jenkins
