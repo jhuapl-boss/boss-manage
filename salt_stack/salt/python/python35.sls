@@ -29,6 +29,8 @@ python35:
         cd /usr/local/bin
         ln -s python3.5 python3
         ln -s pip3.5 pip3
+        cd /usr/local/lib
+        ln -s python3.5 python3
     - cwd: /tmp
     - shell: /bin/bash
     - timeout: 600
