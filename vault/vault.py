@@ -21,7 +21,7 @@ import uuid
 VAULT_TOKEN = "vault_token"
 VAULT_KEY = "vault_key."
 NEW_TOKEN = "new_token"
-PROVISIONER_TOKEN = "vault_token" # Not finished yet "provisioner_token"
+PROVISIONER_TOKEN = "provisioner_token"
 
 _CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 def get_path(machine, filename):
@@ -94,6 +94,10 @@ def vault_init(machine = None, secrets = 5, threashold = 3):
     print("Unsealing Vault")
     client.unseal_multi(result["keys"])
     
+    print()
+    print("Configuring Vault")
+    vault_configure(machine)
+    
 def vault_configure(machine = None):
     client = get_client(read_token = VAULT_TOKEN, machine = machine)
     
@@ -101,7 +105,7 @@ def vault_configure(machine = None):
     audit_options = {
         'low_raw': 'True',
     }
-    #client.enable_audit_backend('syslog', options=audit_options)
+    client.enable_audit_backend('syslog', options=audit_options)
     
     # Policies
     for policy in glob.glob("policies/*.hcl"):
@@ -220,17 +224,18 @@ def vault_status(machine = None):
     print("Auth Backends")
     print(json.dumps(client.list_auth_backends(), indent=True))
     
-def vault_provision(machine = None):
+def vault_provision(policy, machine = None):
     """Create a new Vault access token. Connect using get_client(True),
     request a new access token (default policy), and save it to NEW_TOKEN.
     """
     client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
     
-    token = client.create_token()
+    token = client.create_token(policies = [policy])
     return token["auth"]["client_token"]
         
 def _vault_provision(machine = None):
-    token = vault_provision(machine)
+    policy = input("policy: ")
+    token = vault_provision(policy, machine)
     
     token_file = get_path(machine, NEW_TOKEN)
     with open(token_file, "w") as fh:
@@ -246,7 +251,7 @@ def vault_revoke(token, machine = None):
     
 def _vault_revoke(machine = None):
     token = input("token: ") # prompt for token or ready fron NEW_TOKEN (or REVOKE_TOKEN)?
-    vault_revoke(token)
+    vault_revoke(token, machine)
     
 def vault_django(db_name, username, password, port, machine = None):
     """Provision a Vault with credentials for a Django webserver. Connect

@@ -13,7 +13,7 @@ import pprint
 # Devices that all VPCs/Subnets may potentially have and Subnet number (must fit under SUBNET_CIDR)
 # Subnet number can be a single number or a list of numbers
 ADDRESSES = {
-    "api": range(10, 20),
+    "endpoint": range(10, 20),
     "db": range(20, 30),
 }
        
@@ -48,11 +48,13 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     config.subnet_subnet = hosts.lookup(config.subnet_domain)
     config.add_subnet("BSubnet", az="us-east-1c") # BSubnet needs to be in a different AZ from ASubnet
     
-    user_data_ = { "Fn::Join" : ["", [user_data, "\n[aws]\ndb = ", { "Fn::GetAtt" : [ "DB", "Endpoint.Address" ] }, "\n"]]}
+    user_data_dynamic = [user_data, "\n[aws]\n",
+                         "db = ", { "Fn::GetAtt" : [ "DB", "Endpoint.Address" ] }, "\n"]
+    user_data_ = { "Fn::Join" : ["", user_data_dynamic]}
     
-    config.add_ec2_instance("API",
-                            "api.external." + domain,
-                            lib.ami_lookup(session, "api.boss"),
+    config.add_ec2_instance("Endpoint",
+                            "endpoint.external." + domain,
+                            lib.ami_lookup(session, "endpoint.boss"),
                             keypair,
                             public_ip = True,
                             subnet = "ExternalSubnet",
@@ -101,13 +103,14 @@ def create(session, domain):
         "port": "3306"
     }
     
-    api_token = call_vault("vault-provision")
+    endpoint_token = call_vault("vault-provision", "endpoint")
     user_data = configuration.UserData()
     # CAUTION: This hard codes the Vault address in the config file passed and will cause
     #          problems if the template is saved and launched with a different Vault IP
     user_data["vault"]["url"] = "http://{}:8200".format(hosts.lookup("vault." + domain))
-    user_data["vault"]["token"] = api_token
-    user_data["system"]["fqdn"] = "api.external." + domain
+    user_data["vault"]["token"] = endpoint_token
+    user_data["system"]["fqdn"] = "endpoint.external." + domain
+    user_data["system"]["type"] = "endpoint"
     user_data = str(user_data)
     
     call_vault("vault-django", db["name"], db["user"], db["password"], db["port"])
@@ -127,7 +130,7 @@ def create(session, domain):
         except:
             print("Error revoking Django credentials")
         try:
-            call_vault("vault-revoke", api_token)
+            call_vault("vault-revoke", endpoint_token)
         except:
-            print("Error revoking API Vault access token")
+            print("Error revoking Endpoint Server Vault access token")
         raise

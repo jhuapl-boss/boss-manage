@@ -1,7 +1,18 @@
-path "auth/app-id/map/user-id/*" {
+#
+path "/auth/token/lookup-self" {
+    policy = "read"
+}
+
+# Handle token provisioning
+path "/auth/token/create" {
     policy = "write"
 }
 
-path "auth/token/lookup-self" {
-    policy = "read"
+path "/auth/token/revoke/" {
+    policy = "write"
+}
+
+# Handle Endpoint server provisioning
+path "/secret/endpoint/*" {
+    policy = "write"
 }

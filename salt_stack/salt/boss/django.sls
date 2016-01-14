@@ -17,17 +17,12 @@ django-requirements:
         - requirements: salt://boss/files/boss.git/requirements.txt
         - require:
             - pkg: django-prerequirements
-            - sls: python.python3
-            - sls: python.pip3
-            - sls: python.pip
             
 django-files:
     file.recurse:
         - name: /srv/www
         - source: salt://boss/files/boss.git
         - include_empty: true
-        - require:
-            - sls: python.python3
             
 nginx-config:
     file.managed:
@@ -52,3 +47,14 @@ uwsgi-enable-config:
     file.symlink:
         - name: /etc/uwsgi/apps-enabled/boss.ini
         - target: /etc/uwsgi/apps-available/boss.ini
+
+django-firstboot:
+    file.managed:
+        - name: /etc/init.d/django-firstboot
+        - source: salt://boss/files/firstboot.py
+        - user: root
+        - group: root
+        - mode: 555
+    cmd.run:
+        - name: update-rc.d django-firstboot defaults 99
+        - user: root
