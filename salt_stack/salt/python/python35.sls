@@ -10,6 +10,7 @@
 python35:
   pkg.installed:
     - pkgs:
+        - build-essential: 11.6ubuntu6
         - zlib1g-dev: 1:1.2.8.dfsg-1ubuntu1
         - libssl-dev: 1.0.1f-1ubuntu2.16
   cmd.run:
@@ -17,7 +18,7 @@ python35:
         cd /tmp
         JUSTVERSION="3.5.1"
         VERSION="Python-"$JUSTVERSION
-        curl -O https://www.python.org/ftp/python/3.5.1/$VERSION.tgz
+        curl -O https://www.python.org/ftp/python/$JUSTVERSION/$VERSION.tgz
         tar -zxvf $VERSION.tgz > /dev/null
         cd $VERSION
         sudo -H ./configure > /dev/null
