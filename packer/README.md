@@ -90,5 +90,15 @@ baseline AMI images. Create a variables file in *packer/variables/* (if needed).
 Run *vm.packer* with the `-only=amazon-ebs` option and it will take the baseline
 AWS AMI and produce a populated / configured AMI that can be launched later.
 
+If running **inside** the **APL firewall**, get the private key for the APL
+bastion server and place it in the same folder as *vm.packer*. Include
+````-var-file=variables/aws-bastion```` so Packer connects via the APL
+bastion server.  Check variables/aws-bastion for the expected name of the
+private key file.
+
 **Note:** This requires your AWS credentials in the AWS variable file and access
           from the machine that is running packer to AWS.
+
+**Example of building an endpoint server instance using the bastion server:**
+
+````packer build -var-file=variables/my-aws-creds -var-file=variables/aws-bastion -var-file=variables/endpoint -only=amazon-ebs vm.packer````

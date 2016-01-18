@@ -11,6 +11,13 @@
         "aws_source_ami": "Ubuntu Server 14.04 LTS (HVM), SSD Volume Type",
         "aws_source_ami": "ami-d05e75b8",
 
+        "aws_bastion_ip": "IP of the APL bastion server",
+        "aws_bastion_ip": "",
+        "aws_bastion_user": "User name to login to the bastion server",
+        "aws_bastion_user": "",
+        "aws_bastion_priv_key_file": "Path to the bastion's private key file",
+        "aws_bastion_priv_key_file": "",
+
         "vb_source_path": "The source OVF image to build upon",
         "vb_source_path": "output/virtualbox-default/virtualbox-default.ovf",
 
@@ -47,7 +54,10 @@
         "region": "{{user `aws_region`}}",
         "tags": {
             "Role": "{{user `role`}}"
-        }
+        },
+        "ssh_bastion_username": "{{user `aws_bastion_user`}}",
+        "ssh_bastion_host": "{{user `aws_bastion_ip`}}",
+        "ssh_bastion_private_key_file": "{{user `aws_bastion_priv_key_file`}}"
     }],
 
     "provisioners": [
