@@ -16,6 +16,7 @@ import glob
 import hvac
 import json
 import uuid
+from pprint import pprint
 
 """Location to store and read the Vault's Root Token"""
 VAULT_TOKEN = "vault_token"
@@ -108,19 +109,52 @@ def vault_configure(machine = None):
     client.enable_audit_backend('syslog', options=audit_options)
     
     # Policies
-    for policy in glob.glob("policies/*.hcl"):
+    provisioner_policies = []
+    path = os.path.join(_CURRENT_DIR, "policies", "*.hcl")
+    for policy in glob.glob(path):
         name = os.path.basename(policy).split('.')[0]
         with open(policy, 'r') as fh:
             client.set_policy(name, fh.read())
+            
+        # Add every policy to the provisioner, as it has to have the
+        # superset of any policies that it will provision
+        provisioner_policies.append(name)
         
-        if name == "provisioner":
-            token_file = get_path(machine, PROVISIONER_TOKEN)
-            token = client.create_token(policies=[name])
-            with open(token_file, "w") as fh:
-                fh.write(token['auth']['client_token'])
+    token_file = get_path(machine, PROVISIONER_TOKEN)
+    token = client.create_token(policies=provisioner_policies)
+    with open(token_file, "w") as fh:
+        fh.write(token['auth']['client_token'])
     
     # AWS Backend
     # PKI Backend
+    
+def verify(machine = None):
+    client = get_client(read_token = VAULT_TOKEN, machine = machine)
+    
+    token_file = get_path(machine, PROVISIONER_TOKEN)
+    policy = "provisioner"
+    
+    if False:
+        pprint(client.list_policies())
+        pprint(client.read("/sys/policy/" + policy))
+    
+    if True:
+        client.delete_policy(policy)
+        with open("policies/{}.hcl".format(policy), "r") as fh:
+            client.set_policy(policy, fh.read())
+            
+    if True:
+        with open(token_file, 'r') as fh:
+            result = client.revoke_token(fh.read())
+        with open(token_file, 'w') as fh:
+            result = client.create_token(policies=["provisioner","endpoint"])
+            pprint(result)
+            fh.write(result['auth']['client_token'])
+            
+    if False:
+        with open(token_file, 'r') as fh:
+            result = client.lookup_token(fh.read())
+            pprint(result)
     
 def vault_unseal(machine = None):
     """Unseal a sealed Vault. Connect using get_client() and if the Vault is
@@ -270,14 +304,14 @@ def vault_django(db_name, username, password, port, machine = None):
     """
     client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
     
-    client.write("secret/django", secret_key = str(uuid.uuid4()))
+    client.write("secret/endpoint/django", secret_key = str(uuid.uuid4()))
     db = {
         "name": db_name,
         "user": username,
         "password": password,
         "port": port
     }
-    client.write("secret/django/db", **db)
+    client.write("secret/endpoint/django/db", **db)
         
 def _vault_django(machine = None):
     args = []
@@ -295,6 +329,7 @@ COMMANDS = {
     "vault-provision": _vault_provision,
     "vault-revoke": _vault_revoke,
     "vault-django": _vault_django,
+    "verify":verify,
 }
 
 if __name__ == '__main__':

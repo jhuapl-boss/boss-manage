@@ -1,5 +1,5 @@
 #
-path "/auth/token/lookup-self" {
+path "auth/token/lookup-self" {
     policy = "read"
 }
 
@@ -8,10 +8,10 @@ path "cubbyhole/*" {
 }
 
 # Handle Endpoint server credentials
-path "/secret/endpoint/*" {
+path "secret/endpoint/*" {
     policy = "read"
 }
 
-path "/aws/creds/endpoint" {
+path "aws/creds/endpoint" {
     policy = "read"
 }
