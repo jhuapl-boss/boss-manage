@@ -35,43 +35,46 @@ SUBNET_CIDR = 24 # make sure SUBNET_CIDR is greater than VPC_CIDR
 
 # Name and Subnet number (must fit within ROOT_CIDR to VPC_CIDR) of all VPCs
 VPCS = {
-    "core" : 0,
-    "production": 1,
+    "production" : 0,
+
+    "integration" : 20,
+
+    "test" : 40,
+
+    "pryordm1" : 100,
+    "breinmw1" : 101,
+    "drenkng1" : 102,
+    "giontc1"  : 103,
+    "hiderrt1" : 104,
+    "kleisdm1" : 105,
+    "leea1"    : 106,
+    "manavpj1" : 107,
     
-    "development": 250,
-    "test": 255,
 }
 
 # Name of the VPC, Name of the Subnet and the Subnet's Subnet number (must fit within VPC_CIDR to SUBNET_CIDR) for all Subnets
 SUBNETS = {
-    ("core", "private") : 0,
-    ("core", "public") : 1,
-    
-    ("production", "a") : 0,
-    ("production", "b") : 1,
-    
-    ("development", "pryordm1") : 1,
-    
-    ("test", "internal") : 0,
-    ("test", "external") : 1,
-    ("test", "a") : 2,
-    ("test", "b") : 3,
-    ("test", "test") : 255,
 }
+
+# Dynamically add the following subnets to all VPCs
+for vpc in VPCS:
+    subnets = ["internal", "external", "a", "b"]
+    for subnet in subnets:
+        SUBNETS[(vpc, subnet)] = subnets.index(subnet)
 
 # Static hostname, IP address enteries
 STATIC = {
     # All of the core devices are listed here for two reasons
-    # 1) because we don't want them named xxxx.(private|public).core.boss
+    # 1) because we don't want them named xxxx.(subnet).core.boss
     # 2) we want them included in the host files for every machine
-    "bastion.core.boss": "10.0.1.4",
-    "vault.core.boss": "10.0.0.5",
-    "auth.core.boss": "10.0.0.6",
-    
-    
-    "bastion.test.boss": "10.255.1.4",
-    "vault.test.boss": "10.255.0.5",
 }
+
+# Dynamically add the following static addresses to all VPCs
+for vpc in VPCS:
+    STATIC.update({
+        "vault.{}.{}".format(vpc, TLD) : "10.{}.{}.4".format(VPCS[vpc], SUBNETS[(vpc,"internal")]),
+        "bastion.{}.{}".format(vpc, TLD) : "10.{}.{}.4".format(VPCS[vpc], SUBNETS[(vpc,"external")]),
+    })
 
 
 HOSTS = """
