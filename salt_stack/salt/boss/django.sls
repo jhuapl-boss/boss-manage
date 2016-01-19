@@ -2,14 +2,13 @@ include:
     - python.python35
     - python.pip
     - boss-tools.bossutils
+    - uwsgi.emperor
 
 django-prerequirements:
     pkg.installed:
         - pkgs:
             - libmysqlclient-dev: 5.5.46-0ubuntu0.14.04.2
             - nginx: 1.4.6-1ubuntu3.3
-            - uwsgi: 1.9.17.1-5build5
-            - uwsgi-plugin-python3: 1.9.17.1-5build5
 
 django-requirements:
     pip.installed:
