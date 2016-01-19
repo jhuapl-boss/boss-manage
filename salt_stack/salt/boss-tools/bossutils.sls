@@ -12,14 +12,16 @@ python-lib:
         - group: root
         - file_mode: 755
         - dir_mode: 755
+        - require:
+            - sls: python.python35
 
 firstboot:
     file.managed:
-        - name: /etc/init.d/boss-lib-firstboot
+        - name: /etc/init.d/bossutils-firstboot
         - source: salt://boss-tools/files/firstboot.py
         - user: root
         - group: root
         - mode: 555
     cmd.run:
-        - name: update-rc.d boss-lib-firstboot defaults 10
+        - name: update-rc.d bossutils-firstboot defaults 10
         - user: root
