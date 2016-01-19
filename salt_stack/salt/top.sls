@@ -20,3 +20,13 @@ base:
 # - python.tox
         - python.nose2-3
         - python.nose2-cov-3
+
+    'proofreader-web':
+        - git
+        - python.pip
+        - python.python35
+        - proofreader-web.nginx
+        - proofreader-web.uwsgi
+        - proofreader-web.django
+        - proofreader-web.nodejs
+        - proofreader-web
