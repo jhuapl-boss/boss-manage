@@ -4,6 +4,24 @@ Vault
 This directory contains scripts for manipulating and maintaining Vault
 instances.
 
+Connecting from within APL
+--------------------------
+The scripts in this directory all support using a bastion / proxy host to
+route all non-web traffic through. This information is read automatically
+from environment variables.
+
+    * BASTION_IP is the IP address / DNS name of the bastion / proxy host
+    * BASTION_KEY is the SSH private key to authenticate with
+    * BASTION_USER is the username to log into the host as
+    
+The file *set_vars.sh* can be sourced to set these variables,
+`source set_vars.sh`
+
+
+ssh.py
+------
+Used to lookup the IP address of the named EC2 instance and forming an
+SSH session with it.
 
 bastion.py
 ----------

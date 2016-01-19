@@ -13,6 +13,7 @@ import os
 import signal
 import sys
 import time
+import random
 from boto3.session import Session
 import json
 import vault
@@ -20,19 +21,57 @@ import vault
 # Needed to prevent ssh from asking about the fingerprint from new machines
 SSH_OPTIONS = "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 
-def create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user="ec2-user"):
-    fwd_cmd_fmt = "ssh -i {} {} -N -L {}:{}:{} {}@{}"
+def create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user="ec2-user", bastion_port=22):
+    fwd_cmd_fmt = "ssh -i {} {} -N -L {}:{}:{} -p {} {}@{}"
     fwd_cmd = fwd_cmd_fmt.format(key,
                                  SSH_OPTIONS,
                                  local_port,
                                  remote_ip,
                                  remote_port,
+                                 bastion_port,
                                  bastion_user,
                                  bastion_ip)
-                                 
+
     proc = subprocess.Popen(shlex.split(fwd_cmd))
-    time.sleep(3) # wait for the tunnel to be setup
+    time.sleep(5) # wait for the tunnel to be setup
     return proc
+    
+def create_tunnel_aplnis(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user="ec2-user"):
+    apl_bastion_ip = os.environ.get("BASTION_IP")
+    apl_bastion_key = os.environ.get("BASTION_KEY")
+    apl_bastion_user = os.environ.get("BASTION_USER")
+    
+    if apl_bastion_ip is None or apl_bastion_key is None or apl_bastion_user is None:
+        # traffic
+        # localhost -> bastion -> remote
+        print("APL Bastion information not defined, connecting directly")
+        return create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user)
+    else:
+        # traffic
+        # localhost -> apl_bastion -> bastion -> remote
+        print("Using APL Bastion host at {}".format(apl_bastion_ip))
+        wrapper = ProcWrapper()
+        port = locate_port()
+        proc = create_tunnel(apl_bastion_key, port, bastion_ip, 22, apl_bastion_ip, apl_bastion_user)
+        wrapper.prepend(proc)
+        
+        proc = create_tunnel(key, local_port, remote_ip, remote_port, "localhost", bastion_user, port)
+        wrapper.prepend(proc)
+        return wrapper
+
+class ProcWrapper(list):
+    """Wrapper that holds multiple Popen objects and can call
+    terminate and wait on all contained objects.
+    """
+    def prepend(self, item):
+        self.insert(0, item)
+    def terminate(self):
+        [item.terminate() for item in self]
+    def wait(self):
+        [item.wait() for item in self]
+
+def locate_port():
+    return random.randint(10000,60000)
 
 def become_tty_fg():
     """A helper function for subprocess.call(preexec_fn=) that makes the
@@ -60,9 +99,10 @@ def ssh(key, remote_ip, bastion_ip):
     NOTE: This command uses fixed port numbers, so only one instance of this
           command can be launched on a single machine at the same time.
     """
-    ssh_cmd = "ssh -i {} {} -p 2222 ubuntu@localhost".format(key, SSH_OPTIONS)
+    ssh_port = locate_port()
+    ssh_cmd = "ssh -i {} {} -p {} ubuntu@localhost".format(key, SSH_OPTIONS, ssh_port)
     
-    proc = create_tunnel(key, 2222, remote_ip, 22, bastion_ip)
+    proc = create_tunnel_aplnis(key, ssh_port, remote_ip, 22, bastion_ip)
     try:
         ret = subprocess.call(shlex.split(ssh_cmd), close_fds=True, preexec_fn=become_tty_fg)
     finally:
@@ -78,7 +118,7 @@ def connect_vault(key, remote_ip, bastion_ip, cmd):
           defined in vault.py.
     """
     
-    proc = create_tunnel(key, 8200, remote_ip, 8200, bastion_ip)
+    proc = create_tunnel_aplnis(key, 8200, remote_ip, 8200, bastion_ip)
     try:
         return cmd()
     finally:
