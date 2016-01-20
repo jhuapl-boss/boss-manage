@@ -144,23 +144,30 @@ def vault_configure(machine = None):
                 client.write("aws/roles/" + name, policy = fh.read())
 
     # PKI Backend
-    client.enable_secret_backend('pki')
-    # Generate a self signed certificate for CA
-    print("Generating self signed CA")
-    response = client.write("pki/root/generate/internal", common_name="boss.io")
-    with open(get_path(machine, "ca.pem"), 'w') as fh:
-        fh.write(response["data"]["certificate"])
-    # Should we configure CRL?
-    # Could turn all KV pairs into a JSON dictionary and save under policies/*.pki
-    client.write("pki/roles/ssl", allowed_domains="boss.io",
-                                  allow_localhost = False,
-                                  allow_bare_domains = False,
-                                  allow_subdomains = True, # CAUTION, allows wildcard
-                                  allow_any_name = False,
-                                  server_flag = True,
-                                  client_flag = False)
+    if False: # Disabled until we either have a CA cert or can generate a CA
+        client.enable_secret_backend('pki')
+        # Generate a self signed certificate for CA
+        print("Generating self signed CA")
+        response = client.write("pki/root/generate/internal", common_name="boss.io")
+        with open(get_path(machine, "ca.pem"), 'w') as fh:
+            fh.write(response["data"]["certificate"])
+        # Should we configure CRL?
+        # Could turn all KV pairs into a JSON dictionary and save under policies/*.pki
+        client.write("pki/roles/ssl", allowed_domains="boss.io",
+                                      allow_localhost = False,
+                                      allow_bare_domains = False,
+                                      allow_subdomains = True, # CAUTION, allows wildcard
+                                      allow_any_name = False,
+                                      server_flag = True,
+                                      client_flag = False)
     
+def vault_shell(machine = None):
+    import code
     
+    client = get_client(read_token = VAULT_TOKEN, machine = machine)
+    
+    code.interact(local=locals())
+
 def verify(machine = None):
     client = get_client(read_token = VAULT_TOKEN, machine = machine)
     
@@ -363,6 +370,7 @@ COMMANDS = {
     "vault-revoke": _vault_revoke,
     "vault-django": _vault_django,
     "verify":verify,
+    "vault-shell":vault_shell,
 }
 
 if __name__ == '__main__':
