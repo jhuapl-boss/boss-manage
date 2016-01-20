@@ -126,7 +126,34 @@ def vault_configure(machine = None):
         fh.write(token['auth']['client_token'])
     
     # AWS Backend
+    client.enable_secret_backend('aws')
+    vault_aws_creds = os.path.join(_CURRENT_DIR, "private", "vault_aws_credentials")
+    with open(vault_aws_creds, "r") as fh:
+        creds = json.load(fh)
+        client.write("aws/config/root", access_key = creds["access_key"],
+                                        secret_key = creds["secret_key"],
+                                        region = creds.get("region", "us-east-1"))
+    
+    path = os.path.join(_CURRENT_DIR, "policies", "*.iam")
+    for iam in glob.glob(path):
+        name = os.path.basename(iam).split('.')[0]
+        with open(iam, 'r') as fh:
+            client.write("aws/roles/" + name, policy = fh.read())
+    
     # PKI Backend
+    client.enable_secret_backend('pki')
+    # Generate a self signed certificate for CA
+    client.write("pki/root/generate/internal", common_name="boss.io")
+    # Should we configure CRL?
+    # Could turn all KV pairs into a JSON dictionary and save under policies/*.pki
+    client.write("pki/roles/ssl", allowed_domains="boss.io",
+                                  allow_localhost = False,
+                                  allow_bare_domains = False,
+                                  allow_subdomains = True, # CAUTION, allows wildcard
+                                  allow_any_name = False,
+                                  server_flag = True,
+                                  client_flag = False)
+    
     
 def verify(machine = None):
     client = get_client(read_token = VAULT_TOKEN, machine = machine)
