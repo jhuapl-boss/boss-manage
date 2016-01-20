@@ -1,9 +1,14 @@
+include:
+    - python.python35
+    - python.pip
+
 django:
   pip.installed:
     - name: django == 1.9.1
     - bin_env: /usr/local/bin/pip3
     - require:
       - sls: python.python35
+      - sls: python.pip
 
 djangorestframework:
   pip.installed:
@@ -11,6 +16,7 @@ djangorestframework:
     - bin_env: /usr/local/bin/pip3
     - require:
       - sls: python.python35
+      - sls: python.pip
 
 django-filter:
   pip.installed:
@@ -18,6 +24,7 @@ django-filter:
     - bin_env: /usr/local/bin/pip3
     - require:
       - sls: python.python35
+      - sls: python.pip
 
 libmysqlclient-dev:
   pkg.installed:
@@ -30,3 +37,4 @@ mysqlclient:
     - require:
       - pkg: libmysqlclient-dev
       - sls: python.python35
+      - sls: python.pip

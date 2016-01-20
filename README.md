@@ -46,6 +46,8 @@ directory):
 
 `git clone https://github.com/aplmicrons/boss-tools.git salt_stack/salt/boss-tools/files/boss-tools.git`
 
+`git clone https://github.com/aplmicrons/proofread.git salt_stack/salt/proofread-web/files/proofread.git`
+
 ## SSH Keys
 
 Currently the code that uses SSH tunnels creates SSH sessions is written

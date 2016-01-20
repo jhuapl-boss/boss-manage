@@ -3,12 +3,12 @@ include:
     - python.pip
     - boss-tools.bossutils
     - uwsgi.emperor
+    - nginx
 
 django-prerequirements:
     pkg.installed:
         - pkgs:
             - libmysqlclient-dev: 5.5.46-0ubuntu0.14.04.2
-            - nginx: 1.4.6-1ubuntu3.3
 
 django-requirements:
     pip.installed:
@@ -32,10 +32,6 @@ nginx-enable-config:
     file.symlink:
         - name: /etc/nginx/sites-enabled/boss
         - target: /etc/nginx/sites-available/boss
-
-nginx-disable-default:
-    file.absent:
-        - name: /etc/nginx/sites-enabled/default
 
 uwsgi-config:
     file.managed:
