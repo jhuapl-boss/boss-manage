@@ -126,24 +126,30 @@ def vault_configure(machine = None):
         fh.write(token['auth']['client_token'])
     
     # AWS Backend
-    client.enable_secret_backend('aws')
     vault_aws_creds = os.path.join(_CURRENT_DIR, "private", "vault_aws_credentials")
-    with open(vault_aws_creds, "r") as fh:
-        creds = json.load(fh)
-        client.write("aws/config/root", access_key = creds["access_key"],
-                                        secret_key = creds["secret_key"],
-                                        region = creds.get("region", "us-east-1"))
-    
-    path = os.path.join(_CURRENT_DIR, "policies", "*.iam")
-    for iam in glob.glob(path):
-        name = os.path.basename(iam).split('.')[0]
-        with open(iam, 'r') as fh:
-            client.write("aws/roles/" + name, policy = fh.read())
-    
+    if not os.path.exists(vault_aws_creds):
+        print("Vault AWS credentials file does not exist, skipping...")
+    else:
+        client.enable_secret_backend('aws')
+        with open(vault_aws_creds, "r") as fh:
+            creds = json.load(fh)
+            client.write("aws/config/root", access_key = creds["access_key"],
+                                            secret_key = creds["secret_key"],
+                                            region = creds.get("region", "us-east-1"))
+
+        path = os.path.join(_CURRENT_DIR, "policies", "*.iam")
+        for iam in glob.glob(path):
+            name = os.path.basename(iam).split('.')[0]
+            with open(iam, 'r') as fh:
+                client.write("aws/roles/" + name, policy = fh.read())
+
     # PKI Backend
     client.enable_secret_backend('pki')
     # Generate a self signed certificate for CA
-    client.write("pki/root/generate/internal", common_name="boss.io")
+    print("Generating self signed CA")
+    response = client.write("pki/root/generate/internal", common_name="boss.io")
+    with open(get_path(machine, "ca.pem"), 'w') as fh:
+        fh.write(response["data"]["certificate"])
     # Should we configure CRL?
     # Could turn all KV pairs into a JSON dictionary and save under policies/*.pki
     client.write("pki/roles/ssl", allowed_domains="boss.io",
