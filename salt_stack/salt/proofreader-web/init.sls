@@ -19,7 +19,7 @@ proofreader_client:
     - cwd: /tmp/proofread.git/client
     - unless: test -x /srv/www/html/index.html && test -x /srv/www/html/assets
     - require:
-      - sls: git
+      - pkg: git
       - sls: proofreader-web.nodejs
 
 proofreader_apis:
