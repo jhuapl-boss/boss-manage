@@ -20,6 +20,8 @@ base:
 # - python.tox
         - python.nose2-3
         - python.nose2-cov-3
+        - vault.client
+        - aws.boto3
 
     'proofreader-web':
         - proofreader-web
