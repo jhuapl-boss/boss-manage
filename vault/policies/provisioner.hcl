@@ -16,3 +16,7 @@ path "auth/token/revoke/" {
 path "secret/endpoint/*" {
     policy = "write"
 }
+
+path "secret/proofreader/*" {
+    policy = "write"
+}
