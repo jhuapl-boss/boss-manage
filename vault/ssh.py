@@ -16,6 +16,13 @@ from bastion import *
 
 
 def tunnel_aplnis(ip):
+    """Read environmental variables to either return (None,None) or use the
+    given bastion server as the first machine to connect to and route other
+    tunnels through.
+    
+    This was added to support using a single machine given access through the
+    APL firewall and tunnel all SSH connections through it.
+    """
     apl_bastion_ip = os.environ.get("BASTION_IP")
     apl_bastion_key = os.environ.get("BASTION_KEY")
     apl_bastion_user = os.environ.get("BASTION_USER")
@@ -35,6 +42,7 @@ def ssh(key, ip, user="ubuntu"):
     """
     
     proc, port = tunnel_aplnis(ip)
+    # depending of if a tunnel is created, update some arguments
     if port is None:
         port = 22
     else:
@@ -80,6 +88,8 @@ if __name__ == "__main__":
 
     session = create_session(args.aws_credentials)
     ip = machine_lookup(session, args.hostname)
+    
+    # the bastion server (being an AWS AMI) has a differnt username
     user = "ec2-user" if args.hostname.startswith("bastion") else "ubuntu"
     
     ssh(args.ssh_key, ip, user)

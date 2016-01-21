@@ -1,3 +1,14 @@
+"""
+Create the core configuration which consists of
+  * A new VPC
+  * An internal subnet containing a Vault server
+  * An external subnet containing a Bastion server
+
+The core configuration create all of the infrastructure that is required for
+the other production resources to function. In the furture this may include
+other servers for services like Authentication.
+"""
+
 import library as lib
 import configuration
 import hosts
@@ -7,8 +18,10 @@ import requests
 keypair = None
 
 def create_config(session, domain):
+    """Create the CloudFormationConfiguration object."""
     config = configuration.CloudFormationConfiguration(domain)
 
+    # do a couple of verification checks
     if config.subnet_domain is not None:
         raise Exception("Invalid VPC domain name")
         
@@ -20,6 +33,7 @@ def create_config(session, domain):
     
     config.add_vpc()
     
+    # Create the internal and external subnets
     config.subnet_domain = "internal." + domain
     config.subnet_subnet = hosts.lookup(config.subnet_domain)
     config.add_subnet("InternalSubnet")
@@ -28,6 +42,9 @@ def create_config(session, domain):
     config.subnet_subnet = hosts.lookup(config.subnet_domain)
     config.add_subnet("ExternalSubnet")
     
+    # Create the user data for Vault. No data is given to Bastion
+    # because it is an AWS AMI designed for NAT work and does not
+    # have bossutils to use the user data config.
     user_data = configuration.UserData()
     # CAUTION: This hard codes the Vault address in the config file passed and will cause
     #          problems if the template is saved and launched with a different Vault IP
@@ -54,11 +71,13 @@ def create_config(session, domain):
     config.add_security_group("InternalSecurityGroup",
                               "internal",
                               [("-1", "-1", "-1", "10.0.0.0/8")])
-                              
+
+    # Allow SSH access to bastion from anywhere
     config.add_security_group("AllSSHSecurityGroup",
                               "ssh",
                               [("tcp", "22", "22", "0.0.0.0/0")])
-                              
+
+    # Create the internet gateway and internet router
     config.add_route_table("InternetRouteTable",
                            "internet",
                            subnets = ["ExternalSubnet"])
@@ -73,11 +92,13 @@ def create_config(session, domain):
     return config
                               
 def generate(folder, domain):
+    """Create the configuration and save it to disk"""
     name = lib.domain_to_stackname("core." + domain)
     config = create_config(None, domain)
     config.generate(name, folder)
     
 def create(session, domain):
+    """Create the configuration, launch it, and initialize Vault"""
     name = lib.domain_to_stackname("core." + domain)
     config = create_config(session, domain)
     

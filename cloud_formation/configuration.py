@@ -1,3 +1,7 @@
+"""Configuration class and supporting classes for building and launching
+CloudFormation templates.
+"""
+
 import os
 import time
 import json
@@ -21,16 +25,26 @@ that they want...
 """
 
 def bool_str(val):
+    """Convert a bool to a string with appropriate case formatting."""
     return "true" if val else "false"
         
 class Arg:
+    """Create CloudFormation template arguments of the supplied types."""
     def __init__(self, key, parameter, argument):
+        """Generic constructor used by all of the specific static methods.
+        key is the unique name associated with the argument.
+        parameter is the dictionary of parameter information included in the
+                  template.
+        argument is the dictionary of value information to supply with the
+                 template when launching.
+        """
         self.key = key
         self.parameter = parameter
         self.argument = argument
 
     @staticmethod
     def String(key, value, description=""):
+        """Create a String argument."""
         parameter =  {
             "Description" : description,
             "Type": "String"
@@ -40,6 +54,7 @@ class Arg:
         
     @staticmethod
     def Password(key, value, description=""):
+        """Create a String argument that does not show typed characters."""
         parameter =  {
             "Description" : description,
             "Type": "String",
@@ -50,6 +65,9 @@ class Arg:
        
     @staticmethod
     def IP(key, value, description=""):
+        """Create a String argument that checks the value to make sure it is in
+        a valid IPv4 format.
+        """
         parameter = {
             "Description" : description,
             "Type": "String",
@@ -64,6 +82,9 @@ class Arg:
         
     @staticmethod
     def Port(key, value, description=""):
+        """Create a Number argument that checks the value to make sure it is a
+        valid port number.
+        """
         parameter =  {
             "Description" : description,
             "Type": "Number",
@@ -75,6 +96,9 @@ class Arg:
         
     @staticmethod
     def CIDR(key, value, description=""):
+        """Create a String argument that checks the value to make sure it is in
+        a valid IPv4 CIDR format.
+        """
         parameter = {
             "Description" : description,
             "Type": "String",
@@ -89,6 +113,7 @@ class Arg:
         
     @staticmethod
     def VPC(key, value, description=""):
+        """Create a VPC ID argument that makes sure the value is a valid VPC ID."""
         parameter = {
             "Description" : description,
             "Type": "AWS::EC2::VPC::Id"
@@ -98,6 +123,9 @@ class Arg:
     
     @staticmethod
     def Subnet(key, value, description=""):
+        """Create an (AWS) Subnet ID argument that makes sure the value is a
+        valid Subnet ID.
+        """
         parameter = {
             "Description" : description,
             "Type": "AWS::EC2::Subnet::Id"
@@ -107,6 +135,7 @@ class Arg:
         
     @staticmethod
     def AMI(key, value, description=""):
+        """Create a AMI ID argument that makes sure the value is a valid AMI ID."""
         parameter = {
             "Description" : description,
             "Type": "AWS::EC2::Image::Id"
@@ -116,6 +145,9 @@ class Arg:
         
     @staticmethod
     def KeyPair(key, value, hostname):
+        """Create a KeyPair KeyName argument that makes sure the value is a
+        valid KeyPair name.
+        """
         parameter = {
             "Description" : "Name of an existing EC2 KeyPair to enable SSH access to '{}'".format(hostname),
             "Type": "AWS::EC2::KeyPair::KeyName",
@@ -126,6 +158,9 @@ class Arg:
 
     @staticmethod
     def SecurityGroup(key, value, description=""):
+        """Create a SecurityGroup ID argument that makes sure the value is a
+        valid SecurityGroup ID.
+        """
         parameter = {
             "Description" : description,
             "Type": "AWS::EC2::SecurityGroup::Id"
@@ -135,6 +170,12 @@ class Arg:
     
     @staticmethod    
     def RouteTable(key, value, description=""):
+        """Create a RouteTable ID argument.
+        
+        NOTE: AWS does not currently recognize AWS::EC2::RouteTable::Id as a
+              valid argument type. Therefore this argument is a String
+              argument.
+        """
         parameter = {
             "Description" : description,
             "Type" : "For whatever reason CloudFormation does not recognize RouteTable::Id",
@@ -145,7 +186,14 @@ class Arg:
         return Arg(key, parameter, argument)
 
 class CloudFormationConfiguration:
+    """Configuration class that helps with building CloudFormation templates
+    and launching them.
+    """
     def __init__(self, domain, devices = None):
+        """domain is either <vpc>.<tld> or <subnet>.<vpc>.<tld> and is used to
+                  populate specific pieces of VPC and Subnet information.
+        devices is a dictionary of devices for use when looking up IP addresses.
+        """
         self.resources = {}
         self.parameters = {}
         self.arguments = []
@@ -166,6 +214,9 @@ class CloudFormationConfiguration:
             raise Exception("Not a valiid VPC or Subnet domain name")
     
     def _create_template(self, description=""):
+        """Create the JSON CloudFormation template from the resources that have
+        be added to the object.
+        """
         return json.dumps({"AWSTemplateFormatVersion" : "2010-09-09",
                            "Description" : description,
                            "Parameters": self.parameters,
@@ -173,6 +224,9 @@ class CloudFormationConfiguration:
                           indent=4)
     
     def generate(self, name, folder):
+        """Create <name>.template and <name>.arguments files in the given
+        directory.
+        """
         with open(os.path.join(folder, name + ".template"), "w") as fh:
             fh.write(self._create_template())
             
@@ -180,6 +234,11 @@ class CloudFormationConfiguration:
             json.dump(self.arguments, fh, indent=4)
         
     def create(self, session, name, wait = True):
+        """Using the given boto3 session, launch the CloudFormation template
+        that this object represents. If wait is True this method will block
+        until CloudFormation is done launching the template (successfully or
+        not).
+        """
         for argument in self.arguments:
             if argument["ParameterValue"] is None:
                 raise Exception("Could not determine argument '{}'".format(argument["ParameterKey"]))
@@ -214,11 +273,16 @@ class CloudFormationConfiguration:
         return rtn
     
     def add_arg(self, arg):
+        """Add an Arg class instance to the internal configuration."""
         if arg.key not in self.parameters:
             self.parameters[arg.key] = arg.parameter
             self.arguments.append(arg.argument)
         
     def add_vpc(self, key="VPC"):
+        """Add a VPC to the configuration.
+        
+        VPC name and subnet are derived from the domain given to the constructor.
+        """
         self.resources[key] = {
             "Type" : "AWS::EC2::VPC",
             "Properties" : {
@@ -238,6 +302,11 @@ class CloudFormationConfiguration:
         self.add_arg(domain)
 
     def add_subnet(self, key="Subnet", vpc="VPC", az=None):
+        """Add a Subnet to the configuration.
+        
+        az is the specific Availability Zone to launch the subnet in
+              else AWS will decide.
+        """
         self.resources[key] = {
             "Type" : "AWS::EC2::Subnet",
             "Properties" : {
@@ -262,8 +331,21 @@ class CloudFormationConfiguration:
     
     # ??? save hostname : keypair somewhere?
     def add_ec2_instance(self, key, hostname, ami, keypair, subnet="Subnet", type_="t2.micro", iface_check=True, public_ip=False, security_groups=None, user_data=None, meta_data=None, depends_on=None):
-        """
-            security_groups = [security group, ...]
+        """Add an EC2 instance to the configuration
+        key is the unique name (within the configuration) for this instance
+        hostname is the hostname of the machine
+                 hostname is used to lookup the IP address to assign to the machine
+        ami is the AMI image ID
+        subnet is the Subnet unique name within the configuration to launch this machine in
+        type_ is the instance type to create
+        iface_check determines is the network should check if the traffic is destined for itself
+                    (usedful for NAT instances)
+        public_ip determines is the instance gets a public IP address
+        security_groups is an array of SecurityGroup unique names within the configuration
+        user_data is a string of user-data to give to the instance when launching
+        meta_data is a dictionary of meta-data to include with the configuration
+        depends_on the unique name of a resource within the configuration and is used to
+                   determine the launch order of resources
         """
         self.resources[key] = {
             "Type" : "AWS::EC2::Instance",
@@ -317,6 +399,19 @@ class CloudFormationConfiguration:
         self.add_arg(ip)
     
     def add_rds_db(self, key, hostname, port, db_name, username, password, subnets, type_="db.t2.micro", storage="5", security_groups=None):
+        """Add an RDS DB instance to the configuration
+        key is the unique name (within the configuration) for this instance
+        hostname is the hostname of the machine
+        port is the port for the DB instance to listen on
+        db_name is the name of the database to create on the DB instance
+        username is the master username for the database
+        password is the (plaintext) password for the master username
+        subnets is an array of Subnet unique names within the configuration across
+                which to create a DB SubnetGroup for the DB Instance to launch into
+        type_ is the RDS instance type to create
+        storage is the storage size of the database (in GB)
+        security_groups is an array of SecurityGroup unique names within the configuration
+        """
         self.resources[key] = {
             "Type" : "AWS::RDS::DBInstance",
             
@@ -374,14 +469,16 @@ class CloudFormationConfiguration:
         self.add_arg(password_)
     
     def add_dynamo_db(self, key, name, attributes, key_schema, throughput):
-        """
-            attributes = {AttributeName : AttributeType, ...}
-            key_schema = {AttributeName : KeyType, ...}
-            throughput = (ReadCapacity, WriteCapacity)
-                ReadCapacity is the minimum number of consistent reads of items per second
-                             before Amazon DynamoDB balances the loads
-                WriteCapacity is the minimum number of consistent writes of items per second
-                              before Amazon DynamoDB balances the loads
+        """Add an DynamoDB Table to the configuration
+        key is the unique name (within the configuration) for this instance
+        name is the name of the DynamoDB Table to create
+        attributes = {AttributeName : AttributeType, ...}
+        key_schema = {AttributeName : KeyType, ...}
+        throughput = (ReadCapacity, WriteCapacity)
+            ReadCapacity is the minimum number of consistent reads of items per second
+                         before Amazon DynamoDB balances the loads
+            WriteCapacity is the minimum number of consistent writes of items per second
+                          before Amazon DynamoDB balances the loads
         """
         attr_defs = []
         for key in attributes:
@@ -409,8 +506,12 @@ class CloudFormationConfiguration:
         self.add_arg(table_name)
     
     def add_security_group(self, key, name, rules, vpc="VPC"):
-        """
-            rules = [(protocol, from, to, cidr)]
+        """Add SecurityGroup to the configuration
+        key is the unique name (within the configuration) for this resource
+        name is the name to give the SecurityGroup
+             The name is appended with the configuration's VPC domain name
+        reules is an array of tuples [(protocol, from, to, cidr)]
+             Where protocol/from/to can be -1 if open access is desired
         """
         ports = "/".join(map(lambda x: x[1] + "-" + x[2], rules))
         ingress = []
@@ -435,10 +536,12 @@ class CloudFormationConfiguration:
         self.add_arg(domain)
         
     def add_route_table(self, key, name, vpc="VPC", subnets=["Subnet"]):
+        """Add ReouteTable to the configuration
+        key is the unique name (within the configuration) for this resource
+        name is the name to give the RouteTable
+            The name is appended with the configuration's VPC domain name
+        subnets is a list of subnets to which the RouteTable is associated
         """
-            subnets = [subnet, ...]
-        """
-        
         self.resources[key] = {
           "Type" : "AWS::EC2::RouteTable",
           "Properties" : {
@@ -459,6 +562,11 @@ class CloudFormationConfiguration:
             self.add_route_table_association(key_, key, subnet)
             
     def add_route_table_association(self, key, route_table, subnet="Subnet"):
+        """Add SubnetRouteTableAssociation to the configuration
+        key is the unique name (within the configuration) for this resource
+        route_table is the unique name of the RouteTable in the configuration
+        subnet is the the unique name of the Subnet to associate the RouteTable with
+        """
         self.resources[key] = {
           "Type" : "AWS::EC2::SubnetRouteTableAssociation",
           "Properties" : {
@@ -468,8 +576,15 @@ class CloudFormationConfiguration:
         }
         
     def add_route_table_route(self, key, route_table, cidr="0.0.0.0/0", gateway=None, peer=None, depends_on=None):
-        """
-            cidr  if None use "0.0.0.0/0" else use cidr
+        """Add a Route to the configuration
+        key is the unique name (within the configuration) for this resource
+        route_table is the unqiue name of the RouteTable to add the route to
+        cidr is the CIDR of the route
+        gateway is the target internet gateway
+        peer is the target VPC peer gateway
+            NOTE: One and only one of gateway/peer should be specified
+        depends_on is the resource that this route depends on
+            Normally used when creating an InternetGateway
         """
         self.resources[key] = {
           "Type" : "AWS::EC2::Route",
@@ -498,6 +613,11 @@ class CloudFormationConfiguration:
         self.add_arg(cidr)
         
     def add_internet_gateway(self, key, name="internet", vpc="VPC"):
+        """Add an InternetGateway to the configuration
+        key is the unique name (within the configuration) for this resource
+        name is the name to give the RouteTable
+            The name is appended with the configuration's VPC domain name
+        """
         self.resources[key] = {
           "Type" : "AWS::EC2::InternetGateway",
           "Properties" : {
@@ -521,6 +641,11 @@ class CloudFormationConfiguration:
         self.add_arg(domain)
         
     def add_vpc_peering(self, key, vpc, peer_vpc):
+        """Add a VPCPeeringConnection to the configuration
+        key is the unique name (within the configuration) for this resource
+        vpc is the the unique name of the source VPC to create the peering connection from
+        peer_vpc is the the unique name of the destination VPC to create the peering connection to
+        """
         self.resources[key] = {
             "Type" : "AWS::EC2::VPCPeeringConnection",
             "Properties" : {

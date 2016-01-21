@@ -22,6 +22,7 @@ import vault
 SSH_OPTIONS = "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 
 def create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user="ec2-user", bastion_port=22):
+    """Create a regular SSH tunnel from localhost:local_port to remote_ip:remote_port through bastion_ip."""
     fwd_cmd_fmt = "ssh -i {} {} -N -L {}:{}:{} -p {} {}@{}"
     fwd_cmd = fwd_cmd_fmt.format(key,
                                  SSH_OPTIONS,
@@ -37,6 +38,13 @@ def create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_u
     return proc
     
 def create_tunnel_aplnis(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user="ec2-user"):
+    """Read environmental variables to either directly connect to the given
+    bastion_ip or use the given (second) bastion server as the first machine to
+    connect to and route other tunnels through.
+    
+    This was added to support using a single machine given access through the
+    APL firewall and tunnel all SSH connections through it.
+    """
     apl_bastion_ip = os.environ.get("BASTION_IP")
     apl_bastion_key = os.environ.get("BASTION_KEY")
     apl_bastion_user = os.environ.get("BASTION_USER")
@@ -52,9 +60,17 @@ def create_tunnel_aplnis(key, local_port, remote_ip, remote_port, bastion_ip, ba
         print("Using APL Bastion host at {}".format(apl_bastion_ip))
         wrapper = ProcWrapper()
         port = locate_port()
+        
+        # Used http://superuser.com/questions/96489/ssh-tunnel-via-multiple-hops mssh.pl
+        # to figure out the multiple tunnels
+        
+        # Open up a SSH tunnel to bastion_ip:22 through apl_bastion_ip
+        # (to allow the second tunnel to be created)
         proc = create_tunnel(apl_bastion_key, port, bastion_ip, 22, apl_bastion_ip, apl_bastion_user)
         wrapper.prepend(proc)
         
+        # Create our normal tunnel, but connect to localhost:port to use the
+        # first tunnel that we create
         proc = create_tunnel(key, local_port, remote_ip, remote_port, "localhost", bastion_user, port)
         wrapper.prepend(proc)
         return wrapper
@@ -71,6 +87,9 @@ class ProcWrapper(list):
         [item.wait() for item in self]
 
 def locate_port():
+    """Instead of trying to figure out if a port is in use, assume that it will
+    not be in use.
+    """
     return random.randint(10000,60000)
 
 def become_tty_fg():

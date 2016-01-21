@@ -100,6 +100,18 @@ def vault_init(machine = None, secrets = 5, threashold = 3):
     vault_configure(machine)
     
 def vault_configure(machine = None):
+    """A companion function that will configure a newly initialized Vault
+    as needed for BOSS. This includes:
+        * Configuring the Audit Backend
+        * Adding all of the policies from policies/*.hcl
+        * Creating a provisioner token with all of the policies added
+            - Required so that the provisioner token can issue tokens
+              for any policy
+        * Configure the AWS backend (if there are AWS credentials to use)
+        * Configure AWS backend roles from policies/*.iam
+        * Configure the PKI backend (if there is a certificate to use)
+        * Configure PKI backend roles from policies/*.pki
+    """
     client = get_client(read_token = VAULT_TOKEN, machine = machine)
     
     # Audit Backend
@@ -145,23 +157,29 @@ def vault_configure(machine = None):
 
     # PKI Backend
     if False: # Disabled until we either have a CA cert or can generate a CA
+        print("Vault PKI cert file does not exist, skipping...")
+    else:
         client.enable_secret_backend('pki')
         # Generate a self signed certificate for CA
         print("Generating self signed CA")
         response = client.write("pki/root/generate/internal", common_name="boss.io")
         with open(get_path(machine, "ca.pem"), 'w') as fh:
             fh.write(response["data"]["certificate"])
+        
         # Should we configure CRL?
-        # Could turn all KV pairs into a JSON dictionary and save under policies/*.pki
-        client.write("pki/roles/ssl", allowed_domains="boss.io",
-                                      allow_localhost = False,
-                                      allow_bare_domains = False,
-                                      allow_subdomains = True, # CAUTION, allows wildcard
-                                      allow_any_name = False,
-                                      server_flag = True,
-                                      client_flag = False)
+        
+        path = os.path.join(_CURRENT_DIR, "policies", "*.pki")
+        for pki in glob.glob(path):
+            name = os.path.basename(pki).split('.')[0]
+            with open(pki, 'r') as fh:
+                keys = json.load(fh)
+                client.write("aws/roles/" + name, **keys)
     
 def vault_shell(machine = None):
+    """Create a connection to Vault and then drop the user into an interactive
+    shell (just like the python interperter) with 'client' holding the Vault
+    connection object.
+    """
     import code
     
     client = get_client(read_token = VAULT_TOKEN, machine = machine)
@@ -169,6 +187,9 @@ def vault_shell(machine = None):
     code.interact(local=locals())
 
 def verify(machine = None):
+    """Development function that gets updated when I need to script changes
+    to Vault.
+    """
     client = get_client(read_token = VAULT_TOKEN, machine = machine)
     
     token_file = get_path(machine, PROVISIONER_TOKEN)
@@ -330,17 +351,17 @@ def _vault_revoke(machine = None):
 def vault_django(db_name, username, password, port, machine = None):
     """Provision a Vault with credentials for a Django webserver. Connect
     using get_client(True) and provision the following information:
-     * Generate a secret key and store under 'secret/django secret_key=`
+     * Generate a secret key and store under 'secret/endpoint/django secret_key=`
      * Prompt the user (using input()) for the
        - Database Name
        - Database Username
        - Database Password
        - Database Port
        and store under
-       - 'secret/django/db name='
-       - 'secret/django/db user='
-       - 'secret/django/db password='
-       - 'secret/django/db port='
+       - 'secret/endpoint/django/db name='
+       - 'secret/endpoint/django/db user='
+       - 'secret/endpoint/django/db password='
+       - 'secret/endpoint/django/db port='
     """
     client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
     
@@ -359,7 +380,16 @@ def _vault_django(machine = None):
         args.append(input(key + ": "))
         
     vault_django(*args, machine = machine)
-        
+
+# Should probably create a _vault_write() function that reads
+# user input. Maybe a vault_read() version as well? and vault_delete()?
+def vault_write(path, machine = None, **kwargs):
+    """A generic method for writing data into Vault, for use by CloudFormation
+    scripts.
+    """
+    client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
+    client.write(path, kwargs)
+   
 COMMANDS = {
     "vault-init": vault_init,
     "vault-configure": vault_configure,

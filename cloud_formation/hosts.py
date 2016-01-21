@@ -77,17 +77,6 @@ for vpc in VPCS:
     })
 
 
-HOSTS = """
-# Core Machines
-{TLD_IP}.{VPC_IP}.{EXTERNAL_SUBNET}.{BASTION_IP}\tbastion.{VPC}.{TLD} bastion
-{TLD_IP}.{VPC_IP}.{INTERNAL_SUBNET}.{VAULT_IP}\tvault.{VPC}.{TLD} vault
-
-# Production Machines
-{TLD_IP}.{VPC_IP}.{EXTERNAL_SUBNET}.{API_IP}\tapi.{VPC}.{TLD} api
-"""
-
-
-
 ##
 # Generation Code
 ##

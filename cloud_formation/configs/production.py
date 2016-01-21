@@ -1,9 +1,16 @@
-"""Create the production environment.
+"""
+Create the production configuration which consists of
+  * An endpoint web server in the external subnet
+  * A RDS DB Instance launched into two new subnets (A and B)
+
+The production configuration creates all of the resources needed to run the
+BOSS system. The production configuration expects to be launched / created
+in a VPC created by the core configuration. It also expects for the user to
+select the same KeyPair used when creating the core configuration.
 
 ADDRESSES - the dictionary of production hostnames and subnet indexes.
-DEVICES - the different device configurations to include in the template.
-ROUTE - an extra route for the new VPC Peering connection.
 """
+
 
 import configuration
 import library as lib
@@ -18,8 +25,10 @@ ADDRESSES = {
 }
        
 def create_config(session, domain, keypair=None, user_data=None, db_config={}):
+    """Create the CloudFormationConfiguration object."""
     config = configuration.CloudFormationConfiguration(domain, ADDRESSES)
 
+    # do a couple of verification checks
     if config.subnet_domain is not None:
         raise Exception("Invalid VPC domain name")
         
@@ -27,6 +36,8 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     if session is not None and vpc_id is None:
         raise Exception("VPC does not exists, exiting...")
         
+    # Lookup the VPC, External Subnet, Internal Security Group IDs that are
+    # needed by other resources
     config.add_arg(configuration.Arg.VPC("VPC", vpc_id,
                                          "ID of VPC to create resources in"))
     
@@ -40,6 +51,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                                                    internal_sg_id,
                                                    "ID of internal Security Group"))
     
+    # Create the a and b subnets
     config.subnet_domain = "a." + domain
     config.subnet_subnet = hosts.lookup(config.subnet_domain)
     config.add_subnet("ASubnet", az="us-east-1b")
@@ -48,6 +60,9 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     config.subnet_subnet = hosts.lookup(config.subnet_domain)
     config.add_subnet("BSubnet", az="us-east-1c") # BSubnet needs to be in a different AZ from ASubnet
     
+    # Dynamically add the RDS instance address to the user data, so that
+    # the endpoint server can access the launched DB
+    # Fn::GetAtt and Fn::Join are CloudFormation template functions
     user_data_dynamic = [user_data, "\n[aws]\n",
                          "db = ", { "Fn::GetAtt" : [ "DB", "Endpoint.Address" ] }, "\n"]
     user_data_ = { "Fn::Join" : ["", user_data_dynamic]}
@@ -70,7 +85,8 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                       db_config.get("password"),
                       ["ASubnet", "BSubnet"],
                       security_groups = ["InternalSecurityGroup"])
-                              
+
+    # Allow SSH/HTTP/HTTPS access to endpoint server from anywhere
     config.add_security_group("InternetSecurityGroup",
                               "internet",
                               [
@@ -82,19 +98,23 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     return config
   
 def generate(folder, domain):
+    """Create the configuration and save it to disk"""
     name = lib.domain_to_stackname("production." + domain)
     config = create_config(None, domain)
     config.generate(name, folder)
                           
 def create(session, domain):
+    """Configure Vault, create the configuration, and launch it"""
     keypair = lib.keypair_lookup(session)
     
-    def call_vault(command, *args):
+    def call_vault(command, *args, **kawargs):
+        """A wrapper function around lib.call_vault() that populates most of
+        the needed arguments."""
         return lib.call_vault(session,
                               lib.keypair_to_file(keypair),
                               "bastion." + domain,
                               "vault." + domain,
-                              command, *args)
+                              command, *args, **kwargs)
     
     db = {
         "name":"boss",
@@ -103,8 +123,8 @@ def create(session, domain):
         "port": "3306"
     }
     
-    print(db)
-    
+    # Configure Vault and create the user data config that the endpoint will
+    # use for connecting to Vault and the DB instance
     endpoint_token = call_vault("vault-provision", "endpoint")
     user_data = configuration.UserData()
     # CAUTION: This hard codes the Vault address in the config file passed and will cause
@@ -115,6 +135,7 @@ def create(session, domain):
     user_data["system"]["type"] = "endpoint"
     user_data = str(user_data)
     
+    # Should transition from vault-django to vault-write
     call_vault("vault-django", db["name"], db["user"], db["password"], db["port"])
 
     try:

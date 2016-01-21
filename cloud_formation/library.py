@@ -32,13 +32,14 @@ def template_argument(key, value, use_previous = False):
     return {"ParameterKey": key, "ParameterValue": value, "UsePreviousValue": use_previous}
 
 def keypair_to_file(keypair):
+    """Look for a ssh key named <keypair> and alert if it does not exist."""
     file = os.path.expanduser("~/.ssh/{}.pem".format(keypair))
     if not os.path.exists(file):
         print("Error: SSH Key '{}' does not exist".format(file))
         return None
     return file
  
-def call_vault(session, bastion_key, bastion_host, vault_host, command, *args):
+def call_vault(session, bastion_key, bastion_host, vault_host, command, *args, **kwargs):
     """Call ../vault/bastion.py with a list of hardcoded AWS / SSH arguments.
     This is a common function for any other function that needs to populate
     or provision Vault when starting up new VMs.
@@ -48,11 +49,12 @@ def call_vault(session, bastion_key, bastion_host, vault_host, command, *args):
     def cmd():
         # Have to dynamically lookup the function because vault.COMMANDS
         # references the command line version of the commands we want to execute
-        return vault.__dict__[command.replace('-','_')](*args, machine=vault_host)
+        return vault.__dict__[command.replace('-','_')](*args, machine=vault_host, **kwargs)
         
     return bastion.connect_vault(bastion_key, vault_ip, bastion_ip, cmd)
  
 def password(what):
+    """Prompt the user for a password and verify it."""
     while True:
         pass_ = getpass.getpass("{} Password: ".format(what))
         pass__ = getpass.getpass("Verify {} Password: ".format(what))
@@ -62,6 +64,7 @@ def password(what):
             print("Passwords didn't match, try again.")
             
 def generate_password(length = 16):
+    """Generate an alphanumeric password of the given length."""
     chars = string.ascii_letters + string.digits #+ string.punctuation
     return "".join([chars[c % len(chars)] for c in os.urandom(length)])
  
