@@ -8,7 +8,7 @@ include:
 django-prerequirements:
     pkg.installed:
         - pkgs:
-            - libmysqlclient-dev: 5.5.46-0ubuntu0.14.04.2
+            - libmysqlclient-dev: 5.5.47-0ubuntu0.14.04.1
 
 django-requirements:
     pip.installed:

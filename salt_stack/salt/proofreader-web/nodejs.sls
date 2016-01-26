@@ -8,7 +8,7 @@ nodesource-repo:
 nodejs:
   pkg.installed:
     - fromrepo: trusty
-    - version: 5.4.1-1nodesource1~trusty1
+    - version: 5.5.0-1nodesource1~trusty1
 
 npm@3.5.3:
   npm.installed:
