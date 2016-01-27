@@ -2,6 +2,7 @@ include:
     - git
     - uwsgi.emperor
     - nginx
+    - boss-tools.bossutils
     - proofreader-web.nodejs
     - proofreader-web.django
 
@@ -66,3 +67,14 @@ uwsgi-enable-config:
     - target: /etc/uwsgi/apps-available/proofreader_apis.ini
     - require:
       - sls: uwsgi.emperor
+
+django-firstboot:
+    file.managed:
+        - name: /etc/init.d/django-firstboot
+        - source: salt://proofreader-web/files/firstboot.py
+        - user: root
+        - group: root
+        - mode: 555
+    cmd.run:
+        - name: update-rc.d django-firstboot defaults 99
+        - user: root
