@@ -69,7 +69,7 @@
                 "sudo sh -c 'echo {{user `name`}} > /etc/hostname'",
                 "sudo hostname -F /etc/hostname",
                 "sudo apt-get update",
-                "sudo apt-get -y install curl=7.35.0-1ubuntu2.5"
+                "sudo apt-get -y install curl"
             ]
         },
         {
