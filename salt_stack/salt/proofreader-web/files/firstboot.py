@@ -41,11 +41,11 @@ def configure_django():
     file = "/srv/www/app/proofreader_apis/manage.py"
     if os.path.exists(file):
         logging.info("manage.py collectstatic")
-        bossutils.utils.execute("python3 {} collectstatic --noinput".format(file))
+        bossutils.utils.execute("/usr/local/bin/python3 {} collectstatic --noinput".format(file))
 
         # May not need to be called if another endpoint has already called this
         logging.info("manage.py migrate")
-        bossutils.utils.execute("python3 {} migrate".format(file))
+        bossutils.utils.execute("/usr/local/bin/python3 {} migrate".format(file))
 
 if __name__ == '__main__':
     configure_django()
