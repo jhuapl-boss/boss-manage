@@ -67,6 +67,10 @@ packer/variables/aws-credentials
 *.ppk
 vault/private/
 
+<<<<<<< HEAD
 # Personal Vagrant files
 .vagrant/
 .DS_Store
+
+# PyCharm Stuff
+.idea/
