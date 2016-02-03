@@ -68,3 +68,7 @@ vault/private/
 
 # Other repositories
 *.git
+
+# PyCharm Stuff
+.idea/
+
