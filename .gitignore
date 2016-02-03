@@ -69,3 +69,7 @@ vault/private/
 
 # Personal Vagrant files
 .vagrant/
+
+# PyCharm Stuff
+.idea/
+
