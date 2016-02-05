@@ -11,6 +11,9 @@
         "aws_source_ami": "Ubuntu Server 14.04 LTS (HVM), SSD Volume Type",
         "aws_source_ami": "ami-d05e75b8",
 
+        "aws_force": "Overwrite an existing image",
+        "aws_force": "false",
+
         "aws_bastion_ip": "IP of the APL bastion server",
         "aws_bastion_ip": "",
         "aws_bastion_user": "User name to login to the bastion server",
@@ -50,6 +53,7 @@
         "ami_name": "{{user `name`}}.boss",
         "ami_description": "AMI configured for running as a / the {{user `role`}} server",
         "source_ami": "{{user `aws_source_ami`}}",
+        "force_deregister": "{{user `aws_force`}}",
         "instance_type": "{{user `aws_instance_type`}}",
         "region": "{{user `aws_region`}}",
         "tags": {

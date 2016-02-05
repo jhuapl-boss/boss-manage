@@ -3,7 +3,7 @@ base:
         - vault.server
         - boss-tools.bossutils
 
-    'endpoint':
+    'endpoint*':
         - boss-tools.bossutils
         - boss.django
         - scalyr
@@ -11,6 +11,6 @@ base:
     'jenkins*':
         - jenkins-microns
 
-    'proofreader-web':
+    'proofreader-web*':
         - proofreader-web
         - scalyr
