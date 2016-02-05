@@ -15,7 +15,7 @@ npm@3.5.3:
     - require:
       - pkg: nodejs
 
-bower@1.7.3:
+bower@1.7.7:
   npm.installed:
     - require:
       - pkg: nodejs
