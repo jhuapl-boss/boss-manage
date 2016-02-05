@@ -1,0 +1,5 @@
+{% set scalyr = salt['grains.filter_by']({
+    'default': {
+        'log_config_files': {}
+    },
+}, merge=salt['pillar.get']('scalyr:lookup')) %}

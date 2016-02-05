@@ -6,9 +6,11 @@ base:
     'endpoint':
         - boss-tools.bossutils
         - boss.django
+        - scalyr
 
     'jenkins*':
         - jenkins-microns
 
     'proofreader-web':
         - proofreader-web
+        - scalyr

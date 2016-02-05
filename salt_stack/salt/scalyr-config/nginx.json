@@ -1,0 +1,13 @@
+// nginx log files.
+{
+    logs: [
+        {
+            path: "/var/log/nginx/access.log",
+            attributes: { parser: "accessLog"}
+        },
+        {
+            path: "/var/log/nginx/error.log", 
+            attributes: { parser: "systemLog"}
+        }
+    ]
+}

@@ -68,3 +68,6 @@ vault/private/
 
 # Other repositories
 *.git
+
+# Personal Vagrant files
+.vagrant/
