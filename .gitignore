@@ -64,6 +64,7 @@ packer/variables/aws-credentials
 
 # Private Files
 *.pem
+*.ppk
 vault/private/
 
 # Other repositories
