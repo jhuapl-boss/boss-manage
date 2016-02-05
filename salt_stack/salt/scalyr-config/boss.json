@@ -1,0 +1,9 @@
+// boss endpoint log.
+{
+    logs: [
+        {
+            path: "/var/log/boss.log",
+            attributes: { parser: "json"}
+        }
+    ]
+}
