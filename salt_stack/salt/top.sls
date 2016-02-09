@@ -7,6 +7,7 @@ base:
         - boss-tools.bossutils
         - boss.django
         - scalyr
+        - scalyr.update_host
 
     'jenkins*':
         - jenkins-microns
@@ -14,3 +15,4 @@ base:
     'proofreader-web*':
         - proofreader-web
         - scalyr
+        - scalyr.update_host
