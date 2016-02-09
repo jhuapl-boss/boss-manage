@@ -1,0 +1,12 @@
+[submodule "salt_stack/salt/boss-tools/files/boss-tools.git"]
+	path = salt_stack/salt/boss-tools/files/boss-tools.git
+	url = ../boss-tools.git
+	branch = integration
+[submodule "salt_stack/salt/boss/files/boss.git"]
+	path = salt_stack/salt/boss/files/boss.git
+	url = ../boss.git
+	branch = integration
+[submodule "salt_stack/salt/proofreader-web/files/proofread.git"]
+	path = salt_stack/salt/proofreader-web/files/proofread.git
+	url = ../proofread.git
+	branch = integration
