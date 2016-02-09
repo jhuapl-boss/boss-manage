@@ -39,14 +39,8 @@ When building new machine images with Packer (either VBox or AWS AMI),
 SaltStack expects the boss and boss-tools repositories to be checked
 out to specific directories within the SaltStack directory structure.
 
-Run the following commands to complete this setup (from the root
-directory):
-
-`git clone https://github.com/aplmicrons/boss.git salt_stack/salt/boss/files/boss.git`
-
-`git clone https://github.com/aplmicrons/boss-tools.git salt_stack/salt/boss-tools/files/boss-tools.git`
-
-`git clone https://github.com/aplmicrons/proofread.git salt_stack/salt/proofread-web/files/proofread.git`
+Follow the directions in the [Submodules](docs/Submodules.md) help file to
+correctly setup the submodules of boss-manage.
 
 ## SSH Keys
 

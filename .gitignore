@@ -67,8 +67,5 @@ packer/variables/aws-credentials
 *.ppk
 vault/private/
 
-# Other repositories
-*.git
-
 # Personal Vagrant files
 .vagrant/
