@@ -665,6 +665,52 @@ class CloudFormationConfiguration:
                             "Destination VPC for the peering connection")
         self.add_arg(peer_vpc_)
 
+    def add_loadbalancer(self, key, name, subnets, security_groups, instances ):
+        """ Add loadbalancer to configuration
+        key is the unique name (within the configuration) for this resource
+        name is the name to give the
+        subnets is a list of subnet names
+        security_groups is a list of SecurityGroups
+        instances is the list of instances
+        """
+        self.resources[key] = {
+            "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+            "Properties": {
+                #"AccessLoggingPolicy" : AccessLoggingPolicy,
+                #"AppCookieStickinessPolicy" : [ AppCookieStickinessPolicy, ... ],
+                #"AvailabilityZones" : [ String, ... ],  # using Subnets instead of AVs
+                #"ConnectionDrainingPolicy" : ConnectionDrainingPolicy,
+                #"ConnectionSettings" : ConnectionSettings,
+                "CrossZone" : True,
+                "HealthCheck" : {
+                    "Target" : {
+                        "Fn::Join" : [ "", [ "HTTP:", { "Ref" : "WebServerPort" }, "/" ] ]
+                    },
+                    "HealthyThreshold" : "3",
+                    "UnhealthyThreshold" : "5",
+                    "Interval" : "30",
+                    "Timeout" : "5"
+                },
+                "Instances" : instances,
+                #"LBCookieStickinessPolicy" : [ LBCookieStickinessPolicy, ... ],
+                "LoadBalancerName" : name,
+                "Listeners" : [ {
+                    "LoadBalancerPort" : "80",
+                    "InstancePort" : { "Ref" : "WebServerPort" },
+                    "Protocol" : "HTTP"
+                } ],
+                #"Policies" : [ ElasticLoadBalancing Policy, ... ],
+                #"Scheme" : String,
+                "SecurityGroups" : security_groups,
+                "Subnets" : subnets,
+                "Tags" : [
+                    {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} }
+                ]
+            }
+        }
+
+
+
 class UserData:
     """A wrapper class around configparse.ConfigParser that automatically loads
     the default boss.config file and provide the ability to return the
