@@ -43,7 +43,9 @@ def configure_django():
         logging.info("manage.py collectstatic")
         bossutils.utils.execute("/usr/local/bin/python3 {} collectstatic --noinput".format(file))
 
-        # May not need to be called if another endpoint has already called this
+        logging.info("manage.py makemigrations")
+        bossutils.utils.execute("/usr/local/bin/python3 {} makemigrations common".format(file))
+
         logging.info("manage.py migrate")
         bossutils.utils.execute("/usr/local/bin/python3 {} migrate".format(file))
 
