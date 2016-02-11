@@ -1,0 +1,23 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateAccessKey",
+        "iam:CreateUser",
+        "iam:PutUserPolicy",
+        "iam:ListGroupsForUser",
+        "iam:ListUserPolicies",
+        "iam:ListAccessKeys",
+        "iam:DeleteAccessKey",
+        "iam:DeleteUserPolicy",
+        "iam:RemoveUserFromGroup",
+        "iam:DeleteUser"
+      ],
+      "Resource": [
+        "arn:aws:iam::*:user/vault-*"
+      ]
+    }
+  ]
+}

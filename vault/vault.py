@@ -145,14 +145,15 @@ def vault_configure(machine = None):
         client.enable_secret_backend('aws')
         with open(vault_aws_creds, "r") as fh:
             creds = json.load(fh)
-            client.write("aws/config/root", access_key = creds["access_key"],
-                                            secret_key = creds["secret_key"],
-                                            region = creds.get("region", "us-east-1"))
+            client.write("aws/config/root", access_key = creds["aws_access_key"],
+                                            secret_key = creds["aws_secret_key"],
+                                            region = creds.get("aws_region", "us-east-1"))
 
         path = os.path.join(_CURRENT_DIR, "policies", "*.iam")
         for iam in glob.glob(path):
             name = os.path.basename(iam).split('.')[0]
             with open(iam, 'r') as fh:
+                # if we json parse the file first we can use the duplicate key trick for comments
                 client.write("aws/roles/" + name, policy = fh.read())
 
     # PKI Backend
