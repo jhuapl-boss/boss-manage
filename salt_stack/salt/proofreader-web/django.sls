@@ -4,7 +4,7 @@ include:
 
 django:
   pip.installed:
-    - name: django == 1.9.1
+    - name: django == 1.9.2
     - bin_env: /usr/local/bin/pip3
     - require:
       - sls: python.python35
