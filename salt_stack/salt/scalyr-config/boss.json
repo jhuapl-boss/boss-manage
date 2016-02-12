@@ -2,7 +2,7 @@
 {
     logs: [
         {
-            path: "/var/log/boss.log",
+            path: "/var/log/boss/boss.log",
             attributes: { parser: "json"}
         }
     ]
