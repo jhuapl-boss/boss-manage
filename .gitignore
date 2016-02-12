@@ -69,3 +69,4 @@ vault/private/
 
 # Personal Vagrant files
 .vagrant/
+.DS_Store
