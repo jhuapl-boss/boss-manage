@@ -8,9 +8,9 @@ nodesource-repo:
 nodejs:
   pkg.installed:
     - fromrepo: trusty
-    - version: 5.5.0-1nodesource1~trusty1
+    - version: 5.6.0-1nodesource1~trusty1
 
-npm@3.5.3:
+npm@3.7.1:
   npm.installed:
     - require:
       - pkg: nodejs
@@ -20,7 +20,7 @@ bower@1.7.7:
     - require:
       - pkg: nodejs
 
-gulp@3.9.0:
+gulp@3.9.1:
   npm.installed:
     - require:
       - pkg: nodejs

@@ -27,7 +27,7 @@ that they want...
 def bool_str(val):
     """Convert a bool to a string with appropriate case formatting."""
     return "true" if val else "false"
-        
+
 class Arg:
     """Create CloudFormation template arguments of the supplied types."""
     def __init__(self, key, parameter, argument):
@@ -51,7 +51,7 @@ class Arg:
         }
         argument = lib.template_argument(key, value)
         return Arg(key, parameter, argument)
-        
+
     @staticmethod
     def Password(key, value, description=""):
         """Create a String argument that does not show typed characters."""
@@ -62,7 +62,7 @@ class Arg:
         }
         argument = lib.template_argument(key, value)
         return Arg(key, parameter, argument)
-       
+
     @staticmethod
     def IP(key, value, description=""):
         """Create a String argument that checks the value to make sure it is in
@@ -79,7 +79,7 @@ class Arg:
         }
         argument = lib.template_argument(key, value)
         return Arg(key, parameter, argument)
-        
+
     @staticmethod
     def Port(key, value, description=""):
         """Create a Number argument that checks the value to make sure it is a
@@ -93,7 +93,7 @@ class Arg:
         }
         argument = lib.template_argument(key, value)
         return Arg(key, parameter, argument)
-        
+
     @staticmethod
     def CIDR(key, value, description=""):
         """Create a String argument that checks the value to make sure it is in
@@ -110,7 +110,7 @@ class Arg:
         }
         argument = lib.template_argument(key, value)
         return Arg(key, parameter, argument)
-        
+
     @staticmethod
     def VPC(key, value, description=""):
         """Create a VPC ID argument that makes sure the value is a valid VPC ID."""
@@ -120,7 +120,7 @@ class Arg:
         }
         argument = lib.template_argument(key, value)
         return Arg(key, parameter, argument)
-    
+
     @staticmethod
     def Subnet(key, value, description=""):
         """Create an (AWS) Subnet ID argument that makes sure the value is a
@@ -132,7 +132,7 @@ class Arg:
         }
         argument = lib.template_argument(key, value)
         return Arg(key, parameter, argument)
-        
+
     @staticmethod
     def AMI(key, value, description=""):
         """Create a AMI ID argument that makes sure the value is a valid AMI ID."""
@@ -142,7 +142,7 @@ class Arg:
         }
         argument = lib.template_argument(key, value)
         return Arg(key, parameter, argument)
-        
+
     @staticmethod
     def KeyPair(key, value, hostname):
         """Create a KeyPair KeyName argument that makes sure the value is a
@@ -167,11 +167,11 @@ class Arg:
         }
         argument = lib.template_argument(key, value)
         return Arg(key, parameter, argument)
-    
-    @staticmethod    
+
+    @staticmethod
     def RouteTable(key, value, description=""):
         """Create a RouteTable ID argument.
-        
+
         NOTE: AWS does not currently recognize AWS::EC2::RouteTable::Id as a
               valid argument type. Therefore this argument is a String
               argument.
@@ -198,7 +198,7 @@ class CloudFormationConfiguration:
         self.parameters = {}
         self.arguments = []
         self.devices = {} if devices is None else devices
-        
+
         dots = len(domain.split("."))
         if dots == 2: # vpc.tld
             self.vpc_domain = domain
@@ -212,7 +212,7 @@ class CloudFormationConfiguration:
             self.subnet_subnet = hosts.lookup(domain)
         else:
             raise Exception("Not a valiid VPC or Subnet domain name")
-    
+
     def _create_template(self, description=""):
         """Create the JSON CloudFormation template from the resources that have
         be added to the object.
@@ -222,17 +222,17 @@ class CloudFormationConfiguration:
                            "Parameters": self.parameters,
                            "Resources": self.resources},
                           indent=4)
-    
+
     def generate(self, name, folder):
         """Create <name>.template and <name>.arguments files in the given
         directory.
         """
         with open(os.path.join(folder, name + ".template"), "w") as fh:
             fh.write(self._create_template())
-            
+
         with open(os.path.join(folder, name + ".arguments"), "w") as fh:
             json.dump(self.arguments, fh, indent=4)
-        
+
     def create(self, session, name, wait = True):
         """Using the given boto3 session, launch the CloudFormation template
         that this object represents. If wait is True this method will block
@@ -242,14 +242,14 @@ class CloudFormationConfiguration:
         for argument in self.arguments:
             if argument["ParameterValue"] is None:
                 raise Exception("Could not determine argument '{}'".format(argument["ParameterKey"]))
-    
+
         client = session.client('cloudformation')
         response = client.create_stack(
             StackName = name,
             TemplateBody = self._create_template(),
             Parameters = self.arguments
         )
-        
+
         rtn = None
         if wait:
             get_status = lambda r: r['Stacks'][0]['StackStatus']
@@ -271,30 +271,30 @@ class CloudFormationConfiguration:
                     print("Status of stack '{}' is '{}'".format(name, get_status(response)))
                     rtn = False
         return rtn
-    
+
     def add_arg(self, arg):
         """Add an Arg class instance to the internal configuration."""
         if arg.key not in self.parameters:
             self.parameters[arg.key] = arg.parameter
             self.arguments.append(arg.argument)
-        
+
     def add_vpc(self, key="VPC"):
         """Add a VPC to the configuration.
-        
+
         VPC name and subnet are derived from the domain given to the constructor.
         """
         self.resources[key] = {
             "Type" : "AWS::EC2::VPC",
             "Properties" : {
                 "CidrBlock" : { "Ref" : key + "Subnet" },
-                "Tags" : [ 
+                "Tags" : [
                     {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
                     {"Key" : "Name", "Value" : { "Ref" : key + "Domain"} }
                 ]
             }
         }
-        
-        subnet = Arg.CIDR(key + "Subnet", self.vpc_subnet, 
+
+        subnet = Arg.CIDR(key + "Subnet", self.vpc_subnet,
                           "Subnet of the VPC '{}'".format(key))
         self.add_arg(subnet)
         domain = Arg.String(key + "Domain", self.vpc_domain,
@@ -303,7 +303,7 @@ class CloudFormationConfiguration:
 
     def add_subnet(self, key="Subnet", vpc="VPC", az=None):
         """Add a Subnet to the configuration.
-        
+
         az is the specific Availability Zone to launch the subnet in
               else AWS will decide.
         """
@@ -318,17 +318,17 @@ class CloudFormationConfiguration:
                 ]
             }
         }
-        
+
         if az is not None:
             self.resources[key]["Properties"]["AvailabilityZone"] = az
-        
-        subnet = Arg.CIDR(key + "Subnet", self.subnet_subnet, 
+
+        subnet = Arg.CIDR(key + "Subnet", self.subnet_subnet,
                           "Subnet of the Subnet '{}'".format(key))
         self.add_arg(subnet)
         domain = Arg.String(key + "Domain", self.subnet_domain,
                             "Domain of the Subnet '{}'".format(key))
         self.add_arg(domain)
-    
+
     # ??? save hostname : keypair somewhere?
     def add_ec2_instance(self, key, hostname, ami, keypair, subnet="Subnet", type_="t2.micro", iface_check=True, public_ip=False, security_groups=None, user_data=None, meta_data=None, depends_on=None):
         """Add an EC2 instance to the configuration
@@ -367,37 +367,37 @@ class CloudFormationConfiguration:
                 }]
             }
         }
-        
+
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
-        
+
         if security_groups is not None:
             sgs = []
             for sg in security_groups:
                 sgs.append({ "Ref" : sg })
             self.resources[key]["Properties"]["NetworkInterfaces"][0]["GroupSet"] = sgs
-        
+
         if meta_data is not None:
             self.resources[key]["Metadata"] = meta_data
-            
+
         if user_data is not None:
             self.resources[key]["Properties"]["UserData"] = { "Fn::Base64" : user_data }
-        
+
         _ami = Arg.AMI(key + "AMI", ami,
                        "AMI for the EC2 Instance '{}'".format(key))
         self.add_arg(_ami)
-        
+
         _key = Arg.KeyPair(key + "Key", keypair, hostname)
         self.add_arg(_key)
-        
+
         _hostname = Arg.String(key + "Hostname", hostname,
                                "Hostname of the EC2 Instance '{}'".format(key))
         self.add_arg(_hostname)
-        
+
         ip = Arg.IP(key + "IP", hosts.lookup(hostname, self.devices),
                     "IP Address of the EC2 Instance '{}'".format(key))
         self.add_arg(ip)
-    
+
     def add_rds_db(self, key, hostname, port, db_name, username, password, subnets, type_="db.t2.micro", storage="5", security_groups=None):
         """Add an RDS DB instance to the configuration
         key is the unique name (within the configuration) for this instance
@@ -414,7 +414,7 @@ class CloudFormationConfiguration:
         """
         self.resources[key] = {
             "Type" : "AWS::RDS::DBInstance",
-            
+
             "Properties" : {
                 "Engine" : "mysql",
                 "LicenseModel" : "general-public-license",
@@ -433,7 +433,7 @@ class CloudFormationConfiguration:
                 "StorageEncrypted" : "false"
             }
         }
-            
+
         self.resources[key + "SubnetGroup"] = {
             "Type" : "AWS::RDS::DBSubnetGroup",
             "Properties" : {
@@ -441,33 +441,33 @@ class CloudFormationConfiguration:
                 "SubnetIds" : [{ "Ref" : subnet } for subnet in subnets]
             }
         }
-        
+
         if security_groups is not None:
             sgs = []
             for sg in security_groups:
                 sgs.append({ "Ref" : sg })
             self.resources[key]["Properties"]["VPCSecurityGroups"] = sgs
-        
+
         hostname_ = Arg.String(key + "Hostname", hostname.replace('.','-'),
                                "Hostname of the RDS DB Instance '{}'".format(key))
         self.add_arg(hostname_)
-        
+
         port_ = Arg.Port(key + "Port", port,
                          "DB Server Port for the RDS DB Instance '{}'".format(key))
         self.add_arg(port_)
-        
+
         name_ = Arg.String(key + "DBName", db_name,
                            "Name of the intial database on the RDS DB Instance '{}'".format(key))
         self.add_arg(name_)
-        
+
         username_ = Arg.String(key + "Username", username,
                                "Master Username for RDS DB Instance '{}'".format(key))
         self.add_arg(username_)
-        
+
         password_ = Arg.Password(key + "Password", password,
                                  "Master User Password for RDS DB Instance '{}'".format(key))
         self.add_arg(password_)
-    
+
     def add_dynamo_db(self, key, name, attributes, key_schema, throughput):
         """Add an DynamoDB Table to the configuration
         key is the unique name (within the configuration) for this instance
@@ -483,11 +483,11 @@ class CloudFormationConfiguration:
         attr_defs = []
         for key in attributes:
             attr_defs.append({"AttributeName": key, "AttributeType": attributes[key]})
-            
+
         key_schema_ = []
         for key in key_schema:
             key_schema_.append({"AttributeName": key, "KeyType": attributes[key]})
-    
+
         self.resources[key] = {
             "Type" : "AWS::DynamoDB::Table",
             "Properties" : {
@@ -500,11 +500,11 @@ class CloudFormationConfiguration:
                 }
             }
         }
-        
+
         table_name = Arg.String(key + "TableName", name,
                                 "Name of the DynamoDB table created by instance '{}'".format(key))
         self.add_arg(table_name)
-    
+
     def add_security_group(self, key, name, rules, vpc="VPC"):
         """Add SecurityGroup to the configuration
         key is the unique name (within the configuration) for this resource
@@ -517,7 +517,7 @@ class CloudFormationConfiguration:
         ingress = []
         for rule in rules:
             ingress.append({"IpProtocol" : rule[0], "FromPort" : rule[1], "ToPort" : rule[2], "CidrIp" : rule[3]})
-            
+
         self.resources[key] = {
           "Type" : "AWS::EC2::SecurityGroup",
           "Properties" : {
@@ -530,11 +530,11 @@ class CloudFormationConfiguration:
             ]
           }
         }
-        
+
         domain = Arg.String(vpc + "Domain", self.vpc_domain,
                             "Domain of the VPC '{}'".format(vpc))
         self.add_arg(domain)
-        
+
     def add_route_table(self, key, name, vpc="VPC", subnets=["Subnet"]):
         """Add ReouteTable to the configuration
         key is the unique name (within the configuration) for this resource
@@ -552,15 +552,15 @@ class CloudFormationConfiguration:
             ]
           }
         }
-        
+
         domain = Arg.String(vpc + "Domain", self.vpc_domain,
                             "Domain of the VPC '{}'".format(vpc))
         self.add_arg(domain)
-        
+
         for subnet in subnets:
             key_ = key + "SubnetAssociation" + str(subnets.index(subnet))
             self.add_route_table_association(key_, key, subnet)
-            
+
     def add_route_table_association(self, key, route_table, subnet="Subnet"):
         """Add SubnetRouteTableAssociation to the configuration
         key is the unique name (within the configuration) for this resource
@@ -574,8 +574,8 @@ class CloudFormationConfiguration:
             "RouteTableId" : { "Ref" : route_table }
           }
         }
-        
-    def add_route_table_route(self, key, route_table, cidr="0.0.0.0/0", gateway=None, peer=None, depends_on=None):
+
+    def add_route_table_route(self, key, route_table, cidr="0.0.0.0/0", gateway=None, peer=None, instance=None, depends_on=None):
         """Add a Route to the configuration
         key is the unique name (within the configuration) for this resource
         route_table is the unqiue name of the RouteTable to add the route to
@@ -593,25 +593,27 @@ class CloudFormationConfiguration:
             "DestinationCidrBlock" : { "Ref" : key + "Cidr" },
           }
         }
-        
-        checks = [gateway, peer]
+
+        checks = [gateway, peer, instance]
         check = checks.count(None)
         if len(checks) - checks.count(None) != 1:
-            raise Exception("Required to specify one and only one of the following arguments: gateway|peer")
-        
-        
+            raise Exception("Required to specify one and only one of the following arguments: gateway|peer|instance")
+
+
         if gateway is not None:
             self.resources[key]["Properties"]["GatewayId"] = { "Ref" : gateway }
         if peer is not None:
             self.resources[key]["Properties"]["VpcPeeringConnectionId"] = { "Ref" : peer }
-           
+        if instance is not None:
+            self.resources[key]["Properties"]["InstanceId"] = { "Ref" : instance }
+
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
-        
-        cidr = Arg.CIDR(key + "Cidr", cidr, 
+
+        cidr = Arg.CIDR(key + "Cidr", cidr,
                         "Destination CIDR Block for Route '{}'".format(key))
         self.add_arg(cidr)
-        
+
     def add_internet_gateway(self, key, name="internet", vpc="VPC"):
         """Add an InternetGateway to the configuration
         key is the unique name (within the configuration) for this resource
@@ -627,7 +629,7 @@ class CloudFormationConfiguration:
             ]
           }
         }
-        
+
         self.resources["Attach" + key] = {
            "Type" : "AWS::EC2::VPCGatewayAttachment",
            "Properties" : {
@@ -635,11 +637,11 @@ class CloudFormationConfiguration:
              "InternetGatewayId" : { "Ref" : key }
            }
         }
-        
+
         domain = Arg.String(vpc + "Domain", self.vpc_domain,
                             "Domain of the VPC '{}'".format(vpc))
         self.add_arg(domain)
-        
+
     def add_vpc_peering(self, key, vpc, peer_vpc):
         """Add a VPCPeeringConnection to the configuration
         key is the unique name (within the configuration) for this resource
@@ -651,16 +653,16 @@ class CloudFormationConfiguration:
             "Properties" : {
                 "VpcId" : { "Ref" : key + "VPC" },
                 "PeerVpcId" : { "Ref" : key + "PeerVPC" },
-                "Tags" : [ 
+                "Tags" : [
                     {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} }
                 ]
             }
         }
-        
+
         vpc_ = Arg.VPC(key + "VPC", vpc,
                        "Originating VPC for the peering connection")
         self.add_arg(vpc_)
-        
+
         peer_vpc_ = Arg.VPC(key + "PeerVPC", peer_vpc,
                             "Destination VPC for the peering connection")
         self.add_arg(peer_vpc_)
@@ -674,10 +676,10 @@ class UserData:
     def __init__(self, config_file = "../salt_stack/salt/boss-tools/files/boss.config.default"):
         self.config = configparser.ConfigParser()
         self.config.read(config_file)
-        
+
     def __getitem__(self, key):
         return self.config[key]
-        
+
     def __str__(self):
         buffer = io.StringIO()
         self.config.write(buffer)
