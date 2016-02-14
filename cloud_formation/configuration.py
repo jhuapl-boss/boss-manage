@@ -667,13 +667,13 @@ class CloudFormationConfiguration:
                             "Destination VPC for the peering connection")
         self.add_arg(peer_vpc_)
 
-    def add_loadbalancer(self, key, name, subnets, security_groups, instances ):
-        """ Add loadbalancer to configuration
+    def add_loadbalancer(self, key, name, instances, subnets=None, security_groups=None, depends_on=None ):
+        """ Add loadbalancer to the configuration
         key is the unique name (within the configuration) for this resource
         name is the name to give the
+        instances is the list of instances
         subnets is a list of subnet names
         security_groups is a list of SecurityGroups
-        instances is the list of instances
         """
         self.resources[key] = {
             "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
@@ -685,32 +685,45 @@ class CloudFormationConfiguration:
                 #"ConnectionSettings" : ConnectionSettings,
                 "CrossZone" : True,
                 "HealthCheck" : {
-                    "Target" : {
-                        "Fn::Join" : [ "", [ "HTTP:", { "Ref" : "WebServerPort" }, "/" ] ]
-                    },
-                    "HealthyThreshold" : "3",
-                    "UnhealthyThreshold" : "5",
+                    "Target" : "HTTP:80/ping/",
+                    "HealthyThreshold" : "2",
+                    "UnhealthyThreshold" : "2",
                     "Interval" : "30",
                     "Timeout" : "5"
                 },
-                "Instances" : instances,
                 #"LBCookieStickinessPolicy" : [ LBCookieStickinessPolicy, ... ],
                 "LoadBalancerName" : name,
                 "Listeners" : [ {
                     "LoadBalancerPort" : "80",
-                    "InstancePort" : { "Ref" : "WebServerPort" },
+                    "InstancePort" : "80",
                     "Protocol" : "HTTP"
                 } ],
                 #"Policies" : [ ElasticLoadBalancing Policy, ... ],
                 #"Scheme" : String,
-                "SecurityGroups" : security_groups,
-                "Subnets" : subnets,
                 "Tags" : [
                     {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} }
                 ]
             }
         }
-
+        if instances is not None:
+            ref_insts = []
+            for inst in instances:
+                ref_insts.append({ "Ref" : inst })
+            self.resources[key]["Properties"]["Instances"] = ref_insts
+        if security_groups is not None:
+            sgs = []
+            for sg in security_groups:
+                sgs.append({ "Ref" : sg })
+            print("securityGroup Info follows:")
+            print(sgs)
+            self.resources[key]["Properties"]["SecurityGroups"] = sgs
+        if subnets is not None:
+            ref_subs = []
+            for sub in subnets:
+                ref_subs.append({ "Ref" : sub })
+            self.resources[key]["Properties"]["Subnets"] = ref_subs
+        if depends_on is not None:
+            self.resources[key]["DependsOn"] = depends_on
 
 
 class UserData:
