@@ -185,6 +185,19 @@ class Arg:
         argument = lib.template_argument(key, value)
         return Arg(key, parameter, argument)
 
+    @staticmethod
+    def Certificate(key, value, description=""):
+        """Create a Certificate ID argument that makes sure the value is a
+        valid Certificate ID.
+        """
+        parameter = {
+            "Description" : description,
+            "Type": "AWS::ACM::Certificate::Id"
+        }
+        argument = lib.template_argument(key, value)
+        return Arg(key, parameter, argument)
+
+
 class CloudFormationConfiguration:
     """Configuration class that helps with building CloudFormation templates
     and launching them.
@@ -666,6 +679,61 @@ class CloudFormationConfiguration:
         peer_vpc_ = Arg.VPC(key + "PeerVPC", peer_vpc,
                             "Destination VPC for the peering connection")
         self.add_arg(peer_vpc_)
+
+    def add_loadbalancer(self, key, name, instances, subnets=None, security_groups=None,
+                         cert="arn:aws:acm:us-east-1:256215146792:certificate/afb78241-a392-43e1-9317-f42ffafc432f",
+                         depends_on=None ):
+        """ Add loadbalancer to the configuration
+        key is the unique name (within the configuration) for this resource
+        name is the name to give the
+        instances is the list of instances ids
+        subnets is a list of subnet names
+        security_groups is a list of SecurityGroups
+        cert is the certifcation to use for HTTPS
+        depends_on is a list of resources this loadbalancer depends on
+        """
+        self.resources[key] = {
+            "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+            "Properties": {
+                "CrossZone" : True,
+                "HealthCheck" : {
+                    "Target" : "HTTP:80/ping/",
+                    "HealthyThreshold" : "2",
+                    "UnhealthyThreshold" : "2",
+                    "Interval" : "30",
+                    "Timeout" : "5"
+                },
+                "Instances" : instances,
+                "LoadBalancerName" : name,
+                "Listeners" : [ {
+                    "LoadBalancerPort" : "443",
+                    "InstancePort" : "80",
+                    "Protocol" : "HTTPS",
+                    "SSLCertificateId" : cert
+                } ],
+                "Tags" : [
+                    {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} }
+                ]
+            }
+        }
+        # if instances is not None:
+        #     ref_insts = []
+        #     for inst in instances:
+        #         ref_insts.append({ "Ref" : inst })
+        #     self.resources[key]["Properties"]["Instances"] = ref_insts
+        if security_groups is not None:
+            sgs = []
+            for sg in security_groups:
+                sgs.append({ "Ref" : sg })
+            self.resources[key]["Properties"]["SecurityGroups"] = sgs
+        if subnets is not None:
+            ref_subs = []
+            for sub in subnets:
+                ref_subs.append({ "Ref" : sub })
+            self.resources[key]["Properties"]["Subnets"] = ref_subs
+        if depends_on is not None:
+            self.resources[key]["DependsOn"] = depends_on
+
 
 class UserData:
     """A wrapper class around configparse.ConfigParser that automatically loads
