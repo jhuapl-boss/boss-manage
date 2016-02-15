@@ -38,50 +38,39 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                                             external_subnet_id,
                                             "ID of External Subnet to create resources in"))
 
-    client = session.client('ec2')
-    response = client.describe_instances()
-    #Filters=[{'Name':'string','Values': [] }]
-    print(response)
+    endpoint_instance_id = lib.inst_lookup(session, "endpoint.external."+domain)
+    if endpoint_instance_id is None:
+        raise Exception("Invalid instance name: endpoint.external."+domain)
 
-    # # Create New HTTPS Security Group and LoadBalancer
-    # config.add_security_group("AllHTTPSSecurityGroup",
-    #                           "http",
-    #                           [("tcp", "443", "443", "0.0.0.0/0")])
-    #
-    # loadbalancer_name = "elb-" + domain.replace(".", "-")  #elb names can't have periods in them.
-    # config.add_loadbalancer("LoadBalancer",
-    #                         loadbalancer_name,
-    #                         ["Endpoint"],
-    #                         subnets = ["ExternalSubnet"],
-    #                         security_groups=["AllHTTPSSecurityGroup"],
-    #                         depends_on = ["Endpoint", "AllHTTPSecurityGroup"])
+    # Create New HTTPS Security Group and LoadBalancer
+    config.add_security_group("AllHTTPSSecurityGroup",
+                              "http",
+                              [("tcp", "443", "443", "0.0.0.0/0")])
+
+    loadbalancer_name = "elb-" + domain.replace(".", "-")  #elb names can't have periods in them.
+    config.add_loadbalancer("LoadBalancer",
+                            loadbalancer_name,
+                            [endpoint_instance_id],
+                            subnets = ["ExternalSubnet"],
+                            security_groups=["AllHTTPSSecurityGroup"],
+                            depends_on = ["AllHTTPSSecurityGroup"])
 
     return config
 
 def generate(folder, domain):
     """Create the configuration and save it to disk"""
-    name = lib.domain_to_stackname("core." + domain)
+    name = lib.domain_to_stackname("loadbalancer." + domain)
     config = create_config(None, domain)
     config.generate(name, folder)
 
 def create(session, domain):
     """Create the configuration, launch it, and initialize Vault"""
-    name = lib.domain_to_stackname("core." + domain)
+    name = lib.domain_to_stackname("loadbalancer." + domain)
     config = create_config(session, domain)
 
-    # success = config.create(session, name)
-    # if success:
-    #     vpc_id = lib.vpc_id_lookup(session, domain)
-    #     lib.rt_name_default(session, vpc_id, "internal." + domain)
-    #
-    #     try:
-    #         print("Waiting 2.5 minutes for VMs to start...")
-    #         time.sleep(150)
-    #         print("Initializing Vault...")
-    #         lib.call_vault(session,
-    #                        lib.keypair_to_file(keypair),
-    #                        "bastion." + domain,
-    #                        "vault." + domain,
-    #                        "vault-init")
-    #     except requests.exceptions.ConnectionError:
-    #         print("Could not connect to Vault, manually initialize it before launching other machines")
+    success = config.create(session, name)
+
+    if success:
+        print('success')
+    else:
+        print('failed')
