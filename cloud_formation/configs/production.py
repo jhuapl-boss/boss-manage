@@ -65,7 +65,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     # the endpoint server can access the launched DB
     # Fn::GetAtt and Fn::Join are CloudFormation template functions
     user_data_dynamic = [user_data, "\n[aws]\n",
-                         "db = ", { "Fn::GetAtt" : [ "DB", "Endpoint.Address" ] }, "\n"]
+                        "db = ", { "Fn::GetAtt" : [ "DB", "Endpoint.Address" ] }, "\n"]
     user_data_ = { "Fn::Join" : ["", user_data_dynamic]}
 
     config.add_ec2_instance("Endpoint",
