@@ -38,7 +38,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                                             external_subnet_id,
                                             "ID of External Subnet to create resources in"))
 
-    endpoint_instance_id = lib.inst_lookup(session, "endpoint.external."+domain)
+    endpoint_instance_id = lib.instanceid_lookup(session, "endpoint.external."+domain)
     if endpoint_instance_id is None:
         raise Exception("Invalid instance name: endpoint.external."+domain)
 
