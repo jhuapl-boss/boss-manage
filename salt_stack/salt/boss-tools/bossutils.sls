@@ -25,3 +25,11 @@ firstboot:
     cmd.run:
         - name: update-rc.d bossutils-firstboot defaults 10
         - user: root
+
+logging:
+    file.directory:
+        - name: /var/log/boss
+        - user: ubuntu
+        - group: www-data
+        - dir_mode: 775
+
