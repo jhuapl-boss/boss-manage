@@ -680,56 +680,51 @@ class CloudFormationConfiguration:
                             "Destination VPC for the peering connection")
         self.add_arg(peer_vpc_)
 
-    def add_loadbalancer(self, key, name, instances, subnets=None, security_groups=None, depends_on=None ):
+    def add_loadbalancer(self, key, name, instances, subnets=None, security_groups=None,
+                         cert="arn:aws:acm:us-east-1:256215146792:certificate/afb78241-a392-43e1-9317-f42ffafc432f",
+                         depends_on=None ):
         """ Add loadbalancer to the configuration
         key is the unique name (within the configuration) for this resource
         name is the name to give the
-        instances is the list of instances
+        instances is the list of instances ids
         subnets is a list of subnet names
         security_groups is a list of SecurityGroups
+        cert is the certifcation to use for HTTPS
+        depends_on is a list of resources this loadbalancer depends on
         """
         self.resources[key] = {
             "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
             "Properties": {
-                #"AccessLoggingPolicy" : AccessLoggingPolicy,
-                #"AppCookieStickinessPolicy" : [ AppCookieStickinessPolicy, ... ],
-                #"AvailabilityZones" : [ String, ... ],  # using Subnets instead of AVs
-                #"ConnectionDrainingPolicy" : ConnectionDrainingPolicy,
-                #"ConnectionSettings" : ConnectionSettings,
                 "CrossZone" : True,
                 "HealthCheck" : {
-                    "Target" : "HTTP:80/v0.1/collections/",
+                    "Target" : "HTTP:80/ping/",
                     "HealthyThreshold" : "2",
                     "UnhealthyThreshold" : "2",
                     "Interval" : "30",
                     "Timeout" : "5"
                 },
-                #"LBCookieStickinessPolicy" : [ LBCookieStickinessPolicy, ... ],
+                "Instances" : instances,
                 "LoadBalancerName" : name,
                 "Listeners" : [ {
                     "LoadBalancerPort" : "443",
                     "InstancePort" : "80",
                     "Protocol" : "HTTPS",
-                    "SSLCertificateId" : "arn:aws:acm:us-east-1:256215146792:certificate/afb78241-a392-43e1-9317-f42ffafc432f"
+                    "SSLCertificateId" : cert
                 } ],
-                #"Policies" : [ ElasticLoadBalancing Policy, ... ],
-                #"Scheme" : String,
                 "Tags" : [
                     {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} }
                 ]
             }
         }
-        if instances is not None:
-            ref_insts = []
-            for inst in instances:
-                ref_insts.append({ "Ref" : inst })
-            self.resources[key]["Properties"]["Instances"] = ref_insts
+        # if instances is not None:
+        #     ref_insts = []
+        #     for inst in instances:
+        #         ref_insts.append({ "Ref" : inst })
+        #     self.resources[key]["Properties"]["Instances"] = ref_insts
         if security_groups is not None:
             sgs = []
             for sg in security_groups:
                 sgs.append({ "Ref" : sg })
-            print("securityGroup Info follows:")
-            print(sgs)
             self.resources[key]["Properties"]["SecurityGroups"] = sgs
         if subnets is not None:
             ref_subs = []

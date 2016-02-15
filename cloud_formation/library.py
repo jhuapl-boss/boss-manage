@@ -126,6 +126,19 @@ def rt_lookup(session, vpc_id, rt_name):
         return None
     else:
         return response['RouteTables'][0]['RouteTableId']
+
+def inst_lookup(session, inst_name):
+    """Lookup the Id for the instance with the given name."""
+    if session is None: return None
+
+    client = session.client('ec2')
+    response = client.describe_instances(Filters=[{"Name":"tag:Name", "Values":[inst_name]}])
+    if len(response['Reservations'][0]['Instances']) == 0:
+        return None
+    else:
+        return response['Reservations'][0]['Instances'][0]['InstanceId']
+
+
         
 def rt_name_default(session, vpc_id, new_rt_name):
     """Find the default VPC Route Table and give it a name so that it can be referenced latter.

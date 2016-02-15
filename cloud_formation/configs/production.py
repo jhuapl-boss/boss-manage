@@ -94,18 +94,6 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                                 ("tcp", "80", "80", "0.0.0.0/0"),
                                 ("tcp", "443", "443", "0.0.0.0/0")
                               ])
-    # print("Adding AllHttpSecurityGroup")
-    # config.add_security_group("AllHTTPSecurityGroup",
-    #                           "http",
-    #                           [("tcp", "80", "80", "0.0.0.0/0")])
-    #
-    # loadbalancer_name = "elb-" + domain.replace(".", "-")  #elb names can't have periods in them.
-    # config.add_loadbalancer("LoadBalancer",
-    #                         loadbalancer_name,
-    #                         ["Endpoint"],
-    #                         subnets = ["ExternalSubnet"],
-    #                         security_groups=["AllHTTPSecurityGroup"],
-    #                         depends_on = ["Endpoint", "AllHTTPSecurityGroup"])
 
     return config
 
