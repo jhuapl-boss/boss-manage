@@ -63,10 +63,8 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     # Dynamically add the RDS instance address to the user data, so that
     # the endpoint server can access the launched DB
     # Fn::GetAtt and Fn::Join are CloudFormation template functions
-    # TODO uncommend out old user_data_dynamic line.
-    user_data_dynamic = [user_data, "\n[aws]\n", "db =\n"]
-    #user_data_dynamic = [user_data, "\n[aws]\n",
-    #                     "db = ", { "Fn::GetAtt" : [ "DB", "Endpoint.Address" ] }, "\n"]
+    user_data_dynamic = [user_data, "\n[aws]\n",
+                        "db = ", { "Fn::GetAtt" : [ "DB", "Endpoint.Address" ] }, "\n"]
     user_data_ = { "Fn::Join" : ["", user_data_dynamic]}
 
     config.add_ec2_instance("Endpoint",
@@ -76,18 +74,17 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                             public_ip = True,
                             subnet = "ExternalSubnet",
                             security_groups = ["InternalSecurityGroup", "InternetSecurityGroup"],
-                            user_data = user_data_)  # TODO put depends back after testing
-                            #depends_on = "DB") # make sure the DB is launched before we start
+                            user_data = user_data_,
+                            depends_on = "DB") # make sure the DB is launched before we start
 
-    # TODO Uncomment out this line when finished, also add the depends back to instance
-    # config.add_rds_db("DB",
-    #                   "db." + domain,
-    #                   db_config.get("port"),
-    #                   db_config.get("name"),
-    #                   db_config.get("user"),
-    #                   db_config.get("password"),
-    #                   ["ASubnet", "BSubnet"],
-    #                   security_groups = ["InternalSecurityGroup"])
+    config.add_rds_db("DB",
+                      "db." + domain,
+                      db_config.get("port"),
+                      db_config.get("name"),
+                      db_config.get("user"),
+                      db_config.get("password"),
+                      ["ASubnet", "BSubnet"],
+                      security_groups = ["InternalSecurityGroup"])
 
     # Allow SSH/HTTP/HTTPS access to endpoint server from anywhere
     config.add_security_group("InternetSecurityGroup",
@@ -97,18 +94,19 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                                 ("tcp", "80", "80", "0.0.0.0/0"),
                                 ("tcp", "443", "443", "0.0.0.0/0")
                               ])
-    print("Adding AllHttpSecurityGroup")
-    config.add_security_group("AllHTTPSecurityGroup",
-                              "http",
-                              [("tcp", "80", "80", "0.0.0.0/0")])
+    # print("Adding AllHttpSecurityGroup")
+    # config.add_security_group("AllHTTPSecurityGroup",
+    #                           "http",
+    #                           [("tcp", "80", "80", "0.0.0.0/0")])
+    #
+    # loadbalancer_name = "elb-" + domain.replace(".", "-")  #elb names can't have periods in them.
+    # config.add_loadbalancer("LoadBalancer",
+    #                         loadbalancer_name,
+    #                         ["Endpoint"],
+    #                         subnets = ["ExternalSubnet"],
+    #                         security_groups=["AllHTTPSecurityGroup"],
+    #                         depends_on = ["Endpoint", "AllHTTPSecurityGroup"])
 
-    loadbalancer_name = "elb-" + domain.replace(".", "-")  #elb names can't have periods in them.
-    config.add_loadbalancer("LoadBalancer",
-                            loadbalancer_name,
-                            ["Endpoint"],
-                            subnets = ["ExternalSubnet"],
-                            security_groups=["AllHTTPSecurityGroup"],
-                            depends_on = ["Endpoint", "AllHTTPSecurityGroup"])
     return config
 
 def generate(folder, domain):
