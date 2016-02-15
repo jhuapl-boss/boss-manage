@@ -12,6 +12,7 @@ These environment variables MUST be set:
 """
 
 from boto3.session import Session
+from copy import copy
 import json
 import subprocess
 import library as lib
@@ -19,12 +20,21 @@ import library as lib
 """This file name used to store new config file before uploading to Scalyr."""
 OUTPUT_CFG_FILE = 'scalyr-cfg.json'
 
+"""Base monitor JSON object."""
+EMPTY_MONITOR = {
+    'type': 'cloudwatch',
+    'region': '',
+    'accessKey': '',                # User will need to fill in manually
+    'secretKey': '',                # on Scalyr site.
+    'executionIntervalMinutes': 5,
+    'metrics': []
+}
+
 def add_instances_to_scalyr(session, region, instanceList):
     """
     Main entry point.  Pass a boto3 session and a list of host names to be
     monitored for the StatusCheckFailed CloudWatch metric.
     """
-    print(session)
     raw = download_config_file()
     jsonCfg = json.loads(raw)
     # monEle = get_cloudwatch_obj(jsonCfg, session.region_name)
@@ -66,11 +76,23 @@ def load_config_file(fname):
     f.close()
     return ''.join(strList)
 
+def create_default_monitor_obj(jsonObj, regionStr):
+    """Used to create a default monitors array if it's missing or empty."""
+    monitorObj = copy(EMPTY_MONITOR)
+    monitorObj['region'] = regionStr
+    jsonObj['monitors'] = [monitorObj]
+    return monitorObj
+
 def get_cloudwatch_obj(jsonObj, regionStr):
     """Find the element that configures cloudwatch for the given region."""
-    monitorObj = jsonObj['monitors']
+    try:
+        monitorObj = jsonObj['monitors']
+    except Exception as e:
+        return create_default_monitor_obj(jsonObj, regionStr)
+
     if len(monitorObj) < 1:
-        return None
+        return create_default_monitor_obj(jsonObj, regionStr)
+
     for monitorItem in monitorObj:
         typeEle = monitorItem['type']
         if len(typeEle) < 1:
