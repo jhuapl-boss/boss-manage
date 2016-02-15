@@ -175,3 +175,23 @@ def keypair_lookup(session):
         except:
             print("Invalid Key Pair number, try again")
 
+def instanceid_lookup(session, hostname):
+    """Look up instance id by hostname."""
+    if session is None: return None
+
+    client = session.client('ec2')
+    response = client.describe_instances(
+        Filters=[{"Name":"tag:Name", "Values":[hostname]}])
+
+    item = response['Reservations']
+    if len(item) == 0:
+        return None
+    else:
+        item = item[0]['Instances']
+        if len(item) == 0:
+            return None
+        else:
+            item = item[0]
+            if 'InstanceId' in item:
+                return item['InstanceId']
+            return None
