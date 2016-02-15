@@ -185,6 +185,19 @@ class Arg:
         argument = lib.template_argument(key, value)
         return Arg(key, parameter, argument)
 
+    @staticmethod
+    def Certificate(key, value, description=""):
+        """Create a Certificate ID argument that makes sure the value is a
+        valid Certificate ID.
+        """
+        parameter = {
+            "Description" : description,
+            "Type": "AWS::ACM::Certificate::Id"
+        }
+        argument = lib.template_argument(key, value)
+        return Arg(key, parameter, argument)
+
+
 class CloudFormationConfiguration:
     """Configuration class that helps with building CloudFormation templates
     and launching them.
@@ -685,7 +698,7 @@ class CloudFormationConfiguration:
                 #"ConnectionSettings" : ConnectionSettings,
                 "CrossZone" : True,
                 "HealthCheck" : {
-                    "Target" : "HTTP:80/ping/",
+                    "Target" : "HTTP:80/v0.1/collections/",
                     "HealthyThreshold" : "2",
                     "UnhealthyThreshold" : "2",
                     "Interval" : "30",
@@ -694,9 +707,10 @@ class CloudFormationConfiguration:
                 #"LBCookieStickinessPolicy" : [ LBCookieStickinessPolicy, ... ],
                 "LoadBalancerName" : name,
                 "Listeners" : [ {
-                    "LoadBalancerPort" : "80",
+                    "LoadBalancerPort" : "443",
                     "InstancePort" : "80",
-                    "Protocol" : "HTTP"
+                    "Protocol" : "HTTPS",
+                    "SSLCertificateId" : "arn:aws:acm:us-east-1:256215146792:certificate/afb78241-a392-43e1-9317-f42ffafc432f"
                 } ],
                 #"Policies" : [ ElasticLoadBalancing Policy, ... ],
                 #"Scheme" : String,
