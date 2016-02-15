@@ -20,8 +20,8 @@ import pprint
 # Devices that all VPCs/Subnets may potentially have and Subnet number (must fit under SUBNET_CIDR)
 # Subnet number can be a single number or a list of numbers
 ADDRESSES = {
-    "proofreader-web": range(10, 20),
-    "proofreader-db": range(20, 30),
+    "proofreader-web": range(30, 40),
+    "proofreader-db": range(40, 50),
 }
 
 def create_config(session, domain, keypair=None, user_data=None, db_config={}):
@@ -51,14 +51,42 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                                                    internal_sg_id,
                                                    "ID of internal Security Group"))
 
-    # Create the a and b subnets
-    config.subnet_domain = "a." + domain
-    config.subnet_subnet = hosts.lookup(config.subnet_domain)
-    config.add_subnet("ASubnet", az="us-east-1b")
+    internet_sg_key = "InternetSecurityGroup"
+    internet_sg_id = lib.sg_lookup(session, vpc_id, "internet." + domain)
+    if internet_sg_id is None:
+        # Allow SSH/HTTP/HTTPS access to proofreader web server from anywhere
+        config.add_security_group(internet_sg_key,
+                                  "internet",
+                                  [
+                                    ("tcp", "22", "22", "0.0.0.0/0"),
+                                    ("tcp", "80", "80", "0.0.0.0/0"),
+                                    ("tcp", "443", "443", "0.0.0.0/0")
+                                  ])
+    else:
+        config.add_arg(configuration.Arg.SecurityGroup(internet_sg_key,
+                                                       internet_sg_id,
+                                                       "ID of internal Security Group"))
 
-    config.subnet_domain = "b." + domain
-    config.subnet_subnet = hosts.lookup(config.subnet_domain)
-    config.add_subnet("BSubnet", az="us-east-1c") # BSubnet needs to be in a different AZ from ASubnet
+    # If the subnets exist use them, else create them
+    a_subnet_domain = "a." + domain
+    a_subnet_key = "ASubnet"
+    a_subnet_id = lib.subnet_id_lookup(session, a_subnet_domain)
+    if a_subnet_id is None:
+        config.subnet_domain = a_subnet_domain
+        config.subnet_subnet = hosts.lookup(config.subnet_domain)
+        config.add_subnet(a_subnet_key, az="us-east-1b")
+    else:
+        config.add_arg(configuration.Arg.Subnet(a_subnet_key, a_subnet_id))
+
+    b_subnet_domain = "b." + domain
+    b_subnet_key = "BSubnet"
+    b_subnet_id = lib.subnet_id_lookup(session, b_subnet_domain)
+    if b_subnet_id is None:
+        config.subnet_domain = b_subnet_domain
+        config.subnet_subnet = hosts.lookup(config.subnet_domain)
+        config.add_subnet(b_subnet_key, az="us-east-1c") # BSubnet needs to be in a different AZ from ASubnet
+    else:
+        config.add_arg(configuration.Arg.Subnet(b_subnet_key, b_subnet_id))
 
     # Dynamically add the RDS instance address to the user data, so that
     # the proofreader web server can access the launched DB
@@ -85,15 +113,6 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                       db_config.get("password"),
                       ["ASubnet", "BSubnet"],
                       security_groups = ["InternalSecurityGroup"])
-
-    # Allow SSH/HTTP/HTTPS access to proofreader web server from anywhere
-    config.add_security_group("InternetSecurityGroup",
-                              "internet",
-                              [
-                                ("tcp", "22", "22", "0.0.0.0/0"),
-                                ("tcp", "80", "80", "0.0.0.0/0"),
-                                ("tcp", "443", "443", "0.0.0.0/0")
-                              ])
 
     return config
 
