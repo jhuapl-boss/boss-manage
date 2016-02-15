@@ -16,6 +16,7 @@ import configuration
 import library as lib
 import hosts
 import pprint
+import scalyr
 
 # Devices that all VPCs/Subnets may potentially have and Subnet number (must fit under SUBNET_CIDR)
 # Subnet number can be a single number or a list of numbers
@@ -145,6 +146,10 @@ def create(session, domain):
         success = config.create(session, name)
         if not success:
             raise Exception("Create Failed")
+        else:
+            # Tell Scalyr to get CloudWatch metrics for these instances.
+            instances = [ user_data["system"]["fqdn"] ]
+            scalyr.add_instances_to_scalyr(session, 'us-east-1', instances)
     except:
         print("Error detected, revoking secrets")
         # currently no command for deleting data from Vault, just override it
