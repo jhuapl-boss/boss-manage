@@ -1,5 +1,5 @@
 base:
-    'vault':
+    'vault*':
         - vault.server
         - boss-tools.bossutils
 
@@ -8,6 +8,7 @@ base:
         - boss.django
         - scalyr
         - scalyr.update_host
+        - git
 
     'jenkins*':
         - jenkins-microns
