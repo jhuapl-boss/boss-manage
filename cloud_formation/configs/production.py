@@ -134,14 +134,13 @@ def create(session, domain):
     user_data["vault"]["token"] = endpoint_token
     user_data["system"]["fqdn"] = "endpoint.external." + domain
     user_data["system"]["type"] = "endpoint"
-    user_data = str(user_data)
 
     # Should transition from vault-django to vault-write
     call_vault("vault-django", db["name"], db["user"], db["password"], db["port"])
 
     try:
         name = lib.domain_to_stackname("production." + domain)
-        config = create_config(session, domain, keypair, user_data, db)
+        config = create_config(session, domain, keypair, str(user_data), db)
 
         success = config.create(session, name)
         if not success:
