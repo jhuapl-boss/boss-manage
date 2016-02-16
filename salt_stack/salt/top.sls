@@ -17,3 +17,9 @@ base:
         - proofreader-web
         - scalyr
         - scalyr.update_host
+
+    'workstation*':
+        - python.python35
+        - git
+        - vault.client
+        - aws.boto3
