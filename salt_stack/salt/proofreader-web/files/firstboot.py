@@ -12,24 +12,10 @@
 ### END INIT INFO
 
 # Setup the exception hook to log errors thrown during execution
-import traceback
-import logging
-import sys
-
-logging.basicConfig(filename = "/tmp/proofreader-web.log",
-                    filemode = "a",
-                    level = logging.DEBUG)
-
-def ex_handler(ex_cls, ex, tb):
-    """An exception handler that logs all exceptions."""
-    logging.critical(''.join(traceback.format_tb(tb)))
-    logging.critical('{0}: {1}'.format(ex_cls, ex))
-sys.excepthook = ex_handler
-logging.info("Configured sys.excepthook")
-### END setting up exception hook
-
 import os
 import bossutils
+
+bossutils.utils.set_excepthook()
 
 def configure_django():
     """Run the initial Django configuration commands:
@@ -53,5 +39,4 @@ if __name__ == '__main__':
     configure_django()
 
     # Since the service is to be run once, disable it
-    service_name = os.path.basename(sys.argv[0])
-    bossutils.utils.execute("update-rc.d -f {} remove".format(service_name))
+    bossutils.utils.stop_firstboot()
