@@ -16,6 +16,7 @@ import os
 import bossutils
 
 bossutils.utils.set_excepthook()
+logging = bossutils.logger.BossLogger()
 
 def configure_scalyr():
     """
