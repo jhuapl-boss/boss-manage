@@ -144,7 +144,7 @@ def get_metrics_obj(monitorEle):
     return metricsEle
 
 
-def add_new_instance(metricsObj, idStr):
+def add_single_instance(metricsObj, idStr):
     """Add StatusCheckFailed monitoring for the given instance."""
     if metricsObj is None:
         return
@@ -161,7 +161,7 @@ def add_new_instances(metricsObj, idsList):
     if metricsObj is None:
         return
     for i in idsList:
-        add_new_instance(metricsObj, i)
+        add_single_instance(metricsObj, i)
 
 
 def convert_host_names_to_ids(session, instanceList):

@@ -79,7 +79,7 @@ class TestScalyr(unittest.TestCase):
         actual = get_cloudwatch_obj(jsonObj, 'us-east-1')
         self.assertEqual(expected, actual)
 
-    def test_add_new_instance(self):
+    def test_add_single_instance(self):
         instId = 'rockstar'
         expected = [{
             'namespace': 'AWS/EC2',
@@ -87,8 +87,27 @@ class TestScalyr(unittest.TestCase):
             'dimensions': { 'InstanceId': instId }
         }]
         metricsObj = []
-        add_new_instance(metricsObj, instId)
+        add_single_instance(metricsObj, instId)
         self.assertEqual(expected, metricsObj)
+
+    def test_add_new_instances(self):
+        instId1 = 'rockstar'
+        instId2 = 'allstar'
+        expected = [
+            {
+                'namespace': 'AWS/EC2',
+                'metric': 'StatusCheckFailed',
+                'dimensions': { 'InstanceId': instId1 }
+            },
+            {
+                'namespace': 'AWS/EC2',
+                'metric': 'StatusCheckFailed',
+                'dimensions': { 'InstanceId': instId2 }
+            }
+        ]
+        metrics = []
+        add_new_instances(metrics, [instId1, instId2])
+        self.assertEqual(expected, metrics)
 
     def test_download_config_file_raises_on_failure(self):
         with self.assertRaises(subprocess.CalledProcessError):
