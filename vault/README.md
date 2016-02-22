@@ -13,7 +13,7 @@ from environment variables.
     * BASTION_IP is the IP address / DNS name of the bastion / proxy host
     * BASTION_KEY is the SSH private key to authenticate with
     * BASTION_USER is the username to log into the host as
-    
+
 The file *set_vars.sh* can be sourced to set these variables,
 `source set_vars.sh`
 
@@ -35,9 +35,15 @@ call the specified method in vault.py to manipulate a remote Vault instance.
 **Note:** <bastion_hostname> and <internal_hostname> are the AWS instance names
           of the machines to connect to. Their IP addresses are located by
           querying AWS for the Public or Private IP of the instance.
-          
+
 **Note:** Currently the 'ssh' command only supports connecting to an internal
           instance that uses the same keypair as the bastion instance.
+
+**Example:** Logging into Vault via the bastion server.
+
+````bash
+./bastion.py bastion.<your VPC>.boss vault.<your VPC>.boss ssh
+````
 
 
 vault.py
@@ -49,7 +55,7 @@ connecting to `http://localhost:8200`.
 
 **Note:** Vault private information is stored and read from `private/`.
           **DO NOT COMMIT THIS INFORMATION TO SOURCE CONTROL**
-          
+
 **Note:** The Vault keys are only required to unseal the Vault (after a reboot)
 
 **Note:** The Vault (root) token is required for any (non init/unseal)
