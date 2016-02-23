@@ -31,7 +31,13 @@ def configure_scalyr():
         logging.info("Setting host name for Scalyr.")
         cfg = bossutils.configuration.BossConfig()
         host = cfg["system"]["fqdn"]
-        bossutils.utils.execute("{} --set-server-host {}".format(file, host))
+        returncode = bossutils.utils.execute(
+            "{} --set-server-host {}".format(file, host))
+        if returncode != 0:
+            logging.error("Setting host name failed using {}.".format(file))
+    else:
+        logging.error(
+            "Setting host name for Scalyr failed. {} not found.".format(file))
 
 
 if __name__ == '__main__':

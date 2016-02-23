@@ -14,8 +14,13 @@ import configuration
 import hosts
 import time
 import requests
+import scalyr
 
 keypair = None
+
+# Region core is created in.  Later versions of boto3 should allow us to
+# extract this from the session variable.  Hard coding for now.
+CORE_REGION = 'us-east-1'
 
 def create_config(session, domain):
     """Create the CloudFormationConfiguration object."""
@@ -127,5 +132,8 @@ def create(session, domain):
                            "bastion." + domain,
                            "vault." + domain,
                            "vault-init")
+            # Tell Scalyr to get CloudWatch metrics for these instances.
+            instances = [ "vault." + domain ]
+            scalyr.add_instances_to_scalyr(session, CORE_REGION, instances)
         except requests.exceptions.ConnectionError:
             print("Could not connect to Vault, manually initialize it before launching other machines")

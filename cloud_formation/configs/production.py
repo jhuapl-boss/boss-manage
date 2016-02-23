@@ -25,6 +25,10 @@ ADDRESSES = {
     "db": range(20, 30),
 }
 
+# Region production is created in.  Later versions of boto3 should allow us to
+# extract this from the session variable.  Hard coding for now.
+PRODUCTION_REGION = 'us-east-1'
+
 def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     """Create the CloudFormationConfiguration object."""
     config = configuration.CloudFormationConfiguration(domain, ADDRESSES)
@@ -148,7 +152,8 @@ def create(session, domain):
         else:
             # Tell Scalyr to get CloudWatch metrics for these instances.
             instances = [ user_data["system"]["fqdn"] ]
-            scalyr.add_instances_to_scalyr(session, 'us-east-1', instances)
+            scalyr.add_instances_to_scalyr(
+                session, PRODUCTION_REGION, instances)
     except:
         print("Error detected, revoking secrets")
         # currently no command for deleting data from Vault, just override it
