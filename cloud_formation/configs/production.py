@@ -15,8 +15,8 @@ ADDRESSES - the dictionary of production hostnames and subnet indexes.
 import configuration
 import library as lib
 import hosts
-import pprint
 import scalyr
+import uuid
 
 # Devices that all VPCs/Subnets may potentially have and Subnet number (must fit under SUBNET_CIDR)
 # Subnet number can be a single number or a list of numbers
@@ -28,6 +28,9 @@ ADDRESSES = {
 # Region production is created in.  Later versions of boto3 should allow us to
 # extract this from the session variable.  Hard coding for now.
 PRODUCTION_REGION = 'us-east-1'
+
+VAULT_DJANGO = "secret/endpoint/django"
+VAULT_DJANGO_DB = "secret/endpoint/django/db"
 
 def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     """Create the CloudFormationConfiguration object."""
@@ -140,7 +143,8 @@ def create(session, domain):
     user_data["system"]["type"] = "endpoint"
 
     # Should transition from vault-django to vault-write
-    call_vault("vault-django", db["name"], db["user"], db["password"], db["port"])
+    call_vault("vault-write", VAULT_DJANGO, secret_key = str(uuid.uuid4()))
+    call_vault("vault-write", VAULT_DJANGO_DB, **db)
 
     try:
         name = lib.domain_to_stackname("production." + domain)
@@ -156,9 +160,9 @@ def create(session, domain):
                 session, PRODUCTION_REGION, instances)
     except:
         print("Error detected, revoking secrets")
-        # currently no command for deleting data from Vault, just override it
         try:
-            call_vault("vault-django", "", "", "", "")
+            call_vault("vault-delete", VAULT_DJANGO)
+            call_vault("vault-delete", VAULT_DJANGO_DB)
         except:
             print("Error revoking Django credentials")
         try:

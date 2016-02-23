@@ -349,80 +349,28 @@ def _vault_revoke(machine = None):
     token = input("token: ") # prompt for token or ready fron NEW_TOKEN (or REVOKE_TOKEN)?
     vault_revoke(token, machine)
 
-def vault_django(db_name, username, password, port, machine = None):
-    """Provision a Vault with credentials for a Django webserver. Connect
-    using get_client(True) and provision the following information:
-     * Generate a secret key and store under 'secret/endpoint/django secret_key=`
-     * Prompt the user (using input()) for the
-       - Database Name
-       - Database Username
-       - Database Password
-       - Database Port
-       and store under
-       - 'secret/endpoint/django/db name='
-       - 'secret/endpoint/django/db user='
-       - 'secret/endpoint/django/db password='
-       - 'secret/endpoint/django/db port='
-    """
-    client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
-
-    client.write("secret/endpoint/django", secret_key = str(uuid.uuid4()))
-    db = {
-        "name": db_name,
-        "user": username,
-        "password": password,
-        "port": port
-    }
-    client.write("secret/endpoint/django/db", **db)
-
-def _vault_django(machine = None):
-    args = []
-    for key in ["name", "user", "password", "port"]:
-        args.append(input(key + ": "))
-
-    vault_django(*args, machine = machine)
-
-def vault_proofreader_django(db_name, username, password, port, machine = None):
-    """Provision a Vault with credentials for a Django webserver. Connect
-    using get_client(True) and provision the following information:
-     * Generate a secret key and store under 'secret/endpoint/django secret_key=`
-     * Prompt the user (using input()) for the
-       - Database Name
-       - Database Username
-       - Database Password
-       - Database Port
-       and store under
-       - 'secret/proofreader/django/db name='
-       - 'secret/proofreader/django/db user='
-       - 'secret/proofreader/django/db password='
-       - 'secret/proofreader/django/db port='
-    """
-    client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
-
-    client.write("secret/proofreader/django", secret_key = str(uuid.uuid4()))
-    db = {
-        "name": db_name,
-        "user": username,
-        "password": password,
-        "port": port
-    }
-    client.write("secret/proofreader/django/db", **db)
-
-def _vault_proofreader_django(machine = None):
-    args = []
-    for key in ["name", "user", "password", "port"]:
-        args.append(input(key + ": "))
-
-    vault_django(*args, machine = machine)
-
 # Should probably create a _vault_write() function that reads
-# user input. Maybe a vault_read() version as well? and vault_delete()?
+# user input.
 def vault_write(path, machine = None, **kwargs):
     """A generic method for writing data into Vault, for use by CloudFormation
     scripts.
     """
     client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
-    client.write(path, kwargs)
+    client.write(path, **kwargs)
+
+def vault_read(path, machine = None):
+    """A generic method for reading data from Vault, for use by CloudFormation
+    scripts.
+    """
+    client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
+    client.read(path)
+
+def vault_delete(path, machine = None):
+    """A generic method for deleting data from Vault, for use by CloudFormation
+    scripts.
+    """
+    client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
+    client.delete(path)
 
 COMMANDS = {
     "vault-init": vault_init,
@@ -432,8 +380,6 @@ COMMANDS = {
     "vault-status": vault_status,
     "vault-provision": _vault_provision,
     "vault-revoke": _vault_revoke,
-    "vault-django": _vault_django,
-    "vault-proofreader-django": _vault_proofreader_django,
     "verify":verify,
     "vault-shell":vault_shell,
 }
