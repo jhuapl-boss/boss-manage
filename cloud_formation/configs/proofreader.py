@@ -15,7 +15,7 @@ ADDRESSES - the dictionary of proofreader hostnames and subnet indexes.
 import configuration
 import library as lib
 import hosts
-import pprint
+import uuid
 
 # Devices that all VPCs/Subnets may potentially have and Subnet number (must fit under SUBNET_CIDR)
 # Subnet number can be a single number or a list of numbers
@@ -23,6 +23,9 @@ ADDRESSES = {
     "proofreader-web": range(30, 40),
     "proofreader-db": range(40, 50),
 }
+
+VAULT_DJANGO = "secret/proofreader/django"
+VAULT_DJANGO_DB = "secret/proofreader/django/db"
 
 def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     """Create the CloudFormationConfiguration object."""
@@ -155,7 +158,8 @@ def create(session, domain):
     user_data = str(user_data)
 
     # Should transition from vault-django to vault-write
-    call_vault("vault-proofreader-django", db["name"], db["user"], db["password"], db["port"])
+    call_vault("vault-write", VAULT_DJANGO, secret_key = str(uuid.uuid4()))
+    call_vault("vault-write", VAULT_DJANGO_DB, **db)
 
     try:
         name = lib.domain_to_stackname("proofreader." + domain)
@@ -166,9 +170,9 @@ def create(session, domain):
             raise Exception("Create Failed")
     except:
         print("Error detected, revoking secrets")
-        # currently no command for deleting data from Vault, just override it
         try:
-            call_vault("vault-proofreader-django", "", "", "", "")
+            call_vault("vault-delete", VAULT_DJANGO)
+            call_vault("vault-delete", VAULT_DJANGO_DB)
         except:
             print("Error revoking Django credentials")
         try:

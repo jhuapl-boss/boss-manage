@@ -741,7 +741,7 @@ class UserData:
     configuration file as a string. (ConfigParser can only write to a file
     object)
     """
-    def __init__(self, config_file = "../salt_stack/salt/boss-tools/files/boss.config.default"):
+    def __init__(self, config_file = "../salt_stack/salt/boss-tools/files/boss-tools.git/bossutils/boss.config.default"):
         self.config = configparser.ConfigParser()
         self.config.read(config_file)
 
