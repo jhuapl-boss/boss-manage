@@ -13,6 +13,7 @@ python35:
         - build-essential: 11.6ubuntu6
         - zlib1g-dev: 1:1.2.8.dfsg-1ubuntu1
         - libssl-dev: 1.0.1f-1ubuntu2.17
+        - libsqlite3-dev: 3.8.2-1ubuntu2.1
   cmd.run:
     - name: |
         cd /tmp
