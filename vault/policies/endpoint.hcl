@@ -15,3 +15,11 @@ path "secret/endpoint/*" {
 path "aws/creds/endpoint" {
     policy = "read"
 }
+
+path "sys/renew/aws/creds/endpoint/*" {
+    policy = "write"
+}
+
+path "sys/revoke/aws/creds/endpoint/*" {
+    policy = "write"
+}

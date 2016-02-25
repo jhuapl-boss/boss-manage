@@ -5,6 +5,7 @@ base:
 
     'endpoint*':
         - boss-tools.bossutils
+        - boss-tools.credentials
         - boss.django
         - scalyr
         - scalyr.update_host
