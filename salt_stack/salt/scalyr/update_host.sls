@@ -9,5 +9,5 @@ scalyr_set_host_name:
         - group: root
         - mode: 555
     cmd.run:
-        - name: update-rc.d scalyr-firstboot defaults 95
+        - name: update-rc.d scalyr-firstboot start 95 2 3 4 5 .
         - user: root
