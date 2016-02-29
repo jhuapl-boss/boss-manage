@@ -101,4 +101,4 @@ private key file.
 
 **Example of building an endpoint server instance using the bastion server:**
 
-````packer build -var-file=variables/my-aws-creds -var-file=variables/aws-bastion -var-file=variables/endpoint -only=amazon-ebs vm.packer````
+````packer build -var-file=variables/aws-credentials -var-file=variables/aws-bastion -var-file=variables/endpoint -only=amazon-ebs vm.packer````
