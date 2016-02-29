@@ -1,5 +1,4 @@
 # BOSS Install Guide
-***
 
 This install guide is designed to guide someone who is setting up a new AWS
 account and checking out the source code for the first time.
@@ -49,6 +48,7 @@ $ git clone --recursive https://github.com/aplmicrons/boss-manage.git
 ### Create AWS credentials file
 For all of the scripts to access AWS the access key and secret key for your AWS
 account as stored in a configuration file that all of the scripts use.
+
 1. Copy `boss-manage.git/packer/variables/aws-credentials.example` to
 `boss-manage.git/packer/variables/aws-credentials`
 2. Open `aws-credentials` in a text editor
@@ -61,6 +61,7 @@ scripts used can tunnel their communication through a bastion host. A bastion
 host is a single machine which your corporate IT department has granted you
 outbound SSH access to. All SSH traffic will be tunneled through that machine.
 It is assumed that this bastion host is an EC2 instance running within AWS.
+
 1. Copy the SSH private key for the bastion host into `boss-manage.git/`
 2. Open  `boss-manage.git/packer/variables/aws-bastion` in a text editor
 3. Edit the IP address of the machine
@@ -88,6 +89,7 @@ $ packer build -var-file=variables/aws-credentials -var-file=variables/aws-basti
 ### Configure IAM Vault account
 For Vault to be able to generate AWS credentials it needs to be configured with
 an AWS account that has access to specific resources.
+
 1. Copy `boss-manage.git/packer/variables/aws-credentials.example` to
 `boss-manage.git/vault/private/vault_aws_credentials`
       You may have to create the directory “private”
@@ -162,6 +164,7 @@ AWS console and review or delete the stacks.
 The scripts make use of multiple environment variables to manage optional
 configuration elements. There are shell scripts that contain these environment
 variables that can be sourced before launching different scripts.
+
 1. Open `boss-manage.git/vault/set_keys.sh` in a text editor
 2. Update SSH_KEY to contain the location of the EC2 Keypair created
 3. Update the BASTION_KEY to contain the location of the private key of the SSH bastion host
@@ -199,6 +202,7 @@ Once launched there is a load balancer that acts as the single endpoint for all
 traffic to the endpoint web servers. The last step is to link the load balancer
 to the permanent DNS name that is associated with the new instance of the BOSS
 system.
+
 1. Open a web browser
 2. Login to the AWS console and open up the EC2 console
 3. Select **Load Balancers** from the left side menu
