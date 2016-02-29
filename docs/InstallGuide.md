@@ -62,11 +62,11 @@ host is a single machine which your corporate IT department has granted you
 outbound SSH access to. All SSH traffic will be tunneled through that machine.
 It is assumed that this bastion host is an EC2 instance running within AWS.
 
-1. Copy the SSH private key for the bastion host into `boss-manage.git/`
+1. Copy the SSH private key for the bastion host into `boss-manage.git/packer/`
 2. Open  `boss-manage.git/packer/variables/aws-bastion` in a text editor
 3. Edit the IP address of the machine
 4. Edit the name of the private key
-  * The directory reference "../" should stay the same
+  * The directory reference "./" should stay the same
 5. Save `aws-bastion` and close the text editor
 
 *Note: these instructions are written expecting a bastion host. If you are not
@@ -92,14 +92,14 @@ an AWS account that has access to specific resources.
 
 1. Copy `boss-manage.git/packer/variables/aws-credentials.example` to
 `boss-manage.git/vault/private/vault_aws_credentials`
-  * You may have to create the directory “private”
+  * You may have to create the directory "private"
 2. Open `vault_aws_credentials` in a text editor
 3. Open a web browser
 4. Login to the AWS console and open up the IAM console
 5. Select **Users** from the left side menu
 6. Click **Create New Users**
 7. Give the Vault account a name
-8. Make sure “Generate an access key for each user” is checked
+8. Make sure "Generate an access key for each user" is checked
 9. Click **Create**
 10. Copy the access key and secret key from the browser into the text editor
 11. Save `vault_aws_credentials` and close the text editor
