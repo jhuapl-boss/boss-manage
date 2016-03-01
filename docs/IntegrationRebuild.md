@@ -94,3 +94,13 @@ $ ./cloudformation.py create integration.boss <config>
 *Note: When launching some configurations there may be an message about manually
 configuring Scalyr monitoring. These instructions skip Scalyr configuration and
 you can ignore these instructions.*
+
+## Integration Tests
+After the integration instance is launched the following tests need to be run,
+results recorded, and developers notified of any problems.
+
+### Automated Tests
+To be filled out
+
+### Manual Checks
+To be filled out
