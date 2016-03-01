@@ -30,13 +30,13 @@ Packer
 Packer is used to build VM images (Virtualbox OVF or AWS AMI) that are
 configured by SaltStack.
 
-    1. Create a new Packer variable file.
-        1. Copy one of the existing files in *packer/variables/*
-        2. Rename the new file with the name used in *top.sls*
-        3. Edit the new file and update the name to the name used in *top.sls*
-    2. Follow the README in *packer/* for instructions on how to run Packer
-    to build the new AMI.
-    
+1. Create a new Packer variable file.
+  1. Copy one of the existing files in *packer/variables/*
+  2. Rename the new file with the name used in *top.sls*
+  3. Edit the new file and update the name to the name used in *top.sls*
+2. Follow the README in *packer/* for instructions on how to run Packer
+to build the new AMI.
+
 **Note:** AMIs are named as <name>.boss to make sure they are unique in AWS
 
 **Note:** if you are rebuilding an existing machine image you can skip step #1.
