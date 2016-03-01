@@ -42,8 +42,15 @@ To create the tag
 ```shell
 $ git checkout integration
 $ git pull # if you didn't need to clone
+$ git submodule update --remote
+$ git add salt_stack/salt/boss/files/boss.git
+$ git add salt_stack/salt/boss-tools/files/boss-tools.git
+$ git add salt_stack/salt/proofreader-web/files/proofread.git
+# Review the SHA hash for each submodule to make sure it correctly points to the
+#   tagged version
+$ git commit -m "Updated submodule references"
 $ git tag sprint#
-$ git push origin sprint#
+$ git push --tags
 ```
 
 ## Tagging a stable release
