@@ -14,7 +14,7 @@ subrepositories.
 SaltStack
 ---------
 SaltStack is used to define what software packages are installed on a machine.
-The behavior of Salt is controlled by *salt_stack/salt/top.sls*. For a new
+The behavior of Salt is controlled by `salt_stack/salt/top.sls`. For a new
 machine create a new top level entry and if updating an existing machine type
 update it's top level entry.
 

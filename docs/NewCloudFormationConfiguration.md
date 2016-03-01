@@ -13,8 +13,8 @@ configuration. Right now there are two primary configurations:
 
 - `configs/core.py` which creates a new VPC with a Bastion and Vault server
 - `configs/production.py` which expects to be launched into the VPC that
-- `configs/core.py` created, creates the rest of the production resources and
-links them to the Vault server previously created.
+  `configs/core.py` created, creates the rest of the production resources and
+  links them to the Vault server previously created.
 
 Creating a new configuration
 ----------------------------
@@ -31,8 +31,8 @@ an IP address can be generated for the new machine(s)
 - The second argument for the "vault-provision" call is the token policy, this
 is most likely the type of the machine you are creating.
   - Vault policies are restrictive and only allow access to needed resources.
-    "Vault Users and Policies.docx" on Confluence describes the known users and
-    policies.
+    [Vault Users and Policies.docx](https://ferdinand.robot.jhuapl.edu/download/attachments/2818674/Vault%20Users%20and%20Policies.docx?api=v2)
+    on Confluence describes the known users and policies.
   - If a new policy needs to be created, they are located under `vault/policies/`
   - If a new polciy is created, the core configuration needs to be relaunched.
 - To populate credential information in Vault for a launching instance (for
