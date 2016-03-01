@@ -86,6 +86,9 @@ $ cd packer/
 $ packer build -var-file=variables/aws-credentials -var-file=variables/aws-bastion -var-file=variables/<machine-type> -only=amazon-ebs vm.packer
 ```
 
+*Note: you can run the packer commands in parallel to speed up the process of
+creating the AMIs*
+
 ### Configure IAM Vault account
 For Vault to be able to generate AWS credentials it needs to be configured with
 an AWS account that has access to specific resources.
