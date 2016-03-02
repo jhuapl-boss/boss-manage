@@ -481,7 +481,7 @@ class CloudFormationConfiguration:
                                  "Master User Password for RDS DB Instance '{}'".format(key))
         self.add_arg(password_)
 
-    def add_dynamo_db(self, key, name, attributes, key_schema, throughput):
+    def add_dynamo_table(self, key, name, attributes, key_schema, throughput):
         """Add an DynamoDB Table to the configuration
         key is the unique name (within the configuration) for this instance
         name is the name of the DynamoDB Table to create
@@ -517,6 +517,71 @@ class CloudFormationConfiguration:
         table_name = Arg.String(key + "TableName", name,
                                 "Name of the DynamoDB table created by instance '{}'".format(key))
         self.add_arg(table_name)
+
+    def add_redis_cluster(self, key, hostname, subnets, security_groups, type_="cache.t2.micro", port=6379, version="2.8.24"):
+        self.resources[key] =  {
+            "Type" : "AWS::ElastiCache::CacheCluster",
+            "Properties" : {
+                #"AutoMinorVersionUpgrade" : "false", # defaults to true - Indicates that minor engine upgrades will be applied automatically to the cache cluster during the maintenance window.
+                "CacheNodeType" : type_,
+                "CacheSubnetGroupName" : { "Ref" : key + "SubnetGroup" },
+                "ClusterName" : { "Ref" : key + "Hostname" },
+                "Engine" : "redis",
+                "EngineVersion" : version,
+                "NumCacheNodes" : "1",
+                "Port" : port,
+                #"PreferredMaintenanceWindow" : String, # don't know the default - site says minimum 60 minutes, infrequent and announced on AWS forum 2w prior
+                "Tags" : [
+                    {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
+                    {"Key" : "Name", "Value" : { "Ref": key + "Hostname" } }
+                ],
+                "VpcSecurityGroupIds" :  [{ "Ref" : sg } for sg in security_groups]
+            }
+        }
+
+        self.resources[key + "SubnetGroup"] = {
+            "Type" : "AWS::ElastiCache::SubnetGroup",
+            "Properties" : {
+                "Description" : { "Ref" : key + "Hostname" },
+                "SubnetIds" : [{ "Ref" : subnet } for subnet in subnets]
+            }
+        }
+
+        hostname_ = Arg.String(key + "Hostname", hostname.replace('.','-'),
+                               "Hostname of the Redis Cluster '{}'".format(key))
+        self.add_arg(hostname_)
+
+    def add_redis_replication(self, key, hostname, subnets, security_groups, type_="cache.m3.medium", port=6379, version="2.8.24", clusters=5):
+        self.resources[key] =  {
+            "Type" : "AWS::ElastiCache::ReplicationGroup",
+            "Properties" : {
+                "AutomaticFailoverEnabled" : "true",
+                #"AutoMinorVersionUpgrade" : "false", # defaults to true - Indicates that minor engine upgrades will be applied automatically to the cache cluster during the maintenance window.
+                "CacheNodeType" : type_,
+                "CacheSubnetGroupName" : { "Ref" : key + "SubnetGroup" },
+                "Engine" : "redis",
+                "EngineVersion" : version,
+                "NumCacheClusters" : clusters,
+                "Port" : port,
+                #"PreferredCacheClusterAZs" : [ String, ... ],
+                #"PreferredMaintenanceWindow" : String, # don't know the default - site says minimum 60 minutes, infrequent and announced on AWS forum 2w prior
+                "ReplicationGroupDescription" : { "Ref" : key + "Hostname" },
+                "SecurityGroupIds" : [{ "Ref" : sg } for sg in security_groups]
+            }
+        }
+
+        self.resources[key + "SubnetGroup"] = {
+            "Type" : "AWS::ElastiCache::SubnetGroup",
+            "Properties" : {
+                "Description" : { "Ref" : key + "Hostname" },
+                "SubnetIds" : [{ "Ref" : subnet } for subnet in subnets]
+            }
+        }
+
+        hostname_ = Arg.String(key + "Hostname", hostname.replace('.','-'),
+                               "Hostname of the Redis Cluster '{}'".format(key))
+        self.add_arg(hostname_)
+
 
     def add_security_group(self, key, name, rules, vpc="VPC"):
         """Add SecurityGroup to the configuration
