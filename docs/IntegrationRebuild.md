@@ -95,12 +95,43 @@ $ ./cloudformation.py create integration.boss <config>
 configuring Scalyr monitoring. These instructions skip Scalyr configuration and
 you can ignore these instructions.*
 
+## Initialize Endpoint and run unit tests
+```
+python3.5 ssh.py endpoint.external.integration.boss 
+cd /srv/www/django
+sudo python3 manage.py makemigrations
+sudo python3 manage.py makemigrations bosscore
+sudo python3 manage.py migrate
+sudo python3 manage.py collectstatic
+	: yes
+sudo python3 manage.py createsuperuser
+	user:  bossadmin
+	pass:  88brain88
+	email: garbage@garbage.com
+sudo python3 manage.py test
+```
+	output should say 36 Tests OK
+	
+## Configure Route 53
+Update Route 53 with the new Loadbalancer dns name.
+Under the EC2 page select Loadbalancers
+On description page will be `DNS Name`
+copy that 
+Go into Route 53 AWS Service
+Hosted Zone theboss.io
+check api.theboss.io
+past the new DNS name over top of the old one.
+`Save Recort Set`
+
+
 ## Integration Tests
 After the integration instance is launched the following tests need to be run,
 results recorded, and developers notified of any problems.
+
 
 ### Automated Tests
 To be filled out
 
 ### Manual Checks
-To be filled out
+https://api.theboss.io/ping/
+https://api.theboss.io/v0.2/info/collections/
