@@ -113,15 +113,15 @@ sudo python3 manage.py test
 	output should say 36 Tests OK
 	
 ## Configure Route 53
-Update Route 53 with the new Loadbalancer dns name.
-Under the EC2 page select Loadbalancers
-On description page will be `DNS Name`
-copy that 
-Go into Route 53 AWS Service
-Hosted Zone theboss.io
-check api.theboss.io
-past the new DNS name over top of the old one.
-`Save Recort Set`
+1. Update Route 53 with the new Loadbalancer dns name.
+2. Under the EC2 page select Loadbalancers
+3. On description page will be `DNS Name`
+3. Copy that 
+4. Go into Route 53 AWS Service
+5. Hosted Zone theboss.io
+6. Check checkbox api.theboss.io
+7. Past3 the new DNS name over top of the old one.
+8. `Save Recort Set`
 
 
 ## Integration Tests
@@ -133,5 +133,5 @@ results recorded, and developers notified of any problems.
 To be filled out
 
 ### Manual Checks
-https://api.theboss.io/ping/
-https://api.theboss.io/v0.2/info/collections/
+* https://api.theboss.io/ping/
+* https://api.theboss.io/v0.2/info/collections/
