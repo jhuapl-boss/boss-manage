@@ -39,9 +39,12 @@ def set_hostname():
         current_hostname = fh.read().strip()
 
     fqdn = config["system"]["fqdn"]
-    hostname = fqdn.split(".")[0]
+    hostname, domain = fqdn.split(".", 1)
     ip = bossutils.utils.read_url(bossutils.utils.METADATA_URL + "local-ipv4")
 
+    # while not needed with Rout53 provided DNS, this allows a machine to still
+    # refer to itself as hostname without issue with multiple DNS records for
+    # the same hostname entry
     logging.info("Modifying /etc/hosts")
     with open("/etc/hosts", "r+") as fh:
         data = fh.read()
@@ -62,6 +65,13 @@ def set_hostname():
 
     logging.info("Calling hostname")
     bossutils.utils.execute("hostname -F /etc/hostname")
+
+    logging.info("Updating /etc/resolvconf/resolv.conf.d/base")
+    with open("/etc/resolvconf/resolv.conf.d/base", "a") as fh:
+        fh.write("\nsearch {}\n".format(domain))
+
+    logging.info("Regenerating resolv.conf")
+    bossutils.utils.execute("resolvconf -u")
 
 if __name__ == '__main__':
     logging.info("CONFIG_FILE = \"{}\"".format(bossutils.configuration.CONFIG_FILE))
