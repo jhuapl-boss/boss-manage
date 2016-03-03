@@ -120,7 +120,7 @@ sudo python3 manage.py test
 4. Go into Route 53 AWS Service
 5. Hosted Zone theboss.io
 6. Check checkbox api.theboss.io
-7. Past3 the new DNS name over top of the old one.
+7. Paste the new DNS name over top of the old one.
 8. `Save Recort Set`
 
 
