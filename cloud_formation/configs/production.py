@@ -7,8 +7,6 @@ The production configuration creates all of the resources needed to run the
 BOSS system. The production configuration expects to be launched / created
 in a VPC created by the core configuration. It also expects for the user to
 select the same KeyPair used when creating the core configuration.
-
-ADDRESSES - the dictionary of production hostnames and subnet indexes.
 """
 
 
@@ -17,13 +15,6 @@ import library as lib
 import hosts
 import scalyr
 import uuid
-
-# Devices that all VPCs/Subnets may potentially have and Subnet number (must fit under SUBNET_CIDR)
-# Subnet number can be a single number or a list of numbers
-ADDRESSES = {
-    "endpoint": range(10, 20),
-    "db": range(20, 30),
-}
 
 # Region production is created in.  Later versions of boto3 should allow us to
 # extract this from the session variable.  Hard coding for now.
@@ -34,7 +25,7 @@ VAULT_DJANGO_DB = "secret/endpoint/django/db"
 
 def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     """Create the CloudFormationConfiguration object."""
-    config = configuration.CloudFormationConfiguration(domain, ADDRESSES)
+    config = configuration.CloudFormationConfiguration(domain, PRODUCTION_REGION)
 
     # do a couple of verification checks
     if config.subnet_domain is not None:
@@ -59,40 +50,29 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                                                    internal_sg_id,
                                                    "ID of internal Security Group"))
 
-    # Create the a and b subnets
-    config.subnet_domain = "a." + domain
-    config.subnet_subnet = hosts.lookup(config.subnet_domain)
-    config.add_subnet("ASubnet", az="us-east-1b")
-
-    config.subnet_domain = "b." + domain
-    config.subnet_subnet = hosts.lookup(config.subnet_domain)
-    config.add_subnet("BSubnet", az="us-east-1c") # BSubnet needs to be in a different AZ from ASubnet
-
-    # Dynamically add the RDS instance address to the user data, so that
-    # the endpoint server can access the launched DB
-    # Fn::GetAtt and Fn::Join are CloudFormation template functions
-    user_data_dynamic = [user_data, "\n[aws]\n",
-                        "db = ", { "Fn::GetAtt" : [ "DB", "Endpoint.Address" ] }, "\n"]
-    user_data_ = { "Fn::Join" : ["", user_data_dynamic]}
+    az_subnets = config.find_all_availability_zones(session)
 
     config.add_ec2_instance("Endpoint",
-                            "endpoint.external." + domain,
+                            "endpoint." + domain,
                             lib.ami_lookup(session, "endpoint.boss"),
                             keypair,
                             public_ip = True,
                             subnet = "ExternalSubnet",
                             security_groups = ["InternalSecurityGroup", "InternetSecurityGroup"],
-                            user_data = user_data_,
-                            depends_on = "DB") # make sure the DB is launched before we start
+                            user_data = user_data,
+                            depends_on = "EndpointDB") # make sure the DB is launched before we start
 
-    config.add_rds_db("DB",
-                      "db." + domain,
+    config.add_rds_db("EndpointDB",
+                      "endpoint-db." + domain,
                       db_config.get("port"),
                       db_config.get("name"),
                       db_config.get("user"),
                       db_config.get("password"),
-                      ["ASubnet", "BSubnet"],
+                      az_subnets,
                       security_groups = ["InternalSecurityGroup"])
+
+    config.add_redis_replication("Cache", "cache." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
+    config.add_redis_replication("CacheState", "cache-state." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
 
     # Allow SSH/HTTP/HTTPS access to endpoint server from anywhere
     config.add_security_group("InternetSecurityGroup",
@@ -135,12 +115,12 @@ def create(session, domain):
     # use for connecting to Vault and the DB instance
     endpoint_token = call_vault("vault-provision", "endpoint")
     user_data = configuration.UserData()
-    # CAUTION: This hard codes the Vault address in the config file passed and will cause
-    #          problems if the template is saved and launched with a different Vault IP
-    user_data["vault"]["url"] = "http://{}:8200".format(hosts.lookup("vault." + domain))
     user_data["vault"]["token"] = endpoint_token
-    user_data["system"]["fqdn"] = "endpoint.external." + domain
+    user_data["system"]["fqdn"] = "endpoint." + domain
     user_data["system"]["type"] = "endpoint"
+    user_data["aws"]["db"] = "endpoint-db." + domain
+    user_data["aws"]["cache"] = "cache." + domain
+    user_data["aws"]["cache-state"] = "cache-state." + domain
 
     # Should transition from vault-django to vault-write
     call_vault("vault-write", VAULT_DJANGO, secret_key = str(uuid.uuid4()))

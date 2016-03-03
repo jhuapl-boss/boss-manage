@@ -24,7 +24,7 @@ CORE_REGION = 'us-east-1'
 
 def create_config(session, domain):
     """Create the CloudFormationConfiguration object."""
-    config = configuration.CloudFormationConfiguration(domain)
+    config = configuration.CloudFormationConfiguration(domain, CORE_REGION)
 
     # do a couple of verification checks
     if config.subnet_domain is not None:
@@ -47,13 +47,18 @@ def create_config(session, domain):
     config.subnet_subnet = hosts.lookup(config.subnet_domain)
     config.add_subnet("ExternalSubnet")
 
+    subnets = []
+    for az, sub in lib.azs_lookup(session):
+        name = sub.capitalize() + "Subnet"
+        config.subnet_domain = sub + "." + domain
+        config.subnet_subnet = hosts.lookup(config.subnet_domain)
+        config.add_subnet(name, az = az)
+        subnets.append(name)
+
     # Create the user data for Vault. No data is given to Bastion
     # because it is an AWS AMI designed for NAT work and does not
     # have bossutils to use the user data config.
     user_data = configuration.UserData()
-    # CAUTION: This hard codes the Vault address in the config file passed and will cause
-    #          problems if the template is saved and launched with a different Vault IP
-    user_data["vault"]["url"] = "http://{}:8200".format(hosts.lookup("vault." + domain))
     user_data["system"]["fqdn"] = "vault." + domain
     user_data["system"]["type"] = "vault"
 

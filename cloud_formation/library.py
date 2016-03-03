@@ -90,6 +90,16 @@ def subnet_id_lookup(session, subnet_domain):
     else:
         return response['Subnets'][0]['SubnetId']
 
+def azs_lookup(session):
+    """Lookup all of the Availablity Zones for the connected region."""
+    if session is None: return []
+
+    client = session.client('ec2')
+    response = client.describe_availability_zones()
+    rtn = [(z["ZoneName"], z["ZoneName"][-1]) for z in response["AvailabilityZones"]]
+
+    return rtn
+
 def ami_lookup(session, ami_name):
     """Lookup the Id for the AMI with the given name."""
     if session is None: return None

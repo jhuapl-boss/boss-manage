@@ -202,7 +202,7 @@ class CloudFormationConfiguration:
     """Configuration class that helps with building CloudFormation templates
     and launching them.
     """
-    def __init__(self, domain, devices = None, region = "us-east-1"):
+    def __init__(self, domain, region = "us-east-1"):
         """domain is either <vpc>.<tld> or <subnet>.<vpc>.<tld> and is used to
                   populate specific pieces of VPC and Subnet information.
         devices is a dictionary of devices for use when looking up IP addresses.
@@ -210,7 +210,6 @@ class CloudFormationConfiguration:
         self.resources = {}
         self.parameters = {}
         self.arguments = []
-        self.devices = {} if devices is None else devices
         self.region = region
 
         dots = len(domain.split("."))
@@ -364,6 +363,17 @@ class CloudFormationConfiguration:
                             "Domain of the Subnet '{}'".format(key))
         self.add_arg(domain)
 
+    def find_all_availability_zones(self, session):
+        subnets = []
+        for az, sub in lib.azs_lookup(session):
+            name = sub.capitalize() + "Subnet"
+            domain = sub + "." + self.vpc_domain
+            id = lib.subnet_id_lookup(session, domain)
+
+            self.add_arg(Arg.Subnet(name, id))
+            subnets.append(name)
+        return subnets
+
     # ??? save hostname : keypair somewhere?
     def add_ec2_instance(self, key, hostname, ami, keypair, subnet="Subnet", type_="t2.micro", iface_check=True, public_ip=False, security_groups=None, user_data=None, meta_data=None, depends_on=None):
         """Add an EC2 instance to the configuration
@@ -398,7 +408,6 @@ class CloudFormationConfiguration:
                     "DeviceIndex"              : "0",
                     "DeleteOnTermination"      : "true",
                     "SubnetId"                 : { "Ref" : subnet },
-                    "PrivateIpAddress"         : { "Ref" : key + "IP" }
                 }]
             }
         }
@@ -429,9 +438,7 @@ class CloudFormationConfiguration:
                                "Hostname of the EC2 Instance '{}'".format(key))
         self.add_arg(_hostname)
 
-        ip = Arg.IP(key + "IP", hosts.lookup(hostname, self.devices),
-                    "IP Address of the EC2 Instance '{}'".format(key))
-        self.add_arg(ip)
+        self._add_record_cname(key, hostname, ec2 = True)
 
     def add_rds_db(self, key, hostname, port, db_name, username, password, subnets, type_="db.t2.micro", storage="5", security_groups=None):
         """Add an RDS DB instance to the configuration
@@ -549,7 +556,6 @@ class CloudFormationConfiguration:
                 #"AutoMinorVersionUpgrade" : "false", # defaults to true - Indicates that minor engine upgrades will be applied automatically to the cache cluster during the maintenance window.
                 "CacheNodeType" : type_,
                 "CacheSubnetGroupName" : { "Ref" : key + "SubnetGroup" },
-                "ClusterName" : { "Ref" : key + "Hostname" },
                 "Engine" : "redis",
                 "EngineVersion" : version,
                 "NumCacheNodes" : "1",
@@ -581,7 +587,7 @@ class CloudFormationConfiguration:
         self.resources[key] =  {
             "Type" : "AWS::ElastiCache::ReplicationGroup",
             "Properties" : {
-                "AutomaticFailoverEnabled" : "true",
+                "AutomaticFailoverEnabled" : bool_str(clusters > 1),
                 #"AutoMinorVersionUpgrade" : "false", # defaults to true - Indicates that minor engine upgrades will be applied automatically to the cache cluster during the maintenance window.
                 "CacheNodeType" : type_,
                 "CacheSubnetGroupName" : { "Ref" : key + "SubnetGroup" },
@@ -826,14 +832,17 @@ class CloudFormationConfiguration:
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
 
-    def _add_record_cname(self, key, hostname, vpc="VPC", ttl="300", rds=False, cluster=False, replication=False):
+    def _add_record_cname(self, key, hostname, vpc="VPC", ttl="300", rds=False, cluster=False, replication=False, ec2=False):
         address_key = None
         if rds:
             address_key = "Endpoint.Address"
         elif cluster:
-            address_key = "ConfigurationEndpoint.Address"
+            address_key = "ConfigurationEndpoint.Address" # Only works for memcached db
+            raise Exception("NotSupported currently")
         elif replication:
             address_key = "PrimaryEndPoint.Address"
+        elif ec2: # Could create an A record type, with PrivateIP as the key
+            address_key = "PrivateDnsName"
 
         self.resources[key + "Record"] = {
             "Type" : "AWS::Route53::RecordSet",
@@ -846,7 +855,7 @@ class CloudFormationConfiguration:
             }
         }
 
-        domain = Arg.String(key + "Domain", self.vpc_domain,
+        domain = Arg.String(vpc + "Domain", self.vpc_domain,
                             "Domain of the VPC '{}'".format(vpc))
         self.add_arg(domain)
 
