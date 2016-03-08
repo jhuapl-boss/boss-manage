@@ -71,6 +71,10 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                       az_subnets,
                       security_groups = ["InternalSecurityGroup"])
 
+    attributes = {'metakey': 'S'}
+    key_schema = {'metakey': 'HASH'}
+    config.add_dynamo_table("EndpointMetaDB",'bossmeta', attributes, key_schema, (10, 10))
+
     config.add_redis_replication("Cache", "cache." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
     config.add_redis_replication("CacheState", "cache-state." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
 

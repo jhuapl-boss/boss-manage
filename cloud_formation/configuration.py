@@ -525,12 +525,12 @@ class CloudFormationConfiguration:
                           before Amazon DynamoDB balances the loads
         """
         attr_defs = []
-        for key in attributes:
-            attr_defs.append({"AttributeName": key, "AttributeType": attributes[key]})
+        for key_ in attributes:
+            attr_defs.append({"AttributeName": key_, "AttributeType": attributes[key_]})
 
         key_schema_ = []
-        for key in key_schema:
-            key_schema_.append({"AttributeName": key, "KeyType": attributes[key]})
+        for key_ in key_schema:
+            key_schema_.append({"AttributeName": key_, "KeyType": key_schema[key_]})
 
         self.resources[key] = {
             "Type" : "AWS::DynamoDB::Table",
