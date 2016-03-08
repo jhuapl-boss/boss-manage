@@ -73,7 +73,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
 
     attributes = {'metakey': 'S'}
     key_schema = {'metakey': 'HASH'}
-    config.add_dynamo_table("EndpointMetaDB",'bossmeta', attributes, key_schema, (10, 10))
+    config.add_dynamo_table("EndpointMetaDB",'bossmeta.' + domain, attributes, key_schema, (10, 10))
 
     config.add_redis_replication("Cache", "cache." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
     config.add_redis_replication("CacheState", "cache-state." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
@@ -125,6 +125,7 @@ def create(session, domain):
     user_data["aws"]["db"] = "endpoint-db." + domain
     user_data["aws"]["cache"] = "cache." + domain
     user_data["aws"]["cache-state"] = "cache-state." + domain
+    user_data["aws"]["meta"] = "bossmeta." + domain
 
     # Should transition from vault-django to vault-write
     call_vault("vault-write", VAULT_DJANGO, secret_key = str(uuid.uuid4()))
