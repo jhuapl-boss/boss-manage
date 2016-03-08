@@ -125,7 +125,7 @@ def create(session, domain):
     user_data["aws"]["db"] = "endpoint-db." + domain
     user_data["aws"]["cache"] = "cache." + domain
     user_data["aws"]["cache-state"] = "cache-state." + domain
-    user_data["aws"]["meta"] = "bossmeta." + domain
+    user_data["aws"]["meta-db"] = "bossmeta." + domain
 
     # Should transition from vault-django to vault-write
     call_vault("vault-write", VAULT_DJANGO, secret_key = str(uuid.uuid4()))
