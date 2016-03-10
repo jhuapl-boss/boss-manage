@@ -12,5 +12,4 @@ jenkins:
       # Therefore, if Salt needs to re-run on the Jenkins server, first disable
       # security, when installing new jobs.
       installed:
-          boss-tools: /srv/salt/jenkins-jobs/boss-tools.xml
-          boss-manage.cloud-formation: /srv/salt/jenkins-jobs/cloud-formation.xml
+          proofreader: /srv/salt/jenkins-jobs/proofreader.xml
