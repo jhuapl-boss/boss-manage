@@ -23,7 +23,7 @@ firstboot:
         - group: root
         - mode: 555
     cmd.run:
-        - name: update-rc.d bossutils-firstboot defaults 10
+        - name: update-rc.d bossutils-firstboot start 10 2 3 4 5 .
         - user: root
 
 logging:

@@ -1,5 +1,5 @@
 {
     "aws_bastion_ip": "52.3.13.189",
     "aws_bastion_user": "ubuntu",
-    "aws_bastion_priv_key_file": "../microns-bastion20151117.pem"
+    "aws_bastion_priv_key_file": "./microns-bastion20151117.pem"
 }

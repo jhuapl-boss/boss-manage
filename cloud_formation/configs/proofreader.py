@@ -7,8 +7,6 @@ The proofreader configuration creates all of the resources needed to run the
 proofreader site. The proofreader configuration expects to be launched / created
 in a VPC created by the core configuration. It also expects for the user to
 select the same KeyPair used when creating the core configuration.
-
-ADDRESSES - the dictionary of proofreader hostnames and subnet indexes.
 """
 
 
@@ -17,19 +15,12 @@ import library as lib
 import hosts
 import uuid
 
-# Devices that all VPCs/Subnets may potentially have and Subnet number (must fit under SUBNET_CIDR)
-# Subnet number can be a single number or a list of numbers
-ADDRESSES = {
-    "proofreader-web": range(30, 40),
-    "proofreader-db": range(40, 50),
-}
-
 VAULT_DJANGO = "secret/proofreader/django"
 VAULT_DJANGO_DB = "secret/proofreader/django/db"
 
 def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     """Create the CloudFormationConfiguration object."""
-    config = configuration.CloudFormationConfiguration(domain, ADDRESSES)
+    config = configuration.CloudFormationConfiguration(domain)
 
     # do a couple of verification checks
     if config.subnet_domain is not None:
@@ -70,42 +61,16 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                                                        internet_sg_id,
                                                        "ID of internal Security Group"))
 
-    # If the subnets exist use them, else create them
-    a_subnet_domain = "a." + domain
-    a_subnet_key = "ASubnet"
-    a_subnet_id = lib.subnet_id_lookup(session, a_subnet_domain)
-    if a_subnet_id is None:
-        config.subnet_domain = a_subnet_domain
-        config.subnet_subnet = hosts.lookup(config.subnet_domain)
-        config.add_subnet(a_subnet_key, az="us-east-1b")
-    else:
-        config.add_arg(configuration.Arg.Subnet(a_subnet_key, a_subnet_id))
-
-    b_subnet_domain = "b." + domain
-    b_subnet_key = "BSubnet"
-    b_subnet_id = lib.subnet_id_lookup(session, b_subnet_domain)
-    if b_subnet_id is None:
-        config.subnet_domain = b_subnet_domain
-        config.subnet_subnet = hosts.lookup(config.subnet_domain)
-        config.add_subnet(b_subnet_key, az="us-east-1c") # BSubnet needs to be in a different AZ from ASubnet
-    else:
-        config.add_arg(configuration.Arg.Subnet(b_subnet_key, b_subnet_id))
-
-    # Dynamically add the RDS instance address to the user data, so that
-    # the proofreader web server can access the launched DB
-    # Fn::GetAtt and Fn::Join are CloudFormation template functions
-    user_data_dynamic = [user_data, "\n[aws]\n",
-                         "db = ", { "Fn::GetAtt" : [ "ProofreaderDB", "Endpoint.Address" ] }, "\n"]
-    user_data_ = { "Fn::Join" : ["", user_data_dynamic]}
+    az_subnets = config.find_all_availability_zones(session)
 
     config.add_ec2_instance("ProofreaderWeb",
-                            "proofreader-web.external." + domain,
+                            "proofreader-web." + domain,
                             lib.ami_lookup(session, "proofreader-web.boss"),
                             keypair,
                             public_ip = True,
                             subnet = "ExternalSubnet",
                             security_groups = ["InternalSecurityGroup", "InternetSecurityGroup"],
-                            user_data = user_data_,
+                            user_data = user_data,
                             depends_on = "ProofreaderDB") # make sure the DB is launched before we start
 
     config.add_rds_db("ProofreaderDB",
@@ -114,7 +79,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                       db_config.get("name"),
                       db_config.get("user"),
                       db_config.get("password"),
-                      ["ASubnet", "BSubnet"],
+                      az_subnets,
                       security_groups = ["InternalSecurityGroup"])
 
     return config
@@ -149,12 +114,10 @@ def create(session, domain):
     # use for connecting to Vault and the DB instance
     proofreader_token = call_vault("vault-provision", "proofreader")
     user_data = configuration.UserData()
-    # CAUTION: This hard codes the Vault address in the config file passed and will cause
-    #          problems if the template is saved and launched with a different Vault IP
-    user_data["vault"]["url"] = "http://{}:8200".format(hosts.lookup("vault." + domain))
     user_data["vault"]["token"] = proofreader_token
-    user_data["system"]["fqdn"] = "proofreader-web.external." + domain
+    user_data["system"]["fqdn"] = "proofreader-web." + domain
     user_data["system"]["type"] = "proofreader-web"
+    user_data["aws"]["db"] = "proofreader-db." + domain
     user_data = str(user_data)
 
     # Should transition from vault-django to vault-write

@@ -51,5 +51,5 @@ django-firstboot:
         - group: root
         - mode: 555
     cmd.run:
-        - name: update-rc.d django-firstboot defaults 99
+        - name: update-rc.d django-firstboot start 99 2 3 4 5 .
         - user: root
