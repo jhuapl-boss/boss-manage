@@ -20,7 +20,7 @@ import uuid
 # extract this from the session variable.  Hard coding for now.
 PRODUCTION_REGION = 'us-east-1'
 
-INCOMING_SUBNET = "128.244.0.0/16"
+INCOMING_SUBNET = "52.3.13.189/32" # microns-bastion elastic IP
 
 VAULT_DJANGO = "secret/endpoint/django"
 VAULT_DJANGO_DB = "secret/endpoint/django/db"

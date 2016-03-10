@@ -15,7 +15,7 @@ import library as lib
 import hosts
 import uuid
 
-INCOMING_SUBNET = "128.244.0.0/16"
+INCOMING_SUBNET = "52.3.13.189/32" # microns-bastion elastic IP
 
 VAULT_DJANGO = "secret/proofreader/django"
 VAULT_DJANGO_DB = "secret/proofreader/django/db"

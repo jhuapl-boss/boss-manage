@@ -22,7 +22,7 @@ keypair = None
 # extract this from the session variable.  Hard coding for now.
 CORE_REGION = 'us-east-1'
 
-INCOMING_SUBNET = "128.244.0.0/16"
+INCOMING_SUBNET = "52.3.13.189/32" # microns-bastion elastic IP
 
 def create_config(session, domain):
     """Create the CloudFormationConfiguration object."""
