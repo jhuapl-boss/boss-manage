@@ -28,9 +28,17 @@
 
         "name": "The hostname and minion ID of the VM",
         "name": null,
+        "name_suffix": "An optional suffix for the build name",
+        "name_suffix": "",
 
         "role": "What type of role is the VM filling (web|db|etc)",
-        "role": null
+        "role": null,
+
+        "commit": "Commit hash of the repository version being built from",
+        "commit": "unknown",
+
+        "force_deregister": "Force the deregister of AWS AMIs",
+        "force_deregister": "false"
     },
 
     "builders": [{
@@ -50,18 +58,20 @@
         "secret_key": "{{user `aws_secret_key`}}",
         "ssh_username": "ubuntu",
         "ami_name": "Using the '.boss' suffix to make sure our names are unique in AWS",
-        "ami_name": "{{user `name`}}.boss",
+        "ami_name": "{{user `name`}}.boss{{user `name_suffix`}}",
         "ami_description": "AMI configured for running as a / the {{user `role`}} server",
         "source_ami": "{{user `aws_source_ami`}}",
         "force_deregister": "{{user `aws_force`}}",
         "instance_type": "{{user `aws_instance_type`}}",
         "region": "{{user `aws_region`}}",
         "tags": {
-            "Role": "{{user `role`}}"
+            "Role": "{{user `role`}}",
+            "Commit": "{{user `commit`}}"
         },
         "ssh_bastion_username": "{{user `aws_bastion_user`}}",
         "ssh_bastion_host": "{{user `aws_bastion_ip`}}",
-        "ssh_bastion_private_key_file": "{{user `aws_bastion_priv_key_file`}}"
+        "ssh_bastion_private_key_file": "{{user `aws_bastion_priv_key_file`}}",
+        "force_deregister" : "{{user `force_deregister`}}"
     }],
 
     "provisioners": [
