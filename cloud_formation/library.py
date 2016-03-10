@@ -123,7 +123,8 @@ def ami_lookup(session, ami_name):
     if ami_name.endswith(".boss"):
         AMI_VERSION = os.environ["AMI_VERSION"]
         if AMI_VERSION == "latest":
-            ami_name += "-*"
+            # limit latest searching to only versions tagged with hash information
+            ami_name += "-h*"
         else:
             ami_name += "-" + AMI_VERSION
 

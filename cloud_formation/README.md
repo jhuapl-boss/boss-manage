@@ -28,8 +28,8 @@ Important Arguments:
 
 * `-h` will display a full help message with all arguments
 * `--ami-version` selects the specific AMI build name as used by `packer.py`. By
-  default this is the last built image, but if the partial commit hash or specific
-  name is given that AMI is used.
+  default this is the last built image tagged with a commit hash, but if the
+  partial commit hash or specific name is given that AMI is used.
 
 ## Scalyr Enviroment Variables
 

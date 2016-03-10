@@ -11,14 +11,6 @@ from distutils.spawn import find_executable
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 os.environ["PATH"] += ":" + os.path.join(REPO_ROOT, "bin")
 
-# packer.sh config [, config [,...]]
-# config is the name of a file in packer/variables/ or all
-#   - change this to just use the top level definitions in top.sls?
-# --single-thread only builds one at a time (default is all at once)
-# --name= give a name to the build, defaults start of the commit hash
-# --only= the packer config section to build, defaults amazon-ebs
-# --no-bastion don't use aws-bastion, defaults to true
-
 def get_commit():
     cmd = "git rev-parse HEAD"
     result = subprocess.run(shlex.split(cmd), stdout=subprocess.PIPE)
@@ -59,7 +51,7 @@ if __name__ == '__main__':
                         help = "Which Packer building to use. (default: amazon-ebs)")
     parser.add_argument("--name",
                         metavar = "<build name>",
-                        default = git_hash[:8],
+                        default = 'h' + git_hash[:8],
                         help = "The build name for the machine image(s). (default: First 8 characters of the git SHA1 hash)")
     parser.add_argument("--no-bastion",
                         action = "store_false",
