@@ -2,6 +2,8 @@ base:
     'vault*':
         - vault.server
         - boss-tools.bossutils
+        - scalyr
+        - scalyr.update_host
 
     'endpoint*':
         - boss-tools.bossutils
@@ -13,6 +15,10 @@ base:
 
     'jenkins*':
         - jenkins-microns
+
+    # Jenkins server for proofreader-web Django tests.
+    'pr-jenkins*':
+        - jenkins-microns.proofreader
 
     'proofreader-web*':
         - proofreader-web
