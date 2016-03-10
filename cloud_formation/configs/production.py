@@ -20,6 +20,8 @@ import uuid
 # extract this from the session variable.  Hard coding for now.
 PRODUCTION_REGION = 'us-east-1'
 
+INCOMING_SUBNET = "128.244.0.0/16"
+
 VAULT_DJANGO = "secret/endpoint/django"
 VAULT_DJANGO_DB = "secret/endpoint/django/db"
 
@@ -82,7 +84,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     config.add_security_group("InternetSecurityGroup",
                               "internet",
                               [
-                                ("tcp", "22", "22", "0.0.0.0/0"),
+                                ("tcp", "22", "22", INCOMING_SUBNET),
                                 ("tcp", "80", "80", "0.0.0.0/0"),
                                 ("tcp", "443", "443", "0.0.0.0/0")
                               ])
