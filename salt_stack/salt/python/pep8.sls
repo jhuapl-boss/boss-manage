@@ -5,7 +5,7 @@ include:
 
 pep8:
     pip.installed:
-        - name: pep8
+        - name: pep8==1.7.0
         - bin_env: /usr/local/bin/pip3
         - require:
             - sls: python.python35

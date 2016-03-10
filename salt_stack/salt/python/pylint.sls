@@ -5,7 +5,7 @@ include:
 
 pylint:
     pip.installed:
-        - name: pylint
+        - name: pylint==1.5.4
         - bin_env: /usr/local/bin/pip3
         - require:
             - sls: python.python35
