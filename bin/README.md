@@ -6,9 +6,9 @@ the BOSS infrastructure.
 
 packer.py
 ---------
-Used to simplify the building of machine images using [Packer]() and [SaltStack]().
-The scrpt tags built AWS AMIs with the commit version and it can build multiple
-images at the same time.
+Used to simplify the building of machine images using [Packer](https://www.packer.io/)
+and [SaltStack](http://saltstack.com/). The scrpt tags built AWS AMIs with the commit
+version and it can build multiple images at the same time.
 
 Requirements:
 
