@@ -260,7 +260,10 @@ class CloudFormationConfiguration:
         response = client.create_stack(
             StackName = name,
             TemplateBody = self._create_template(),
-            Parameters = self.arguments
+            Parameters = self.arguments,
+            Tags = [
+                {"Key": "Commit", "Value": lib.get_commit()}
+            ]
         )
 
         rtn = None
@@ -411,6 +414,14 @@ class CloudFormationConfiguration:
                 }]
             }
         }
+
+        if type(ami) == tuple:
+            commit = ami[1]
+            ami = ami[0]
+
+            if commit is not None:
+                kv = {"Key": "AMI Commit", "Value": commit}
+                self.resources[key]["Properties"]["Tags"].append(kv)
 
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on

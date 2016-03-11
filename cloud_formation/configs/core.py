@@ -22,6 +22,8 @@ keypair = None
 # extract this from the session variable.  Hard coding for now.
 CORE_REGION = 'us-east-1'
 
+INCOMING_SUBNET = "52.3.13.189/32" # microns-bastion elastic IP
+
 def create_config(session, domain):
     """Create the CloudFormationConfiguration object."""
     config = configuration.CloudFormationConfiguration(domain, CORE_REGION)
@@ -86,7 +88,7 @@ def create_config(session, domain):
     # Allow SSH access to bastion from anywhere
     config.add_security_group("BastionSecurityGroup",
                               "ssh",
-                              [("tcp", "22", "22", "0.0.0.0/0")])
+                              [("tcp", "22", "22", INCOMING_SUBNET)])
 
     # Create the internal route table to route traffic to the NAT Bastion
     config.add_route_table("InternalRouteTable",

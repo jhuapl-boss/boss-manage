@@ -5,19 +5,19 @@
   <keepDependencies>false</keepDependencies>
   <properties>
     <jenkins.plugins.slack.SlackNotifier_-SlackJobProperty plugin="slack@1.8.1">
-      <teamDomain></teamDomain>
-      <token></token>
-      <room></room>
+      <teamDomain>apl-microns</teamDomain>
+      <token>XAoRfwgxZJhScrKC03VXdgyI</token>
+      <room>#ci</room>
       <startNotification>false</startNotification>
       <notifySuccess>false</notifySuccess>
       <notifyAborted>false</notifyAborted>
       <notifyNotBuilt>false</notifyNotBuilt>
       <notifyUnstable>false</notifyUnstable>
-      <notifyFailure>false</notifyFailure>
-      <notifyBackToNormal>false</notifyBackToNormal>
+      <notifyFailure>true</notifyFailure>
+      <notifyBackToNormal>true</notifyBackToNormal>
       <notifyRepeatedFailure>false</notifyRepeatedFailure>
       <includeTestSummary>false</includeTestSummary>
-      <showCommitList>false</showCommitList>
+      <showCommitList>true</showCommitList>
       <includeCustomMessage>false</includeCustomMessage>
       <customMessage></customMessage>
     </jenkins.plugins.slack.SlackNotifier_-SlackJobProperty>
@@ -27,12 +27,12 @@
     <userRemoteConfigs>
       <hudson.plugins.git.UserRemoteConfig>
         <url>https://github.com/aplmicrons/proofread</url>
-        <credentialsId>22ccf630-62bf-4e14-912e-530c9639ae10</credentialsId>
+        <credentialsId>dc83befc-585e-46a1-b6f0-0026cf50c000</credentialsId>
       </hudson.plugins.git.UserRemoteConfig>
     </userRemoteConfigs>
     <branches>
       <hudson.plugins.git.BranchSpec>
-        <name>*/giontc1</name>
+        <name>*/integration</name>
       </hudson.plugins.git.BranchSpec>
     </branches>
     <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
@@ -309,6 +309,12 @@
         <encoding>default</encoding>
       </config>
     </hudson.plugins.violations.ViolationsPublisher>
+    <jenkins.plugins.slack.SlackNotifier plugin="slack@1.8.1">
+      <teamDomain>apl-microns</teamDomain>
+      <authToken>XAoRfwgxZJhScrKC03VXdgyI</authToken>
+      <buildServerUrl>http://localhost:8080/</buildServerUrl>
+      <room>#ci</room>
+    </jenkins.plugins.slack.SlackNotifier>
   </publishers>
   <buildWrappers/>
 </project>

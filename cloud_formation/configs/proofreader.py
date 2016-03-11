@@ -15,6 +15,8 @@ import library as lib
 import hosts
 import uuid
 
+INCOMING_SUBNET = "52.3.13.189/32" # microns-bastion elastic IP
+
 VAULT_DJANGO = "secret/proofreader/django"
 VAULT_DJANGO_DB = "secret/proofreader/django/db"
 
@@ -52,7 +54,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
         config.add_security_group(internet_sg_key,
                                   "internet",
                                   [
-                                    ("tcp", "22", "22", "0.0.0.0/0"),
+                                    ("tcp", "22", "22", INCOMING_SUBNET),
                                     ("tcp", "80", "80", "0.0.0.0/0"),
                                     ("tcp", "443", "443", "0.0.0.0/0")
                                   ])

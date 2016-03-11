@@ -7,6 +7,8 @@ import pprint
 import time
 import getpass
 import string
+import subprocess
+import shlex
 
 import hosts
 
@@ -16,6 +18,14 @@ vault_dir = os.path.normpath(os.path.join(cur_dir, "..", "vault"))
 sys.path.append(vault_dir)
 import bastion
 import vault
+
+def get_commit():
+    try:
+        cmd = "git rev-parse HEAD"
+        result = subprocess.run(shlex.split(cmd), stdout=subprocess.PIPE)
+        return result.stdout.decode("utf-8").strip()
+    except:
+        return "unknown"
 
 def domain_to_stackname(domain):
     """Create a CloudFormation Stackname from domain name by removing '.' and
@@ -100,16 +110,36 @@ def azs_lookup(session):
 
     return rtn
 
+def _find(xs, predicate):
+    for x in xs:
+        if predicate(x):
+            return x
+    return None
+
 def ami_lookup(session, ami_name):
     """Lookup the Id for the AMI with the given name."""
     if session is None: return None
+
+    if ami_name.endswith(".boss"):
+        AMI_VERSION = os.environ["AMI_VERSION"]
+        if AMI_VERSION == "latest":
+            # limit latest searching to only versions tagged with hash information
+            ami_name += "-h*"
+        else:
+            ami_name += "-" + AMI_VERSION
 
     client = session.client('ec2')
     response = client.describe_images(Filters=[{"Name":"name", "Values":[ami_name]}])
     if len(response['Images']) == 0:
         return None
     else:
-        return response['Images'][0]['ImageId']
+        response['Images'].sort(key=lambda x: x["CreationDate"], reverse=True)
+        image = response['Images'][0]
+        ami = image['ImageId']
+        tag = _find(image.get('Tags',[]), lambda x: x["Key"] == "Commit")
+        commit = None if tag is None else tag["Value"]
+
+        return (ami, commit)
 
 def sg_lookup(session, vpc_id, group_name):
     """Lookup the Id for the VPC Security Group with the given name."""
