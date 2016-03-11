@@ -53,7 +53,7 @@
   <concurrentBuild>false</concurrentBuild>
   <builders>
     <hudson.tasks.Shell>
-      <command>nose2</command>
+      <command>bash -ex jenkins.sh</command>
     </hudson.tasks.Shell>
   </builders>
   <publishers>
