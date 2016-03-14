@@ -27,25 +27,22 @@ $ git push
 Once the boss-manage.git repository submodules are pointed at the latest
 integration code, we need to rebuild the AMIs before we launch them.
 
-### Deregistering existing AMIs
-Before new AMIs can be created, the old ones need to be deleted (deregistered)
-
-1. Open a web browser
-2. Login to the AWS console and open up the EC2 console
-3. Select **AMIs** from the left side menu
-4. For *vault.boss*, *endpoint.boss*, *proofreader-web.boss*
-  1. Right click on the AMI and select **Deregister**
-5. Wait for all of the AMIs to be deleted
-
 ### Running Packer
-For *vault*, *endpoint*, *proofreader-web* execute the following command
+Make sure that the Packer executable is either in $PATH (you can call it by just
+calling packer) or in the `bin/` directory of the boss-manage repository.
+
 ```shell
-$ cd packer/
-$ packer build -var-file=variables/aws-credentials -var-file=variables/aws-bastion -var-file=variables/<machine-type> -only=amazon-ebs vm.packer
+$ bin/path.py vault endpoint proofreader-web
 ```
 
-*Note: you can run the packer commands in parallel to speed up the process of
-creating the AMIs*
+*Note: because the packer.py script is running builds in parallel it is redirecting
+the output from each Packer subprocess to `packer/logs/<config>.log`. Because of
+buffering you may not see the file update with every new line. Tailing the log
+does seem to work (`tail -f packer/logs/<config>.log`)*
+
+*Note: the packer.py script will name the AMIs with the hash of the current commit
+you are building from. Make sure that all changes have been committed (they don't
+have to be pushed yet) so that the correct commit hash is used.*
 
 ## Relaunching Integration Stack
 
@@ -79,7 +76,7 @@ configuration elements.
 
 ```shell
 $ cd cloudformation/
-$ source ../vault/set_vars.sh
+$ source ../config/set_vars.sh
 ```
 
 ### Launching configs
@@ -95,9 +92,13 @@ $ ./cloudformation.py create integration.boss <config>
 configuring Scalyr monitoring. These instructions skip Scalyr configuration and
 you can ignore these instructions.*
 
+*Note: The cloudformation.py script will automatically use the latest created AMIs
+that are named with a commit hash. Since you just rebuilt the AMIs they should be
+the latest ones.*
+
 ## Initialize Endpoint and run unit tests
 ```
-python3.5 ssh.py endpoint.external.integration.boss 
+vault/ssh.py endpoint.integration.boss
 cd /srv/www/django
 sudo python3 manage.py makemigrations
 sudo python3 manage.py makemigrations bosscore
@@ -111,12 +112,12 @@ sudo python3 manage.py createsuperuser
 sudo python3 manage.py test
 ```
 	output should say 36 Tests OK
-	
+
 ## Configure Route 53
 1. Update Route 53 with the new Loadbalancer dns name.
 2. Under the EC2 page select Loadbalancers
 3. On description page will be `DNS Name`
-3. Copy that 
+3. Copy that
 4. Go into Route 53 AWS Service
 5. Hosted Zone theboss.io
 6. Check checkbox api.theboss.io
