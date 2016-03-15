@@ -1,6 +1,5 @@
 nginx:
-  pkg.installed:
-    - version: 1.4.6-1ubuntu3.4
+  pkg.installed: []
   service.running:
     - require:
       - pkg: nginx

@@ -6,7 +6,6 @@
 mysql-server-5-6:
     pkg.installed:
         - name: mysql-server-5.6
-        - version: 5.6.28-0ubuntu0.14.04.1
     service:
         - running
         - name: mysql

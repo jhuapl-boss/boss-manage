@@ -27,8 +27,7 @@ django-filter:
       - sls: python.pip
 
 libmysqlclient-dev:
-  pkg.installed:
-    - version: 5.5.47-0ubuntu0.14.04.1
+  pkg.installed: []
 
 mysqlclient:
   pip.installed:
