@@ -32,7 +32,8 @@ Make sure that the Packer executable is either in $PATH (you can call it by just
 calling packer) or in the `bin/` directory of the boss-manage repository.
 
 ```shell
-$ bin/packer.py vault endpoint proofreader-web
+$ cd bin/
+$ ./packer.py vault endpoint proofreader-web
 ```
 
 *Note: because the packer.py script is running builds in parallel it is redirecting
@@ -75,7 +76,7 @@ The scripts make use of multiple environment variables to manage optional
 configuration elements.
 
 ```shell
-$ cd cloudformation/
+$ cd cloud_formation/
 $ source ../config/set_vars.sh
 ```
 
@@ -97,8 +98,9 @@ that are named with a commit hash. Since you just rebuilt the AMIs they should b
 the latest ones.*
 
 ## Initialize Endpoint and run unit tests
-```
-vault/ssh.py endpoint.integration.boss
+```shell
+cd vault
+./ssh.py endpoint.integration.boss
 cd /srv/www/django
 sudo python3 manage.py makemigrations
 sudo python3 manage.py makemigrations bosscore
@@ -107,8 +109,8 @@ sudo python3 manage.py collectstatic
 	: yes
 sudo python3 manage.py createsuperuser
 	user:  bossadmin
-	pass:  88brain88
 	email: garbage@garbage.com
+	pass:  88brain88
 sudo python3 manage.py test
 ```
 	output should say 36 Tests OK
@@ -124,6 +126,17 @@ sudo python3 manage.py test
 7. Paste the new DNS name over top of the old one.
 8. `Save Recort Set`
 
+
+## Proofreader Tests
+````shell
+cd vault
+./ssh.py proofreader-web.integration.boss
+cd /srv/www/app/proofreader_apis
+sudo python3 manage.py makemigrations --noinput
+sudo python3 manage.py makemigrations --noinput common
+sudo python3 manage.py migrate
+sudo python3 manage.py test
+````
 
 ## Integration Tests
 After the integration instance is launched the following tests need to be run,
