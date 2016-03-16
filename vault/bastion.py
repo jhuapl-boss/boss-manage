@@ -128,6 +128,31 @@ def ssh(key, remote_ip, bastion_ip):
         proc.terminate()
         proc.wait()
 
+def ssh_cmd(key, remote_ip, bastion_ip, command = None):
+    """Create an SSH tunnel from the local machine to bastion that gets
+    forwarded to remote. Launch a second SSH connection (using
+    become_tty_fg) through the SSH tunnel to the remote machine.
+
+    After the second SSH session is complete, the SSH tunnel is destroyed.
+
+    NOTE: This command uses fixed port numbers, so only one instance of this
+          command can be launched on a single machine at the same time.
+    """
+
+    if command is None:
+        command = input("command: ")
+
+    ssh_port = locate_port()
+    ssh_cmd_str = "ssh -i {} {} -p {} ubuntu@localhost '{}'".format(key, SSH_OPTIONS, ssh_port, command)
+    print(ssh_cmd_str)
+
+    proc = create_tunnel_aplnis(key, ssh_port, remote_ip, 22, bastion_ip)
+    try:
+        ret = subprocess.call(shlex.split(ssh_cmd_str))
+    finally:
+        proc.terminate()
+        proc.wait()
+
 def connect_vault(key, remote_ip, bastion_ip, cmd):
     """Create an SSH tunnel from the local machine to bastion that gets
     forwarded to remote. Call a command and then destroy the SSH tunnel.
@@ -186,7 +211,7 @@ if __name__ == "__main__":
         return "\n" + header + "\n" + \
                "\n".join(map(lambda x: "  " + x, options)) + "\n"
 
-    commands = ["ssh"]
+    commands = ["ssh", "ssh-cmd"]
     commands.extend(vault.COMMANDS.keys())
     commands_help = create_help("command supports the following:", commands)
 
@@ -230,6 +255,8 @@ if __name__ == "__main__":
 
     if args.command in ("ssh",):
         ssh(args.ssh_key, private, bastion)
+    elif args.command in ("ssh-cmd",):
+        ssh_cmd(args.ssh_key, private, bastion)
     elif args.command in vault.COMMANDS:
         connect_vault(args.ssh_key, private, bastion, lambda: vault.COMMANDS[args.command](args.internal))
     else:

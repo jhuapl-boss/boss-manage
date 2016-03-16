@@ -63,6 +63,16 @@ def call_vault(session, bastion_key, bastion_host, vault_host, command, *args, *
 
     return bastion.connect_vault(bastion_key, vault_ip, bastion_ip, cmd)
 
+def call_ssh(session, bastion_key, bastion_host, target_host, command):
+    """Call ../vault/bastion.py with a list of hardcoded AWS / SSH arguments.
+    This is a common function for any other function that needs to execute an
+    SSH command on a new VM.
+    """
+    bastion_ip = bastion.machine_lookup(session, bastion_host)
+    target_ip = bastion.machine_lookup(session, target_host, public_ip = False)
+
+    return bastion.ssh_cmd(bastion_key, target_ip, bastion_ip, command)
+
 def password(what):
     """Prompt the user for a password and verify it."""
     while True:

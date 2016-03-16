@@ -5,6 +5,9 @@ base:
         - scalyr
         - scalyr.update_host
 
+    'auth*':
+        - keycloak
+
     'endpoint*':
         - boss-tools.bossutils
         - boss-tools.credentials
