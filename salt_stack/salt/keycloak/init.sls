@@ -19,6 +19,14 @@ download:
         - user: root
         - group: root
 
+keycloak-config:
+    file.managed:
+        - name: /srv/keycloak/standalone/configuration/standalone.xml
+        - source: salt://keycloak/files/standalone.xml
+        - mode: 400
+        - require:
+            - file: download
+
 keycloak-init.d:
     file.managed:
         - name: /etc/init.d/keycloak

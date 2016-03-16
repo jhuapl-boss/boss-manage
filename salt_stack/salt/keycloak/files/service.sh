@@ -11,7 +11,9 @@
 #
 ### END INIT INFO
 
-ARGS="-N -n keycloak -u root -r --output=daemon.info"
+ARGS="-N -n keycloak -u root -r"
+
+# $LAUNCH_JBOSS_IN_BACKGROUND and $JBOSS_PIDFILE may be usefule env vars to define
 
 case "$1" in
  start)

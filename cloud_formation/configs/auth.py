@@ -77,7 +77,7 @@ def create(session, domain):
     name = lib.domain_to_stackname("auth." + domain)
     config = create_config(session, domain)
 
-    success = True#config.create(session, name)
+    success = config.create(session, name)
     if success:
         try:
             time.sleep(15)
