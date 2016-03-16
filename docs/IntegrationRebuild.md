@@ -32,7 +32,7 @@ Make sure that the Packer executable is either in $PATH (you can call it by just
 calling packer) or in the `bin/` directory of the boss-manage repository.
 
 ```shell
-$ bin/path.py vault endpoint proofreader-web
+$ bin/packer.py vault endpoint proofreader-web
 ```
 
 *Note: because the packer.py script is running builds in parallel it is redirecting
