@@ -19,7 +19,7 @@ scalyr:
     pkg.installed:
         - pkgs:
             - scalyr-repo
-            - scalyr-agent-2: 2.0.15
+            - scalyr-agent-2
 
 set_scalyr_log_key:
     cmd.run:
