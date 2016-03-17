@@ -14,9 +14,9 @@ import library as lib
 """
 Either hardcode all arguments into the template
 -OR-
-Construct seperate arguments dictionary
+Construct separate arguments dictionary
 
-The differrence is when a configuration is generated,
+The difference is when a configuration is generated,
 the first produces something that is exactly the same
 as the call to CloudFormation create_stack(), while the
 second approach allows someone to upload the generated
