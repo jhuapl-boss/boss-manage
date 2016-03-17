@@ -23,7 +23,7 @@ keycloak-config:
     file.managed:
         - name: /srv/keycloak/standalone/configuration/standalone.xml
         - source: salt://keycloak/files/standalone.xml
-        - mode: 400
+        - mode: 644
         - require:
             - file: download
 
