@@ -31,12 +31,14 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     config.add_arg(configuration.Arg.VPC("VPC", vpc_id,
                                          "ID of VPC to create resources in"))
 
-
-
     loadbalancer_name = "elb-" + domain.replace(".", "-")  # elb names can't have periods in them.
     is_lb = lib.lb_lookup(session, loadbalancer_name)
     if not is_lb:
         raise Exception("Invalid load balancer name: " + loadbalancer_name)
+
+    mailingListTopic = lib.sns_topic_lookup(session, "ProductionMicronsMailingList")
+    # if mailingListTopic is None:
+    #TODO Test that MailingListTopic is working.
 
     config.add_cloudwatch( loadbalancer_name,
                            "arn:aws:sns:us-east-1:256215146792:ProductionMicronsMailingList")
