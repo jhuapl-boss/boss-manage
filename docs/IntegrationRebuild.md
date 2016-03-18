@@ -31,9 +31,11 @@ integration code, we need to rebuild the AMIs before we launch them.
 Make sure that the Packer executable is either in $PATH (you can call it by just
 calling packer) or in the `bin/` directory of the boss-manage repository.
 
+Place `microns-bastion20151117.pem` in the `bin` folder.
+
 ```shell
-$ cd cloud_formation
-$ ./cloudformation.py vault endpoint proofreader-web
+$ cd bin
+$ ./packer.py vault endpoint proofreader-web
 ```
 
 *Note: because the packer.py script is running builds in parallel it is redirecting
