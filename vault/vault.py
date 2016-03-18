@@ -363,7 +363,12 @@ def vault_read(path, machine = None):
     scripts.
     """
     client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
-    client.read(path)
+    return client.read(path)
+
+def _vault_read(machine = None):
+    path = input("path: ")
+    results = vault_read(path, machine)
+    pprint(results)
 
 def vault_delete(path, machine = None):
     """A generic method for deleting data from Vault, for use by CloudFormation
@@ -371,6 +376,10 @@ def vault_delete(path, machine = None):
     """
     client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
     client.delete(path)
+
+def _vault_delete(machine = None):
+    path = input("path: ")
+    vault_delete(path, machine)
 
 COMMANDS = {
     "vault-init": vault_init,
@@ -382,6 +391,8 @@ COMMANDS = {
     "vault-revoke": _vault_revoke,
     "verify":verify,
     "vault-shell":vault_shell,
+    "vault-read":_vault_read,
+    "vault-delete":_vault_delete,
 }
 
 if __name__ == '__main__':

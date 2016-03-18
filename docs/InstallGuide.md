@@ -49,8 +49,8 @@ $ git clone --recursive https://github.com/aplmicrons/boss-manage.git
 For all of the scripts to access AWS the access key and secret key for your AWS
 account as stored in a configuration file that all of the scripts use.
 
-1. Copy `boss-manage.git/packer/variables/aws-credentials.example` to
-`boss-manage.git/packer/variables/aws-credentials`
+1. Copy `boss-manage.git/config/aws-credentials.example` to
+`boss-manage.git/config/aws-credentials`
 2. Open `aws-credentials` in a text editor
 3. Enter the access key and secret key for your AWS account
 4. Save `aws-credentials` and close the text editor
@@ -62,8 +62,8 @@ host is a single machine which your corporate IT department has granted you
 outbound SSH access to. All SSH traffic will be tunneled through that machine.
 It is assumed that this bastion host is an EC2 instance running within AWS.
 
-1. Copy the SSH private key for the bastion host into `boss-manage.git/packer/`
-2. Open  `boss-manage.git/packer/variables/aws-bastion` in a text editor
+1. Copy the SSH private key for the bastion host into `boss-manage.git/bin/`
+2. Open  `boss-manage.git/config/aws-bastion` in a text editor
 3. Edit the IP address of the machine
 4. Edit the name of the private key
   * The directory reference "./" should stay the same
@@ -78,16 +78,17 @@ Several AWS Images (AMIs) need to be created. These images are preconfigured for
 specific roles within the architecture. These procedures expect the AWS
 credentials and AWS bastion files described in the previous two sections.
 
-For the vault, endpoint, and proofread-web variable files run the following
-command. You can run the commands in parallel to speed up the process.
+Make sure that the Packer executable is either in $PATH (you can call it by just
+calling packer) or in the `bin/` directory of the boss-manage repository.
 
 ```shell
-$ cd packer/
-$ packer build -var-file=variables/aws-credentials -var-file=variables/aws-bastion -var-file=variables/<machine-type> -only=amazon-ebs vm.packer
+$ bin/packer.py vault endpoint proofreader-web
 ```
 
-*Note: you can run the packer commands in parallel to speed up the process of
-creating the AMIs*
+*Note: because the packer.py script is running builds in parallel it is redirecting
+the output from each Packer subprocess to `packer/logs/<config>.log`. Because of
+buffering you may not see the file update with every new line. Tailing the log
+does seem to work (`tail -f packer/logs/<config>.log`)*
 
 ### Configure IAM Vault account
 For Vault to be able to generate AWS credentials it needs to be configured with

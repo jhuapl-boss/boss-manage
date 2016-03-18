@@ -20,3 +20,7 @@ path "secret/endpoint/*" {
 path "secret/proofreader/*" {
     policy = "write"
 }
+
+path "secret/auth" {
+    policy = "write"
+}
