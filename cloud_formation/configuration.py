@@ -523,6 +523,43 @@ class CloudFormationConfiguration:
 
         self._add_record_cname(key, hostname, rds = True)
 
+    def add_dynamo_table_from_json(self, key, name, KeySchema, AttributeDefinitions, ProvisionedThroughput):
+        """Add DynamoDB table to the configuration using DynamoDB's calling convention.
+
+        Args:
+            key (string): Unique name (within the configuration) for this instance
+            name (string): Table name
+            KeySchema (list): [{'AttributeName': 'thename', 'KeyType': 'thetype'}, . . .]
+            AttributeDefinitions (list): [{'AttributeName': 'thename', 'AttributeType': 'thetype'}, . . .]
+            ProvisionedThroughput (dictionary): {'ReadCapacityUnits': 10, 'WriteCapacityUnits': 10}
+
+        Returns:
+            None
+
+        Example:
+            jsoncfg = open('dynamoschema.json', 'r')
+            tablecfg = json.load(jsoncfg)
+            config.add_dynamo_table_from_json('thekey', 'thename', **tablecfg)
+        """
+
+        props = {
+            "TableName" : { "Ref" : key + "TableName" },
+            "KeySchema" : KeySchema,
+            "AttributeDefinitions" : AttributeDefinitions,
+            "ProvisionedThroughput" : ProvisionedThroughput
+        }
+
+        self.resources[key] = {
+            "Type" : "AWS::DynamoDB::Table",
+            "Properties" : props
+        }
+
+        table_name = Arg.String(
+            key + "TableName", name,
+            "Name of the DynamoDB table created by instance '{}'".format(key))
+
+        self.add_arg(table_name)
+
     def add_dynamo_table(self, key, name, attributes, key_schema, throughput):
         """Add an DynamoDB Table to the configuration
         key is the unique name (within the configuration) for this instance

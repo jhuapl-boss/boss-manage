@@ -13,12 +13,15 @@ select the same KeyPair used when creating the core configuration.
 import configuration
 import library as lib
 import hosts
+import json
 import scalyr
 import uuid
 
 # Region production is created in.  Later versions of boto3 should allow us to
 # extract this from the session variable.  Hard coding for now.
 PRODUCTION_REGION = 'us-east-1'
+
+DYNAMO_SCHEMA = '../salt_stack/salt/boss/files/boss.git/django/bosscore/dynamo_schema.json'
 
 INCOMING_SUBNET = "52.3.13.189/32" # microns-bastion elastic IP
 
@@ -73,9 +76,9 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                       az_subnets,
                       security_groups = ["InternalSecurityGroup"])
 
-    attributes = {'metakey': 'S'}
-    key_schema = {'metakey': 'HASH'}
-    config.add_dynamo_table("EndpointMetaDB",'bossmeta.' + domain, attributes, key_schema, (10, 10))
+    dynamo_json = open(DYNAMO_SCHEMA, 'r')
+    dynamo_cfg = json.load(dynamo_json)
+    config.add_dynamo_table_from_json("EndpointMetaDB",'bossmeta.' + domain, **dynamo_cfg)
 
     config.add_redis_replication("Cache", "cache." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
     config.add_redis_replication("CacheState", "cache-state." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
