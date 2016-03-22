@@ -577,7 +577,8 @@ class CloudFormationConfiguration:
                     {"Key" : "Name", "Value" : { "Ref": key + "Hostname" } }
                 ],
                 "VpcSecurityGroupIds" :  [{ "Ref" : sg } for sg in security_groups]
-            }
+            },
+            "DependsOn" : key + "SubnetGroup"
         }
 
         self.resources[key + "SubnetGroup"] = {
@@ -610,7 +611,8 @@ class CloudFormationConfiguration:
                 #"PreferredMaintenanceWindow" : String, # don't know the default - site says minimum 60 minutes, infrequent and announced on AWS forum 2w prior
                 "ReplicationGroupDescription" : { "Ref" : key + "Hostname" },
                 "SecurityGroupIds" : [{ "Ref" : sg } for sg in security_groups]
-            }
+            },
+            "DependsOn" : key + "SubnetGroup"
         }
 
         self.resources[key + "SubnetGroup"] = {
@@ -865,6 +867,9 @@ class CloudFormationConfiguration:
                 "Type" : "CNAME"
             }
         }
+
+        if "DNSZone" in self.resources:
+            self.resources[key + "Record"]["DependsOn"] = "DNSZone"
 
         domain = Arg.String(vpc + "Domain", self.vpc_domain,
                             "Domain of the VPC '{}'".format(vpc))
