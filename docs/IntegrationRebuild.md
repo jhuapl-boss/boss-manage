@@ -126,7 +126,7 @@ sudo python3 manage.py test
 5. Hosted Zone theboss.io
 6. Check checkbox api.theboss.io
 7. Paste the new DNS name over top of the old one.
-8. `Save Recort Set`
+8. `Save Record Set`
 
 
 ## Proofreader Tests
