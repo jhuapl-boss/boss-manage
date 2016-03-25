@@ -358,6 +358,27 @@ def vault_write(path, machine = None, **kwargs):
     client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
     client.write(path, **kwargs)
 
+def _vault_write(machine = None):
+    path = input("path: ")
+    entries = {}
+    while True:
+        entry = input("entry: ")
+        if entry is None or entry == '':
+            break
+        key,val = entry.split("=")
+        entries[key.strip()] = val.strip()
+
+    VAULT_DJANGO_AUTH = "secret/endpoint/auth"
+    auth = {
+        "url": "http://auth-test-31630954.us-east-1.elb.amazonaws.com:8080/auth/realms/master",
+        "public_uri": "http://ec2-54-85-42-228.compute-1.amazonaws.com",
+        "client_id": "test",
+        "client_secret": "0a6c2eee-14ad-4c3a-89a8-7f44df837273",
+    }
+
+    #vault_write(path, machine, **entries)
+    vault_write(VAULT_DJANGO_AUTH, machine, **auth)
+
 def vault_read(path, machine = None):
     """A generic method for reading data from Vault, for use by CloudFormation
     scripts.
@@ -391,6 +412,7 @@ COMMANDS = {
     "vault-revoke": _vault_revoke,
     "verify":verify,
     "vault-shell":vault_shell,
+    "vault-write":_vault_write,
     "vault-read":_vault_read,
     "vault-delete":_vault_delete,
 }
