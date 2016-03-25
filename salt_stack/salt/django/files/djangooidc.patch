@@ -16,3 +16,12 @@
 -from oic.oauth2 import rndstr, ErrorResponse
 +from oic import oic, rndstr
 +from oic.oauth2 import ErrorResponse
+--- backends.py
++++ backends.py
+@@ -48 +48,5 @@
+-            args = {UserModel.USERNAME_FIELD: username, 'defaults': openid_data, }
++            # HACK DP: KeyCloak user ids are 37 characters long, Django username is 30 characters
++            # meaning that after creating the user the first time they login
++            # lookup fails (because the name has been truncated)
++            # but the create also fails (truncated name already exists)
++            args = {UserModel.USERNAME_FIELD: username[:30], 'defaults': openid_data, }
