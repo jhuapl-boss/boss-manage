@@ -16,6 +16,9 @@ base:
         - scalyr.update_host
         - git
 
+    'ep-jenkins*':
+        - jenkins-microns.endpoint
+
     'jenkins*':
         - jenkins-microns
 

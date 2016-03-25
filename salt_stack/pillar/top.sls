@@ -5,6 +5,9 @@ base:
   'endpoint*':
     - endpoint
 
+  'ep-jenkins*':
+    - endpoint-jenkins
+
   'proofreader-web*':
     - proofreader-web
 
