@@ -14,6 +14,7 @@ python35:
         - zlib1g-dev
         - libssl-dev
         - libsqlite3-dev
+        - curl
   cmd.run:
     - name: |
         cd /tmp
