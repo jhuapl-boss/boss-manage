@@ -27,6 +27,7 @@ INCOMING_SUBNET = "52.3.13.189/32" # microns-bastion elastic IP
 
 VAULT_DJANGO = "secret/endpoint/django"
 VAULT_DJANGO_DB = "secret/endpoint/django/db"
+VAULT_DJANGO_AUTH = "secret/endpoint/auth"
 
 def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     """Create the CloudFormationConfiguration object."""
@@ -78,10 +79,10 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
 
     dynamo_json = open(DYNAMO_SCHEMA, 'r')
     dynamo_cfg = json.load(dynamo_json)
-    config.add_dynamo_table_from_json("EndpointMetaDB",'bossmeta.' + domain, **dynamo_cfg)
+    #config.add_dynamo_table_from_json("EndpointMetaDB",'bossmeta.' + domain, **dynamo_cfg)
 
-    config.add_redis_replication("Cache", "cache." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
-    config.add_redis_replication("CacheState", "cache-state." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
+    #config.add_redis_replication("Cache", "cache." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
+    #config.add_redis_replication("CacheState", "cache-state." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
 
     # Allow SSH/HTTP/HTTPS access to endpoint server from anywhere
     config.add_security_group("InternetSecurityGroup",
@@ -120,6 +121,13 @@ def create(session, domain):
         "port": "3306"
     }
 
+    auth = {
+        "url": "http://auth-test-31630954.us-east-1.elb.amazonaws.com:8080/auth/realms/master",
+        "public_uri": "http://ec2-52-91-236-190.compute-1.amazonaws.com", # get from launched instance
+        "client_id": "test",
+        "client_secret": "0a6c2eee-14ad-4c3a-89a8-7f44df837273",
+    }
+
     # Configure Vault and create the user data config that the endpoint will
     # use for connecting to Vault and the DB instance
     endpoint_token = call_vault("vault-provision", "endpoint")
@@ -135,6 +143,7 @@ def create(session, domain):
     # Should transition from vault-django to vault-write
     call_vault("vault-write", VAULT_DJANGO, secret_key = str(uuid.uuid4()))
     call_vault("vault-write", VAULT_DJANGO_DB, **db)
+    call_vault("vault-write", VAULT_DJANGO_AUTH, **auth)
 
     try:
         name = lib.domain_to_stackname("production." + domain)
@@ -153,6 +162,7 @@ def create(session, domain):
         try:
             call_vault("vault-delete", VAULT_DJANGO)
             call_vault("vault-delete", VAULT_DJANGO_DB)
+            call_vault("vault-delete", VAULT_DJANGO_AUTH)
         except:
             print("Error revoking Django credentials")
         try:

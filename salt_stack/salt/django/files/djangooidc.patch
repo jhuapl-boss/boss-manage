@@ -1,0 +1,18 @@
+--- views.py
++++ views.py
+@@ -4 +4 @@
+-from urlparse import parse_qs
++from urllib.parse import parse_qs
+@@ -59 +59 @@
+-            except Exception, e:
++            except Exception as e:
+@@ -69 +69 @@
+-        except Exception, e:
++        except Exception as e:
+--- oidc.py
++++ oidc.py
+@@ -5,2 +5,2 @@
+-from oic import oic
+-from oic.oauth2 import rndstr, ErrorResponse
++from oic import oic, rndstr
++from oic.oauth2 import ErrorResponse
