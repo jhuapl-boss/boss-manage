@@ -134,7 +134,7 @@ def upload_realm_config(port, password):
 def configure_keycloak(session):
     # NOTE DP: if there is an ELB in front of the auth server, this needs to be
     #          the public DNS address of the ELB.
-    auth_dns = lib.instance_public_lookup(session, "auth". domain)
+    auth_dns = lib.instance_public_lookup(session, "auth." + domain)
     auth_discovery_url = "http://{}:8080/auth/realms/BOSS".format(auth_dns)
 
     password = lib.generate_password()

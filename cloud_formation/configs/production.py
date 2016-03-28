@@ -147,7 +147,7 @@ def create(session, domain):
         else:
             # NOTE DP: If an ELB is created the public_uri should be the Public DNS Name
             #          of the ELB. Endpoint Django instances may have to be restarted if running.
-            dns = lib.instance_public_lookup(session, "endpoint". domain)
+            dns = lib.instance_public_lookup(session, "endpoint." + domain)
             uri = "http://{}".format(dns)
             call_vault("vault-write", VAULT_DJANGO_AUTH, public_uri = uri)
 
