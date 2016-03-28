@@ -147,7 +147,7 @@ def ssh_cmd(key, remote_ip, bastion_ip, command = None):
         proc.terminate()
         proc.wait()
 
-def ssh_tunnel(key, remote_ip, bastion_ip, port = None, local_port = None):
+def ssh_tunnel(key, remote_ip, bastion_ip, port = None, local_port = None, cmd = None):
     """Create an SSH tunnel from the local machine to bastion that gets
     forwarded to remote. Launch a second SSH tunnel through the SSH tunnel to
     the remote machine.
@@ -158,12 +158,15 @@ def ssh_tunnel(key, remote_ip, bastion_ip, port = None, local_port = None):
         port = int(input("Target Port: "))
 
     if local_port is None:
-        local_port = int(input("Local Port: "))
+        local_port = int(input("Local Port: ")) if cmd is None else locate_port()
 
     proc = create_tunnel_aplnis(key, local_port, remote_ip, port, bastion_ip)
     try:
-        print("Connect to localhost:{} to be forwarded to {}:{}".format(local_port, remote_ip, port))
-        input("Waiting to close tunnel...")
+        if cmd is None:
+            print("Connect to localhost:{} to be forwarded to {}:{}".format(local_port, remote_ip, port))
+            input("Waiting to close tunnel...")
+        else:
+            cmd(local_port)
     finally:
         proc.terminate()
         proc.wait()
