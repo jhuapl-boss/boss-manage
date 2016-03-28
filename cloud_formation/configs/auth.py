@@ -149,7 +149,7 @@ def configure_keycloak(session, domain):
     def ssh_tunnel(cmd, port):
         lib.call_ssh_tunnel(session, lib.keypair_to_file(keypair), "bastion." + domain, "auth." + domain, cmd, port)
     def vault_write(path, **kwargs):
-        lib.call_vault(session, lib.keypair_to_file(keypair), "bastion." + domain, "vault." + domain, "vault-write", path, **kwargs)
+        lib.call_vault(session, lib.keypair_to_file(keypair), "bastion." + domain, "vault." + domain, "vault-update", path, **kwargs)
 
     vault_write("secret/auth", password = password, username = "admin")
     vault_write("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")

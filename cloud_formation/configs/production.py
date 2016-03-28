@@ -149,7 +149,7 @@ def create(session, domain):
             #          of the ELB. Endpoint Django instances may have to be restarted if running.
             dns = lib.instance_public_lookup(session, "endpoint." + domain)
             uri = "http://{}".format(dns)
-            call_vault("vault-write", VAULT_DJANGO_AUTH, public_uri = uri)
+            call_vault("vault-update", VAULT_DJANGO_AUTH, public_uri = uri)
 
             # Tell Scalyr to get CloudWatch metrics for these instances.
             instances = [ user_data["system"]["fqdn"] ]
