@@ -19,7 +19,7 @@ import json
 import vault
 
 # Needed to prevent ssh from asking about the fingerprint from new machines
-SSH_OPTIONS = "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+SSH_OPTIONS = "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -q"
 
 def create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user="ec2-user", bastion_port=22):
     """Create a regular SSH tunnel from localhost:local_port to remote_ip:remote_port through bastion_ip."""
@@ -138,7 +138,6 @@ def ssh_cmd(key, remote_ip, bastion_ip, command = None):
 
     ssh_port = locate_port()
     ssh_cmd_str = "ssh -i {} {} -p {} ubuntu@localhost '{}'".format(key, SSH_OPTIONS, ssh_port, command)
-    print(ssh_cmd_str)
 
     proc = create_tunnel_aplnis(key, ssh_port, remote_ip, 22, bastion_ip)
     try:
