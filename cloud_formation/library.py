@@ -81,7 +81,7 @@ def call_ssh_tunnel(session, bastion_key, bastion_host, target_host, command, po
     bastion_ip = bastion.machine_lookup(session, bastion_host)
     target_ip = bastion.machine_lookup(session, target_host, public_ip = False)
 
-    return bastion.ssh_tunnel(bastion_key, remote_ip, bastion_ip, port, local_port, command)
+    return bastion.ssh_tunnel(bastion_key, target_ip, bastion_ip, port, local_port, command)
 
 def password(what):
     """Prompt the user for a password and verify it."""

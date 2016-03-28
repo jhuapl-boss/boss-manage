@@ -66,7 +66,7 @@ def create_config(session, domain):
 
     config.add_security_group("AuthSecurityGroup",
                               "http",
-                              [("tcp", "80", "80", "128.244.0.0/16"),
+                              [("tcp", "8080", "8080", "128.244.0.0/16"),
                                ("tcp", "22", "22", INCOMING_SUBNET)])
 
     return config
@@ -104,6 +104,10 @@ def upload_realm_config(port, password):
         }
     )
 
+    if token is None:
+        print("Could not authenticate to KeyCloak Server, could not upload BOSS.realm config file")
+        return
+
     cur_dir = os.path.dirname(os.path.realpath(__file__))
     realm_file = os.path.normpath(os.path.join(cur_dir, "..", "..", "salt_stack", "salt", "keycloak", "files", "BOSS.realm"))
     print("Opening realm file at '{}'".format(realm_file))
@@ -131,7 +135,7 @@ def upload_realm_config(port, password):
         }
     )
 
-def configure_keycloak(session):
+def configure_keycloak(session, domain):
     # NOTE DP: if there is an ELB in front of the auth server, this needs to be
     #          the public DNS address of the ELB.
     auth_dns = lib.instance_public_lookup(session, "auth." + domain)
@@ -144,14 +148,19 @@ def configure_keycloak(session):
         lib.call_ssh(session, lib.keypair_to_file(keypair), "bastion." + domain, "auth." + domain, cmd)
     def ssh_tunnel(cmd, port):
         lib.call_ssh_tunnel(session, lib.keypair_to_file(keypair), "bastion." + domain, "auth." + domain, cmd, port)
-    def vault_write(cmd, *args, **kwargs):
-        lib.call_vault(session, lib.keypair_to_file(keypair), "bastion." + domain, "vault." + domain, "vault-write", *args, **kwargs)
+    def vault_write(path, **kwargs):
+        lib.call_vault(session, lib.keypair_to_file(keypair), "bastion." + domain, "vault." + domain, "vault-write", path, **kwargs)
 
     vault_write("secret/auth", password = password, username = "admin")
     vault_write("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
 
     ssh("/srv/keycloak/bin/add-user.sh -r master -u admin -p " + password)
-    ssh("sudo service keycloak restart")
+    ssh("sudo service keycloak stop")
+    ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
+                             # make sure the process is actually killed
+    ssh("sudo service keycloak start")
+
+    time.sleep(15) # wait for service to start
     ssh_tunnel(lambda p: upload_realm_config(p, password), 8080)
 
 def generate(folder, domain):
@@ -169,6 +178,6 @@ def create(session, domain):
     if success:
         try:
             time.sleep(15)
-            configure_keycloak(session)
+            configure_keycloak(session, domain)
         except requests.exceptions.ConnectionError:
             print("Could not connect to Vault")
