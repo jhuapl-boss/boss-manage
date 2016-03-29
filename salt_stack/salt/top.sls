@@ -12,6 +12,7 @@ base:
         - boss-tools.bossutils
         - boss-tools.credentials
         - django.openid-connect # install first and patch
+        - django.rest-framework # install first and patch
         - boss.django
         - scalyr
         - scalyr.update_host
