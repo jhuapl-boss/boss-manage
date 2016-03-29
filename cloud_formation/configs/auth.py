@@ -101,6 +101,7 @@ def configure_keycloak(session, domain):
     call.vault_write("secret/auth", password = password, username = "admin")
     call.vault_update("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
 
+    call.set_ssh_target("auth")
     call.ssh("/srv/keycloak/bin/add-user.sh -r master -u admin -p " + password)
     call.ssh("sudo service keycloak stop")
     call.ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh

@@ -206,7 +206,7 @@ class KeyCloakClient:
         key = "redirectUris"
         if key not in client:
             client[key] = []
-        client[key].append(uri)
+        client[key].append(uri) # DP: should probably check to see if the uri exists first
 
         self.update_client(realm_name, client['id'], client)
 
@@ -220,11 +220,11 @@ class ExternalCalls:
         self.ssh_target = None
 
     def vault(self, cmd, *args, **kwargs):
-        call_vault(self.session,
-                   self.keypair_file,
-                   self.bastion_hostname,
-                   self.vault_hostname,
-                   cmd, *args, **kwargs)
+        return call_vault(self.session,
+                          self.keypair_file,
+                          self.bastion_hostname,
+                          self.vault_hostname,
+                          cmd, *args, **kwargs)
 
     def vault_write(self, path, **kwargs):
         self.vault("vault-write", path, **kwargs)
@@ -239,12 +239,15 @@ class ExternalCalls:
     def vault_delete(self, path):
         self.vault("vault-delete", path)
 
-    def ssh_target(self, target):
+    def set_ssh_target(self, target):
         self.ssh_target = target
         if not target.endswith("." + self.domain):
             self.ssh_target += "." + self.domain
 
     def ssh(self, cmd):
+        if self.ssh_target is None:
+            raise Exception("No SSH Target Set")
+
         call_ssh(self.session,
                  self.keypair_file,
                  self.bastion_hostname,
@@ -252,6 +255,9 @@ class ExternalCalls:
                  cmd)
 
     def ssh_tunnel(self, cmd, port):
+        if self.ssh_target is None:
+            raise Exception("No SSH Target Set")
+
         call_ssh_tunnel(self.session,
                         self.keypair_file,
                         self.bastion_hostname,

@@ -77,8 +77,8 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                       az_subnets,
                       security_groups = ["InternalSecurityGroup"])
 
-    dynamo_json = open(DYNAMO_SCHEMA, 'r')
-    dynamo_cfg = json.load(dynamo_json)
+    with open(DYNAMO_SCHEMA, 'r') as fh:
+        dynamo_cfg = json.load(fh)
     #config.add_dynamo_table_from_json("EndpointMetaDB",'bossmeta.' + domain, **dynamo_cfg)
 
     #config.add_redis_replication("Cache", "cache." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
@@ -150,6 +150,8 @@ def create(session, domain):
                 kc.login(creds["username"], creds["password"])
                 kc.add_redirect_uri("BOSS","endpoint", uri + "/*")
                 kc.logout()
+            call.set_ssh_target("auth")
+            call.ssh_tunnel(configure_auth, 8080)
 
             # Tell Scalyr to get CloudWatch metrics for these instances.
             instances = [ user_data["system"]["fqdn"] ]
