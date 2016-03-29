@@ -9,6 +9,11 @@ import getpass
 import string
 import subprocess
 import shlex
+import traceback
+from urllib.request import Request, urlopen
+from urllib.parse import urlencode
+from urllib.error import HTTPError
+
 
 import hosts
 
@@ -97,6 +102,161 @@ def generate_password(length = 16):
     """Generate an alphanumeric password of the given length."""
     chars = string.ascii_letters + string.digits #+ string.punctuation
     return "".join([chars[c % len(chars)] for c in os.urandom(length)])
+
+class KeyCloakClient:
+    def __init__(self, url_base):
+        self.url_base = url_base
+        self.token = None
+
+    def request(self, url, params = None, headers = {}, convert = urlencode, method = None):
+        request = Request(
+            self.url_base + url,
+            data = None if params is None else convert(params).encode("utf-8"),
+            headers = headers,
+            method = method
+        )
+
+        try:
+            response = urlopen(request).read().decode("utf-8")
+            if len(response) > 0:
+                response = json.loads(response)
+            return response
+        except HTTPError as e:
+            print("Error on '{}'".format(url))
+            print(e)
+            return None
+
+    def login(self, username, password):
+        self.token = self.request(
+            "/auth/realms/master/protocol/openid-connect/token",
+            params = {
+                "username": username,
+                "password": password,
+                "grant_type": "password",
+                "client_id": "admin-cli",
+            },
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded",
+            }
+        )
+
+        if self.token is None:
+            print("Could not authenticate to KeyCloak Server")
+
+    def logout(self):
+        if self.token is None:
+            return
+
+        self.request( # no response
+            "/auth/realms/master/protocol/openid-connect/logout",
+            params = {
+                "refresh_token": self.token["refresh_token"],
+                "client_id": "admin-cli",
+            },
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded",
+            }
+        )
+
+        self.token = None
+
+    def create_realm(self, realm):
+        resp = self.request(
+            "/auth/admin/realms",
+            params = realm,
+            headers = {
+                "Authorization": "Bearer " + self.token["access_token"],
+                "Content-Type": "application/json",
+            },
+            convert = json.dumps
+        )
+
+    def get_client(self, realm_name, client_id):
+        resp = self.request(
+            "/auth/admin/realms/{}/clients".format(realm_name),
+            headers = {
+                "Authorization": "Bearer " + self.token["access_token"],
+                "Content-Type": "application/x-www-form-urlencoded",
+            }
+        )
+
+        if resp is None:
+            return None
+
+        for client in resp:
+            if client['clientId'] == client_id:
+                return client
+        return None
+
+    def update_client(self, realm_name, id, client):
+        resp = self.request(
+            "/auth/admin/realms/{}/clients/{}".format(realm_name, id),
+            params = client,
+            headers = {
+                "Authorization": "Bearer " + self.token["access_token"],
+                "Content-Type": "application/json",
+            },
+            convert = json.dumps,
+            method = "PUT"
+        )
+
+    def add_redirect_uri(self, realm_name, client_id, uri):
+        client = self.get_client(realm_name, client_id)
+
+        key = "redirectUris"
+        if key not in client:
+            client[key] = []
+        client[key].append(uri)
+
+        self.update_client(realm_name, client['id'], client)
+
+class ExternalCalls:
+    def __init__(self, session, keypair, domain):
+        self.session = session
+        self.keypair_file = keypair_to_file(keypair)
+        self.bastion_hostname = "bastion." + domain
+        self.vault_hostname = "vault." + domain
+        self.domain = domain
+        self.ssh_target = None
+
+    def vault(self, cmd, *args, **kwargs):
+        call_vault(self.session,
+                   self.keypair_file,
+                   self.bastion_hostname,
+                   self.vault_hostname,
+                   cmd, *args, **kwargs)
+
+    def vault_write(self, path, **kwargs):
+        self.vault("vault-write", path, **kwargs)
+
+    def vault_update(self, path, **kwargs):
+        self.vault("vault-update", path, **kwargs)
+
+    def vault_read(self, path):
+        res = self.vault("vault-read", path)
+        return None if res is None else res['data']
+
+    def vault_delete(self, path):
+        self.vault("vault-delete", path)
+
+    def ssh_target(self, target):
+        self.ssh_target = target
+        if not target.endswith("." + self.domain):
+            self.ssh_target += "." + self.domain
+
+    def ssh(self, cmd):
+        call_ssh(self.session,
+                 self.keypair_file,
+                 self.bastion_hostname,
+                 self.ssh_target,
+                 cmd)
+
+    def ssh_tunnel(self, cmd, port):
+        call_ssh_tunnel(self.session,
+                        self.keypair_file,
+                        self.bastion_hostname,
+                        self.ssh_target,
+                        cmd, port)
 
 def vpc_id_lookup(session, vpc_domain):
     """Lookup the Id for the VPC with the given domain name."""
@@ -262,7 +422,8 @@ def instance_public_lookup(session, hostname):
 
     client = session.client('ec2')
     response = client.describe_instances(
-        Filters=[{"Name":"tag:Name", "Values":[hostname]}])
+        Filters=[{"Name":"tag:Name", "Values":[hostname]},
+                 {"Name":"instance-state-name", "Values":["running"]}])
 
     item = response['Reservations']
     if len(item) == 0:

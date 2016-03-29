@@ -16,10 +16,8 @@ import time
 import requests
 import scalyr
 
-import json, traceback, os
-from urllib.request import Request, urlopen
-from urllib.parse import urlencode
-from urllib.error import HTTPError
+import os
+import json
 
 keypair = None
 
@@ -71,41 +69,13 @@ def create_config(session, domain):
 
     return config
 
-def make_auth_request(url, params = None, headers = {}, convert = urlencode):
-    request = Request(
-        url,
-        data = None if params is None else convert(params).encode("utf-8"),
-        headers = headers
-    )
-
-    try:
-        response = urlopen(request).read().decode("utf-8")
-        if len(response) > 0:
-            response = json.loads(response)
-        return response
-    except HTTPError as e:
-        print("Error on '{}'".format(url))
-        print(e)
-        return None
-
 def upload_realm_config(port, password):
     URL = "http://localhost:{}".format(port)
 
-    token = make_auth_request(
-        URL + "/auth/realms/master/protocol/openid-connect/token",
-        params = {
-            "username": "admin",
-            "password": password,
-            "grant_type": "password",
-            "client_id": "admin-cli",
-        },
-        headers = {
-            "Content-Type": "application/x-www-form-urlencoded",
-        }
-    )
-
-    if token is None:
-        print("Could not authenticate to KeyCloak Server, could not upload BOSS.realm config file")
+    kc = lib.KeyCloakClient(URL)
+    kc.login("admin", password)
+    if kc.token is None:
+        print("Could not upload BOSS.realm configuration, exiting...")
         return
 
     cur_dir = os.path.dirname(os.path.realpath(__file__))
@@ -114,26 +84,8 @@ def upload_realm_config(port, password):
     with open(realm_file, "r") as fh:
         realm = json.load(fh)
 
-    resp = make_auth_request(
-        URL + "/auth/admin/realms",
-        params = realm,
-        headers = {
-            "Authorization": "Bearer " + token["access_token"],
-            "Content-Type": "application/json",
-        },
-        convert = json.dumps
-    )
-
-    make_auth_request( # no response
-        URL + "/auth/realms/master/protocol/openid-connect/logout",
-        params = {
-            "refresh_token": token["refresh_token"],
-            "client_id": "admin-cli",
-        },
-        headers = {
-            "Content-Type": "application/x-www-form-urlencoded",
-        }
-    )
+    kc.create_realm(realm)
+    kc.logout()
 
 def configure_keycloak(session, domain):
     # NOTE DP: if there is an ELB in front of the auth server, this needs to be
@@ -144,24 +96,19 @@ def configure_keycloak(session, domain):
     password = lib.generate_password()
     print("Setting Admin password to: " + password)
 
-    def ssh(cmd):
-        lib.call_ssh(session, lib.keypair_to_file(keypair), "bastion." + domain, "auth." + domain, cmd)
-    def ssh_tunnel(cmd, port):
-        lib.call_ssh_tunnel(session, lib.keypair_to_file(keypair), "bastion." + domain, "auth." + domain, cmd, port)
-    def vault_write(path, **kwargs):
-        lib.call_vault(session, lib.keypair_to_file(keypair), "bastion." + domain, "vault." + domain, "vault-update", path, **kwargs)
+    call = lib.ExternalCalls(session, keypair, domain)
 
-    vault_write("secret/auth", password = password, username = "admin")
-    vault_write("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
+    call.vault_write("secret/auth", password = password, username = "admin")
+    call.vault_update("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
 
-    ssh("/srv/keycloak/bin/add-user.sh -r master -u admin -p " + password)
-    ssh("sudo service keycloak stop")
-    ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
+    call.ssh("/srv/keycloak/bin/add-user.sh -r master -u admin -p " + password)
+    call.ssh("sudo service keycloak stop")
+    call.ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
                              # make sure the process is actually killed
-    ssh("sudo service keycloak start")
+    call.ssh("sudo service keycloak start")
 
     time.sleep(15) # wait for service to start
-    ssh_tunnel(lambda p: upload_realm_config(p, password), 8080)
+    call.ssh_tunnel(lambda p: upload_realm_config(p, password), 8080)
 
 def generate(folder, domain):
     """Create the configuration and save it to disk"""
