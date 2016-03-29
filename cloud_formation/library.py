@@ -73,6 +73,16 @@ def call_ssh(session, bastion_key, bastion_host, target_host, command):
 
     return bastion.ssh_cmd(bastion_key, target_ip, bastion_ip, command)
 
+def call_ssh_tunnel(session, bastion_key, bastion_host, target_host, command, port, local_port = None):
+    """Call ../vault/bastion.py with a list of hardcoded AWS / SSH arguments.
+    This is a common function for any other function that needs to execute an
+    arbitrary command within a SSH tunnel.
+    """
+    bastion_ip = bastion.machine_lookup(session, bastion_host)
+    target_ip = bastion.machine_lookup(session, target_host, public_ip = False)
+
+    return bastion.ssh_tunnel(bastion_key, target_ip, bastion_ip, port, local_port, command)
+
 def password(what):
     """Prompt the user for a password and verify it."""
     while True:
@@ -267,4 +277,26 @@ def cert_arn_lookup(session, domain_name):
         if certs['DomainName'] == domain_name:
             return certs['CertificateArn']
     return None
+
+
+def instance_public_lookup(session, hostname):
+    """Look up instance id by hostname."""
+    if session is None: return None
+
+    client = session.client('ec2')
+    response = client.describe_instances(
+        Filters=[{"Name":"tag:Name", "Values":[hostname]}])
+
+    item = response['Reservations']
+    if len(item) == 0:
+        return None
+    else:
+        item = item[0]['Instances']
+        if len(item) == 0:
+            return None
+        else:
+            item = item[0]
+            if 'PublicDnsName' in item:
+                return item['PublicDnsName']
+            return None
 

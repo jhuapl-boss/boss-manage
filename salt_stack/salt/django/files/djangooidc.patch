@@ -9,6 +9,10 @@
 @@ -69 +69 @@
 -        except Exception, e:
 +        except Exception as e:
+@@ -142 +142,2 @@
+-        resp = HttpResponse(content_type=res.headers["content-type"], status=res.status_code, content=res._content)
++        # HACK DP: For whatever reason res.headers doesn't containt "content-type" when logging out from KeyCloak
++        resp = HttpResponse(content_type="text/html", status=res.status_code, content=res._content)
 --- oidc.py
 +++ oidc.py
 @@ -5,2 +5,2 @@

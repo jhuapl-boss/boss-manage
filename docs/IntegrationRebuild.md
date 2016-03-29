@@ -113,6 +113,8 @@ sudo python3 manage.py createsuperuser
 	user:  bossadmin
 	email: garbage@garbage.com
 	pass:  88brain88
+sudo service uwsgi-emperor reload
+sudo service nginx restart
 sudo python3 manage.py test
 ```
 	output should say 36 Tests OK

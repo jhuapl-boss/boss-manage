@@ -121,13 +121,6 @@ def create(session, domain):
         "port": "3306"
     }
 
-    auth = {
-        "url": "http://auth-test-31630954.us-east-1.elb.amazonaws.com:8080/auth/realms/master",
-        "public_uri": "http://ec2-52-91-236-190.compute-1.amazonaws.com", # get from launched instance
-        "client_id": "test",
-        "client_secret": "0a6c2eee-14ad-4c3a-89a8-7f44df837273",
-    }
-
     # Configure Vault and create the user data config that the endpoint will
     # use for connecting to Vault and the DB instance
     endpoint_token = call_vault("vault-provision", "endpoint")
@@ -143,7 +136,6 @@ def create(session, domain):
     # Should transition from vault-django to vault-write
     call_vault("vault-write", VAULT_DJANGO, secret_key = str(uuid.uuid4()))
     call_vault("vault-write", VAULT_DJANGO_DB, **db)
-    call_vault("vault-write", VAULT_DJANGO_AUTH, **auth)
 
     try:
         name = lib.domain_to_stackname("production." + domain)
@@ -153,6 +145,12 @@ def create(session, domain):
         if not success:
             raise Exception("Create Failed")
         else:
+            # NOTE DP: If an ELB is created the public_uri should be the Public DNS Name
+            #          of the ELB. Endpoint Django instances may have to be restarted if running.
+            dns = lib.instance_public_lookup(session, "endpoint." + domain)
+            uri = "http://{}".format(dns)
+            call_vault("vault-update", VAULT_DJANGO_AUTH, public_uri = uri)
+
             # Tell Scalyr to get CloudWatch metrics for these instances.
             instances = [ user_data["system"]["fqdn"] ]
             scalyr.add_instances_to_scalyr(
@@ -162,7 +160,6 @@ def create(session, domain):
         try:
             call_vault("vault-delete", VAULT_DJANGO)
             call_vault("vault-delete", VAULT_DJANGO_DB)
-            call_vault("vault-delete", VAULT_DJANGO_AUTH)
         except:
             print("Error revoking Django credentials")
         try:

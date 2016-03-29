@@ -1,0 +1,31 @@
+{
+    "enabled": true,
+
+    "id": "BOSS",
+    "realm": "BOSS",
+    "displayName": "MICrONS BOSS",
+    "displayNameHtml": "<div class=\"kc-logo-text\"><span>MICrONS BOSS</span></div>",
+
+    "registrationAllowed": true,
+    "editUsernameAllowed": false,
+    "resetPasswordAllowed": true,
+    "rememberMe": true,
+    "verifyEmail": false,
+
+    "sslRequired": "external",
+    "sslRequired": "none",
+
+    "clients": [{
+        "enabled": true,
+        "protocol": "openid-connect",
+
+        "clientId": "endpoint",
+        "name": "BOSS Endpoint",
+        "description": "BOSS Endpoint OpenID Connect Client",
+
+        "redirectUris": ["/openid/callback/login/","/openid/callback/logout/"],
+
+        "consentRequired": false,
+        "publicClient": true
+    }]
+}
