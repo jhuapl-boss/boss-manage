@@ -225,6 +225,7 @@ def keypair_lookup(session):
         except:
             print("Invalid Key Pair number, try again")
 
+
 def instanceid_lookup(session, hostname):
     """Look up instance id by hostname."""
     if session is None: return None
@@ -245,3 +246,25 @@ def instanceid_lookup(session, hostname):
             if 'InstanceId' in item:
                 return item['InstanceId']
             return None
+
+
+def cert_arn_lookup(session, domain_name):
+    """
+    Looks up the arn for a domain_name certificate
+    Args:
+        session: amazon session
+        domain_name: domain name the certificate was issued for.
+
+    Returns: arn (string)
+
+    """
+    if session is None: return None
+
+    client = session.client('acm')
+    response = client.list_certificates()
+    print("Certificates")
+    for certs in response['CertificateSummaryList']:
+        if certs['DomainName'] == domain_name:
+            return certs['CertificateArn']
+    return None
+
