@@ -79,10 +79,10 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
 
     with open(DYNAMO_SCHEMA, 'r') as fh:
         dynamo_cfg = json.load(fh)
-    #config.add_dynamo_table_from_json("EndpointMetaDB",'bossmeta.' + domain, **dynamo_cfg)
+    config.add_dynamo_table_from_json("EndpointMetaDB",'bossmeta.' + domain, **dynamo_cfg)
 
-    #config.add_redis_replication("Cache", "cache." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
-    #config.add_redis_replication("CacheState", "cache-state." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
+    config.add_redis_replication("Cache", "cache." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
+    config.add_redis_replication("CacheState", "cache-state." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
 
     # Allow SSH/HTTP/HTTPS access to endpoint server from anywhere
     config.add_security_group("InternetSecurityGroup",
@@ -126,7 +126,6 @@ def create(session, domain):
     user_data["aws"]["cache-state"] = "cache-state." + domain
     user_data["aws"]["meta-db"] = "bossmeta." + domain
 
-    # Should transition from vault-django to vault-write
     call.vault_write(VAULT_DJANGO, secret_key = str(uuid.uuid4()))
     call.vault_write(VAULT_DJANGO_DB, **db)
 
