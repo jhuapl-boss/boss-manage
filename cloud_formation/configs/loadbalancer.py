@@ -52,6 +52,9 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     endpoint_instance_id = lib.instanceid_lookup(session, "endpoint."+domain)
     if endpoint_instance_id is None:
         raise Exception("Invalid instance name: endpoint.external."+domain)
+    config.add_arg(configuration.Arg.Instance("Endpoint",
+                                              endpoint_instance_id,
+                                              "ID of the Endpoint Instance to attach the LoadBalancer"))
 
     # Create New HTTPS Security Group and LoadBalancer
     config.add_security_group("AllHTTPSSecurityGroup",
@@ -63,11 +66,11 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     cert = lib.cert_arn_lookup(session, "api.theboss.io")
     listeners.append(lib.create_elb_listener("443","80","HTTPS", cert ))
 
-    loadbalancer_name = "elb-" + domain.replace(".", "-")  #elb names can't have periods in them.
+    loadbalancer_name = "elb." + domain
     config.add_loadbalancer("LoadBalancer",
                             loadbalancer_name,
                             listeners,
-                            [endpoint_instance_id],
+                            ["Endpoint"],
                             subnets=["ExternalSubnet"],
                             security_groups=["AllHTTPSSecurityGroup"],
                             depends_on = ["AllHTTPSSecurityGroup"])
@@ -91,5 +94,13 @@ def create(session, domain):
 
     if success:
         print('success')
+
+        print("KeyPair to communicating with Vault")
+        keypair = lib.keypair_lookup(session)
+        call = lib.ExternalCalls(session, keypair, domain)
+        dns = lib.elb_public_lookup(session, "elb." + domain)
+        uri = "http://{}".format(dns)
+        call.vault_update("secret/endpoint/auth", public_uri = uri)
+        print("Restart Django on the Endpoint Servers")
     else:
         print('failed')

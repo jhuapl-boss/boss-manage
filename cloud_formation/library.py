@@ -457,7 +457,6 @@ def cert_arn_lookup(session, domain_name):
 
     client = session.client('acm')
     response = client.list_certificates()
-    print("Certificates")
     for certs in response['CertificateSummaryList']:
         if certs['DomainName'] == domain_name:
             return certs['CertificateArn']
@@ -486,6 +485,19 @@ def instance_public_lookup(session, hostname):
                 return item['PublicDnsName']
             return None
 
+def elb_public_lookup(session, hostname):
+    """Look up instance id by hostname."""
+    if session is None: return None
+
+    client = session.client('elb')
+    responses = client.describe_load_balancers()
+
+    hostname_ = hostname.replace(".", "-")
+
+    for response in responses["LoadBalancerDescriptions"]:
+        if response["LoadBalancerName"].startswith(hostname_):
+            return response["DNSName"]
+    return None
 
 def create_elb_listener(loadbalancer_port, instance_port, protocol, ssl_cert_id=None):
     """

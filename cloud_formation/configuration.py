@@ -144,6 +144,16 @@ class Arg:
         return Arg(key, parameter, argument)
 
     @staticmethod
+    def Instance(key, value, description=""):
+        """Create a Instance ID argument that makes sure the value is a valid Instance ID."""
+        parameter = {
+            "Description" : description,
+            "Type": "AWS::EC2::Instance::Id"
+        }
+        argument = lib.template_argument(key, value)
+        return Arg(key, parameter, argument)
+
+    @staticmethod
     def KeyPair(key, value, hostname):
         """Create a KeyPair KeyName argument that makes sure the value is a
         valid KeyPair name.
@@ -856,7 +866,7 @@ class CloudFormationConfiguration:
                     "Interval": "30",
                     "Timeout": "5"
                 },
-                "LoadBalancerName": name,
+                "LoadBalancerName": name.replace(".", "-"),  #elb names can't have periods in them
                 "Listeners": listeners,
                 "Tags": [
                     {"Key": "Stack", "Value": { "Ref": "AWS::StackName"}}
@@ -865,7 +875,10 @@ class CloudFormationConfiguration:
         }
 
         if instances is not None:
-            self.resources[key]["Properties"]["Instances"] = instances
+            instance_refs = []
+            for ref in instances:
+                instance_refs.append({ "Ref" : ref })
+            self.resources[key]["Properties"]["Instances"] = instance_refs
         if security_groups is not None:
             sgs = []
             for sg in security_groups:
