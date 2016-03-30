@@ -36,9 +36,13 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     if not is_lb:
         raise Exception("Invalid load balancer name: " + loadbalancer_name)
 
-    mailingListTopic = lib.sns_topic_lookup(session, "ProductionMicronsMailingList")
-    # if mailingListTopic is None:
-    #TODO Test that MailingListTopic is working.
+    # TODO Test that MailingListTopic is working.
+    production_mailing_list = "ProductionMicronsMailingList"
+    mailingListTopic = lib.sns_topic_lookup(session, production_mailing_list)
+    if mailingListTopic is None:
+        #config.add_sns_topic("topicList", production_mailing_list)
+        raise Exception("MailingList " + production_mailing_list + "needs to be created before running cloudwatch")
+
 
     config.add_cloudwatch( loadbalancer_name,
                            "arn:aws:sns:us-east-1:256215146792:ProductionMicronsMailingList")
