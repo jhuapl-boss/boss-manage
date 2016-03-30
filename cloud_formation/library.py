@@ -248,15 +248,10 @@ def instanceid_lookup(session, hostname):
 
 
 def lb_lookup(session, lb_name):
-    """
-    Lookup the Id for the loadbalancer with the given name.
-    Args:
-        session: session information used to peform lookups
-        lb_name: loadbalancer name to lookup
-
-    Returns: true if a valid loadbalancer name
-
-    """
+    """Lookup the Id for the loadbalancer with the given name.
+    session information used to peform lookups
+    lb_name is loadbalancer name to lookup
+    returns true if a valid loadbalancer name"""
     if session is None: return None
 
     client = session.client('elb')
@@ -270,25 +265,3 @@ def lb_lookup(session, lb_name):
     return False
 
 
-def sns_topic_lookup(session, topic_name):
-    """
-    Lookups up SNS topic ID given a topic name
-    Args:
-        session: session information to perform lookups
-        topic_name: name of the topic
-
-    Returns: None if topic doesn't exist, or Id of topic
-
-    """
-    if session is None: return None
-
-    client = session.client('sns')
-    response = client.list_topics()
-
-
-    value = response['Topics']
-
-    for i in range(len(response['LoadBalancerDescriptions'])):
-        if (response['LoadBalancerDescriptions'][i]['LoadBalancerName']) == topic_name:
-            return True
-    return False
