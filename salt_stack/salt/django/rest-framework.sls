@@ -2,7 +2,7 @@ include:
     - python.python35
     - python.pip
 
-oidc-lib:
+rest_framework:
     pip.installed:
         - name: djangorestframework==3.3.1
         - bin_env: /usr/local/bin/pip3
