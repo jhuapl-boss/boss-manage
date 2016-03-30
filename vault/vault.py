@@ -368,16 +368,44 @@ def _vault_write(machine = None):
         key,val = entry.split("=")
         entries[key.strip()] = val.strip()
 
-    VAULT_DJANGO_AUTH = "secret/endpoint/auth"
-    auth = {
-        "url": "http://auth-test-31630954.us-east-1.elb.amazonaws.com:8080/auth/realms/master",
-        "public_uri": "http://ec2-54-85-42-228.compute-1.amazonaws.com",
-        "client_id": "test",
-        "client_secret": "0a6c2eee-14ad-4c3a-89a8-7f44df837273",
-    }
+    vault_write(path, machine, **entries)
 
-    #vault_write(path, machine, **entries)
-    vault_write(VAULT_DJANGO_AUTH, machine, **auth)
+def vault_update(path, machine = None, **kwargs):
+    """A generic method for updating data in Vault, for use by CloudFormation
+    scripts.
+    """
+    client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
+
+    existing = client.read(path)
+    if existing is None:
+        existing = {}
+    else:
+        existing = existing["data"]
+
+    existing.update(kwargs)
+
+    client.write(path, **existing)
+
+def _vault_update(machine = None):
+    path = input("path: ")
+    entries = {}
+    while True:
+        entry = input("entry: ")
+        if entry is None or entry == '':
+            break
+        key,val = entry.split("=")
+        entries[key.strip()] = val.strip()
+
+    """
+    path = "secret/endpoint/auth"
+    entries = {
+        "url": "http://ec2-52-90-0-27.compute-1.amazonaws.com:8080/auth/realms/BOSS",
+        "public_uri": "http://ec2-52-3-250-125.compute-1.amazonaws.com",
+        "client_id": "endpoint",
+    }
+    """
+
+    vault_update(path, machine, **entries)
 
 def vault_read(path, machine = None):
     """A generic method for reading data from Vault, for use by CloudFormation
@@ -413,6 +441,7 @@ COMMANDS = {
     "verify":verify,
     "vault-shell":vault_shell,
     "vault-write":_vault_write,
+    "vault-update":_vault_update,
     "vault-read":_vault_read,
     "vault-delete":_vault_delete,
 }

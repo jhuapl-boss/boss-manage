@@ -15,7 +15,7 @@ import os
 import bossutils
 
 bossutils.utils.set_excepthook()
-logging = bossutils.logger.BossLogger()
+logging = bossutils.logger.BossLogger().logger
 
 def read_vault_token():
     """If the Boss configuration file contains a Vault token, call

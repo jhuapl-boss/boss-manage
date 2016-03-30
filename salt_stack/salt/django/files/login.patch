@@ -1,0 +1,5 @@
+--- login.html
++++ login.html
+@@ -61,0 +62,2 @@
++    <br/><br/>
++    <label>&nbsp;</label><a href="/openid/openid/KeyCloak?next=/admin/">SSO Login</a>

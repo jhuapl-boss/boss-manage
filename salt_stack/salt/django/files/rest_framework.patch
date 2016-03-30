@@ -1,0 +1,8 @@
+--- rest_framework.py
++++ rest_framework.py
+@@ -46 +46 @@
+-        login_url = reverse('rest_framework:login')
++        login_url = "/openid/openid/KeyCloak"
+@@ -62 +62 @@
+-        logout_url = reverse('rest_framework:logout')
++        logout_url = "/openid/logout"

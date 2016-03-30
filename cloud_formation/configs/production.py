@@ -27,6 +27,7 @@ INCOMING_SUBNET = "52.3.13.189/32" # microns-bastion elastic IP
 
 VAULT_DJANGO = "secret/endpoint/django"
 VAULT_DJANGO_DB = "secret/endpoint/django/db"
+VAULT_DJANGO_AUTH = "secret/endpoint/auth"
 
 def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     """Create the CloudFormationConfiguration object."""
@@ -76,8 +77,8 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                       az_subnets,
                       security_groups = ["InternalSecurityGroup"])
 
-    dynamo_json = open(DYNAMO_SCHEMA, 'r')
-    dynamo_cfg = json.load(dynamo_json)
+    with open(DYNAMO_SCHEMA, 'r') as fh:
+        dynamo_cfg = json.load(fh)
     config.add_dynamo_table_from_json("EndpointMetaDB",'bossmeta.' + domain, **dynamo_cfg)
 
     config.add_redis_replication("Cache", "cache." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
@@ -104,14 +105,7 @@ def create(session, domain):
     """Configure Vault, create the configuration, and launch it"""
     keypair = lib.keypair_lookup(session)
 
-    def call_vault(command, *args, **kwargs):
-        """A wrapper function around lib.call_vault() that populates most of
-        the needed arguments."""
-        return lib.call_vault(session,
-                              lib.keypair_to_file(keypair),
-                              "bastion." + domain,
-                              "vault." + domain,
-                              command, *args, **kwargs)
+    call = lib.ExternalCalls(session, keypair, domain)
 
     db = {
         "name":"boss",
@@ -122,7 +116,7 @@ def create(session, domain):
 
     # Configure Vault and create the user data config that the endpoint will
     # use for connecting to Vault and the DB instance
-    endpoint_token = call_vault("vault-provision", "endpoint")
+    endpoint_token = call.vault("vault-provision", "endpoint")
     user_data = configuration.UserData()
     user_data["vault"]["token"] = endpoint_token
     user_data["system"]["fqdn"] = "endpoint." + domain
@@ -132,9 +126,8 @@ def create(session, domain):
     user_data["aws"]["cache-state"] = "cache-state." + domain
     user_data["aws"]["meta-db"] = "bossmeta." + domain
 
-    # Should transition from vault-django to vault-write
-    call_vault("vault-write", VAULT_DJANGO, secret_key = str(uuid.uuid4()))
-    call_vault("vault-write", VAULT_DJANGO_DB, **db)
+    call.vault_write(VAULT_DJANGO, secret_key = str(uuid.uuid4()))
+    call.vault_write(VAULT_DJANGO_DB, **db)
 
     try:
         name = lib.domain_to_stackname("production." + domain)
@@ -144,6 +137,21 @@ def create(session, domain):
         if not success:
             raise Exception("Create Failed")
         else:
+            def configure_auth(auth_port):
+                # NOTE DP: If an ELB is created the public_uri should be the Public DNS Name
+                #          of the ELB. Endpoint Django instances may have to be restarted if running.
+                dns = lib.instance_public_lookup(session, "endpoint." + domain)
+                uri = "http://{}".format(dns)
+                call.vault_update(VAULT_DJANGO_AUTH, public_uri = uri)
+
+                creds = call.vault_read("secret/auth")
+                kc = lib.KeyCloakClient("http://localhost:{}".format(auth_port))
+                kc.login(creds["username"], creds["password"])
+                kc.add_redirect_uri("BOSS","endpoint", uri + "/*")
+                kc.logout()
+            call.set_ssh_target("auth")
+            call.ssh_tunnel(configure_auth, 8080)
+
             # Tell Scalyr to get CloudWatch metrics for these instances.
             instances = [ user_data["system"]["fqdn"] ]
             scalyr.add_instances_to_scalyr(
@@ -151,12 +159,12 @@ def create(session, domain):
     except:
         print("Error detected, revoking secrets")
         try:
-            call_vault("vault-delete", VAULT_DJANGO)
-            call_vault("vault-delete", VAULT_DJANGO_DB)
+            call.vault_delete(VAULT_DJANGO)
+            call.vault_delete(VAULT_DJANGO_DB)
         except:
             print("Error revoking Django credentials")
         try:
-            call_vault("vault-revoke", endpoint_token)
+            call.vault("vault-revoke", endpoint_token)
         except:
             print("Error revoking Endpoint Server Vault access token")
         raise

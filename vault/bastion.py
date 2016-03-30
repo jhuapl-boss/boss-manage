@@ -19,7 +19,7 @@ import json
 import vault
 
 # Needed to prevent ssh from asking about the fingerprint from new machines
-SSH_OPTIONS = "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+SSH_OPTIONS = "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -q"
 
 def create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user="ec2-user", bastion_port=22):
     """Create a regular SSH tunnel from localhost:local_port to remote_ip:remote_port through bastion_ip."""
@@ -138,7 +138,6 @@ def ssh_cmd(key, remote_ip, bastion_ip, command = None):
 
     ssh_port = locate_port()
     ssh_cmd_str = "ssh -i {} {} -p {} ubuntu@localhost '{}'".format(key, SSH_OPTIONS, ssh_port, command)
-    print(ssh_cmd_str)
 
     proc = create_tunnel_aplnis(key, ssh_port, remote_ip, 22, bastion_ip)
     try:
@@ -147,7 +146,7 @@ def ssh_cmd(key, remote_ip, bastion_ip, command = None):
         proc.terminate()
         proc.wait()
 
-def ssh_tunnel(key, remote_ip, bastion_ip, port = None, local_port = None):
+def ssh_tunnel(key, remote_ip, bastion_ip, port = None, local_port = None, cmd = None):
     """Create an SSH tunnel from the local machine to bastion that gets
     forwarded to remote. Launch a second SSH tunnel through the SSH tunnel to
     the remote machine.
@@ -158,12 +157,15 @@ def ssh_tunnel(key, remote_ip, bastion_ip, port = None, local_port = None):
         port = int(input("Target Port: "))
 
     if local_port is None:
-        local_port = int(input("Local Port: "))
+        local_port = int(input("Local Port: ")) if cmd is None else locate_port()
 
     proc = create_tunnel_aplnis(key, local_port, remote_ip, port, bastion_ip)
     try:
-        print("Connect to localhost:{} to be forwarded to {}:{}".format(local_port, remote_ip, port))
-        input("Waiting to close tunnel...")
+        if cmd is None:
+            print("Connect to localhost:{} to be forwarded to {}:{}".format(local_port, remote_ip, port))
+            input("Waiting to close tunnel...")
+        else:
+            cmd(local_port)
     finally:
         proc.terminate()
         proc.wait()

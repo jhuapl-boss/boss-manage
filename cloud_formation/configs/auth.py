@@ -16,6 +16,9 @@ import time
 import requests
 import scalyr
 
+import os
+import json
+
 keypair = None
 
 # Region core is created in.  Later versions of boto3 should allow us to
@@ -23,6 +26,7 @@ keypair = None
 CORE_REGION = 'us-east-1'
 
 INCOMING_SUBNET = "52.3.13.189/32" # microns-bastion elastic IP
+
 
 def create_config(session, domain):
     """Create the CloudFormationConfiguration object."""
@@ -61,10 +65,65 @@ def create_config(session, domain):
 
     config.add_security_group("AuthSecurityGroup",
                               "http",
-                              [("tcp", "80", "80", "128.244.0.0/16"),
+                              [("tcp", "8080", "8080", "128.244.0.0/16"),
                                ("tcp", "22", "22", INCOMING_SUBNET)])
 
+    listeners = [lib.create_elb_listener("8080", "8080", "HTTP"),
+                 lib.create_elb_listener("9990", "9990", "HTTP")]
+
+    config.add_loadbalancer("LoadBalancerAuth",
+                            "elb-auth." + domain,
+                            listeners,
+                            instances=["Auth"],
+                            subnets=["ExternalSubnet"], # eventually use find_all_availability_zones()
+                            healthcheck_target="HTTP:8080/index.html",
+                            security_groups=["InternalSecurityGroup", "AuthSecurityGroup"],
+                            depends_on=["AuthSecurityGroup"])
+
     return config
+
+
+def upload_realm_config(port, password):
+    URL = "http://localhost:{}".format(port)
+
+    kc = lib.KeyCloakClient(URL)
+    kc.login("admin", password)
+    if kc.token is None:
+        print("Could not upload BOSS.realm configuration, exiting...")
+        return
+
+    cur_dir = os.path.dirname(os.path.realpath(__file__))
+    realm_file = os.path.normpath(os.path.join(cur_dir, "..", "..", "salt_stack", "salt", "keycloak", "files", "BOSS.realm"))
+    print("Opening realm file at '{}'".format(realm_file))
+    with open(realm_file, "r") as fh:
+        realm = json.load(fh)
+
+    kc.create_realm(realm)
+    kc.logout()
+
+def configure_keycloak(session, domain):
+    # NOTE DP: if there is an ELB in front of the auth server, this needs to be
+    #          the public DNS address of the ELB.
+    auth_dns = lib.elb_public_lookup(session, "elb-auth." + domain)
+    auth_discovery_url = "http://{}:8080/auth/realms/BOSS".format(auth_dns)
+
+    password = lib.generate_password()
+    print("Setting Admin password to: " + password)
+
+    call = lib.ExternalCalls(session, keypair, domain)
+
+    call.vault_write("secret/auth", password = password, username = "admin")
+    call.vault_update("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
+
+    call.set_ssh_target("auth")
+    call.ssh("/srv/keycloak/bin/add-user.sh -r master -u admin -p " + password)
+    call.ssh("sudo service keycloak stop")
+    call.ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
+                             # make sure the process is actually killed
+    call.ssh("sudo service keycloak start")
+
+    time.sleep(15) # wait for service to start
+    call.ssh_tunnel(lambda p: upload_realm_config(p, password), 8080)
 
 def generate(folder, domain):
     """Create the configuration and save it to disk"""
@@ -81,26 +140,6 @@ def create(session, domain):
     if success:
         try:
             time.sleep(15)
-            password = lib.generate_password()
-            print("Setting Admin password to: " + password)
-
-            lib.call_ssh(session,
-                           lib.keypair_to_file(keypair),
-                           "bastion." + domain,
-                           "auth." + domain,
-                           "/srv/keycloak/bin/add-user.sh -r master -u admin -p " + password)
-
-            lib.call_ssh(session,
-                           lib.keypair_to_file(keypair),
-                           "bastion." + domain,
-                           "auth." + domain,
-                           "sudo service keycloak restart")
-
-            lib.call_vault(session,
-                           lib.keypair_to_file(keypair),
-                           "bastion." + domain,
-                           "vault." + domain,
-                           "vault-write", "secret/auth", password = password, username = "admin")
-
+            configure_keycloak(session, domain)
         except requests.exceptions.ConnectionError:
             print("Could not connect to Vault")
