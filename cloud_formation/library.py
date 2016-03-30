@@ -272,23 +272,23 @@ def lb_lookup(session, lb_name):
 
 def sns_topic_lookup(session, topic_name):
     """
-    Lookups up SNS topic ARN given a topic name
+    Lookups up SNS topic ID given a topic name
     Args:
         session: session information to perform lookups
         topic_name: name of the topic
 
-    Returns: ARN for the topic or None if topic doesn't exist
+    Returns: None if topic doesn't exist, or Id of topic
 
     """
     if session is None: return None
 
     client = session.client('sns')
     response = client.list_topics()
-    topics_list = response['Topics']
-    for topic in topics_list:
-        arn_topic_name = topic["TopicArn"].split(':').pop()
-        if arn_topic_name == topic_name:
-            return topic["TopicArn"]
-    return None
 
 
+    value = response['Topics']
+
+    for i in range(len(response['LoadBalancerDescriptions'])):
+        if (response['LoadBalancerDescriptions'][i]['LoadBalancerName']) == topic_name:
+            return True
+    return False
