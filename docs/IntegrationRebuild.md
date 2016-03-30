@@ -35,7 +35,7 @@ Place `microns-bastion20151117.pem` in the `bin` folder.
 
 ```shell
 $ cd bin
-$ ./packer.py vault endpoint proofreader-web
+$ ./packer.py auth vault endpoint proofreader-web
 ```
 
 *Note: because the packer.py script is running builds in parallel it is redirecting
@@ -56,7 +56,7 @@ Stacks need to be deleted.
 1. Open a web browser
 2. Login to the AWS console and open up the CloudFormation console
 3. For *LoadbalancerIntegrationBoss*, *ProofreaderIntegrationBoss*,
-   *ProductionIntegrationBoss*, *CoreIntegrationBoss*
+   *ProductionIntegrationBoss*, *AuthIntegrationBoss*, *CoreIntegrationBoss*
   1. Right click on the Stack and select *Delete Stack*
   2. Wait for the stack to be deleted
 
@@ -84,7 +84,7 @@ $ source ../config/set_vars.sh
 
 ### Launching configs
 
-For the *core*, *production*, *proofreader*, and *loadbalancer* configurations
+For the *core*, *auth*, *production*, *proofreader*, and *loadbalancer* configurations
 run the following command. You have to wait for each command to finish before
 launching the next configuration as they build upon each other.
 ```shell
@@ -98,6 +98,22 @@ you can ignore these instructions.*
 *Note: The cloudformation.py script will automatically use the latest created AMIs
 that are named with a commit hash. Since you just rebuilt the AMIs they should be
 the latest ones.*
+
+*Manual Configuration: Because of restrictive Security Group rules you need to
+manually add the endpoint's IP address to the http.integration.boss Security Group.*
+
+1. Open the AWS web console to the EC2 section
+2. On the left side click *Instances*
+3. Locate the *endpoint.integration.boss* instance and record the public IP address
+4. On the lift side click *Security Groups*
+3. Locate the *http.integration.boss* Security Group
+4. Select the *Inbound* tab for the *http.integration.boss* Security Group
+5. Click *Edit*
+6. Click *Add Rule*
+7. Type is *Custom TCP Rule*
+8. Port Range is *8080*
+9. Source is *Custom IP* with a value of *<endpoint IP>/32*
+10. Click *Save*
 
 ## Initialize Endpoint and run unit tests
 ```shell
