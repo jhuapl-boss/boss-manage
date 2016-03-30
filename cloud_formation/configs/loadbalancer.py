@@ -101,7 +101,7 @@ def create(session, domain):
 
         def configure_auth(auth_port):
             dns = lib.elb_public_lookup(session, "elb." + domain)
-            uri = "http://{}".format(dns)
+            uri = "https://{}".format(dns)
             call.vault_update("secret/endpoint/auth", public_uri = uri)
 
             creds = call.vault_read("secret/auth")
