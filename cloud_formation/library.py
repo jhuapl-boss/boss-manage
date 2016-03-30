@@ -245,23 +245,3 @@ def instanceid_lookup(session, hostname):
             if 'InstanceId' in item:
                 return item['InstanceId']
             return None
-
-
-def lb_lookup(session, lb_name):
-    """Lookup the Id for the loadbalancer with the given name.
-    session information used to peform lookups
-    lb_name is loadbalancer name to lookup
-    returns true if a valid loadbalancer name"""
-    if session is None: return None
-
-    client = session.client('elb')
-    response = client.describe_load_balancers()#Filters=[{"LoadBalancerName":lb_name}])
-
-    value = response['LoadBalancerDescriptions'][0]['LoadBalancerName']
-
-    for i in range(len(response['LoadBalancerDescriptions'])):
-        if (response['LoadBalancerDescriptions'][i]['LoadBalancerName']) == lb_name:
-            return True
-    return False
-
-

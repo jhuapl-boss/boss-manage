@@ -366,6 +366,17 @@ class CloudFormationConfiguration:
                             "Domain of the Subnet '{}'".format(key))
         self.add_arg(domain)
 
+    def find_all_availability_zones(self, session):
+        subnets = []
+        for az, sub in lib.azs_lookup(session):
+            name = sub.capitalize() + "Subnet"
+            domain = sub + "." + self.vpc_domain
+            id = lib.subnet_id_lookup(session, domain)
+
+            self.add_arg(Arg.Subnet(name, id))
+            subnets.append(name)
+        return subnets
+
     # ??? save hostname : keypair somewhere?
     def add_ec2_instance(self, key, hostname, ami, keypair, subnet="Subnet", type_="t2.micro", iface_check=True, public_ip=False, security_groups=None, user_data=None, meta_data=None, depends_on=None):
         """Add an EC2 instance to the configuration
@@ -586,6 +597,75 @@ class CloudFormationConfiguration:
                                 "Name of the DynamoDB table created by instance '{}'".format(key))
         self.add_arg(table_name)
 
+    def add_redis_cluster(self, key, hostname, subnets, security_groups, type_="cache.t2.micro", port=6379, version="2.8.24"):
+        self.resources[key] =  {
+            "Type" : "AWS::ElastiCache::CacheCluster",
+            "Properties" : {
+                #"AutoMinorVersionUpgrade" : "false", # defaults to true - Indicates that minor engine upgrades will be applied automatically to the cache cluster during the maintenance window.
+                "CacheNodeType" : type_,
+                "CacheSubnetGroupName" : { "Ref" : key + "SubnetGroup" },
+                "Engine" : "redis",
+                "EngineVersion" : version,
+                "NumCacheNodes" : "1",
+                "Port" : port,
+                #"PreferredMaintenanceWindow" : String, # don't know the default - site says minimum 60 minutes, infrequent and announced on AWS forum 2w prior
+                "Tags" : [
+                    {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
+                    {"Key" : "Name", "Value" : { "Ref": key + "Hostname" } }
+                ],
+                "VpcSecurityGroupIds" :  [{ "Ref" : sg } for sg in security_groups]
+            },
+            "DependsOn" : key + "SubnetGroup"
+        }
+
+        self.resources[key + "SubnetGroup"] = {
+            "Type" : "AWS::ElastiCache::SubnetGroup",
+            "Properties" : {
+                "Description" : { "Ref" : key + "Hostname" },
+                "SubnetIds" : [{ "Ref" : subnet } for subnet in subnets]
+            }
+        }
+
+        hostname_ = Arg.String(key + "Hostname", hostname.replace('.','-'),
+                               "Hostname of the Redis Cluster '{}'".format(key))
+        self.add_arg(hostname_)
+
+        self._add_record_cname(key, hostname, cluster = True)
+
+    def add_redis_replication(self, key, hostname, subnets, security_groups, type_="cache.m3.medium", port=6379, version="2.8.24", clusters=5):
+        self.resources[key] =  {
+            "Type" : "AWS::ElastiCache::ReplicationGroup",
+            "Properties" : {
+                "AutomaticFailoverEnabled" : bool_str(clusters > 1),
+                #"AutoMinorVersionUpgrade" : "false", # defaults to true - Indicates that minor engine upgrades will be applied automatically to the cache cluster during the maintenance window.
+                "CacheNodeType" : type_,
+                "CacheSubnetGroupName" : { "Ref" : key + "SubnetGroup" },
+                "Engine" : "redis",
+                "EngineVersion" : version,
+                "NumCacheClusters" : clusters,
+                "Port" : port,
+                #"PreferredCacheClusterAZs" : [ String, ... ],
+                #"PreferredMaintenanceWindow" : String, # don't know the default - site says minimum 60 minutes, infrequent and announced on AWS forum 2w prior
+                "ReplicationGroupDescription" : { "Ref" : key + "Hostname" },
+                "SecurityGroupIds" : [{ "Ref" : sg } for sg in security_groups]
+            },
+            "DependsOn" : key + "SubnetGroup"
+        }
+
+        self.resources[key + "SubnetGroup"] = {
+            "Type" : "AWS::ElastiCache::SubnetGroup",
+            "Properties" : {
+                "Description" : { "Ref" : key + "Hostname" },
+                "SubnetIds" : [{ "Ref" : subnet } for subnet in subnets]
+            }
+        }
+
+        hostname_ = Arg.String(key + "Hostname", hostname.replace('.','-'),
+                               "Hostname of the Redis Cluster '{}'".format(key))
+        self.add_arg(hostname_)
+
+        self._add_record_cname(key, hostname, replication = True)
+
     def add_security_group(self, key, name, rules, vpc="VPC"):
         """Add SecurityGroup to the configuration
         key is the unique name (within the configuration) for this resource
@@ -802,192 +882,6 @@ class CloudFormationConfiguration:
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
 
-    def add_cloudwatch(self, lb_name, alarm_actions, depends_on=None ):
-        """ Add alarms for Loadbalancer
-        :arg lb_name loadbalancer name
-        :arg alarm_actions name of SNS mailing list
-        :arg depends_on is a list of resources this loadbalancer depends on
-        """
-        key = "Latency"
-        self.resources[key] = {
-              "Type": "AWS::CloudWatch::Alarm",
-              "Properties": {
-                "ActionsEnabled": "true",
-                "ComparisonOperator": "GreaterThanOrEqualToThreshold",
-                "EvaluationPeriods": "5",
-                "MetricName": "Latency",
-                "Namespace": "AWS/ELB",
-                "Period": "60",
-                "Statistic": "Average",
-                "Threshold": "2.0",
-                "AlarmActions": [alarm_actions],
-                "Dimensions": [
-                  {
-                    "Name": "LoadBalancerName",
-                    "Value": lb_name
-                  }
-                ]
-              }
-        }
-        if depends_on is not None:
-            self.resources[key]["DependsOn"] = depends_on
-
-        key = "SurgeCount"
-        self.resources[key] = {
-              "Type": "AWS::CloudWatch::Alarm",
-              "Properties": {
-                "ActionsEnabled": "true",
-                "AlarmDescription": "Surge Count in Load Balance",
-                "ComparisonOperator": "GreaterThanOrEqualToThreshold",
-                "EvaluationPeriods": "5",
-                "MetricName": "SurgeQueueLength",
-                "Namespace": "AWS/ELB",
-                "Period": "60",
-                "Statistic": "Average",
-                "Threshold": "3.0",
-                "AlarmActions": [alarm_actions],
-                "Dimensions": [
-                  {
-                    "Name": "LoadBalancerName",
-                    "Value": lb_name
-                  }
-                ]
-              }
-        }
-        if depends_on is not None:
-            self.resources[key]["DependsOn"] = depends_on
-
-        key = "UnhealthyHostCount"
-        self.resources[key] = {
-              "Type": "AWS::CloudWatch::Alarm",
-              "Properties": {
-                "ActionsEnabled": "true",
-                "AlarmDescription": "Urnhealthy Host Count in Load Balance",
-                "ComparisonOperator": "GreaterThanOrEqualToThreshold",
-                "EvaluationPeriods": "5",
-                "MetricName": "UnHealthyHostCount",
-                "Namespace": "AWS/ELB",
-                "Period": "60",
-                "Statistic": "Minimum",
-                "Threshold": "1.0",
-                "AlarmActions": [alarm_actions],
-                "Dimensions": [
-                  {
-                    "Name": "LoadBalancerName",
-                    "Value": lb_name
-                  }
-                ]
-              }
-        }
-        if depends_on is not None:
-            self.resources[key]["DependsOn"] = depends_on
-
-
-    def add_sns_topic(self, key, name, depends_on=None ):
-        """ Add alarms for Loadbalancer
-        :arg key is the unique name (within the configuration) for this resource
-        :arg name is the name to give the
-        :arg depends_on is a list of resources this loadbalancer depends on
-        """
-        self.resources[key] = {
-            "topicMicronList": {
-                  "Type": "AWS::SNS::Topic",
-                  "Properties": {
-                    "DisplayName": "MicronList",
-                    "Subscription": [
-                      {
-                        "Endpoint": "13012544552",
-                        "Protocol": "sms"
-                      },
-                      {
-                        "Endpoint": "sandy.hider@jhuapl.edu",
-                        "Protocol": "email"
-                      }
-                    ]
-                  }
-                },
-                "snspolicyMicronList": {
-                  "Type": "AWS::SNS::TopicPolicy",
-                  "Properties": {
-                    "Topics": [
-                      {
-                        "Ref": "topicMicronList"
-                      }
-                    ],
-                    "PolicyDocument": {
-                      "Version": "2008-10-17",
-                      "Id": "__default_policy_ID",
-                      "Statement": [
-                        {
-                          "Sid": "__default_statement_ID",
-                          "Effect": "Allow",
-                          "Principal": {
-                            "AWS": "*"
-                          },
-                          "Action": [
-                            "SNS:ListSubscriptionsByTopic",
-                            "SNS:Subscribe",
-                            "SNS:DeleteTopic",
-                            "SNS:GetTopicAttributes",
-                            "SNS:Publish",
-                            "SNS:RemovePermission",
-                            "SNS:AddPermission",
-                            "SNS:Receive",
-                            "SNS:SetTopicAttributes"
-                          ],
-                          "Resource": {
-                            "Ref": "topicMicronList"
-                          },
-                          "Condition": {
-                            "StringEquals": {
-                              "AWS:SourceOwner": "256215146792"
-                            }
-                          }
-                        },
-                        {
-                          "Sid": "__console_pub_0",
-                          "Effect": "Allow",
-                          "Principal": {
-                            "AWS": "*"
-                          },
-                          "Action": "SNS:Publish",
-                          "Resource": {
-                            "Ref": "topicMicronList"
-                          }
-                        },
-                        {
-                          "Sid": "__console_sub_0",
-                          "Effect": "Allow",
-                          "Principal": {
-                            "AWS": "*"
-                          },
-                          "Action": [
-                            "SNS:Subscribe",
-                            "SNS:Receive"
-                          ],
-                          "Resource": {
-                            "Ref": "topicMicronList"
-                          },
-                          "Condition": {
-                            "StringEquals": {
-                              "SNS:Protocol": [
-                                "application",
-                                "sms",
-                                "email"
-                              ]
-                            }
-                          }
-                        }
-                      ]
-                    }
-                  }
-                }
-
-
-        }
-        if depends_on is not None:
-            self.resources[key]["DependsOn"] = depends_on
-
     def _add_record_cname(self, key, hostname, vpc="VPC", ttl="300", rds=False, cluster=False, replication=False, ec2=False):
         address_key = None
         if rds:
@@ -1017,7 +911,6 @@ class CloudFormationConfiguration:
         domain = Arg.String(vpc + "Domain", self.vpc_domain,
                             "Domain of the VPC '{}'".format(vpc))
         self.add_arg(domain)
-
 
 class UserData:
     """A wrapper class around configparse.ConfigParser that automatically loads
