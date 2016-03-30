@@ -18,6 +18,9 @@ jenkins_user:
     - name: {{ jenkins.user }}
     - groups:
       - {{ jenkins.group }}
+{% for grp in jenkins.additional_groups %}
+      - {{ grp }}
+{% endfor %}
     - system: True
     - home: {{ jenkins.home }}
     - shell: /bin/bash

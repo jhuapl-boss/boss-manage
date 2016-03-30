@@ -26,10 +26,15 @@ firstboot:
         - name: update-rc.d bossutils-firstboot start 10 2 3 4 5 .
         - user: root
 
+# For VirtualBox builds, ensure this user exists.  This is the
+# default user for the Amazon AMIs.
+bossutils-user:
+    user.present:
+        - name: ubuntu
+
 logging:
     file.directory:
         - name: /var/log/boss
         - user: ubuntu
         - group: www-data
         - dir_mode: 775
-

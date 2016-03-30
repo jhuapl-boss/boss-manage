@@ -1,5 +1,6 @@
 jenkins:
   lookup:
+    # master_url: "{{ salt['pillar.get']('master:id', 'localhost')}}:8080"
     additional_groups: ['www-data']
     plugins:
       installed:
@@ -13,4 +14,4 @@ jenkins:
       # Therefore, if Salt needs to re-run on the Jenkins server, first disable
       # security, when installing new jobs.
       installed:
-          proofreader: /srv/salt/jenkins-jobs/proofreader.xml
+          endpoint: /srv/salt/jenkins-jobs/endpoint.xml
