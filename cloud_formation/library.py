@@ -518,3 +518,48 @@ def create_elb_listener(loadbalancer_port, instance_port, protocol, ssl_cert_id=
     if ssl_cert_id is not None:
         listener["SSLCertificateId"] = ssl_cert_id
     return listener
+
+
+def lb_lookup(session, lb_name):
+    """
+    Lookup the Id for the loadbalancer with the given name.
+    Args:
+        session: session information used to peform lookups
+        lb_name: loadbalancer name to lookup
+
+    Returns: true if a valid loadbalancer name
+
+    """
+    if session is None: return None
+
+    client = session.client('elb')
+    response = client.describe_load_balancers()#Filters=[{"LoadBalancerName":lb_name}])
+
+    value = response['LoadBalancerDescriptions'][0]['LoadBalancerName']
+
+    for i in range(len(response['LoadBalancerDescriptions'])):
+        if (response['LoadBalancerDescriptions'][i]['LoadBalancerName']) == lb_name:
+            return True
+    return False
+
+
+def sns_topic_lookup(session, topic_name):
+    """
+    Lookups up SNS topic ARN given a topic name
+    Args:
+        session: session information to perform lookups
+        topic_name: name of the topic
+
+    Returns: ARN for the topic or None if topic doesn't exist
+
+    """
+    if session is None: return None
+
+    client = session.client('sns')
+    response = client.list_topics()
+    topics_list = response['Topics']
+    for topic in topics_list:
+        arn_topic_name = topic["TopicArn"].split(':').pop()
+        if arn_topic_name == topic_name:
+            return topic["TopicArn"]
+    return None

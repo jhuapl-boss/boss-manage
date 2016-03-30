@@ -930,6 +930,192 @@ class CloudFormationConfiguration:
                             "Domain of the VPC '{}'".format(vpc))
         self.add_arg(domain)
 
+    def add_cloudwatch(self, lb_name, alarm_actions, depends_on=None ):
+        """ Add alarms for Loadbalancer
+        :arg lb_name loadbalancer name
+        :arg alarm_actions name of SNS mailing list
+        :arg depends_on is a list of resources this loadbalancer depends on
+        """
+        key = "Latency"
+        self.resources[key] = {
+              "Type": "AWS::CloudWatch::Alarm",
+              "Properties": {
+                "ActionsEnabled": "true",
+                "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+                "EvaluationPeriods": "5",
+                "MetricName": "Latency",
+                "Namespace": "AWS/ELB",
+                "Period": "60",
+                "Statistic": "Average",
+                "Threshold": "2.0",
+                "AlarmActions": [alarm_actions],
+                "Dimensions": [
+                  {
+                    "Name": "LoadBalancerName",
+                    "Value": lb_name
+                  }
+                ]
+              }
+        }
+        if depends_on is not None:
+            self.resources[key]["DependsOn"] = depends_on
+
+        key = "SurgeCount"
+        self.resources[key] = {
+              "Type": "AWS::CloudWatch::Alarm",
+              "Properties": {
+                "ActionsEnabled": "true",
+                "AlarmDescription": "Surge Count in Load Balance",
+                "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+                "EvaluationPeriods": "5",
+                "MetricName": "SurgeQueueLength",
+                "Namespace": "AWS/ELB",
+                "Period": "60",
+                "Statistic": "Average",
+                "Threshold": "3.0",
+                "AlarmActions": [alarm_actions],
+                "Dimensions": [
+                  {
+                    "Name": "LoadBalancerName",
+                    "Value": lb_name
+                  }
+                ]
+              }
+        }
+        if depends_on is not None:
+            self.resources[key]["DependsOn"] = depends_on
+
+        key = "UnhealthyHostCount"
+        self.resources[key] = {
+              "Type": "AWS::CloudWatch::Alarm",
+              "Properties": {
+                "ActionsEnabled": "true",
+                "AlarmDescription": "Urnhealthy Host Count in Load Balance",
+                "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+                "EvaluationPeriods": "5",
+                "MetricName": "UnHealthyHostCount",
+                "Namespace": "AWS/ELB",
+                "Period": "60",
+                "Statistic": "Minimum",
+                "Threshold": "1.0",
+                "AlarmActions": [alarm_actions],
+                "Dimensions": [
+                  {
+                    "Name": "LoadBalancerName",
+                    "Value": lb_name
+                  }
+                ]
+              }
+        }
+        if depends_on is not None:
+            self.resources[key]["DependsOn"] = depends_on
+
+    def add_sns_topic(self, key, topic_name, depends_on=None ):
+        """ Add alarms for Loadbalancer
+        :arg key is the unique name (within the configuration) for this resource
+        :arg name is the name to give the
+        :arg depends_on is a list of resources this loadbalancer depends on
+        """
+        self.resources[key] = {
+            "topicMicronList": {
+                  "Type": "AWS::SNS::Topic",
+                  "Properties": {
+                    "DisplayName": "MicronList",
+                    "Subscription": [
+                      {
+                        "Endpoint": "13012544552",
+                        "Protocol": "sms"
+                      },
+                      {
+                        "Endpoint": "sandy.hider@jhuapl.edu",
+                        "Protocol": "email"
+                      }
+                    ]
+                  }
+                },
+                "snspolicyMicronList": {
+                  "Type": "AWS::SNS::TopicPolicy",
+                  "Properties": {
+                    "Topics": [
+                      {
+                        "Ref": "topicMicronList"
+                      }
+                    ],
+                    "PolicyDocument": {
+                      "Version": "2008-10-17",
+                      "Id": "__default_policy_ID",
+                      "Statement": [
+                        {
+                          "Sid": "__default_statement_ID",
+                          "Effect": "Allow",
+                          "Principal": {
+                            "AWS": "*"
+                          },
+                          "Action": [
+                            "SNS:ListSubscriptionsByTopic",
+                            "SNS:Subscribe",
+                            "SNS:DeleteTopic",
+                            "SNS:GetTopicAttributes",
+                            "SNS:Publish",
+                            "SNS:RemovePermission",
+                            "SNS:AddPermission",
+                            "SNS:Receive",
+                            "SNS:SetTopicAttributes"
+                          ],
+                          "Resource": {
+                            "Ref": "topicMicronList"
+                          },
+                          "Condition": {
+                            "StringEquals": {
+                              "AWS:SourceOwner": "256215146792"
+                            }
+                          }
+                        },
+                        {
+                          "Sid": "__console_pub_0",
+                          "Effect": "Allow",
+                          "Principal": {
+                            "AWS": "*"
+                          },
+                          "Action": "SNS:Publish",
+                          "Resource": {
+                            "Ref": "topicMicronList"
+                          }
+                        },
+                        {
+                          "Sid": "__console_sub_0",
+                          "Effect": "Allow",
+                          "Principal": {
+                            "AWS": "*"
+                          },
+                          "Action": [
+                            "SNS:Subscribe",
+                            "SNS:Receive"
+                          ],
+                          "Resource": {
+                            "Ref": "topicMicronList"
+                          },
+                          "Condition": {
+                            "StringEquals": {
+                              "SNS:Protocol": [
+                                "application",
+                                "sms",
+                                "email"
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+
+
+        }
+        if depends_on is not None:
+            self.resources[key]["DependsOn"] = depends_on
+
+
 
 class UserData:
     """A wrapper class around configparse.ConfigParser that automatically loads
