@@ -60,7 +60,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
 
     listeners = []
     # cert="arn:aws:acm:us-east-1:256215146792:certificate/afb78241-a392-43e1-9317-f42ffafc432f"
-    cert = lib.cert_arn_lookup(session, "api.hiderrt1.theboss.io")
+    cert = lib.cert_arn_lookup(session, "api.theboss.io")
     listeners.append(lib.create_elb_listener("443","80","HTTPS", cert ))
 
     loadbalancer_name = "elb-" + domain.replace(".", "-")  #elb names can't have periods in them.
