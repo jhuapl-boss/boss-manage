@@ -14,9 +14,9 @@ import library as lib
 """
 Either hardcode all arguments into the template
 -OR-
-Construct separate arguments dictionary
+Construct seperate arguments dictionary
 
-The difference is when a configuration is generated,
+The differrence is when a configuration is generated,
 the first produces something that is exactly the same
 as the call to CloudFormation create_stack(), while the
 second approach allows someone to upload the generated
@@ -802,7 +802,7 @@ class CloudFormationConfiguration:
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
 
-    def add_cloudwatch(self, lb_name, alarm_actions, depends_on=None ):
+   def add_cloudwatch(self, lb_name, alarm_actions, depends_on=None ):
         """ Add alarms for Loadbalancer
         :arg lb_name loadbalancer name
         :arg alarm_actions name of SNS mailing list
@@ -987,7 +987,8 @@ class CloudFormationConfiguration:
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
 
-    def _add_record_cname(self, key, hostname, vpc="VPC", ttl="300", rds=False, cluster=False, replication=False, ec2=False):
+
+def _add_record_cname(self, key, hostname, vpc="VPC", ttl="300", rds=False, cluster=False, replication=False, ec2=False):
         address_key = None
         if rds:
             address_key = "Endpoint.Address"
