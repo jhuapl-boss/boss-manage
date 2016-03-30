@@ -9,6 +9,7 @@ django-prerequirements:
     pkg.installed:
         - pkgs:
             - libmysqlclient-dev
+            - libffi-dev
 
 django-requirements:
     pip.installed:

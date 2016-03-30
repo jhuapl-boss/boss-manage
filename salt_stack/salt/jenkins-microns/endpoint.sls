@@ -5,6 +5,7 @@ include:
   - boss-tools.bossutils
   - boss-tools.credentials
   - boss.django
+  - django.openid-connect # install first and patch
   - mysql
   - dynamodb
   - python.coverage
