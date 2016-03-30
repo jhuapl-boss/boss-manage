@@ -905,6 +905,7 @@ class CloudFormationConfiguration:
             }
         }
 
+
         if "DNSZone" in self.resources:
             self.resources[key + "Record"]["DependsOn"] = "DNSZone"
 

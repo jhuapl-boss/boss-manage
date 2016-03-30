@@ -245,3 +245,4 @@ def instanceid_lookup(session, hostname):
             if 'InstanceId' in item:
                 return item['InstanceId']
             return None
+
