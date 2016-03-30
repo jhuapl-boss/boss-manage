@@ -18,7 +18,18 @@ import pprint
 
 
 def create_config(session, domain, keypair=None, user_data=None, db_config={}):
-    """Create the CloudFormationConfiguration object."""
+    """
+    Create the CloudFormationConfiguration object.
+    Args:
+        session: aws session key
+        domain: domain used to create this system
+        keypair: aws keypair used to create resources
+        user_data: Not used in this but is used in other config files, needed for compatibility
+        db_config: Not used in this but is used in other config files, needed for compatibility
+
+    Returns: aws cloudformation stack
+
+    """
     config = configuration.CloudFormationConfiguration(domain)
 
     # do a couple of verification checks
@@ -47,21 +58,29 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                               "http",
                               [("tcp", "443", "443", "0.0.0.0/0")])
 
+    listeners = []
+    # cert="arn:aws:acm:us-east-1:256215146792:certificate/afb78241-a392-43e1-9317-f42ffafc432f"
+    cert = lib.cert_arn_lookup(session, "api.hiderrt1.theboss.io")
+    listeners.append(lib.create_elb_listener("443","80","HTTPS", cert ))
+
     loadbalancer_name = "elb-" + domain.replace(".", "-")  #elb names can't have periods in them.
     config.add_loadbalancer("LoadBalancer",
                             loadbalancer_name,
+                            listeners,
                             [endpoint_instance_id],
-                            subnets = ["ExternalSubnet"],
+                            subnets=["ExternalSubnet"],
                             security_groups=["AllHTTPSSecurityGroup"],
                             depends_on = ["AllHTTPSSecurityGroup"])
 
     return config
+
 
 def generate(folder, domain):
     """Create the configuration and save it to disk"""
     name = lib.domain_to_stackname("loadbalancer." + domain)
     config = create_config(None, domain)
     config.generate(name, folder)
+
 
 def create(session, domain):
     """Create the configuration, launch it, and initialize Vault"""

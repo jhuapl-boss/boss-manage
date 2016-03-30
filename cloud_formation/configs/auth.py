@@ -27,6 +27,7 @@ CORE_REGION = 'us-east-1'
 
 INCOMING_SUBNET = "52.3.13.189/32" # microns-bastion elastic IP
 
+
 def create_config(session, domain):
     """Create the CloudFormationConfiguration object."""
     config = configuration.CloudFormationConfiguration(domain, CORE_REGION)
@@ -67,7 +68,25 @@ def create_config(session, domain):
                               [("tcp", "8080", "8080", "128.244.0.0/16"),
                                ("tcp", "22", "22", INCOMING_SUBNET)])
 
+    # Create New HTTPS Security Group and LoadBalancer
+    config.add_security_group("AllHTTPSSecurityGroup",
+                              "http",
+                              [("tcp", "443", "443", "0.0.0.0/0")])
+
+    listeners = [lib.create_elb_listener("8080", "8080", "HTTP"),
+                 lib.create_elb_listener("9990", "9990", "HTTP")]
+
+    loadbalancer_name = "elb-auth-" + domain.replace(".", "-")  #elb names can't have periods in them.
+    config.add_loadbalancer("LoadBalancerAuth",
+                            loadbalancer_name,
+                            listeners,
+                            subnets=["ExternalSubnet"],
+                            healthcheck_target="http:8080/index.html",
+                            security_groups=["AuthSecurityGroup"],
+                            depends_on=["AuthSecurityGroup"])
+
     return config
+
 
 def upload_realm_config(port, password):
     URL = "http://localhost:{}".format(port)
@@ -86,6 +105,7 @@ def upload_realm_config(port, password):
 
     kc.create_realm(realm)
     kc.logout()
+
 
 def configure_keycloak(session, domain):
     # NOTE DP: if there is an ELB in front of the auth server, this needs to be

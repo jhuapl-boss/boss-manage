@@ -828,59 +828,63 @@ class CloudFormationConfiguration:
                             "Destination VPC for the peering connection")
         self.add_arg(peer_vpc_)
 
-    def add_loadbalancer(self, key, name, instances, subnets=None, security_groups=None,
-                         cert="arn:aws:acm:us-east-1:256215146792:certificate/afb78241-a392-43e1-9317-f42ffafc432f",
-                         depends_on=None ):
-        """ Add loadbalancer to the configuration
-        key is the unique name (within the configuration) for this resource
-        name is the name to give the
-        instances is the list of instances ids
-        subnets is a list of subnet names
-        security_groups is a list of SecurityGroups
-        cert is the certifcation to use for HTTPS
-        depends_on is a list of resources this loadbalancer depends on
+    def add_loadbalancer(self, key, name, listeners, instances=None, subnets=None, security_groups=None,
+                         healthcheck_target="HTTP:80/ping/", depends_on=None ):
+        """
+        Add loadbalancer to the configuration
+        Args:
+            key: the unique name (within the configuration) for this resource
+            name: the name to give this elb
+            listeners: list of listeners for the elb
+            instances: list of instances ids
+            subnets: list of subnet names
+            security_groups:  list of SecurityGroups
+            healthcheck_target: URL used for for health checks Ex: "HTTP:80/"
+            depends_on:
+
+        Returns:
+
         """
         self.resources[key] = {
             "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
             "Properties": {
-                "CrossZone" : True,
-                "HealthCheck" : {
-                    "Target" : "HTTP:80/ping/",
-                    "HealthyThreshold" : "2",
-                    "UnhealthyThreshold" : "2",
-                    "Interval" : "30",
-                    "Timeout" : "5"
+                "CrossZone": True,
+                "HealthCheck": {
+                    "Target": healthcheck_target,
+                    "HealthyThreshold": "2",
+                    "UnhealthyThreshold": "2",
+                    "Interval": "30",
+                    "Timeout": "5"
                 },
-                "Instances" : instances,
-                "LoadBalancerName" : name,
-                "Listeners" : [ {
-                    "LoadBalancerPort" : "443",
-                    "InstancePort" : "80",
-                    "Protocol" : "HTTPS",
-                    "SSLCertificateId" : cert
-                } ],
-                "Tags" : [
-                    {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} }
+                "LoadBalancerName": name,
+                "Listeners": listeners,
+                "Tags": [
+                    {"Key": "Stack", "Value": { "Ref": "AWS::StackName"}}
                 ]
             }
         }
-        # if instances is not None:
-        #     ref_insts = []
-        #     for inst in instances:
-        #         ref_insts.append({ "Ref" : inst })
-        #     self.resources[key]["Properties"]["Instances"] = ref_insts
+
+        if instances is not None:
+            self.resources[key]["Properties"]["Instances"] = instances
         if security_groups is not None:
             sgs = []
             for sg in security_groups:
-                sgs.append({ "Ref" : sg })
+                sgs.append({"Ref": sg })
             self.resources[key]["Properties"]["SecurityGroups"] = sgs
         if subnets is not None:
             ref_subs = []
             for sub in subnets:
-                ref_subs.append({ "Ref" : sub })
+                ref_subs.append({"Ref": sub })
             self.resources[key]["Properties"]["Subnets"] = ref_subs
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
+
+        # self.resources["Outputs"] = {
+        #     "URL" : {
+        #         "Description": "URL of the ELB website",
+        #         "Value":  { "Fn::Join": ["", ["http://", {"Fn::GetAtt": [ "ElasticLoadBalancer", "DNSName"]}]]}
+        #     }
+        # }
 
     def _add_record_cname(self, key, hostname, vpc="VPC", ttl="300", rds=False, cluster=False, replication=False, ec2=False):
         address_key = None
@@ -911,6 +915,7 @@ class CloudFormationConfiguration:
         domain = Arg.String(vpc + "Domain", self.vpc_domain,
                             "Domain of the VPC '{}'".format(vpc))
         self.add_arg(domain)
+
 
 class UserData:
     """A wrapper class around configparse.ConfigParser that automatically loads
