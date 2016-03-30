@@ -882,8 +882,7 @@ class CloudFormationConfiguration:
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
 
-
-    def add_sns_topic(self, key, name, depends_on=None ):
+    def add_sns_topic(self, key, topic_name, depends_on=None ):
         """ Add alarms for Loadbalancer
         :arg key is the unique name (within the configuration) for this resource
         :arg name is the name to give the
