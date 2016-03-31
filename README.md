@@ -2,7 +2,7 @@ boss-manage
 ===========
 
 This repository contains code for creating all of the infrastructure needed by
-the [BOSS](https://github.com/aplmicrons/boss) repository.
+the [Boss](https://github.com/aplmicrons/boss) repository.
 
 Components:
 
