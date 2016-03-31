@@ -4,6 +4,7 @@ include:
     - boss-tools.bossutils
     - uwsgi.emperor
     - nginx
+    - spdb
 
 django-prerequirements:
     pkg.installed:
