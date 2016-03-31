@@ -146,6 +146,12 @@ sudo python3 manage.py test
 7. Paste the new DNS name over top of the old one.
 8. `Save Record Set`
 
+### Update the Auth redirect URL
+```shell
+$ cd cloud_formation/
+$ source ../config/set_vars.sh
+$ ./cloudformation.py create integration.boss update_auth
+```
 
 ## Proofreader Tests
 ````shell
