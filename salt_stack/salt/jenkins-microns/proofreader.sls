@@ -5,6 +5,7 @@ include:
     - mysql
     - python.coverage
     - python.pylint
+    - python.pylint-django
     - python.pep8
     - jenkins
     - jenkins.plugins
