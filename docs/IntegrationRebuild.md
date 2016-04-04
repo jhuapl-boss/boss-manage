@@ -55,7 +55,7 @@ Stacks need to be deleted.
 
 1. Open a web browser
 2. Login to the AWS console and open up the CloudFormation console
-3. For *LoadbalancerIntegrationBoss*, *ProofreaderIntegrationBoss*,
+3. For *CloudwatchIntegrationBoss*, *LoadbalancerIntegrationBoss*, *ProofreaderIntegrationBoss*,
    *ProductionIntegrationBoss*, *AuthIntegrationBoss*, *CoreIntegrationBoss*
   1. Right click on the Stack and select *Delete Stack*
   2. Wait for the stack to be deleted
@@ -84,7 +84,7 @@ $ source ../config/set_vars.sh
 
 ### Launching configs
 
-For the *core*, *auth*, *production*, *proofreader*, and *loadbalancer* configurations
+For the *core*, *auth*, *production*, *proofreader*, *loadbalancer*, *cloudwatch* configurations
 run the following command. You have to wait for each command to finish before
 launching the next configuration as they build upon each other.
 ```shell
