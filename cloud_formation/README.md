@@ -42,15 +42,15 @@ These tokens can be retrieved (and deleted if necessary) from the Scalyr web sit
 
 Here's a sample script for setting these values:
 
-````bash
+```bash
 #!/bin/bash
 
 export scalyr_readconfig_token='some key string'
 export scalyr_writeconfig_token='another key string'
-````
+```
 
 Run this script like so:
 
-````bash
+```bash
 source scalyr_vars.sh
-````
+```

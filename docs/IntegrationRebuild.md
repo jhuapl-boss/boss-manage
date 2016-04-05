@@ -82,6 +82,28 @@ $ cd cloud_formation/
 $ source ../config/set_vars.sh
 ```
 
+Set the environment variables necessary to add Scalyr monitoring of AWS instance
+health checks.  The Scalyr values may be obtained from this page:
+https://www.scalyr.com/keys
+
+Login information was distributed in an encrypted email.
+
+Here's a sample script for setting these values:
+
+```shell
+#!/bin/bash
+
+export scalyr_readconfig_token='some key string'
+export scalyr_writeconfig_token='another key string'
+```
+
+Create this script and save it for the next time you do the integration test
+build.  Run this script like so:
+
+```shell
+source set_scalyr_vars.sh
+```
+
 ### Launching configs
 
 For the *core*, *auth*, *production*, *proofreader*, *loadbalancer*, *cloudwatch* configurations
@@ -92,8 +114,8 @@ $ ./cloudformation.py create integration.boss <config>
 ```
 
 *Note: When launching some configurations there may be an message about manually
-configuring Scalyr monitoring. These instructions skip Scalyr configuration and
-you can ignore these instructions.*
+configuring Scalyr monitoring.  Report this as an potential problem if you
+encounter this message.*
 
 *Note: The cloudformation.py script will automatically use the latest created AMIs
 that are named with a commit hash. Since you just rebuilt the AMIs they should be
@@ -175,3 +197,5 @@ To be filled out
 ### Manual Checks
 * https://api.theboss.io/ping/
 * https://api.theboss.io/v0.2/info/collections/
+* Login into Scalyr and verify that the new instances appear on the overview page.
+* Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint and vault.
