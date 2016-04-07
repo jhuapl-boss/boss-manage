@@ -14,6 +14,7 @@ For each of the following repositories
 * https://github.com/aplmicrons/boss.git
 * https://github.com/aplmicrons/proofread.git
 * https://github.com/aplmicrons/boss-tools.git
+* https://github.com/aplmicrons/spdb.git
 
 
 If you don't have the repository already cloned
@@ -46,11 +47,13 @@ $ git submodule update --remote
 $ git add salt_stack/salt/boss/files/boss.git
 $ git add salt_stack/salt/boss-tools/files/boss-tools.git
 $ git add salt_stack/salt/proofreader-web/files/proofread.git
+$ git add salt_stack/salt/spdb/files/spdb.git
 # Review the SHA hash for each submodule to make sure it correctly points to the
 #   tagged version
 $ git commit -m "Updated submodule references"
 $ git tag sprint#
 $ git push --tags
+$ git push
 ```
 
 ## Tagging a stable release
@@ -60,6 +63,7 @@ For each of the following repositories
 * https://github.com/aplmicrons/boss.git
 * https://github.com/aplmicrons/proofread.git
 * https://github.com/aplmicrons/boss-tools.git
+* https://github.com/aplmicrons/spdb.git
 
 
 If you don't have the repository already cloned
@@ -75,6 +79,7 @@ $ git checkout master
 $ git merge integration # resolve any conflicts and commit
 $ git tag <release#>
 $ git push --tags
+$ git push  # One more push to push the merged commits.
 ```
 
 
@@ -96,9 +101,11 @@ $ git submodule foreach "git fetch && git checkout tags/<release#>"
 $ git add salt_stack/salt/boss/files/boss.git
 $ git add salt_stack/salt/boss-tools/files/boss-tools.git
 $ git add salt_stack/salt/proofreader-web/files/proofread.git
+$ git add salt_stack/salt/spdb/files/spdb.git
 # Review the SHA hash for each submodule to make sure it correctly points to the
 #   tagged version
 $ git commit -m "Updated submodule references"
 $ git tag <release#>
 $ git push --tags
+$ git push
 ```
