@@ -34,6 +34,7 @@ You will need access to the following code repositories on Github:
 * [boss-tools.git](https://github.com/aplmicrons/boss-tools)
 * [boss.git](https://github.com/aplmicrons/boss)
 * [proofread.git](https://github.com/aplmicrons/proofread)
+* [spdb.git](https://github.com/aplmicrons/spdb)
 
 ## Install Procedures
 
@@ -82,7 +83,7 @@ Make sure that the Packer executable is either in $PATH (you can call it by just
 calling packer) or in the `bin/` directory of the boss-manage repository.
 
 ```shell
-$ bin/packer.py vault endpoint proofreader-web
+$ bin/packer.py vault auth endpoint proofreader-web
 ```
 
 *Note: because the packer.py script is running builds in parallel it is redirecting
@@ -182,15 +183,12 @@ $ source ../scalyr_keys.sh
 
 #### Launching
 
-For the *core*, *production*, *proofreader*, and *loadbalancer* configurations
+For the *core*, *production*, and *proofreader* configurations
 run the following command. You have to wait for each command to finish before
 launching the next configuration as they build upon each other.
 ```shell
 $ ./cloudformation.py create production.boss <config>
 ```
-
-*Note: make sure to select the keypair created earlier when launching the
-different configurations.*
 
 *Note: If when launching the core configuration you receive a message about
 manually initializing / configuring Vault then run the following commands. If

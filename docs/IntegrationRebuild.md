@@ -55,8 +55,8 @@ Stacks need to be deleted.
 
 1. Open a web browser
 2. Login to the AWS console and open up the CloudFormation console
-3. For *CloudwatchIntegrationBoss*, *LoadbalancerIntegrationBoss*, *ProofreaderIntegrationBoss*,
-   *ProductionIntegrationBoss*, *AuthIntegrationBoss*, *CoreIntegrationBoss*
+3. For *CloudwatchIntegrationBoss*, *ProofreaderIntegrationBoss*,
+   *ProductionIntegrationBoss*, *CoreIntegrationBoss*
   1. Right click on the Stack and select *Delete Stack*
   2. Wait for the stack to be deleted
 
@@ -106,7 +106,7 @@ source set_scalyr_vars.sh
 
 ### Launching configs
 
-For the *core*, *auth*, *production*, *proofreader*, *loadbalancer*, *cloudwatch* configurations
+For the *core*, *production*, *proofreader*, *cloudwatch* configurations
 run the following command. You have to wait for each command to finish before
 launching the next configuration as they build upon each other.
 ```shell
@@ -121,38 +121,15 @@ encounter this message.*
 that are named with a commit hash. Since you just rebuilt the AMIs they should be
 the latest ones.*
 
-*Manual Configuration: Because of restrictive Security Group rules you need to
-manually add the endpoint's IP address to the http.integration.boss Security Group.*
-
-1. Open the AWS web console to the EC2 section
-2. On the left side click *Instances*
-3. Locate the *endpoint.integration.boss* instance and record the public IP address
-4. On the lift side click *Security Groups*
-3. Locate the *http.integration.boss* Security Group
-4. Select the *Inbound* tab for the *http.integration.boss* Security Group
-5. Click *Edit*
-6. Click *Add Rule*
-7. Type is *Custom TCP Rule*
-8. Port Range is *8080*
-9. Source is *Custom IP* with a value of *<endpoint IP>/32*
-10. Click *Save*
-
 ## Initialize Endpoint and run unit tests
 ```shell
 cd vault
-./ssh.py endpoint.integration.boss
+./bastion.py bastion.integration.boss endpoint.integration.boss ssh
 cd /srv/www/django
-sudo python3 manage.py makemigrations
-sudo python3 manage.py makemigrations bosscore
-sudo python3 manage.py migrate
-sudo python3 manage.py collectstatic
-	: yes
 sudo python3 manage.py createsuperuser
 	user:  bossadmin
 	email: garbage@garbage.com
 	pass:  88secret88
-sudo service uwsgi-emperor reload
-sudo service nginx restart
 sudo python3 manage.py test
 ```
 	output should say 36 Tests OK
