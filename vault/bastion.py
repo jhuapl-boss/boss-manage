@@ -237,6 +237,8 @@ def machine_lookup(session, hostname, public_ip = True):
                 return None
 
 if __name__ == "__main__":
+    os.chdir(os.path.abspath(os.path.dirname(__file__)))
+
     def create_help(header, options):
         """Create formated help."""
         return "\n" + header + "\n" + \
@@ -264,6 +266,9 @@ if __name__ == "__main__":
                         choices = commands,
                         metavar = "command",
                         help = "Command to execute")
+    parser.add_argument("arguments",
+                        nargs = "*",
+                        help = "Arguments to pass to the command")
 
     args = parser.parse_args()
 
@@ -287,11 +292,11 @@ if __name__ == "__main__":
     if args.command in ("ssh",):
         ssh(args.ssh_key, private, bastion)
     elif args.command in ("ssh-cmd",):
-        ssh_cmd(args.ssh_key, private, bastion)
+        ssh_cmd(args.ssh_key, private, bastion, *args.arguments)
     elif args.command in ("ssh-tunnel",):
-        ssh_tunnel(args.ssh_key, private, bastion)
+        ssh_tunnel(args.ssh_key, private, bastion, *args.arguments)
     elif args.command in vault.COMMANDS:
-        connect_vault(args.ssh_key, private, bastion, lambda: vault.COMMANDS[args.command](args.internal))
+        connect_vault(args.ssh_key, private, bastion, lambda: vault.COMMANDS[args.command](args.internal, *args.arguments))
     else:
         parser.print_usage()
         sys.exit(1)

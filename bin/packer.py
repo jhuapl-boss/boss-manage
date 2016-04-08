@@ -38,6 +38,8 @@ if __name__ == '__main__':
             print("Could not locate {} binary on the system, required...".format(cmd))
             sys.exit(1)
 
+    os.chdir(os.path.abspath(os.path.dirname(__file__)))
+
     git_hash = get_commit()
 
     def create_help(header, options):

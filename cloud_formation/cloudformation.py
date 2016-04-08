@@ -57,6 +57,8 @@ def generate_config(domain, config):
     module.generate("templates", domain)
 
 if __name__ == '__main__':
+    os.chdir(os.path.abspath(os.path.dirname(__file__)))
+
     def create_help(header, options):
         """Create formated help."""
         return "\n" + header + "\n" + \
@@ -68,9 +70,12 @@ if __name__ == '__main__':
     actions = ["create", "generate"]
     actions_help = create_help("action supports the following:", actions)
 
+    scenarios = ["development", "production"]
+    scenario_help = create_help("scenario supports the following:", scenarios)
+
     parser = argparse.ArgumentParser(description = "Script the creation and provisioning of CloudFormation Stacks",
                                      formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     epilog=actions_help + config_help)
+                                     epilog=actions_help + config_help + scenario_help)
     parser.add_argument("--aws-credentials", "-a",
                         metavar = "<file>",
                         default = os.environ.get("AWS_CREDENTIALS"),
@@ -80,6 +85,11 @@ if __name__ == '__main__':
                         metavar = "<ami-version>",
                         default = "latest",
                         help = "The AMI version to use when selecting images (default: latest)")
+    parser.add_argument("--scenario",
+                        metavar = "<scenario>",
+                        default = "development",
+                        choices = scenarios,
+                        help = "The deployment configuration to use when creating the stack (instance size, autoscale group size, etc) (default: development)")
     parser.add_argument("action",
                         choices = ["create","generate"],
                         metavar = "action",
@@ -98,6 +108,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     os.environ["AMI_VERSION"] = args.ami_version
+    os.environ["SCENARIO"] = args.scenario
 
     credentials = json.load(args.aws_credentials)
 

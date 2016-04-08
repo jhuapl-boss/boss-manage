@@ -343,11 +343,13 @@ def vault_provision(policy, machine = None):
     token = client.create_token(policies = [policy])
     return token["auth"]["client_token"]
 
-def _vault_provision(machine = None):
-    policy = input("policy: ")
+def _vault_provision(machine = None, policy = None):
+    if policy is None:
+        policy = input("policy: ")
     token = vault_provision(policy, machine)
 
     token_file = get_path(machine, NEW_TOKEN)
+    print("Provisioned Token saved to {}".format(token_file))
     with open(token_file, "w") as fh:
         fh.write(token)
 
@@ -359,12 +361,11 @@ def vault_revoke(token, machine = None):
 
     client.revoke_token(token)
 
-def _vault_revoke(machine = None):
-    token = input("token: ") # prompt for token or ready fron NEW_TOKEN (or REVOKE_TOKEN)?
+def _vault_revoke(machine = None, token = None):
+    if token is None:
+        token = input("token: ") # prompt for token or ready fron NEW_TOKEN (or REVOKE_TOKEN)?
     vault_revoke(token, machine)
 
-# Should probably create a _vault_write() function that reads
-# user input.
 def vault_write(path, machine = None, **kwargs):
     """A generic method for writing data into Vault, for use by CloudFormation
     scripts.
@@ -372,15 +373,21 @@ def vault_write(path, machine = None, **kwargs):
     client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
     client.write(path, **kwargs)
 
-def _vault_write(machine = None):
-    path = input("path: ")
+def _vault_write(machine = None, path = None, *args):
+    if path is None:
+        path = input("path: ")
     entries = {}
-    while True:
-        entry = input("entry: ")
-        if entry is None or entry == '':
-            break
-        key,val = entry.split("=")
-        entries[key.strip()] = val.strip()
+    if len(args) == 0:
+        while True:
+            entry = input("entry (key=value): ")
+            if entry is None or entry == '':
+                break
+            key,val = entry.split("=")
+            entries[key.strip()] = val.strip()
+    else:
+        for arg in args:
+            key,val = arg.split("=")
+            entries[key.strip()] = val.strip()
 
     vault_write(path, machine, **entries)
 
@@ -400,24 +407,21 @@ def vault_update(path, machine = None, **kwargs):
 
     client.write(path, **existing)
 
-def _vault_update(machine = None):
-    path = input("path: ")
+def _vault_update(machine = None, path = None, *args):
+    if path is None:
+        path = input("path: ")
     entries = {}
-    while True:
-        entry = input("entry: ")
-        if entry is None or entry == '':
-            break
-        key,val = entry.split("=")
-        entries[key.strip()] = val.strip()
-
-    """
-    path = "secret/endpoint/auth"
-    entries = {
-        "url": "http://ec2-52-90-0-27.compute-1.amazonaws.com:8080/auth/realms/BOSS",
-        "public_uri": "http://ec2-52-3-250-125.compute-1.amazonaws.com",
-        "client_id": "endpoint",
-    }
-    """
+    if len(args) == 0:
+        while True:
+            entry = input("entry (key=value): ")
+            if entry is None or entry == '':
+                break
+            key,val = entry.split("=")
+            entries[key.strip()] = val.strip()
+    else:
+        for arg in args:
+            key,val = arg.split("=")
+            entries[key.strip()] = val.strip()
 
     vault_update(path, machine, **entries)
 
@@ -428,8 +432,9 @@ def vault_read(path, machine = None):
     client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
     return client.read(path)
 
-def _vault_read(machine = None):
-    path = input("path: ")
+def _vault_read(machine = None, path = None):
+    if path is None:
+        path = input("path: ")
     results = vault_read(path, machine)
     pprint(results)
 
@@ -440,8 +445,9 @@ def vault_delete(path, machine = None):
     client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
     client.delete(path)
 
-def _vault_delete(machine = None):
-    path = input("path: ")
+def _vault_delete(machine = None, path = None):
+    if path is None:
+        path = input("path: ")
     vault_delete(path, machine)
 
 COMMANDS = {
@@ -461,6 +467,8 @@ COMMANDS = {
 }
 
 if __name__ == '__main__':
+    os.chdir(os.path.abspath(os.path.dirname(__file__)))
+
     def create_help(header, options):
         """Create formated help."""
         return "\n" + header + "\n" + \

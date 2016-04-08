@@ -30,6 +30,9 @@ import time
 import requests
 import scalyr
 
+import os
+import json
+
 keypair = None
 
 # Region core is created in.  Later versions of boto3 should allow us to
@@ -95,6 +98,22 @@ def create_config(session, domain):
                             iface_check = False,
                             security_groups = ["InternalSecurityGroup", "BastionSecurityGroup"])
 
+    config.add_ec2_instance("Auth",
+                            "auth." + domain,
+                            lib.ami_lookup(session, "auth.boss"),
+                            keypair,
+                            subnet = "InternalSubnet", # Eventually place in a autoscale group across all subnets
+                            security_groups = ["InternalSecurityGroup"])
+
+    config.add_loadbalancer("LoadBalancerAuth",
+                            "elb-auth." + domain,
+                            [lib.create_elb_listener("8080", "8080", "HTTP")],
+                            instances = ["Auth"],
+                            subnets = ["ExternalSubnet"],
+                            healthcheck_target = "HTTP:8080/index.html",
+                            security_groups = ["InternalSecurityGroup", "AuthSecurityGroup"],
+                            depends_on = ["AuthSecurityGroup"])
+
     config.add_security_group("InternalSecurityGroup",
                               "internal",
                               [("-1", "-1", "-1", "10.0.0.0/8")])
@@ -103,6 +122,10 @@ def create_config(session, domain):
     config.add_security_group("BastionSecurityGroup",
                               "ssh",
                               [("tcp", "22", "22", INCOMING_SUBNET)])
+
+    config.add_security_group("AuthSecurityGroup",
+                              "auth",
+                              [("tcp", "8080", "8080", "0.0.0.0/0")])
 
     # Create the internal route table to route traffic to the NAT Bastion
     config.add_route_table("InternalRouteTable",
@@ -128,6 +151,48 @@ def create_config(session, domain):
 
     return config
 
+def upload_realm_config(port, password):
+    URL = "http://localhost:{}".format(port)
+
+    kc = lib.KeyCloakClient(URL)
+    kc.login("admin", password)
+    if kc.token is None:
+        print("Could not upload BOSS.realm configuration, exiting...")
+        return
+
+    cur_dir = os.path.dirname(os.path.realpath(__file__))
+    realm_file = os.path.normpath(os.path.join(cur_dir, "..", "..", "salt_stack", "salt", "keycloak", "files", "BOSS.realm"))
+    print("Opening realm file at '{}'".format(realm_file))
+    with open(realm_file, "r") as fh:
+        realm = json.load(fh)
+
+    kc.create_realm(realm)
+    kc.logout()
+
+def configure_keycloak(session, domain):
+    # NOTE DP: if there is an ELB in front of the auth server, this needs to be
+    #          the public DNS address of the ELB.
+    auth_dns = lib.elb_public_lookup(session, "elb-auth." + domain)
+    auth_discovery_url = "http://{}:8080/auth/realms/BOSS".format(auth_dns)
+
+    password = lib.generate_password()
+    print("Setting Admin password to: " + password)
+
+    call = lib.ExternalCalls(session, keypair, domain)
+
+    call.vault_write("secret/auth", password = password, username = "admin")
+    call.vault_update("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
+
+    call.set_ssh_target("auth")
+    call.ssh("/srv/keycloak/bin/add-user.sh -r master -u admin -p " + password)
+    call.ssh("sudo service keycloak stop")
+    call.ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
+                                  # make sure the process is actually killed
+    call.ssh("sudo service keycloak start")
+
+    time.sleep(15) # wait for service to start
+    call.ssh_tunnel(lambda p: upload_realm_config(p, password), 8080)
+
 def generate(folder, domain):
     """Create the configuration and save it to disk"""
     name = lib.domain_to_stackname("core." + domain)
@@ -145,16 +210,28 @@ def create(session, domain):
         lib.rt_name_default(session, vpc_id, "internal." + domain)
 
         try:
-            print("Waiting 2.5 minutes for VMs to start...")
-            time.sleep(150)
+            print("Waiting 1 minute for VMs to start...")
+            time.sleep(60)
+
             print("Initializing Vault...")
-            lib.call_vault(session,
-                           lib.keypair_to_file(keypair),
-                           "bastion." + domain,
-                           "vault." + domain,
-                           "vault-init")
+            initialized = False
+            for i in range(6):
+                try:
+                    call = lib.ExternalCalls(session, keypair, domain)
+                    call.vault("vault-init")
+                    initialized = True
+                    break
+                except requests.exceptions.ConnectionError:
+                    time.sleep(30)
+            if not initialized:
+                raise Exception("Could not initialize Vault")
+
+            print("Configuring KeyCloak...")
+            configure_keycloak(session, domain)
+
             # Tell Scalyr to get CloudWatch metrics for these instances.
             instances = [ "vault." + domain ]
             scalyr.add_instances_to_scalyr(session, CORE_REGION, instances)
-        except requests.exceptions.ConnectionError:
+        except:
             print("Could not connect to Vault, manually initialize it before launching other machines")
+            # If Vault fails to initialize then KeyCloak also needs to be configured...

@@ -419,6 +419,13 @@ class CloudFormationConfiguration:
         depends_on the unique name of a resource within the configuration and is used to
                    determine the launch order of resources
         """
+        if type(type_) == dict:
+            scenario = os.environ["SCENARIO"]
+            type__ = type_.get(scenario, None)
+            if type__ is None:
+                type__ = type_.get("default", "t2.micro")
+            type_ = type__
+
         self.resources[key] = {
             "Type" : "AWS::EC2::Instance",
             "Properties" : {
@@ -489,6 +496,19 @@ class CloudFormationConfiguration:
         storage is the storage size of the database (in GB)
         security_groups is an array of SecurityGroup unique names within the configuration
         """
+        scenario = os.environ["SCENARIO"]
+        if type(type_) == dict:
+            type__ = type_.get(scenario, None)
+            if type__ is None:
+                type__ = type_.get("default", "db.t2.micro")
+            type_ = type__
+
+        multi_az = {
+            "development": "false",
+            "production": "true",
+        }
+        multi_az = multi_az.get(scenario, "false")
+
         self.resources[key] = {
             "Type" : "AWS::RDS::DBInstance",
 
@@ -497,7 +517,7 @@ class CloudFormationConfiguration:
                 "LicenseModel" : "general-public-license",
                 "EngineVersion" : "5.6.23",
                 "DBInstanceClass" : type_,
-                "MultiAZ" : "false",
+                "MultiAZ" : multi_az,
                 "StorageType" : "standard",
                 "AllocatedStorage" : storage,
                 "DBInstanceIdentifier" : { "Ref" : key + "Hostname" },
@@ -622,6 +642,13 @@ class CloudFormationConfiguration:
         self.add_arg(table_name)
 
     def add_redis_cluster(self, key, hostname, subnets, security_groups, type_="cache.t2.micro", port=6379, version="2.8.24"):
+        if type(type_) == dict:
+            scenario = os.environ["SCENARIO"]
+            type__ = type_.get(scenario, None)
+            if type__ is None:
+                type__ = type_.get("default", "cache.t2.micro")
+            type_ = type__
+
         self.resources[key] =  {
             "Type" : "AWS::ElastiCache::CacheCluster",
             "Properties" : {
@@ -656,7 +683,20 @@ class CloudFormationConfiguration:
 
         self._add_record_cname(key, hostname, cluster = True)
 
-    def add_redis_replication(self, key, hostname, subnets, security_groups, type_="cache.m3.medium", port=6379, version="2.8.24", clusters=5):
+    def add_redis_replication(self, key, hostname, subnets, security_groups, type_="cache.m3.medium", port=6379, version="2.8.24", clusters=1):
+        scenario = os.environ["SCENARIO"]
+        if type(type_) == dict:
+            type__ = type_.get(scenario, None)
+            if type__ is None:
+                type__ = type_.get("default", "cache.m3.medium")
+            type_ = type__
+
+        if type(clusters) == dict:
+            clusters__ = clusters.get(scenario, None)
+            if clusters__ is None:
+                clusters__ = clusters.get("default", 1)
+            clusters = clusters__
+
         self.resources[key] =  {
             "Type" : "AWS::ElastiCache::ReplicationGroup",
             "Properties" : {

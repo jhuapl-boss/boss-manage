@@ -33,14 +33,14 @@ def tunnel_aplnis(ip):
     """Read environmental variables to either return (None,None) or use the
     given bastion server as the first machine to connect to and route other
     tunnels through.
-    
+
     This was added to support using a single machine given access through the
     APL firewall and tunnel all SSH connections through it.
     """
     apl_bastion_ip = os.environ.get("BASTION_IP")
     apl_bastion_key = os.environ.get("BASTION_KEY")
     apl_bastion_user = os.environ.get("BASTION_USER")
-    
+
     if apl_bastion_ip is None or apl_bastion_key is None or apl_bastion_user is None:
         print("APL Bastion information not defined, connecting directly")
         return (None, None)
@@ -54,14 +54,14 @@ def ssh(key, ip, user="ubuntu"):
     """Create an SSH session from the local machine to the given remote
     remote IP address (using become_tty_fg).
     """
-    
+
     proc, port = tunnel_aplnis(ip)
     # depending of if a tunnel is created, update some arguments
     if port is None:
         port = 22
     else:
         ip = "localhost"
-    
+
     try:
         ssh_cmd = "ssh -i {} {} -p {} {}@{}".format(key, SSH_OPTIONS, port, user, ip)
         subprocess.call(shlex.split(ssh_cmd), close_fds=True, preexec_fn=become_tty_fg)
@@ -72,6 +72,8 @@ def ssh(key, ip, user="ubuntu"):
 
 
 if __name__ == "__main__":
+    os.chdir(os.path.abspath(os.path.dirname(__file__)))
+
     parser = argparse.ArgumentParser(description = "Script to lookup AWS instance names and start an SSH session",
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--aws-credentials", "-a",
@@ -86,7 +88,7 @@ if __name__ == "__main__":
     parser.add_argument("hostname", help="Hostname of the EC2 instance to create SSH Tunnels on")
 
     args = parser.parse_args()
-    
+
     if args.aws_credentials is None:
         parser.print_usage()
         print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
@@ -102,8 +104,8 @@ if __name__ == "__main__":
 
     session = create_session(args.aws_credentials)
     ip = machine_lookup(session, args.hostname)
-    
+
     # the bastion server (being an AWS AMI) has a differnt username
     user = "ec2-user" if args.hostname.startswith("bastion") else "ubuntu"
-    
+
     ssh(args.ssh_key, ip, user)

@@ -43,6 +43,26 @@ VAULT_DJANGO = "secret/endpoint/django"
 VAULT_DJANGO_DB = "secret/endpoint/django/db"
 VAULT_DJANGO_AUTH = "secret/endpoint/auth"
 
+ENDPONT_TYPE = {
+    "development": "t2.micro",
+    "production": "m4.large",
+}
+
+RDS_TYPE = {
+    "development": "db.t2.micro",
+    "production": "db.t2.medium",
+}
+
+REDIS_TYPE = {
+    "development": "cache.m3.medium",
+    "production": "cache.r3.8xlarge",
+}
+
+REDIS_CLUSTER_SIZE = {
+    "development": 1,
+    "production": 5,
+}
+
 def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     """Create the CloudFormationConfiguration object."""
     config = configuration.CloudFormationConfiguration(domain, PRODUCTION_REGION)
@@ -65,6 +85,11 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                                             external_subnet_id,
                                             "ID of External Subnet to create resources in"))
 
+    internal_subnet_id = lib.subnet_id_lookup(session, "internal." + domain)
+    config.add_arg(configuration.Arg.Subnet("InternalSubnet",
+                                            internal_subnet_id,
+                                            "ID of Internal Subnet to create resources in"))
+
     internal_sg_id = lib.sg_lookup(session, vpc_id, "internal." + domain)
     config.add_arg(configuration.Arg.SecurityGroup("InternalSecurityGroup",
                                                    internal_sg_id,
@@ -72,13 +97,22 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
 
     az_subnets = config.find_all_availability_zones(session)
 
+    cert = lib.cert_arn_lookup(session, "api.theboss.io")
+    config.add_loadbalancer("LoadBalancer",
+                            "elb." + domain,
+                            [lib.create_elb_listener("443","80","HTTPS", cert )],
+                            ["Endpoint"],
+                            subnets=["ExternalSubnet"],
+                            security_groups=["AllHTTPSSecurityGroup"],
+                            depends_on = ["AllHTTPSSecurityGroup"])
+
     config.add_ec2_instance("Endpoint",
                             "endpoint." + domain,
                             lib.ami_lookup(session, "endpoint.boss"),
                             keypair,
-                            public_ip = True,
-                            subnet = "ExternalSubnet",
-                            security_groups = ["InternalSecurityGroup", "InternetSecurityGroup"],
+                            subnet = "InternalSubnet",
+                            type_ = ENDPONT_TYPE,
+                            security_groups = ["InternalSecurityGroup"],
                             user_data = user_data,
                             depends_on = "EndpointDB") # make sure the DB is launched before we start
 
@@ -89,23 +123,30 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                       db_config.get("user"),
                       db_config.get("password"),
                       az_subnets,
+                      type_ = RDS_TYPE,
                       security_groups = ["InternalSecurityGroup"])
 
     with open(DYNAMO_SCHEMA, 'r') as fh:
         dynamo_cfg = json.load(fh)
     config.add_dynamo_table_from_json("EndpointMetaDB",'bossmeta.' + domain, **dynamo_cfg)
 
-    config.add_redis_replication("Cache", "cache." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
-    config.add_redis_replication("CacheState", "cache-state." + domain, az_subnets, ["InternalSecurityGroup"], clusters=1)
+    config.add_redis_replication("Cache",
+                                 "cache." + domain,
+                                 az_subnets,
+                                 ["InternalSecurityGroup"],
+                                 type_ = REDIS_TYPE,
+                                 clusters = REDIS_CLUSTER_SIZE)
+    config.add_redis_replication("CacheState",
+                                 "cache-state." + domain,
+                                 az_subnets,
+                                 ["InternalSecurityGroup"],
+                                 type_ = REDIS_TYPE,
+                                 clusters = REDIS_CLUSTER_SIZE)
 
-    # Allow SSH/HTTP/HTTPS access to endpoint server from anywhere
-    config.add_security_group("InternetSecurityGroup",
-                              "internet",
-                              [
-                                ("tcp", "22", "22", INCOMING_SUBNET),
-                                ("tcp", "80", "80", "0.0.0.0/0"),
-                                ("tcp", "443", "443", "0.0.0.0/0")
-                              ])
+    # Allow HTTPS access to endpoint loadbalancer from anywhere
+    config.add_security_group("AllHTTPSSecurityGroup",
+                              "https",
+                              [("tcp", "443", "443", "0.0.0.0/0")])
 
     return config
 
@@ -151,11 +192,12 @@ def create(session, domain):
         if not success:
             raise Exception("Create Failed")
         else:
+            print("Configuring KeyCloak")
             def configure_auth(auth_port):
                 # NOTE DP: If an ELB is created the public_uri should be the Public DNS Name
                 #          of the ELB. Endpoint Django instances may have to be restarted if running.
-                dns = lib.instance_public_lookup(session, "endpoint." + domain)
-                uri = "http://{}".format(dns)
+                dns = lib.elb_public_lookup(session, "elb." + domain)
+                uri = "https://{}".format(dns)
                 call.vault_update(VAULT_DJANGO_AUTH, public_uri = uri)
 
                 creds = call.vault_read("secret/auth")
@@ -165,6 +207,18 @@ def create(session, domain):
                 kc.logout()
             call.set_ssh_target("auth")
             call.ssh_tunnel(configure_auth, 8080)
+
+            print("Initializing Django")
+            call.set_ssh_target("endpoint")
+            migrate_cmd = "sudo python3 /srv/www/django/manage.py "
+            call.ssh(migrate_cmd + "makemigrations") # will hang if it cannot contact the auth server
+            call.ssh(migrate_cmd + "makemigrations bosscore")
+            call.ssh(migrate_cmd + "migrate")
+            call.ssh(migrate_cmd + "collectstatic --no-input")
+            # http://stackoverflow.com/questions/6244382/how-to-automate-createsuperuser-on-django
+            # For how it is possible to script createsuperuser command
+            call.ssh("sudo service uwsgi-emperor reload")
+            call.ssh("sudo service nginx restart")
 
             # Tell Scalyr to get CloudWatch metrics for these instances.
             instances = [ user_data["system"]["fqdn"] ]

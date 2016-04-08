@@ -72,44 +72,6 @@ def keypair_to_file(keypair):
         return None
     return file
 
-
-def call_vault(session, bastion_key, bastion_host, vault_host, command, *args, **kwargs):
-    """Call ../vault/bastion.py with a list of hardcoded AWS / SSH arguments.
-    This is a common function for any other function that needs to populate
-    or provision Vault when starting up new VMs.
-    """
-    bastion_ip = bastion.machine_lookup(session, bastion_host)
-    vault_ip = bastion.machine_lookup(session, vault_host, public_ip = False)
-    def cmd():
-        # Have to dynamically lookup the function because vault.COMMANDS
-        # references the command line version of the commands we want to execute
-        return vault.__dict__[command.replace('-','_')](*args, machine=vault_host, **kwargs)
-
-    return bastion.connect_vault(bastion_key, vault_ip, bastion_ip, cmd)
-
-
-def call_ssh(session, bastion_key, bastion_host, target_host, command):
-    """Call ../vault/bastion.py with a list of hardcoded AWS / SSH arguments.
-    This is a common function for any other function that needs to execute an
-    SSH command on a new VM.
-    """
-    bastion_ip = bastion.machine_lookup(session, bastion_host)
-    target_ip = bastion.machine_lookup(session, target_host, public_ip = False)
-
-    return bastion.ssh_cmd(bastion_key, target_ip, bastion_ip, command)
-
-
-def call_ssh_tunnel(session, bastion_key, bastion_host, target_host, command, port, local_port = None):
-    """Call ../vault/bastion.py with a list of hardcoded AWS / SSH arguments.
-    This is a common function for any other function that needs to execute an
-    arbitrary command within a SSH tunnel.
-    """
-    bastion_ip = bastion.machine_lookup(session, bastion_host)
-    target_ip = bastion.machine_lookup(session, target_host, public_ip = False)
-
-    return bastion.ssh_tunnel(bastion_key, target_ip, bastion_ip, port, local_port, command)
-
-
 def password(what):
     """Prompt the user for a password and verify it."""
     while True:
@@ -239,16 +201,19 @@ class ExternalCalls:
         self.session = session
         self.keypair_file = keypair_to_file(keypair)
         self.bastion_hostname = "bastion." + domain
+        self.bastion_ip = bastion.machine_lookup(session, self.bastion_hostname)
         self.vault_hostname = "vault." + domain
+        self.vault_ip = bastion.machine_lookup(session, self.vault_hostname, public_ip = False)
         self.domain = domain
         self.ssh_target = None
 
     def vault(self, cmd, *args, **kwargs):
-        return call_vault(self.session,
-                          self.keypair_file,
-                          self.bastion_hostname,
-                          self.vault_hostname,
-                          cmd, *args, **kwargs)
+        def delegate():
+            # Have to dynamically lookup the function because vault.COMMANDS
+            # references the command line version of the commands we want to execute
+            return vault.__dict__[cmd.replace('-','_')](*args, machine=self.vault_hostname, **kwargs)
+
+        return bastion.connect_vault(self.keypair_file, self.vault_ip, self.bastion_ip, delegate)
 
     def vault_write(self, path, **kwargs):
         self.vault("vault-write", path, **kwargs)
@@ -267,26 +232,27 @@ class ExternalCalls:
         self.ssh_target = target
         if not target.endswith("." + self.domain):
             self.ssh_target += "." + self.domain
+        self.ssh_target_ip = bastion.machine_lookup(self.session, self.ssh_target, public_ip = False)
 
     def ssh(self, cmd):
         if self.ssh_target is None:
             raise Exception("No SSH Target Set")
 
-        call_ssh(self.session,
-                 self.keypair_file,
-                 self.bastion_hostname,
-                 self.ssh_target,
-                 cmd)
+        return bastion.ssh_cmd(self.keypair_file,
+                               self.ssh_target_ip,
+                               self.bastion_ip,
+                               cmd)
 
-    def ssh_tunnel(self, cmd, port):
+    def ssh_tunnel(self, cmd, port, local_port = None):
         if self.ssh_target is None:
             raise Exception("No SSH Target Set")
 
-        call_ssh_tunnel(self.session,
-                        self.keypair_file,
-                        self.bastion_hostname,
-                        self.ssh_target,
-                        cmd, port)
+        return bastion.ssh_tunnel(self.keypair_file,
+                                  self.ssh_target_ip,
+                                  self.bastion_ip,
+                                  port,
+                                  local_port,
+                                  cmd)
 
 def vpc_id_lookup(session, vpc_domain):
     """Lookup the Id for the VPC with the given domain name."""
@@ -421,6 +387,17 @@ def keypair_lookup(session):
 
     client = session.client('ec2')
     response = client.describe_key_pairs()
+
+    # If SSH_KEY exists and points to a valid Key Pair, use it
+    key = os.environ.get("SSH_KEY", None) # reuse bastion.py env vars
+    if key is not None:
+        kp_name = os.path.basename(key)
+        if kp_name.endswith(".pem"):
+            kp_name = kp_name[:-4]
+        for kp in response['KeyPairs']:
+            if kp["KeyName"] == kp_name:
+                return kp_name
+
     print("Key Pairs")
     for i in range(len(response['KeyPairs'])):
         print("{}:  {}".format(i, response['KeyPairs'][i]['KeyName']))
@@ -431,6 +408,8 @@ def keypair_lookup(session):
             idx = input("[0]: ")
             idx = int(idx if len(idx) > 0 else "0")
             return response['KeyPairs'][idx]['KeyName']
+        except KeyboardInterrupt:
+            sys.exit(1)
         except:
             print("Invalid Key Pair number, try again")
 
