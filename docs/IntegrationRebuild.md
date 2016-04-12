@@ -110,7 +110,7 @@ For the *core*, *production*, *proofreader*, *cloudwatch* configurations
 run the following command. You have to wait for each command to finish before
 launching the next configuration as they build upon each other.
 ```shell
-$ ./cloudformation.py create integration.boss <config>
+$ ./cloudformation.py create integration.boss --scenario production <config>
 ```
 
 *Note: When launching some configurations there may be an message about manually
