@@ -187,7 +187,7 @@ For the *core*, *production*, and *proofreader* configurations
 run the following command. You have to wait for each command to finish before
 launching the next configuration as they build upon each other.
 ```shell
-$ ./cloudformation.py create production.boss <config>
+$ ./cloudformation.py create production.boss --scenario production <config>
 ```
 
 *Note: If when launching the core configuration you receive a message about

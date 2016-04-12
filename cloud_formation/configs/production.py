@@ -111,6 +111,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                             lib.ami_lookup(session, "endpoint.boss"),
                             keypair,
                             subnet = "ExternalSubnet",
+                            public_ip = True,
                             type_ = ENDPONT_TYPE,
                             security_groups = ["InternalSecurityGroup"],
                             user_data = user_data,
