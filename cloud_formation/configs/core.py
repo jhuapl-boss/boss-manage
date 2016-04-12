@@ -102,7 +102,7 @@ def create_config(session, domain):
                             "auth." + domain,
                             lib.ami_lookup(session, "auth.boss"),
                             keypair,
-                            subnet = "InternalSubnet", # Eventually place in a autoscale group across all subnets
+                            subnet = "ExternalSubnet", # Eventually place in a autoscale group across all subnets
                             security_groups = ["InternalSecurityGroup"])
 
     config.add_loadbalancer("LoadBalancerAuth",
