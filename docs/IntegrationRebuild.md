@@ -97,11 +97,10 @@ export scalyr_readconfig_token='some key string'
 export scalyr_writeconfig_token='another key string'
 ```
 
-Create this script and save it for the next time you do the integration test
-build.  Run this script like so:
+Create this script and save it (config/set_scalyr_vars.sh) for the next time you do the integration test build.  Run this script like so:
 
 ```shell
-source set_scalyr_vars.sh
+source ../config/set_scalyr_vars.sh
 ```
 
 ### Launching configs
