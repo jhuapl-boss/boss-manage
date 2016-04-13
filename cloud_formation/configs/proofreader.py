@@ -33,6 +33,7 @@ INCOMING_SUBNET = "52.3.13.189/32" # microns-bastion elastic IP
 
 VAULT_DJANGO = "secret/proofreader/django"
 VAULT_DJANGO_DB = "secret/proofreader/django/db"
+VAULT_DJANGO_AUTH = "secret/proofreader/auth"
 
 def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     """Create the CloudFormationConfiguration object."""
@@ -110,14 +111,7 @@ def create(session, domain):
     """Configure Vault, create the configuration, and launch it"""
     keypair = lib.keypair_lookup(session)
 
-    def call_vault(command, *args, **kwargs):
-        """A wrapper function around lib.call_vault() that populates most of
-        the needed arguments."""
-        return lib.call_vault(session,
-                              lib.keypair_to_file(keypair),
-                              "bastion." + domain,
-                              "vault." + domain,
-                              command, *args, **kwargs)
+    call = lib.ExternalCalls(session, keypair, domain)
 
     db = {
         "name": "microns_proofreader",
@@ -128,7 +122,7 @@ def create(session, domain):
 
     # Configure Vault and create the user data config that proofreader-web will
     # use for connecting to Vault and the DB instance
-    proofreader_token = call_vault("vault-provision", "proofreader")
+    proofreader_token = call.vault("vault-provision", "proofreader")
     user_data = configuration.UserData()
     user_data["vault"]["token"] = proofreader_token
     user_data["system"]["fqdn"] = "proofreader-web." + domain
@@ -137,8 +131,8 @@ def create(session, domain):
     user_data = str(user_data)
 
     # Should transition from vault-django to vault-write
-    call_vault("vault-write", VAULT_DJANGO, secret_key = str(uuid.uuid4()))
-    call_vault("vault-write", VAULT_DJANGO_DB, **db)
+    call.vault_write(VAULT_DJANGO, secret_key = str(uuid.uuid4()))
+    call.vault_write(VAULT_DJANGO_DB, **db)
 
     try:
         name = lib.domain_to_stackname("proofreader." + domain)
@@ -147,15 +141,31 @@ def create(session, domain):
         success = config.create(session, name)
         if not success:
             raise Exception("Create Failed")
+        else:
+            print("Configuring KeyCloak")
+            def configure_auth(auth_port):
+                # NOTE DP: If an ELB is created the public_uri should be the Public DNS Name
+                #          of the ELB. Endpoint Django instances may have to be restarted if running.
+                dns = lib.instance_public_lookup(session, "proofreader-web." + domain)
+                uri = "http://{}".format(dns)
+                call.vault_update(VAULT_DJANGO_AUTH, public_uri = uri)
+
+                creds = call.vault_read("secret/auth")
+                kc = lib.KeyCloakClient("http://localhost:{}".format(auth_port))
+                kc.login(creds["username"], creds["password"])
+                kc.add_redirect_uri("BOSS","endpoint", uri + "/*")
+                kc.logout()
+            call.set_ssh_target("auth")
+            call.ssh_tunnel(configure_auth, 8080)
     except:
         print("Error detected, revoking secrets")
         try:
-            call_vault("vault-delete", VAULT_DJANGO)
-            call_vault("vault-delete", VAULT_DJANGO_DB)
+            call.vault_delete(VAULT_DJANGO)
+            call.vault_delete(VAULT_DJANGO_DB)
         except:
             print("Error revoking Django credentials")
         try:
-            call_vault("vault-revoke", proofreader_token)
+            call.vault("vault-revoke", proofreader_token)
         except:
             print("Error revoking Proofreader Server Vault access token")
         raise

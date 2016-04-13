@@ -183,6 +183,7 @@ def configure_keycloak(session, domain):
 
     call.vault_write("secret/auth", password = password, username = "admin")
     call.vault_update("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
+    call.vault_update("secret/proofreader/auth", url = auth_discovery_url, client_id = "endpoint")
 
     call.set_ssh_target("auth")
     call.ssh("/srv/keycloak/bin/add-user.sh -r master -u admin -p " + password)
