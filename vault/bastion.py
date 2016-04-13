@@ -222,10 +222,12 @@ def machine_lookup(session, hostname, public_ip = True):
 
     item = response['Reservations']
     if len(item) == 0:
+        print("Could not find IP address for '{}'".format(hostname))
         return None
     else:
         item = item[0]['Instances']
         if len(item) == 0:
+            print("Could not find IP address for '{}'".format(hostname))
             return None
         else:
             item = item[0]
@@ -234,6 +236,7 @@ def machine_lookup(session, hostname, public_ip = True):
             elif 'PrivateIpAddress' in item:
                 return item['PrivateIpAddress']
             else:
+                print("Could not find IP address for '{}'".format(hostname))
                 return None
 
 if __name__ == "__main__":
