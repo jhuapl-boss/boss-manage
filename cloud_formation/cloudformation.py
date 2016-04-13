@@ -21,9 +21,12 @@ import sys
 import os
 import importlib
 from boto3.session import Session
+from botocore.exceptions import ClientError
 import json
 import pprint
 import glob
+import time
+import library as lib
 
 import hosts
 
@@ -49,6 +52,49 @@ def create_config(session, domain, config):
     module = importlib.import_module("configs." + config)
     module.create(session, domain)
 
+def delete_config(session, domain, config):
+    """Deletes the given stack from CloudFormation.
+
+    Initiates the stack delete and waits for it to finish.  config and domain
+    are combined to identify the stack.
+
+    Args:
+        session (boto3.Session): An active session.
+        domain (string): Name of domain.
+        config (string): Name of config.
+
+    Returns:
+        (bool) : True if stack successfully deleted.
+    """
+    name = lib.domain_to_stackname(config + "." + domain)
+    client = session.client("cloudformation")
+    client.delete_stack(StackName = name)
+    # waiter = client.get_waiter('stack_delete_complete')
+    # waiter.wait(StackName = name)
+
+    print("Waiting for delete ", end="", flush=True)
+
+    try:
+        response = client.describe_stacks(StackName = name)
+        get_status = lambda r: r['Stacks'][0]['StackStatus']
+        while get_status(response) == 'DELETE_IN_PROGRESS':
+            time.sleep(5)
+            print(".", end="", flush=True)
+            response = client.describe_stacks(StackName=name)
+        print(" done")
+
+        if get_status(response) == 'DELETE_COMPLETE':
+            print("Deleted stack '{}'".format(name))
+            return True
+
+        print("Status of stack '{}' is '{}'".format(name, get_status(response)))
+        return False
+    except ClientError as e:
+        # Stack doesn't exist or no longer exists.
+        print(" done")
+
+    return True
+
 def generate_config(domain, config):
     """Import 'configs.<config>' and then call the generate() function with
     'templates' directory and <domain>.
@@ -67,7 +113,7 @@ if __name__ == '__main__':
     config_names = [x.split('/')[1].split('.')[0] for x in glob.glob("configs/*.py") if "__init__" not in x]
     config_help = create_help("config_name supports the following:", config_names)
 
-    actions = ["create", "generate"]
+    actions = ["create", "generate", "delete"]
     actions_help = create_help("action supports the following:", actions)
 
     scenarios = ["development", "production"]
@@ -91,7 +137,7 @@ if __name__ == '__main__':
                         choices = scenarios,
                         help = "The deployment configuration to use when creating the stack (instance size, autoscale group size, etc) (default: development)")
     parser.add_argument("action",
-                        choices = ["create","generate"],
+                        choices = ["create","generate","delete"],
                         metavar = "action",
                         help = "Action to execute")
     parser.add_argument("domain_name", help="Domain in which to execute the configuration (example: subnet.vpc.boss)")
@@ -118,3 +164,6 @@ if __name__ == '__main__':
         create_config(session, args.domain_name, args.config_name)
     elif args.action in ("generate", "gen"):
         generate_config(args.domain_name, args.config_name)
+    elif args.action in ("delete", "del"):
+        if not delete_config(session, args.domain_name, args.config_name):
+            sys.exit(1)
