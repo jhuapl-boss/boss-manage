@@ -61,7 +61,7 @@ target/
 *.exe
 *.iso
 packer/output/
-packer/variables/aws-credentials
+config/aws-credentials
 
 # Private Files
 *.pem
@@ -74,3 +74,10 @@ vault/private/
 
 # PyCharm Stuff
 .idea/
+
+# Scylr
+config/set_scalyr_vars.sh
+*/scalyr-cfg.json
+
+# Keycloack Stuff
+salt_stack/salt/keycloak/files/keycloak-*Final.tar.gz
