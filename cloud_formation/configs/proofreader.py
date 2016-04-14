@@ -142,31 +142,8 @@ def create(session, domain):
         if not success:
             raise Exception("Create Failed")
         else:
-            print("Configuring KeyCloak")
-            def configure_auth(auth_port):
-                # NOTE DP: If an ELB is created the public_uri should be the Public DNS Name
-                #          of the ELB. Endpoint Django instances may have to be restarted if running.
-                dns = lib.instance_public_lookup(session, "proofreader-web." + domain)
-                uri = "http://{}".format(dns)
-                call.vault_update(VAULT_DJANGO_AUTH, public_uri = uri)
+            post_init(session, domain)
 
-                creds = call.vault_read("secret/auth")
-                kc = lib.KeyCloakClient("http://localhost:{}".format(auth_port))
-                kc.login(creds["username"], creds["password"])
-                kc.add_redirect_uri("BOSS","endpoint", uri + "/*")
-                kc.logout()
-            call.set_ssh_target("auth")
-            call.ssh_tunnel(configure_auth, 8080)
-
-            print("Initializing Django")
-            call.set_ssh_target("proofreader-web")
-            migrate_cmd = "sudo python3 /srv/www/app/proofreader_apis/manage.py "
-            call.ssh(migrate_cmd + "makemigrations") # will hang if it cannot contact the auth server
-            call.ssh(migrate_cmd + "makemigrations common")
-            call.ssh(migrate_cmd + "migrate")
-            call.ssh(migrate_cmd + "collectstatic --no-input")
-            call.ssh("sudo service uwsgi-emperor reload")
-            call.ssh("sudo service nginx restart")
     except:
         print("Error detected, revoking secrets")
         try:
@@ -179,3 +156,35 @@ def create(session, domain):
         except:
             print("Error revoking Proofreader Server Vault access token")
         raise
+
+def post_init(session, domain):
+    global keypair
+    if keypair is None:
+        keypair = lib.keypair_lookup(session)
+    call = lib.ExternalCalls(session, keypair, domain)
+
+    print("Configuring KeyCloak") # Should abstract for production and proofreader
+    def configure_auth(auth_port):
+        # NOTE DP: If an ELB is created the public_uri should be the Public DNS Name
+        #          of the ELB. Endpoint Django instances may have to be restarted if running.
+        dns = lib.instance_public_lookup(session, "proofreader-web." + domain)
+        uri = "http://{}".format(dns)
+        call.vault_update(VAULT_DJANGO_AUTH, public_uri = uri)
+
+        creds = call.vault_read("secret/auth")
+        kc = lib.KeyCloakClient("http://localhost:{}".format(auth_port))
+        kc.login(creds["username"], creds["password"])
+        kc.add_redirect_uri("BOSS","endpoint", uri + "/*")
+        kc.logout()
+    call.set_ssh_target("auth")
+    call.ssh_tunnel(configure_auth, 8080)
+
+    print("Initializing Django")
+    call.set_ssh_target("proofreader-web")
+    migrate_cmd = "sudo python3 /srv/www/app/proofreader_apis/manage.py "
+    call.ssh(migrate_cmd + "makemigrations") # will hang if it cannot contact the auth server
+    call.ssh(migrate_cmd + "makemigrations common")
+    call.ssh(migrate_cmd + "migrate")
+    call.ssh(migrate_cmd + "collectstatic --no-input")
+    call.ssh("sudo service uwsgi-emperor reload")
+    call.ssh("sudo service nginx restart")
