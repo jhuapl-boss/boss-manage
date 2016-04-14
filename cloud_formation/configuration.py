@@ -860,7 +860,7 @@ class CloudFormationConfiguration:
            "Properties" : {
              "VpcId" : { "Ref" : vpc },
              "InternetGatewayId" : { "Ref" : key }
-           }
+           },
            "DependsOn" : key
         }
 
