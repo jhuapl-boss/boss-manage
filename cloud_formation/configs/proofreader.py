@@ -145,7 +145,7 @@ def create(session, domain):
             post_init(session, domain)
 
     except:
-        print("Error detected, revoking secrets")
+        print("Error detected, revoking secrets") # Do we want to revoke if an exception from post_init?
         try:
             call.vault_delete(VAULT_DJANGO)
             call.vault_delete(VAULT_DJANGO_DB)
@@ -158,9 +158,7 @@ def create(session, domain):
         raise
 
 def post_init(session, domain):
-    global keypair
-    if keypair is None:
-        keypair = lib.keypair_lookup(session)
+    keypair = lib.keypair_lookup(session)
     call = lib.ExternalCalls(session, keypair, domain)
 
     print("Configuring KeyCloak") # Should abstract for production and proofreader
