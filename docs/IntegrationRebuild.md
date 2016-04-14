@@ -53,12 +53,28 @@ have to be pushed yet) so that the correct commit hash is used.*
 Before the new integration instance can be created, the existing CloudFormation
 Stacks need to be deleted.
 
+Using the CloudFormation console:
+
 1. Open a web browser
 2. Login to the AWS console and open up the CloudFormation console
 3. For *CloudwatchIntegrationBoss*, *ProofreaderIntegrationBoss*,
    *ProductionIntegrationBoss*, *CoreIntegrationBoss*
   1. Right click on the Stack and select *Delete Stack*
   2. Wait for the stack to be deleted
+
+Alternatively, via the cloudformation script:
+
+```shell
+$ cd cloud_formation/
+$ source ../config/set_vars.sh
+
+# Deletion of cloudwatch, production, and proofreader can probably
+# be done in parallel.
+$ ./cloudformation.py delete integration.boss cloudwatch
+$ ./cloudformation.py delete integration.boss production
+$ ./cloudformation.py delete integration.boss proofreader
+$ ./cloudformation.py delete integration.boss core
+```
 
 ### Vault AWS configuration
 For Vault to be able to create AWS credentials (used by the Endpoint) you need a
