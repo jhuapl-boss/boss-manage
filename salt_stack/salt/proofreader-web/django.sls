@@ -10,14 +10,6 @@ django:
       - sls: python.python35
       - sls: python.pip
 
-djangorestframework:
-  pip.installed:
-    - name: djangorestframework == 3.3.2
-    - bin_env: /usr/local/bin/pip3
-    - require:
-      - sls: python.python35
-      - sls: python.pip
-
 django-filter:
   pip.installed:
     - name: django-filter == 0.12.0

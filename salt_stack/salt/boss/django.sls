@@ -44,14 +44,3 @@ uwsgi-enable-config:
     file.symlink:
         - name: /etc/uwsgi/apps-enabled/boss.ini
         - target: /etc/uwsgi/apps-available/boss.ini
-
-django-firstboot:
-    file.managed:
-        - name: /etc/init.d/django-firstboot
-        - source: salt://boss/files/firstboot.py
-        - user: root
-        - group: root
-        - mode: 555
-    cmd.run:
-        - name: update-rc.d django-firstboot start 99 2 3 4 5 .
-        - user: root

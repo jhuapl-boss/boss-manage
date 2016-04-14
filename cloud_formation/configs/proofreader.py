@@ -157,6 +157,16 @@ def create(session, domain):
                 kc.logout()
             call.set_ssh_target("auth")
             call.ssh_tunnel(configure_auth, 8080)
+
+            print("Initializing Django")
+            call.set_ssh_target("proofreader-web")
+            migrate_cmd = "sudo python3 /srv/www/app/proofreader_apis/manage.py "
+            call.ssh(migrate_cmd + "makemigrations") # will hang if it cannot contact the auth server
+            call.ssh(migrate_cmd + "makemigrations common")
+            call.ssh(migrate_cmd + "migrate")
+            call.ssh(migrate_cmd + "collectstatic --no-input")
+            call.ssh("sudo service uwsgi-emperor reload")
+            call.ssh("sudo service nginx restart")
     except:
         print("Error detected, revoking secrets")
         try:
