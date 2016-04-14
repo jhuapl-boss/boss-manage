@@ -17,22 +17,7 @@ include:
   - jenkins.slack
   - jenkins.django
   - jenkins.jobs
-
-test_db:
-  mysql_user.present:
-    - name: root
-    - host: localhost
-    - password: MICrONS
-    - require:
-      - sls: mysql
-
-  mysql_database.present:
-    - name: microns
-    - connection_user: root
-    - connection_pass: MICrONS
-    - host: localhost
-    - require:
-      - sls: mysql
+  - endpoint-dev.test-mysql
 
 django_infrastructure:
   file.directory:
