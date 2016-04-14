@@ -3,6 +3,18 @@
 @@ -46 +46 @@
 -        login_url = reverse('rest_framework:login')
 +        login_url = "/openid/openid/KeyCloak"
-@@ -62 +62 @@
+@@ -60,0 +61,5 @@
++    if user.email is not None and len(user.email) > 0:
++        display_name = escape(user.email)
++    else:
++        display_name = escape(user)
++
+@@ -62 +67 @@
 -        logout_url = reverse('rest_framework:logout')
 +        logout_url = "/openid/logout"
+@@ -64 +69 @@
+-        snippet = format_html('<li class="navbar-text">{user}</li>', user=escape(user))
++        snippet = format_html('<li class="navbar-text">{user}</li>', user=escape(display_name))
+@@ -76 +81 @@
+-    snippet = format_html(snippet, user=escape(user), href=logout_url, next=escape(request.path))
++    snippet = format_html(snippet, user=escape(display_name), href=logout_url, next=escape(request.path))
