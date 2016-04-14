@@ -193,40 +193,9 @@ def create(session, domain):
         if not success:
             raise Exception("Create Failed")
         else:
-            print("Configuring KeyCloak")
-            def configure_auth(auth_port):
-                # NOTE DP: If an ELB is created the public_uri should be the Public DNS Name
-                #          of the ELB. Endpoint Django instances may have to be restarted if running.
-                dns = lib.elb_public_lookup(session, "elb." + domain)
-                uri = "https://{}".format(dns)
-                call.vault_update(VAULT_DJANGO_AUTH, public_uri = uri)
-
-                creds = call.vault_read("secret/auth")
-                kc = lib.KeyCloakClient("http://localhost:{}".format(auth_port))
-                kc.login(creds["username"], creds["password"])
-                kc.add_redirect_uri("BOSS","endpoint", uri + "/*")
-                kc.logout()
-            call.set_ssh_target("auth")
-            call.ssh_tunnel(configure_auth, 8080)
-
-            print("Initializing Django")
-            call.set_ssh_target("endpoint")
-            migrate_cmd = "sudo python3 /srv/www/django/manage.py "
-            call.ssh(migrate_cmd + "makemigrations") # will hang if it cannot contact the auth server
-            call.ssh(migrate_cmd + "makemigrations bosscore")
-            call.ssh(migrate_cmd + "migrate")
-            call.ssh(migrate_cmd + "collectstatic --no-input")
-            # http://stackoverflow.com/questions/6244382/how-to-automate-createsuperuser-on-django
-            # For how it is possible to script createsuperuser command
-            call.ssh("sudo service uwsgi-emperor reload")
-            call.ssh("sudo service nginx restart")
-
-            # Tell Scalyr to get CloudWatch metrics for these instances.
-            instances = [ user_data["system"]["fqdn"] ]
-            scalyr.add_instances_to_scalyr(
-                session, PRODUCTION_REGION, instances)
+            post_init(session, domain)
     except:
-        print("Error detected, revoking secrets")
+        print("Error detected, revoking secrets") # Do we want to revoke if an exception from post_init?
         try:
             call.vault_delete(VAULT_DJANGO)
             call.vault_delete(VAULT_DJANGO_DB)
@@ -237,3 +206,40 @@ def create(session, domain):
         except:
             print("Error revoking Endpoint Server Vault access token")
         raise
+
+def post_init(session, domain):
+    keypair = lib.keypair_lookup(session)
+    call = lib.ExternalCalls(session, keypair, domain)
+
+    print("Configuring KeyCloak") # Should abstract for production and proofreader
+    def configure_auth(auth_port):
+        # NOTE DP: If an ELB is created the public_uri should be the Public DNS Name
+        #          of the ELB. Endpoint Django instances may have to be restarted if running.
+        dns = lib.elb_public_lookup(session, "elb." + domain)
+        uri = "https://{}".format(dns)
+        call.vault_update(VAULT_DJANGO_AUTH, public_uri = uri)
+
+        creds = call.vault_read("secret/auth")
+        kc = lib.KeyCloakClient("http://localhost:{}".format(auth_port))
+        kc.login(creds["username"], creds["password"])
+        kc.add_redirect_uri("BOSS","endpoint", uri + "/*")
+        kc.logout()
+    call.set_ssh_target("auth")
+    call.ssh_tunnel(configure_auth, 8080)
+
+    print("Initializing Django") # Should create ssh call with array of commands
+    call.set_ssh_target("endpoint")
+    migrate_cmd = "sudo python3 /srv/www/django/manage.py "
+    call.ssh(migrate_cmd + "makemigrations") # will hang if it cannot contact the auth server
+    call.ssh(migrate_cmd + "makemigrations bosscore")
+    call.ssh(migrate_cmd + "migrate")
+    call.ssh(migrate_cmd + "collectstatic --no-input")
+    # http://stackoverflow.com/questions/6244382/how-to-automate-createsuperuser-on-django
+    # For how it is possible to script createsuperuser command
+    call.ssh("sudo service uwsgi-emperor reload")
+    call.ssh("sudo service nginx restart")
+
+    # Tell Scalyr to get CloudWatch metrics for these instances.
+    instances = [ "endpoint." + domain ]
+    scalyr.add_instances_to_scalyr(
+        session, PRODUCTION_REGION, instances)

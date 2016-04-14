@@ -102,6 +102,14 @@ def generate_config(domain, config):
     module = importlib.import_module("configs." + config)
     module.generate("templates", domain)
 
+def post_init(session, domain, config):
+    """Import 'configs.<config>' and then call the create() function with
+    <session> and <domain>.
+    """
+    module = importlib.import_module("configs." + config)
+    if "post_init" in dir(modules):
+        module.post_init(session, domain)
+
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
@@ -113,7 +121,7 @@ if __name__ == '__main__':
     config_names = [x.split('/')[1].split('.')[0] for x in glob.glob("configs/*.py") if "__init__" not in x]
     config_help = create_help("config_name supports the following:", config_names)
 
-    actions = ["create", "generate", "delete"]
+    actions = ["create", "generate", "delete", "post-init"]
     actions_help = create_help("action supports the following:", actions)
 
     scenarios = ["development", "production"]
@@ -162,6 +170,8 @@ if __name__ == '__main__':
 
     if args.action in ("create", ):
         create_config(session, args.domain_name, args.config_name)
+    elif args.action in ("post-init", ):
+        post_init(session, args.domain_name, args.config_name)
     elif args.action in ("generate", "gen"):
         generate_config(args.domain_name, args.config_name)
     elif args.action in ("delete", "del"):

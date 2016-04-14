@@ -211,29 +211,32 @@ def create(session, domain):
         vpc_id = lib.vpc_id_lookup(session, domain)
         lib.rt_name_default(session, vpc_id, "internal." + domain)
 
+        print("Waiting 1 minute for VMs to start...")
+        time.sleep(60)
+        post_init(session, domain)
+
+def post_init(session, domain):
+    global keypair
+    if keypair is None:
+        keypair = lib.keypair_lookup(session)
+
+    print("Initializing Vault...")
+    initialized = False
+    for i in range(6):
         try:
-            print("Waiting 1 minute for VMs to start...")
-            time.sleep(60)
+            call = lib.ExternalCalls(session, keypair, domain)
+            call.vault("vault-init")
+            initialized = True
+            break
+        except requests.exceptions.ConnectionError:
+            time.sleep(30)
+    if not initialized:
+        print("Could not initialize Vault, manually call post-init before launching other machines")
+        return
 
-            print("Initializing Vault...")
-            initialized = False
-            for i in range(6):
-                try:
-                    call = lib.ExternalCalls(session, keypair, domain)
-                    call.vault("vault-init")
-                    initialized = True
-                    break
-                except requests.exceptions.ConnectionError:
-                    time.sleep(30)
-            if not initialized:
-                raise Exception("Could not initialize Vault")
+    print("Configuring KeyCloak...")
+    configure_keycloak(session, domain)
 
-            print("Configuring KeyCloak...")
-            configure_keycloak(session, domain)
-
-            # Tell Scalyr to get CloudWatch metrics for these instances.
-            instances = [ "vault." + domain ]
-            scalyr.add_instances_to_scalyr(session, CORE_REGION, instances)
-        except:
-            print("Could not connect to Vault, manually initialize it before launching other machines")
-            # If Vault fails to initialize then KeyCloak also needs to be configured...
+    # Tell Scalyr to get CloudWatch metrics for these instances.
+    instances = [ "vault." + domain ]
+    scalyr.add_instances_to_scalyr(session, CORE_REGION, instances)

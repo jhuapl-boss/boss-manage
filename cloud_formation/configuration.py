@@ -860,7 +860,8 @@ class CloudFormationConfiguration:
            "Properties" : {
              "VpcId" : { "Ref" : vpc },
              "InternetGatewayId" : { "Ref" : key }
-           }
+           },
+           "DependsOn" : key
         }
 
         domain = Arg.String(vpc + "Domain", self.vpc_domain,
