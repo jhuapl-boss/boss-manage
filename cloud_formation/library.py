@@ -556,3 +556,28 @@ def sns_topic_lookup(session, topic_name):
         if arn_topic_name == topic_name:
             return topic["TopicArn"]
     return None
+
+
+def request_cert(session, domain_name, validation_domain='theboss.io'):
+    """
+    Requests a certificate in the AWS Certificate Manager for the domain name
+    Args:
+        session: AWS session object used to make the request
+        domain_name: domain name the certificate is being requested for.
+        validation_domain; domain suffix the request will be sent to.
+
+    Returns:  The response from the request_certificate()
+
+    """
+    if session is None: return None
+
+    client = session.client('acm')
+    validation_options=[
+        {
+            'DomainName': domain_name,
+            'ValidationDomain': validation_domain
+        },
+    ]
+    response = client.request_certificate(DomainName=domain_name,
+                                          DomainValidationOptions=validation_options)
+    return response
