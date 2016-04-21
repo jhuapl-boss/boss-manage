@@ -5,6 +5,7 @@ include:
     - uwsgi.emperor
     - nginx
     - spdb
+    - boss-oidc
 
 django-prerequirements:
     pkg.installed:
@@ -16,6 +17,7 @@ django-requirements:
     pip.installed:
         - bin_env: /usr/local/bin/pip3
         - requirements: salt://boss/files/boss.git/requirements.txt
+        - exists_action: w
         - require:
             - pkg: django-prerequirements
 

@@ -60,6 +60,7 @@ target/
 # Packer Files / Support
 *.exe
 *.iso
+bin/packer
 packer/output/
 config/aws-credentials
 

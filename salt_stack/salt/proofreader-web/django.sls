@@ -1,6 +1,7 @@
 include:
     - python.python35
     - python.pip
+    - boss-oidc
 
 django:
   pip.installed:

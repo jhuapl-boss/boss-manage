@@ -11,7 +11,6 @@ base:
     'endpoint*':
         - boss-tools.bossutils
         - boss-tools.credentials
-        - django.openid-connect # install first and patch
         - django.rest-framework # install first and patch
         - boss.django
         - django.login # patch, expects django to already be installed
@@ -30,7 +29,6 @@ base:
         - jenkins-microns.proofreader
 
     'proofreader-web*':
-        - django.openid-connect # install first and patch
         - django.rest-framework # install first and patch
         - proofreader-web
         - django.login # patch, expects django to already be installed
