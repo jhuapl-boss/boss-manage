@@ -55,7 +55,7 @@ def domain_to_stackname(domain):
     return "".join(map(lambda x: x.capitalize(), domain.split(".")))
 
 
-def template_argument(key, value, use_previous = False):
+def template_argument(key, value, use_previous=False):
     """Create a JSON dictionary formated as a CloudFlormation template
     argument.
 
@@ -72,6 +72,7 @@ def keypair_to_file(keypair):
         return None
     return file
 
+
 def password(what):
     """Prompt the user for a password and verify it."""
     while True:
@@ -83,8 +84,14 @@ def password(what):
             print("Passwords didn't match, try again.")
 
 
-def generate_password(length = 16):
-    """Generate an alphanumeric password of the given length."""
+def generate_password(length=16):
+    """
+    Generate an alphanumeric password of the given length.
+    Args:
+        length: length of the password to be generated
+
+    Returns:  password
+    """
     chars = string.ascii_letters + string.digits #+ string.punctuation
     return "".join([chars[c % len(chars)] for c in os.urandom(length)])
 
@@ -94,12 +101,12 @@ class KeyCloakClient:
         self.url_base = url_base
         self.token = None
 
-    def request(self, url, params = None, headers = {}, convert = urlencode, method = None):
+    def request(self, url, params=None, headers={}, convert=urlencode, method=None):
         request = Request(
             self.url_base + url,
-            data = None if params is None else convert(params).encode("utf-8"),
-            headers = headers,
-            method = method
+            data=None if params is None else convert(params).encode("utf-8"),
+            headers=headers,
+            method=method
         )
 
         try:
@@ -115,7 +122,7 @@ class KeyCloakClient:
     def login(self, username, password):
         self.token = self.request(
             "/auth/realms/master/protocol/openid-connect/token",
-            params = {
+            params={
                 "username": username,
                 "password": password,
                 "grant_type": "password",
@@ -133,7 +140,7 @@ class KeyCloakClient:
         if self.token is None:
             return
 
-        self.request( # no response
+        self.request(  # no response
             "/auth/realms/master/protocol/openid-connect/logout",
             params={
                 "refresh_token": self.token["refresh_token"],
@@ -149,12 +156,12 @@ class KeyCloakClient:
     def create_realm(self, realm):
         resp = self.request(
             "/auth/admin/realms",
-            params = realm,
+            params=realm,
             headers={
                 "Authorization": "Bearer " + self.token["access_token"],
                 "Content-Type": "application/json",
             },
-            convert = json.dumps
+            convert=json.dumps
         )
 
     def get_client(self, realm_name, client_id):
@@ -177,7 +184,7 @@ class KeyCloakClient:
     def update_client(self, realm_name, id, client):
         resp = self.request(
             "/auth/admin/realms/{}/clients/{}".format(realm_name, id),
-            params = client,
+            params=client,
             headers={
                 "Authorization": "Bearer " + self.token["access_token"],
                 "Content-Type": "application/json",
@@ -192,9 +199,10 @@ class KeyCloakClient:
         key = "redirectUris"
         if key not in client:
             client[key] = []
-        client[key].append(uri) # DP: should probably check to see if the uri exists first
+        client[key].append(uri)  # DP: should probably check to see if the uri exists first
 
         self.update_client(realm_name, client['id'], client)
+
 
 class ExternalCalls:
     def __init__(self, session, keypair, domain):
@@ -203,7 +211,7 @@ class ExternalCalls:
         self.bastion_hostname = "bastion." + domain
         self.bastion_ip = bastion.machine_lookup(session, self.bastion_hostname)
         self.vault_hostname = "vault." + domain
-        self.vault_ip = bastion.machine_lookup(session, self.vault_hostname, public_ip = False)
+        self.vault_ip = bastion.machine_lookup(session, self.vault_hostname, public_ip=False)
         self.domain = domain
         self.ssh_target = None
 
@@ -211,7 +219,7 @@ class ExternalCalls:
         def delegate():
             # Have to dynamically lookup the function because vault.COMMANDS
             # references the command line version of the commands we want to execute
-            return vault.__dict__[cmd.replace('-','_')](*args, machine=self.vault_hostname, **kwargs)
+            return vault.__dict__[cmd.replace('-', '_')](*args, machine=self.vault_hostname, **kwargs)
 
         return bastion.connect_vault(self.keypair_file, self.vault_ip, self.bastion_ip, delegate)
 
@@ -232,7 +240,7 @@ class ExternalCalls:
         self.ssh_target = target
         if not target.endswith("." + self.domain):
             self.ssh_target += "." + self.domain
-        self.ssh_target_ip = bastion.machine_lookup(self.session, self.ssh_target, public_ip = False)
+        self.ssh_target_ip = bastion.machine_lookup(self.session, self.ssh_target, public_ip=False)
 
     def ssh(self, cmd):
         if self.ssh_target is None:
@@ -243,7 +251,17 @@ class ExternalCalls:
                                self.bastion_ip,
                                cmd)
 
-    def ssh_tunnel(self, cmd, port, local_port = None):
+    def ssh_tunnel(self, cmd, port, local_port=None):
+        """
+        call to the bastion.ssh_tunnel command
+        Args:
+            cmd: command to run through ssh
+            port: remote port to use for tunnel
+            local_port: local port to use for tunnel
+
+        Returns: None
+
+        """
         if self.ssh_target is None:
             raise Exception("No SSH Target Set")
 
@@ -254,12 +272,22 @@ class ExternalCalls:
                                   local_port,
                                   cmd)
 
+
 def vpc_id_lookup(session, vpc_domain):
-    """Lookup the Id for the VPC with the given domain name."""
-    if session is None: return None
+    """
+    Lookup the Id for the VPC with the given domain name.
+    Args:
+        session: amazon session
+        vpc_domain: vpc to lookup
+
+    Returns: id of vpc
+
+    """
+    if session is None:
+        return None
 
     client = session.client('ec2')
-    response = client.describe_vpcs(Filters=[{"Name":"tag:Name", "Values":[vpc_domain]}])
+    response = client.describe_vpcs(Filters=[{"Name": "tag:Name", "Values": [vpc_domain]}])
     if len(response['Vpcs']) == 0:
         return None
     else:
@@ -267,11 +295,20 @@ def vpc_id_lookup(session, vpc_domain):
 
 
 def subnet_id_lookup(session, subnet_domain):
-    """Lookup the Id for the Subnet with the given domain name."""
-    if session is None: return None
+    """
+    Lookup the Id for the Subnet with the given domain name.
+    Args:
+        session: amazon session
+        subnet_domain: subnet domain to look up
+
+    Returns: id of the subnet domain
+
+    """
+    if session is None:
+        return None
 
     client = session.client('ec2')
-    response = client.describe_subnets(Filters=[{"Name":"tag:Name", "Values":[subnet_domain]}])
+    response = client.describe_subnets(Filters=[{"Name": "tag:Name", "Values": [subnet_domain]}])
     if len(response['Subnets']) == 0:
         return None
     else:
@@ -279,8 +316,16 @@ def subnet_id_lookup(session, subnet_domain):
 
 
 def azs_lookup(session):
-    """Lookup all of the Availablity Zones for the connected region."""
-    if session is None: return []
+    """
+    Lookup all of the Availablity Zones for the connected region.
+    Args:
+        session: amazon session
+
+    Returns: amazon availability zones
+
+    """
+    if session is None:
+        return []
 
     client = session.client('ec2')
     response = client.describe_availability_zones()
@@ -297,38 +342,57 @@ def _find(xs, predicate):
 
 
 def ami_lookup(session, ami_name):
-    """Lookup the Id for the AMI with the given name."""
-    if session is None: return None
+    """
+    Lookup the Id for the AMI with the given name.
+    Args:
+        session: amazon session
+        ami_name: name of the AMI
+
+    Returns: tuple of imageId and Value Tag.
+
+    """
+    if session is None:
+        return None
 
     if ami_name.endswith(".boss"):
-        AMI_VERSION = os.environ["AMI_VERSION"]
-        if AMI_VERSION == "latest":
+        ami_version = os.environ["AMI_VERSION"]
+        if ami_version == "latest":
             # limit latest searching to only versions tagged with hash information
             ami_name += "-h*"
         else:
-            ami_name += "-" + AMI_VERSION
+            ami_name += "-" + ami_version
 
     client = session.client('ec2')
-    response = client.describe_images(Filters=[{"Name":"name", "Values":[ami_name]}])
+    response = client.describe_images(Filters=[{"Name": "name", "Values": [ami_name]}])
     if len(response['Images']) == 0:
         return None
     else:
         response['Images'].sort(key=lambda x: x["CreationDate"], reverse=True)
         image = response['Images'][0]
         ami = image['ImageId']
-        tag = _find(image.get('Tags',[]), lambda x: x["Key"] == "Commit")
+        tag = _find(image.get('Tags', []), lambda x: x["Key"] == "Commit")
         commit = None if tag is None else tag["Value"]
 
         return (ami, commit)
 
 
 def sg_lookup(session, vpc_id, group_name):
-    """Lookup the Id for the VPC Security Group with the given name."""
-    if session is None: return None
+    """
+    Lookup the Id for the VPC Security Group with the given name.
+    Args:
+        session: amazon session
+        vpc_id: id of VPC containting security group
+        group_name: name of security group to look up
+
+    Returns:  security group id of the security group with the passed in name.
+
+    """
+    if session is None:
+        return None
 
     client = session.client('ec2')
-    response = client.describe_security_groups(Filters=[{"Name":"vpc-id", "Values":[vpc_id]},
-                                                        {"Name":"tag:Name", "Values":[group_name]}])
+    response = client.describe_security_groups(Filters=[{"Name": "vpc-id", "Values": [vpc_id]},
+                                                        {"Name": "tag:Name", "Values": [group_name]}])
 
     if len(response['SecurityGroups']) == 0:
         return None
@@ -337,12 +401,22 @@ def sg_lookup(session, vpc_id, group_name):
 
 
 def rt_lookup(session, vpc_id, rt_name):
-    """Lookup the Id for the VPC Route Table with the given name."""
-    if session is None: return None
+    """
+    Lookup the Id for the VPC Route Table with the given name.
+    Args:
+        session: amazon session
+        vpc_id: id of VPC to look up route table in
+        rt_name: name of route table
+
+    Returns:  route table id for the route table with given name.
+
+    """
+    if session is None:
+        return None
 
     client = session.client('ec2')
-    response = client.describe_route_tables(Filters=[{"Name":"vpc-id", "Values":[vpc_id]},
-                                                     {"Name":"tag:Name", "Values":[rt_name]}])
+    response = client.describe_route_tables(Filters=[{"Name": "vpc-id", "Values": [vpc_id]},
+                                                     {"Name": "tag:Name", "Values": [rt_name]}])
 
     if len(response['RouteTables']) == 0:
         return None
@@ -351,12 +425,20 @@ def rt_lookup(session, vpc_id, rt_name):
 
 
 def rt_name_default(session, vpc_id, new_rt_name):
-    """Find the default VPC Route Table and give it a name so that it can be referenced latter.
-    Needed because by default the Route Table does not have a name and rt_lookup() will not find it. """
+    """
+    Find the default VPC Route Table and give it a name so that it can be referenced latter.
+    Needed because by default the Route Table does not have a name and rt_lookup() will not find it.
+    Args:
+        session: amazon session
+        vpc_id: ID of VPC
+        new_rt_name: new name for default VPC Route Table
 
+    Returns: None
+
+    """
     client = session.client('ec2')
-    response = client.describe_route_tables(Filters=[{"Name":"vpc-id", "Values":[vpc_id]}])
-    rt_id = response['RouteTables'][0]['RouteTableId'] # TODO: verify that Tags does not already have a name tag
+    response = client.describe_route_tables(Filters=[{"Name": "vpc-id", "Values": [vpc_id]}])
+    rt_id = response['RouteTables'][0]['RouteTableId']  # TODO: verify that Tags does not already have a name tag
 
     resource = session.resource('ec2')
     rt = resource.RouteTable(rt_id)
@@ -364,15 +446,29 @@ def rt_name_default(session, vpc_id, new_rt_name):
 
 
 def peering_lookup(session, from_id, to_id):
-    """Lookup the Id for the Peering Connection between the two VPCs."""
-    if session is None: return None
+    """
+    Lookup the Id for the Peering Connection between the two VPCs.
+    Args:
+        session: amazon session
+        from_id: id of from VPC
+        to_id: id of to VPC
+
+    Returns: peering connection id
+
+    """
+    if session is None:
+        return None
 
     client = session.client('ec2')
-    response = client.describe_vpc_peering_connections(Filters=[{"Name":"requester-vpc-info.vpc-id", "Values":[from_id]},
-                                                                {"Name":"requester-vpc-info.owner-id", "Values":["256215146792"]},
-                                                                {"Name":"accepter-vpc-info.vpc-id", "Values":[to_id]},
-                                                                {"Name":"accepter-vpc-info.owner-id", "Values":["256215146792"]},
-                                                                {"Name":"status-code", "Values":["active"]},
+    response = client.describe_vpc_peering_connections(Filters=[{"Name": "requester-vpc-info.vpc-id",
+                                                                 "Values": [from_id]},
+                                                                {"Name": "requester-vpc-info.owner-id",
+                                                                 "Values": ["256215146792"]},
+                                                                {"Name": "accepter-vpc-info.vpc-id",
+                                                                 "Values": [to_id]},
+                                                                {"Name": "accepter-vpc-info.owner-id",
+                                                                 "Values": ["256215146792"]},
+                                                                {"Name": "status-code", "Values": ["active"]},
                                                                 ])
 
     if len(response['VpcPeeringConnections']) == 0:
@@ -382,14 +478,22 @@ def peering_lookup(session, from_id, to_id):
 
 
 def keypair_lookup(session):
-    """Print the valid key pairs for the session and ask the user which to use."""
-    if session is None: return None
+    """
+    Print the valid key pairs for the session and ask the user which to use.
+    Args:
+        session: amazon session
+
+    Returns:  valid keypair
+
+    """
+    if session is None:
+        return None
 
     client = session.client('ec2')
     response = client.describe_key_pairs()
 
     # If SSH_KEY exists and points to a valid Key Pair, use it
-    key = os.environ.get("SSH_KEY", None) # reuse bastion.py env vars
+    key = os.environ.get("SSH_KEY", None)  # reuse bastion.py env vars
     if key is not None:
         kp_name = os.path.basename(key)
         if kp_name.endswith(".pem"):
@@ -415,8 +519,17 @@ def keypair_lookup(session):
 
 
 def instanceid_lookup(session, hostname):
-    """Look up instance id by hostname."""
-    if session is None: return None
+    """
+    Look up instance id by hostname.
+    Args:
+        session: amazon session
+        hostname: hostname to lookup
+
+    Returns:
+        InstanceId of hostname or None
+    """
+    if session is None:
+        return None
 
     client = session.client('ec2')
     response = client.describe_instances(
@@ -435,6 +548,7 @@ def instanceid_lookup(session, hostname):
                 return item['InstanceId']
             return None
 
+
 def cert_arn_lookup(session, domain_name):
     """
     Looks up the arn for a domain_name certificate
@@ -445,7 +559,8 @@ def cert_arn_lookup(session, domain_name):
     Returns:
         (string): arn
     """
-    if session is None: return None
+    if session is None:
+        return None
 
     client = session.client('acm')
     response = client.list_certificates()
@@ -456,8 +571,18 @@ def cert_arn_lookup(session, domain_name):
 
 
 def instance_public_lookup(session, hostname):
-    """Look up instance id by hostname."""
-    if session is None: return None
+    """
+    Look up instance id by hostname.
+    Args:
+        session: amazon session
+        hostname: hostname to lookup
+
+    Returns:
+        (string) Public DNS name or None if it does not exist.
+
+    """
+    if session is None:
+        return None
 
     client = session.client('ec2')
     response = client.describe_instances(
@@ -477,9 +602,19 @@ def instance_public_lookup(session, hostname):
                 return item['PublicDnsName']
             return None
 
+
 def elb_public_lookup(session, hostname):
-    """Look up instance id by hostname."""
-    if session is None: return None
+    """
+    Look up instance id by hostname.
+    Args:
+        session: amazon session
+        hostname: hostname to lookup
+
+    Returns: public DNS name of elb starting with hostname.
+
+    """
+    if session is None:
+        return None
 
     client = session.client('elb')
     responses = client.describe_load_balancers()
@@ -490,6 +625,7 @@ def elb_public_lookup(session, hostname):
         if response["LoadBalancerName"].startswith(hostname_):
             return response["DNSName"]
     return None
+
 
 def create_elb_listener(loadbalancer_port, instance_port, protocol, ssl_cert_id=None):
     """
@@ -523,12 +659,11 @@ def lb_lookup(session, lb_name):
     Returns: true if a valid loadbalancer name
 
     """
-    if session is None: return None
+    if session is None:
+        return None
 
     client = session.client('elb')
-    response = client.describe_load_balancers()#Filters=[{"LoadBalancerName":lb_name}])
-
-    value = response['LoadBalancerDescriptions'][0]['LoadBalancerName']
+    response = client.describe_load_balancers()
 
     for i in range(len(response['LoadBalancerDescriptions'])):
         if (response['LoadBalancerDescriptions'][i]['LoadBalancerName']) == lb_name:
@@ -546,7 +681,8 @@ def sns_topic_lookup(session, topic_name):
     Returns: ARN for the topic or None if topic doesn't exist
 
     """
-    if session is None: return None
+    if session is None:
+        return None
 
     client = session.client('sns')
     response = client.list_topics()
@@ -563,16 +699,17 @@ def request_cert(session, domain_name, validation_domain='theboss.io'):
     Requests a certificate in the AWS Certificate Manager for the domain name
     Args:
         session: AWS session object used to make the request
-        domain_name: domain name the certificate is being requested for.
-        validation_domain; domain suffix the request will be sent to.
+        domain_name: domain name the certificate is being requested for
+        validation_domain: domain suffix the request will be sent to.
 
-    Returns:  The response from the request_certificate()
+    Returns: response from the request_certificate()
 
     """
-    if session is None: return None
+    if session is None:
+        return None
 
     client = session.client('acm')
-    validation_options=[
+    validation_options = [
         {
             'DomainName': domain_name,
             'ValidationDomain': validation_domain
