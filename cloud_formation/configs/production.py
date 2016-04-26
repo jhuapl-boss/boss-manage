@@ -55,12 +55,12 @@ RDS_TYPE = {
 
 REDIS_TYPE = {
     "development": "cache.m3.medium",
-    "production": "cache.r3.8xlarge",
+    "production": "cache.m3.xlarge",
 }
 
 REDIS_CLUSTER_SIZE = {
     "development": 1,
-    "production": 5,
+    "production": 2,
 }
 
 def create_config(session, domain, keypair=None, user_data=None, db_config={}):
