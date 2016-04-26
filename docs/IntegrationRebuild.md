@@ -137,6 +137,11 @@ encounter this message.*
 that are named with a commit hash. Since you just rebuilt the AMIs they should be
 the latest ones.*
 
+*Note: By using the '--scenario production' flag you will be spinning up larger/more
+resources than in development mode. Omitting the '--scenerio' flag or setting it to 'development'
+will deploy the stack with the minimum set of resources.*
+
+
 ## Initialize Endpoint and run unit tests
 ```shell
 cd vault
@@ -151,15 +156,16 @@ sudo python3 manage.py test
 	output should say 36 Tests OK
 
 ## Configure Route 53
-1. Update Route 53 with the new Loadbalancer dns name.
-2. Under the EC2 page select Loadbalancers
-3. On description page will be `DNS Name`
-3. Copy that
+You must manually update Route 53 with the new LoadBalancer dns name for the Endpoint servers
+1. Under the EC2 page select LoadBalancers on the left
+2. Select the load balancer for the integration endpoint
+    - On description below will be `DNS Name`
+    - Copy this value
 4. Go into Route 53 AWS Service
-5. Hosted Zone theboss.io
-6. Check checkbox api.theboss.io
-7. Paste the new DNS name over top of the old one.
-8. `Save Record Set`
+5. Select the hosted Zone theboss.io
+6. Select api.theboss.io
+7. On the right, paste the new DNS name over top of the old one.
+8. Click `Save Record Set`
 
 ### Update the Auth redirect URL
 ```shell
