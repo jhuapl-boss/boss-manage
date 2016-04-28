@@ -41,6 +41,8 @@ CORE_REGION = 'us-east-1'
 
 INCOMING_SUBNET = "52.3.13.189/32" # microns-bastion elastic IP
 
+
+
 def create_config(session, domain):
     """Create the CloudFormationConfiguration object."""
     config = configuration.CloudFormationConfiguration(domain, CORE_REGION)
@@ -106,9 +108,18 @@ def create_config(session, domain):
                             public_ip = True,
                             security_groups = ["InternalSecurityGroup"])
 
+    if domain in hosts.BASE_DOMAIN_CERTS.keys():
+        authExternalPort = "443"
+        auth_protocol = "HTTPS"
+        cert = lib.cert_arn_lookup(session, "auth." + hosts.BASE_DOMAIN_CERTS[domain])
+    else:
+        authExternalPort = "8080"
+        auth_protocol = "HTTP"
+        cert = None
+
     config.add_loadbalancer("LoadBalancerAuth",
                             "elb-auth." + domain,
-                            [lib.create_elb_listener("8080", "8080", "HTTP")],
+                            [lib.create_elb_listener(authExternalPort, "8080", auth_protocol, cert)],
                             instances = ["Auth"],
                             subnets = ["ExternalSubnet"],
                             healthcheck_target = "HTTP:8080/index.html",
@@ -126,7 +137,8 @@ def create_config(session, domain):
 
     config.add_security_group("AuthSecurityGroup",
                               "auth",
-                              [("tcp", "8080", "8080", "0.0.0.0/0")])
+                              [("tcp", "443", "443", "0.0.0.0/0"),
+                               ("tcp", "8080", "8080", "0.0.0.0/0")])
 
     # Create the internal route table to route traffic to the NAT Bastion
     config.add_route_table("InternalRouteTable",
@@ -174,7 +186,14 @@ def configure_keycloak(session, domain):
     # NOTE DP: if there is an ELB in front of the auth server, this needs to be
     #          the public DNS address of the ELB.
     auth_dns = lib.elb_public_lookup(session, "elb-auth." + domain)
-    auth_discovery_url = "http://{}:8080/auth/realms/BOSS".format(auth_dns)
+
+    if domain in hosts.BASE_DOMAIN_CERTS.keys():
+        dns_name = auth_dns
+        auth_dns = 'auth.' + hosts.BASE_DOMAIN_CERTS[domain]
+        auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_dns)
+        lib.set_domain_to_dns_name(session, auth_dns, dns_name)
+    else:
+        auth_discovery_url = "http://{}:8080/auth/realms/BOSS".format(auth_dns)
 
     password = lib.generate_password()
     print("Setting Admin password to: " + password)

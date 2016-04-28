@@ -718,3 +718,83 @@ def request_cert(session, domain_name, validation_domain='theboss.io'):
     response = client.request_certificate(DomainName=domain_name,
                                           DomainValidationOptions=validation_options)
     return response
+
+
+def get_hosted_zone_id(session, hosted_zone='theboss.io'):
+    """
+    given a hosted zone, fine the HostedZoneId
+    Args:
+        session: amazon session object
+        hosted_zone: the zone being hosted in route 53
+
+    Returns:  the Id for the hosted zone or None
+
+    """
+    if session is None:
+        return None
+
+    client = session.client('route53')
+    response = client.list_hosted_zones_by_name(
+        DNSName=hosted_zone,
+        MaxItems='1'
+    )
+    if len(response['HostedZones']) >= 1:
+        full_id = response['HostedZones'][0]['Id']
+        id_parts = full_id.split('/')
+        return id_parts.pop()
+    else:
+        return None
+
+
+def set_domain_to_dns_name(session, domain_name, dns_resource, hosted_zone='theboss.io'):
+    """
+    Sets the domain_name to use the dns name.
+    Args:
+        session: amazon session object
+        domain_name: full domain name.  (Ex:  auth.integration.theboss.io)
+        dns_resource: DNS name being assigned to this domain name  (Ex: DNS for loadbalancer)
+        hosted_zone: hosted zone being managed by route 53
+
+    Returns:  results from change_resource_record_sets
+
+    """
+    if session is None:
+        return None
+
+    client = session.client('route53')
+    hosted_zone_id = get_hosted_zone_id(session, hosted_zone)
+
+    if hosted_zone_id is None:
+        print("Error: Unable to find Route 53 Hosted Zone, " + hosted_zone + ",  Cannot set resource record for: " +
+              dns_resource)
+        return
+
+    response = client.change_resource_record_sets(
+        HostedZoneId=hosted_zone_id,
+        ChangeBatch={
+            'Changes': [
+                {
+                    'Action': 'UPSERT',
+                    'ResourceRecordSet': {
+                        'Name': domain_name,
+                        'Type': 'CNAME',
+                        'ResourceRecords': [
+                            {
+                                'Value': dns_resource
+                            },
+                        ],
+                        'TTL': 300,
+                    }
+                },
+            ]
+        }
+    )
+    return response
+
+
+def get_domain_cert_base(session, domain):
+    if domain in hosts.BASE_DOMAIN_CERTS.keys():
+        cert = lib.cert_arn_lookup(session, "api." + hosts.BASE_DOMAIN_CERTS[domain])
+    else:
+        # default to using api.theboss.io
+        cert = lib.cert_arn_lookup(session, "api.theboss.io")
