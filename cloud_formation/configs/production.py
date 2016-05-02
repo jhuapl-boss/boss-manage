@@ -248,7 +248,6 @@ def post_init(session, domain):
         kc = lib.KeyCloakClient("http://localhost:{}".format(auth_port))
         kc.login(creds["username"], creds["password"])
 
-        print("About to add redirect to KeyCloak")
         kc.add_redirect_uri("BOSS","endpoint", uri + "/*")
         kc.logout()
     call.set_ssh_target("auth")
@@ -257,23 +256,16 @@ def post_init(session, domain):
     print("Initializing Django")  # Should create ssh call with array of commands
     call.set_ssh_target("endpoint")
     migrate_cmd = "sudo python3 /srv/www/django/manage.py "
-    print("about to makemigrations")
     call.ssh(migrate_cmd + "makemigrations")  #
-    print("about to makemigrations bosscore")
     call.ssh(migrate_cmd + "makemigrations bosscore")  # will hang if it cannot contact the auth server
-    print("about to migrate")
     call.ssh(migrate_cmd + "migrate")
-    print("about to collectstatic")
     call.ssh(migrate_cmd + "collectstatic --no-input")
     # http://stackoverflow.com/questions/6244382/how-to-automate-createsuperuser-on-django
     # For how it is possible to script createsuperuser command
-    print("about to reload uwsgi-emperor")
     call.ssh("sudo service uwsgi-emperor reload")
-    print("about to restart nginx")
     call.ssh("sudo service nginx restart")
 
     # Tell Scalyr to get CloudWatch metrics for these instances.
-    print("about to add instance to scalyr")
     instances = ["endpoint." + domain]
     scalyr.add_instances_to_scalyr(
         session, PRODUCTION_REGION, instances)
