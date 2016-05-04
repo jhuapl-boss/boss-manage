@@ -90,9 +90,10 @@ def generate_password(length=16):
     Args:
         length: length of the password to be generated
 
-    Returns:  password
+    Returns:
+        password
     """
-    chars = string.ascii_letters + string.digits #+ string.punctuation
+    chars = string.ascii_letters + string.digits  #+ string.punctuation
     return "".join([chars[c % len(chars)] for c in os.urandom(length)])
 
 
@@ -259,7 +260,8 @@ class ExternalCalls:
             port: remote port to use for tunnel
             local_port: local port to use for tunnel
 
-        Returns: None
+        Returns:
+            None
 
         """
         if self.ssh_target is None:
@@ -280,7 +282,8 @@ def vpc_id_lookup(session, vpc_domain):
         session: amazon session
         vpc_domain: vpc to lookup
 
-    Returns: id of vpc
+    Returns:
+        id of vpc
 
     """
     if session is None:
@@ -301,7 +304,8 @@ def subnet_id_lookup(session, subnet_domain):
         session: amazon session
         subnet_domain: subnet domain to look up
 
-    Returns: id of the subnet domain
+    Returns:
+        id of the subnet domain
 
     """
     if session is None:
@@ -321,7 +325,8 @@ def azs_lookup(session):
     Args:
         session: amazon session
 
-    Returns: amazon availability zones
+    Returns:
+        amazon availability zones
 
     """
     if session is None:
@@ -348,7 +353,8 @@ def ami_lookup(session, ami_name):
         session: amazon session
         ami_name: name of the AMI
 
-    Returns: tuple of imageId and Value Tag.
+    Returns:
+        tuple of imageId and Value Tag.
 
     """
     if session is None:
@@ -384,7 +390,8 @@ def sg_lookup(session, vpc_id, group_name):
         vpc_id: id of VPC containting security group
         group_name: name of security group to look up
 
-    Returns:  security group id of the security group with the passed in name.
+    Returns:
+        security group id of the security group with the passed in name.
 
     """
     if session is None:
@@ -408,7 +415,8 @@ def rt_lookup(session, vpc_id, rt_name):
         vpc_id: id of VPC to look up route table in
         rt_name: name of route table
 
-    Returns:  route table id for the route table with given name.
+    Returns:
+        route table id for the route table with given name.
 
     """
     if session is None:
@@ -433,7 +441,8 @@ def rt_name_default(session, vpc_id, new_rt_name):
         vpc_id: ID of VPC
         new_rt_name: new name for default VPC Route Table
 
-    Returns: None
+    Returns:
+        None
 
     """
     client = session.client('ec2')
@@ -453,7 +462,8 @@ def peering_lookup(session, from_id, to_id):
         from_id: id of from VPC
         to_id: id of to VPC
 
-    Returns: peering connection id
+    Returns:
+        peering connection id
 
     """
     if session is None:
@@ -483,7 +493,8 @@ def keypair_lookup(session):
     Args:
         session: amazon session
 
-    Returns:  valid keypair
+    Returns:
+        valid keypair
 
     """
     if session is None:
@@ -533,7 +544,7 @@ def instanceid_lookup(session, hostname):
 
     client = session.client('ec2')
     response = client.describe_instances(
-        Filters=[{"Name":"tag:Name", "Values":[hostname]}])
+        Filters=[{"Name": "tag:Name", "Values": [hostname]}])
 
     item = response['Reservations']
     if len(item) == 0:
@@ -636,7 +647,8 @@ def create_elb_listener(loadbalancer_port, instance_port, protocol, ssl_cert_id=
         protocol (string): protocol used, ex: HTTP, HTTPS
         ssl_cert_id:
 
-    Returns: a map of the listener properly formatted
+    Returns:
+        a map of the elb listener properly formatted
 
     """
     listener = {
@@ -718,3 +730,76 @@ def request_cert(session, domain_name, validation_domain='theboss.io'):
     response = client.request_certificate(DomainName=domain_name,
                                           DomainValidationOptions=validation_options)
     return response
+
+
+def get_hosted_zone_id(session, hosted_zone='theboss.io'):
+    """
+    given a hosted zone, fine the HostedZoneId
+    Args:
+        session: amazon session object
+        hosted_zone: the zone being hosted in route 53
+
+    Returns:  the Id for the hosted zone or None
+
+    """
+    if session is None:
+        return None
+
+    client = session.client('route53')
+    response = client.list_hosted_zones_by_name(
+        DNSName=hosted_zone,
+        MaxItems='1'
+    )
+    if len(response['HostedZones']) >= 1:
+        full_id = response['HostedZones'][0]['Id']
+        id_parts = full_id.split('/')
+        return id_parts.pop()
+    else:
+        return None
+
+
+def set_domain_to_dns_name(session, domain_name, dns_resource, hosted_zone='theboss.io'):
+    """
+    Sets the domain_name to use the dns name.
+    Args:
+        session: amazon session object
+        domain_name: full domain name.  (Ex:  auth.integration.theboss.io)
+        dns_resource: DNS name being assigned to this domain name  (Ex: DNS for loadbalancer)
+        hosted_zone: hosted zone being managed by route 53
+
+    Returns:  results from change_resource_record_sets
+
+    """
+    if session is None:
+        return None
+
+    client = session.client('route53')
+    hosted_zone_id = get_hosted_zone_id(session, hosted_zone)
+
+    if hosted_zone_id is None:
+        print("Error: Unable to find Route 53 Hosted Zone, " + hosted_zone + ",  Cannot set resource record for: " +
+              dns_resource)
+        return
+
+    response = client.change_resource_record_sets(
+        HostedZoneId=hosted_zone_id,
+        ChangeBatch={
+            'Changes': [
+                {
+                    'Action': 'UPSERT',
+                    'ResourceRecordSet': {
+                        'Name': domain_name,
+                        'Type': 'CNAME',
+                        'ResourceRecords': [
+                            {
+                                'Value': dns_resource
+                            },
+                        ],
+                        'TTL': 300,
+                    }
+                },
+            ]
+        }
+    )
+    return response
+

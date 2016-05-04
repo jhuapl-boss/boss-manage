@@ -84,6 +84,12 @@ STATIC = {
 }
 
 
+# domains listed in this dictionary have certificates for the auth and api loadbalancers to use.
+BASE_DOMAIN_CERTS = {"production.boss": "theboss.io",
+                      "integration.boss": "integration.theboss.io",
+                      "hiderrt1.boss": "hiderrt1.theboss.io"}
+
+
 ##
 # Generation Code
 ##
