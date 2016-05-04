@@ -20,6 +20,11 @@ If a user tries to login to another application and their original Keycloak sess
 has not expired, the Keycloak login page is not displayed and the user is immediantly
 redirected back to the application.
 
+### OIDC Token Format
+The OIDC protocol specifies that tokens use the [JWT](https://en.wikipedia.org/wiki/JSON_Web_Token).
+
+A quick way to decode the a token is to use https://jwt.io/.
+
 ## Keycloak
 Keycloak is the Authentication Server that is being used in the BOSS architecture.
 It is an OIDC Provider and allows the different applications to authenticate to it.
