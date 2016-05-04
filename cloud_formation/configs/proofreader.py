@@ -78,7 +78,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                                                        internet_sg_id,
                                                        "ID of internal Security Group"))
 
-    az_subnets = config.find_all_availability_zones(session)
+    az_subnets, _ = config.find_all_availability_zones(session)
 
     config.add_ec2_instance("ProofreaderWeb",
                             "proofreader-web." + domain,
