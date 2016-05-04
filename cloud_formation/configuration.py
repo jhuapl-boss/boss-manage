@@ -959,7 +959,7 @@ class CloudFormationConfiguration:
                 "LoadBalancerPort": str(listener[0]),
                 "InstancePort": str(listener[1]),
                 "Protocol": listener[2],
-                "PolicyNames": key + "Policy",
+                "PolicyNames": [key + "Policy"],
             }
 
             if len(listener) == 4 and listener[3] is not None:
