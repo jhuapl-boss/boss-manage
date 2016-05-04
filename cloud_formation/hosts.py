@@ -73,7 +73,9 @@ SUBNETS = {
 # Dynamically add the following subnets to all VPCs
 for vpc in VPCS:
     # not all regions have all availability zones, but reserve them
-    subnets = ["internal", "external", "a", "b", "c", "d", "e"]
+    subnets = ["internal", "external",
+               "a-internal", "b-internal", "c-internal", "d-internal", "e-internal",
+               "a-external", "b-external", "c-external", "d-external", "e-external"]
     for subnet in subnets:
         SUBNETS[(vpc, subnet)] = subnets.index(subnet)
 
