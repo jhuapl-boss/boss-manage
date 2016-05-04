@@ -142,7 +142,7 @@ def create_config(session, domain):
 
     config.add_loadbalancer("LoadBalancerAuth",
                             "elb-auth." + domain,
-                            [lib.create_elb_listener(authExternalPort, "8080", auth_protocol, cert)],
+                            [(authExternalPort, "8080", auth_protocol, cert)],
                             subnets = external_subnets,
                             healthcheck_target = "HTTP:8080/index.html",
                             security_groups = ["InternalSecurityGroup", "AuthSecurityGroup"],

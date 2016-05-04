@@ -638,29 +638,6 @@ def elb_public_lookup(session, hostname):
     return None
 
 
-def create_elb_listener(loadbalancer_port, instance_port, protocol, ssl_cert_id=None):
-    """
-    Creates an elastic loadbalancer listener
-    Args:
-        loadbalancer_port (string): string representation of port listening on
-        instance_port (string): string representation of port on instance elb sends to
-        protocol (string): protocol used, ex: HTTP, HTTPS
-        ssl_cert_id:
-
-    Returns:
-        a map of the elb listener properly formatted
-
-    """
-    listener = {
-        "LoadBalancerPort": loadbalancer_port,
-        "InstancePort": instance_port,
-        "Protocol": protocol,
-    }
-    if ssl_cert_id is not None:
-        listener["SSLCertificateId"] = ssl_cert_id
-    return listener
-
-
 def lb_lookup(session, lb_name):
     """
     Lookup the Id for the loadbalancer with the given name.
@@ -758,7 +735,7 @@ def get_hosted_zone_id(session, hosted_zone='theboss.io'):
         return None
 
 
-def set_domain_to_dns_name(session, domain_name, dns_resource, hosted_zone='theboss.io'):
+def set_domain_to_dns_name(session, domain_name, dns_resource, hosted_zone='theboss.io'): # TODO move into CF config??
     """
     Sets the domain_name to use the dns name.
     Args:

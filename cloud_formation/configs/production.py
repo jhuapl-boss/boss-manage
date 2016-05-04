@@ -116,7 +116,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
         cert = lib.cert_arn_lookup(session, "api.theboss.io")
     config.add_loadbalancer("LoadBalancer",
                             "elb." + domain,
-                            [lib.create_elb_listener("443", "80", "HTTPS", cert)],
+                            [("443", "80", "HTTPS", cert)],
                             ["Endpoint"],
                             subnets=external_subnets,
                             security_groups=["AllHTTPSSecurityGroup"],

@@ -938,7 +938,11 @@ class CloudFormationConfiguration:
         Args:
             key: the unique name (within the configuration) for this resource
             name: the name to give this elb
-            listeners: list of listeners for the elb
+            listeners: list of (elb_port, instance_port, protocol [, ssl_cert_id]) for the elb
+                       elb_port is the port for the elb to listening on
+                       instance_port is the port on the instance that the elb sends traffic to
+                       protocol is the protocol used, ex: HTTP, HTTPS
+                       ssl_cert_id is the AWS ID of the SSL cert to use
             instances: list of instances ids
             subnets: list of subnet names
             security_groups:  list of SecurityGroups
@@ -948,8 +952,20 @@ class CloudFormationConfiguration:
         Returns:
 
         """
+
+        listener_defs = []
         for listener in listeners:
-            listener["PolicyNames"] = [key + "Policy"]
+            listener_def = {
+                "LoadBalancerPort": str(listener[0]),
+                "InstancePort": str(listener[1]),
+                "Protocol": listener[2],
+                "PolicyNames": key + "Policy",
+            }
+
+            if len(listener) == 4 and listener[3] is not None:
+                listener_def["SSLCertificateId"] = listener[3]
+            listener_defs.append(listener_def)
+
 
         self.resources[key] = {
             "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
@@ -964,7 +980,7 @@ class CloudFormationConfiguration:
                 },
                 "LBCookieStickinessPolicy" : [{"PolicyName": key + "Policy"}],
                 "LoadBalancerName": name.replace(".", "-"),  #elb names can't have periods in them
-                "Listeners": listeners,
+                "Listeners": listener_defs,
                 "Tags": [
                     {"Key": "Stack", "Value": { "Ref": "AWS::StackName"}}
                 ]
