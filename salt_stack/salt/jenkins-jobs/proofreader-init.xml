@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <project>
   <actions/>
-  <description></description>
+  <description>Tests of script used to automatically create a proofreader project and assign jobs.</description>
   <keepDependencies>false</keepDependencies>
   <properties>
     <jenkins.plugins.slack.SlackNotifier_-SlackJobProperty plugin="slack@1.8.1">
@@ -22,51 +22,23 @@
       <customMessage></customMessage>
     </jenkins.plugins.slack.SlackNotifier_-SlackJobProperty>
   </properties>
-  <scm class="hudson.plugins.git.GitSCM" plugin="git@2.4.2">
-    <configVersion>2</configVersion>
-    <userRemoteConfigs>
-      <hudson.plugins.git.UserRemoteConfig>
-        <url>https://github.com/aplmicrons/proofread</url>
-        <credentialsId>dc83befc-585e-46a1-b6f0-0026cf50c000</credentialsId>
-      </hudson.plugins.git.UserRemoteConfig>
-    </userRemoteConfigs>
-    <branches>
-      <hudson.plugins.git.BranchSpec>
-        <name>*/integration</name>
-      </hudson.plugins.git.BranchSpec>
-    </branches>
-    <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
-    <submoduleCfg class="list"/>
-    <extensions/>
-  </scm>
+  <scm class="hudson.scm.NullSCM"/>
   <canRoam>true</canRoam>
   <disabled>false</disabled>
   <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
   <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
-  <triggers>
-    <hudson.triggers.SCMTrigger>
-      <spec>H/5 * * * *</spec>
-      <ignorePostCommitHooks>false</ignorePostCommitHooks>
-    </hudson.triggers.SCMTrigger>
-  </triggers>
+  <triggers/>
   <concurrentBuild>false</concurrentBuild>
+  <customWorkspace>jobs/proofreader/workspace</customWorkspace>
   <builders>
     <hudson.tasks.Shell>
-      <command>bash -ex ./jenkins.sh</command>
+      <command>cd scripts
+nose2</command>
     </hudson.tasks.Shell>
   </builders>
   <publishers>
-    <hudson.tasks.BuildTrigger>
-      <childProjects>proofreader-init-script</childProjects>
-      <threshold>
-        <name>SUCCESS</name>
-        <ordinal>0</ordinal>
-        <color>BLUE</color>
-        <completeBuild>true</completeBuild>
-      </threshold>
-    </hudson.tasks.BuildTrigger>
     <hudson.plugins.cobertura.CoberturaPublisher plugin="cobertura@1.9.7">
-      <coberturaReportFile>proofreader_apis/reports/coverage.xml</coberturaReportFile>
+      <coberturaReportFile>scripts/coverage.xml</coberturaReportFile>
       <onlyStable>false</onlyStable>
       <failUnhealthy>false</failUnhealthy>
       <failUnstable>false</failUnstable>
@@ -126,7 +98,7 @@
       <sourceEncoding>ASCII</sourceEncoding>
     </hudson.plugins.cobertura.CoberturaPublisher>
     <hudson.tasks.junit.JUnitResultArchiver plugin="junit@1.11">
-      <testResults>proofreader_apis/reports/junit.xml</testResults>
+      <testResults>scripts/nose2-junit.xml</testResults>
       <keepLongStdio>false</keepLongStdio>
       <healthScaleFactor>1.0</healthScaleFactor>
       <allowEmptyResults>false</allowEmptyResults>
@@ -313,7 +285,7 @@
           </entry>
         </typeConfigs>
         <limit>100</limit>
-        <sourcePathPattern>**/proofreader_apis</sourcePathPattern>
+        <sourcePathPattern>**/scripts</sourcePathPattern>
         <fauxProjectPath></fauxProjectPath>
         <encoding>default</encoding>
       </config>

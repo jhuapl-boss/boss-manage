@@ -14,3 +14,4 @@ jenkins:
       # security, when installing new jobs.
       installed:
           proofreader: /srv/salt/jenkins-jobs/proofreader.xml
+          proofreader-init-script: /srv/salt/jenkins-jobs/proofreader-init.xml 
