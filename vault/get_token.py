@@ -109,7 +109,7 @@ if __name__ == "__main__":
     session = create_session(args.aws_credentials)
     hostname = elb_public_lookup(session, "elb-auth." + args.domain_name)
 
-    url = "http://" + hostname + ":8080/auth/realms/BOSS/protocol/openid-connect/token"
+    url = "https://" + hostname + "/auth/realms/BOSS/protocol/openid-connect/token"
     params = {
         "grant_type": "password",
         "client_id": "endpoint",

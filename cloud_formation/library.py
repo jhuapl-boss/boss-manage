@@ -216,6 +216,18 @@ class ExternalCalls:
         self.domain = domain
         self.ssh_target = None
 
+    def vault_init(self):
+        """ Call vault-init on the first machine and vault-unseal on all others"""
+        vaults = bastion.machine_lookup_all(self.session, self.vault_hostname, public_ip=False)
+
+        def connect(ip, func):
+            bastion.connect_vault(self.keypair_file, ip, self.bastion_ip, func)
+
+        connect(vaults[0], lambda: vault.vault_init(machine=self.vault_hostname))
+        for ip in vaults[1:]:
+            connect(ip, lambda: vault.vault_unseal(machine=self.vault_hostname))
+
+
     def vault(self, cmd, *args, **kwargs):
         def delegate():
             # Have to dynamically lookup the function because vault.COMMANDS

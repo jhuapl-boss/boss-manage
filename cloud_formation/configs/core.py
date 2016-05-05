@@ -103,6 +103,11 @@ def create_config(session, domain):
 
     SCENARIO = os.environ["SCENARIO"]
     USE_DB = SCENARIO in ("production",)
+    # Problem: If development scenario uses a local DB. If the auth server crashes
+    #          and is auto restarted by the autoscale group then the new auth server
+    #          will not have any of the previous configuration, because the old DB
+    #          was lost. Using an RDS for development fixes this at the cost of having
+    #          the core config taking longer to launch.
     if USE_DB:
         deps = ["AttachInternetGateway", "AuthDB"]
         user_data["aws"]["db"] = "keycloak" # flag for init script for which config to use
@@ -262,7 +267,7 @@ def post_init(session, domain):
     for i in range(6):
         try:
             call = lib.ExternalCalls(session, keypair, domain)
-            call.vault("vault-init")
+            call.vault_init()
             initialized = True
             break
         except requests.exceptions.ConnectionError:
@@ -271,7 +276,10 @@ def post_init(session, domain):
         print("Could not initialize Vault, manually call post-init before launching other machines")
         return
 
-    print("Configuring KeyCloak...")
+    print("Waiting for Keycloak to bootstrap")
+    time.sleep(60)
+
+    print("Configuring Keycloak...")
     configure_keycloak(session, domain)
 
     # Tell Scalyr to get CloudWatch metrics for these instances.
