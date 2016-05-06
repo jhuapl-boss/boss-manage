@@ -128,6 +128,7 @@ def create(session, domain):
     user_data["system"]["fqdn"] = "proofreader-web." + domain
     user_data["system"]["type"] = "proofreader-web"
     user_data["aws"]["db"] = "proofreader-db." + domain
+    user_data["auth"]["OIDC_VERIFY_SSL"] = "{}".format(domain in hosts.BASE_DOMAIN_CERTS.keys())
     user_data = str(user_data)
 
 
