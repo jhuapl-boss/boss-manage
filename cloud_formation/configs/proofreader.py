@@ -129,6 +129,8 @@ def create(session, domain):
     user_data["system"]["type"] = "proofreader-web"
     user_data["aws"]["db"] = "proofreader-db." + domain
     user_data = str(user_data)
+    user_data["auth"]["OIDC_VERIFY_SSL"] = "{}".format(domain in hosts.BASE_DOMAIN_CERTS.keys())
+
 
     # Should transition from vault-django to vault-write
     call.vault_write(VAULT_DJANGO, secret_key = str(uuid.uuid4()))

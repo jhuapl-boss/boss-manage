@@ -1180,6 +1180,7 @@ class UserData:
     """
     def __init__(self, config_file = "../salt_stack/salt/boss-tools/files/boss-tools.git/bossutils/boss.config.default"):
         self.config = configparser.ConfigParser()
+        self.config.optionxform = str  # this line perserves the case of the keys.
         self.config.read(config_file)
 
     def __getitem__(self, key):
