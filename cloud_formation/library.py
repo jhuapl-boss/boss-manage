@@ -194,15 +194,35 @@ class KeyCloakClient:
             method="PUT"
         )
 
-    def add_redirect_uri(self, realm_name, client_id, uri):
+    def add_to_string_list_property(self, realm_name, client_id, key, value, auto_update=True):
         client = self.get_client(realm_name, client_id)
 
-        key = "redirectUris"
         if key not in client:
             client[key] = []
-        client[key].append(uri)  # DP: should probably check to see if the uri exists first
+        if value not in client[key]:
+            client[key].append(value)
 
-        self.update_client(realm_name, client['id'], client)
+        if auto_update:
+            self.update_client(realm_name, client['id'], client)
+
+    def add_redirect_uri(self, realm_name, client_id, uri, auto_update=True):
+        self.add_to_string_list_property(realm_name, client_id, "redirectUris", uri, auto_update)
+
+    def add_web_origin(self, realm_name, client_id, uri, auto_update=True):
+        self.add_to_string_list_property(realm_name, client_id, "webOrigins", uri, auto_update)
+
+    def get_client_installation_json(self, realm_name, client_id):
+        client = self.get_client(realm_name, client_id)
+
+        resp = self.request(
+            "/auth/admin/realms/{}/clients/{}/installation/providers/keycloak-oidc-keycloak-json".format(realm_name, client["id"]),
+            headers={
+                "Authorization": "Bearer " + self.token["access_token"],
+                "Content-Type": "application/json",
+            }
+        )
+
+        return resp
 
 
 class ExternalCalls:
@@ -791,4 +811,3 @@ def set_domain_to_dns_name(session, domain_name, dns_resource, hosted_zone='theb
         }
     )
     return response
-
