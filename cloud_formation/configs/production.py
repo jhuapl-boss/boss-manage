@@ -200,7 +200,7 @@ def create(session, domain):
     user_data["aws"]["cache"] = "cache." + domain
     user_data["aws"]["cache-state"] = "cache-state." + domain
     user_data["aws"]["meta-db"] = "bossmeta." + domain
-    user_data["auth"]["OIDC_VERIFY_SSL"] = "{}".format(domain in hosts.BASE_DOMAIN_CERTS.keys())
+    user_data["auth"]["OIDC_VERIFY_SSL"] = str(domain in hosts.BASE_DOMAIN_CERTS.keys())
 
     call.vault_write(VAULT_DJANGO, secret_key = str(uuid.uuid4()))
     call.vault_write(VAULT_DJANGO_DB, **db)
