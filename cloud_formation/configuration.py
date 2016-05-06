@@ -38,6 +38,16 @@ config to CloudFormation and manually specify the values
 that they want...
 """
 
+def get_scenario(var, default = None):
+    scenario = os.environ["SCENARIO"]
+    if type(var) == dict:
+        var_ = var.get(scenario, None)
+        if var_ is None:
+            var_ = var.get("default", default)
+    else:
+        var_ = var
+    return var_
+
 def bool_str(val):
     """Convert a bool to a string with appropriate case formatting."""
     return "true" if val else "false"
@@ -390,16 +400,42 @@ class CloudFormationConfiguration:
                             "Domain of the Subnet '{}'".format(key))
         self.add_arg(domain)
 
-    def find_all_availability_zones(self, session):
-        subnets = []
+    def add_all_azs(self, session):
+        internal = []
+        external = []
         for az, sub in lib.azs_lookup(session):
-            name = sub.capitalize() + "Subnet"
-            domain = sub + "." + self.vpc_domain
-            id = lib.subnet_id_lookup(session, domain)
+            name = sub.capitalize() + "InternalSubnet"
+            self.subnet_domain = sub + "-internal." + self.vpc_domain
+            self.subnet_subnet = hosts.lookup(self.subnet_domain)
+            self.add_subnet(name, az = az)
+            internal.append(name)
 
+            name = sub.capitalize() + "ExternalSubnet"
+            self.subnet_domain = sub + "-external." + self.vpc_domain
+            self.subnet_subnet = hosts.lookup(self.subnet_domain)
+            self.add_subnet(name, az = az)
+            external.append(name)
+
+        return (internal, external)
+
+    def find_all_availability_zones(self, session):
+        internal = []
+        external = []
+
+        for az, sub in lib.azs_lookup(session):
+            name = sub.capitalize() + "InternalSubnet"
+            domain = sub + "-internal." + self.vpc_domain
+            id = lib.subnet_id_lookup(session, domain)
             self.add_arg(Arg.Subnet(name, id))
-            subnets.append(name)
-        return subnets
+            internal.append(name)
+
+            name = sub.capitalize() + "ExternalSubnet"
+            domain = sub + "-external." + self.vpc_domain
+            id = lib.subnet_id_lookup(session, domain)
+            self.add_arg(Arg.Subnet(name, id))
+            external.append(name)
+
+        return (internal, external)
 
     # ??? save hostname : keypair somewhere?
     def add_ec2_instance(self, key, hostname, ami, keypair, subnet="Subnet", type_="t2.micro", iface_check=True, public_ip=False, security_groups=None, user_data=None, meta_data=None, depends_on=None):
@@ -691,6 +727,7 @@ class CloudFormationConfiguration:
                 type__ = type_.get("default", "cache.m3.medium")
             type_ = type__
 
+        # TODO Should create a helper method to contain this logic
         if type(clusters) == dict:
             clusters__ = clusters.get(scenario, None)
             if clusters__ is None:
@@ -852,7 +889,8 @@ class CloudFormationConfiguration:
                 {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
                 {"Key" : "Name", "Value" : { "Fn::Join" : [ ".", [name, { "Ref" : vpc + "Domain" }]]}}
             ]
-          }
+          },
+          "DependsOn" : vpc
         }
 
         self.resources["Attach" + key] = {
@@ -900,7 +938,11 @@ class CloudFormationConfiguration:
         Args:
             key: the unique name (within the configuration) for this resource
             name: the name to give this elb
-            listeners: list of listeners for the elb
+            listeners: list of (elb_port, instance_port, protocol [, ssl_cert_id]) for the elb
+                       elb_port is the port for the elb to listening on
+                       instance_port is the port on the instance that the elb sends traffic to
+                       protocol is the protocol used, ex: HTTP, HTTPS
+                       ssl_cert_id is the AWS ID of the SSL cert to use
             instances: list of instances ids
             subnets: list of subnet names
             security_groups:  list of SecurityGroups
@@ -910,6 +952,21 @@ class CloudFormationConfiguration:
         Returns:
 
         """
+
+        listener_defs = []
+        for listener in listeners:
+            listener_def = {
+                "LoadBalancerPort": str(listener[0]),
+                "InstancePort": str(listener[1]),
+                "Protocol": listener[2],
+                "PolicyNames": [key + "Policy"],
+            }
+
+            if len(listener) == 4 and listener[3] is not None:
+                listener_def["SSLCertificateId"] = listener[3]
+            listener_defs.append(listener_def)
+
+
         self.resources[key] = {
             "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
             "Properties": {
@@ -921,8 +978,9 @@ class CloudFormationConfiguration:
                     "Interval": "30",
                     "Timeout": "5"
                 },
+                "LBCookieStickinessPolicy" : [{"PolicyName": key + "Policy"}],
                 "LoadBalancerName": name.replace(".", "-"),  #elb names can't have periods in them
-                "Listeners": listeners,
+                "Listeners": listener_defs,
                 "Tags": [
                     {"Key": "Stack", "Value": { "Ref": "AWS::StackName"}}
                 ]
@@ -930,19 +988,13 @@ class CloudFormationConfiguration:
         }
 
         if instances is not None:
-            instance_refs = []
-            for ref in instances:
-                instance_refs.append({ "Ref" : ref })
+            instance_refs = [{ "Ref" : ref } for ref in instances]
             self.resources[key]["Properties"]["Instances"] = instance_refs
         if security_groups is not None:
-            sgs = []
-            for sg in security_groups:
-                sgs.append({"Ref": sg })
+            sgs = [{"Ref": sg } for sg in security_groups]
             self.resources[key]["Properties"]["SecurityGroups"] = sgs
         if subnets is not None:
-            ref_subs = []
-            for sub in subnets:
-                ref_subs.append({"Ref": sub })
+            ref_subs = [{"Ref": sub } for sub in subnets]
             self.resources[key]["Properties"]["Subnets"] = ref_subs
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
@@ -953,6 +1005,62 @@ class CloudFormationConfiguration:
         #         "Value":  { "Fn::Join": ["", ["http://", {"Fn::GetAtt": [ "ElasticLoadBalancer", "DNSName"]}]]}
         #     }
         # }
+
+    def add_autoscale_group(self, key, hostname, ami, keypair, subnets=["Subnet"], type_="t2.micro", public_ip=False, security_groups=[], user_data=None, min=1, max=1, elb=None, depends_on=None):
+
+        self.resources[key] = {
+            "Type" : "AWS::AutoScaling::AutoScalingGroup",
+            "Properties" : {
+                #"DesiredCapacity" : get_scenario(min, 1), Initial capacity, will min size also ensure the size on startup?
+                "HealthCheckType" : "EC2" if elb is None else "ELB",
+                "HealthCheckGracePeriod" : 30, # seconds
+                "LaunchConfigurationName" : { "Ref": key + "Configuration" },
+                "LoadBalancerNames" : [] if elb is None else [{ "Ref": elb }],
+                "MaxSize" : str(get_scenario(max, 1)),
+                "MinSize" : str(get_scenario(min, 1)),
+                "Tags" : [
+                    {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"}, "PropagateAtLaunch": "true" },
+                    {"Key" : "Name", "Value" : { "Ref": key + "Hostname" }, "PropagateAtLaunch": "true" }
+                ],
+                "VPCZoneIdentifier" : [{ "Ref" : subnet } for subnet in subnets]
+            }
+        }
+
+        if depends_on is not None:
+            self.resources[key]["DependsOn"] = depends_on
+
+        self.resources[key + "Configuration"] = {
+            "Type" : "AWS::AutoScaling::LaunchConfiguration",
+            "Properties" : {
+                "AssociatePublicIpAddress" : public_ip,
+                #"EbsOptimized" : Boolean, EBS I/O optimized
+                "ImageId" : { "Ref" : key + "AMI" },
+                "InstanceMonitoring" : False, # CloudWatch Monitoring...
+                "InstanceType" : get_scenario(type_, "t2.micro"),
+                "KeyName" : { "Ref" : key + "Key" },
+                "SecurityGroups" : [{ "Ref" : sg } for sg in security_groups],
+                "UserData" : "" if user_data is None else { "Fn::Base64" : user_data }
+            }
+        }
+
+        if type(ami) == tuple:
+            commit = ami[1]
+            ami = ami[0]
+
+            if commit is not None:
+                kv = {"Key": "AMI Commit", "Value": commit, "PropagateAtLaunch": "true"}
+                self.resources[key]["Properties"]["Tags"].append(kv)
+
+        _ami = Arg.AMI(key + "AMI", ami,
+                       "AMI for the EC2 Instance '{}'".format(key))
+        self.add_arg(_ami)
+
+        _key = Arg.KeyPair(key + "Key", keypair, hostname)
+        self.add_arg(_key)
+
+        _hostname = Arg.String(key + "Hostname", hostname,
+                               "Hostname of the EC2 Instance '{}'".format(key))
+        self.add_arg(_hostname)
 
     def _add_record_cname(self, key, hostname, vpc="VPC", ttl="300", rds=False, cluster=False, replication=False, ec2=False):
         address_key = None

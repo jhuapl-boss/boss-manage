@@ -6,6 +6,7 @@ base:
         - scalyr.update_host
 
     'auth*':
+        - boss-tools.bossutils
         - keycloak
 
     'endpoint*':

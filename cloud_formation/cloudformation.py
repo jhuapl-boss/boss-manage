@@ -107,7 +107,7 @@ def post_init(session, domain, config):
     <session> and <domain>.
     """
     module = importlib.import_module("configs." + config)
-    if "post_init" in dir(modules):
+    if "post_init" in dir(module):
         module.post_init(session, domain)
 
 if __name__ == '__main__':
@@ -145,7 +145,7 @@ if __name__ == '__main__':
                         choices = scenarios,
                         help = "The deployment configuration to use when creating the stack (instance size, autoscale group size, etc) (default: development)")
     parser.add_argument("action",
-                        choices = ["create","generate","delete"],
+                        choices = actions,
                         metavar = "action",
                         help = "Action to execute")
     parser.add_argument("domain_name", help="Domain in which to execute the configuration (example: subnet.vpc.boss)")

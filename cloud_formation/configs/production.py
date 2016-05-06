@@ -108,7 +108,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                                                    internal_sg_id,
                                                    "ID of internal Security Group"))
 
-    az_subnets = config.find_all_availability_zones(session)
+    az_subnets, external_subnets = config.find_all_availability_zones(session)
 
     if domain in hosts.BASE_DOMAIN_CERTS.keys():
         cert = lib.cert_arn_lookup(session, "api." + hosts.BASE_DOMAIN_CERTS[domain])
@@ -117,9 +117,9 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
         cert = lib.cert_arn_lookup(session, "api.theboss.io")
     config.add_loadbalancer("LoadBalancer",
                             "elb." + domain,
-                            [lib.create_elb_listener("443", "80", "HTTPS", cert)],
+                            [("443", "80", "HTTPS", cert)],
                             ["Endpoint"],
-                            subnets=["ExternalSubnet"],
+                            subnets=external_subnets,
                             security_groups=["AllHTTPSSecurityGroup"],
                             depends_on=["AllHTTPSSecurityGroup"])
 

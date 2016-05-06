@@ -20,6 +20,14 @@ download:
         - user: root
         - group: root
 
+keycloak-ha-config:
+    file.managed:
+        - name: /srv/keycloak/standalone/configuration/standalone-ha.xml
+        - source: salt://keycloak/files/standalone-ha.xml
+        - mode: 644
+        - require:
+            - file: download
+
 keycloak-config:
     file.managed:
         - name: /srv/keycloak/standalone/configuration/standalone.xml
@@ -48,3 +56,15 @@ create-java-symlink:
         - force: True
         - user: root
         - group: root
+
+mysql-config:
+    file.managed:
+        - name: /srv/keycloak/modules/system/layers/base/com/mysql/main/module.xml
+        - source: salt://keycloak/files/module.xml
+        - makedirs: True
+
+mysql-jar:
+    file.managed:
+        - name: /srv/keycloak/modules/system/layers/base/com/mysql/main/mysql-connector-java-5.1.38-bin.jar
+        - source: salt://keycloak/files/mysql-connector-java-5.1.38-bin.jar
+        - makedirs: True

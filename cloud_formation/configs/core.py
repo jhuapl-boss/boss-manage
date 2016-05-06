@@ -41,7 +41,10 @@ CORE_REGION = 'us-east-1'
 
 INCOMING_SUBNET = "52.3.13.189/32" # microns-bastion elastic IP
 
-
+AUTH_CLUSTER_SIZE = { # Auth Server Cluster is a fixed size
+    "development" : 1,
+    "production": 3 # should be an odd number
+}
 
 def create_config(session, domain):
     """Create the CloudFormationConfiguration object."""
@@ -68,13 +71,7 @@ def create_config(session, domain):
     config.subnet_subnet = hosts.lookup(config.subnet_domain)
     config.add_subnet("ExternalSubnet")
 
-    subnets = []
-    for az, sub in lib.azs_lookup(session):
-        name = sub.capitalize() + "Subnet"
-        config.subnet_domain = sub + "." + domain
-        config.subnet_subnet = hosts.lookup(config.subnet_domain)
-        config.add_subnet(name, az = az)
-        subnets.append(name)
+    internal_subnets, external_subnets = config.add_all_azs(session)
 
     # Create the user data for Vault. No data is given to Bastion
     # because it is an AWS AMI designed for NAT work and does not
@@ -98,33 +95,59 @@ def create_config(session, domain):
                             subnet = "ExternalSubnet",
                             public_ip = True,
                             iface_check = False,
-                            security_groups = ["InternalSecurityGroup", "BastionSecurityGroup"])
+                            security_groups = ["InternalSecurityGroup", "BastionSecurityGroup"],
+                            depends_on = "AttachInternetGateway")
 
-    config.add_ec2_instance("Auth",
-                            "auth." + domain,
-                            lib.ami_lookup(session, "auth.boss"),
-                            keypair,
-                            subnet = "ExternalSubnet", # Eventually place in a autoscale group across all subnets
-                            public_ip = True,
-                            security_groups = ["InternalSecurityGroup"])
+    user_data["system"]["fqdn"] = "auth." + domain
+    user_data["system"]["type"] = "auth"
+
+    SCENARIO = os.environ["SCENARIO"]
+    USE_DB = SCENARIO in ("production",)
+    # Problem: If development scenario uses a local DB. If the auth server crashes
+    #          and is auto restarted by the autoscale group then the new auth server
+    #          will not have any of the previous configuration, because the old DB
+    #          was lost. Using an RDS for development fixes this at the cost of having
+    #          the core config taking longer to launch.
+    if USE_DB:
+        deps = ["AttachInternetGateway", "AuthDB"]
+        user_data["aws"]["db"] = "keycloak" # flag for init script for which config to use
+    else:
+        deps = ["AttachInternetGateway"]
+
+    config.add_autoscale_group("Auth",
+                               "auth." + domain,
+                               lib.ami_lookup(session, "auth.boss"),
+                               keypair,
+                               subnets = internal_subnets,
+                               security_groups = ["InternalSecurityGroup"],
+                               user_data = str(user_data),
+                               min = AUTH_CLUSTER_SIZE,
+                               max = AUTH_CLUSTER_SIZE,
+                               elb = "LoadBalancerAuth",
+                               depends_on = deps)
+    if USE_DB:
+        config.add_rds_db("AuthDB",
+                          "auth-db." + domain,
+                          "3306",
+                          "keycloak",
+                          "keycloak",
+                          "keycloak",
+                          internal_subnets,
+                          type_ = "db.t2.micro",
+                          security_groups = ["InternalSecurityGroup"])
 
     if domain in hosts.BASE_DOMAIN_CERTS.keys():
-        authExternalPort = "443"
-        auth_protocol = "HTTPS"
         cert = lib.cert_arn_lookup(session, "auth." + hosts.BASE_DOMAIN_CERTS[domain])
     else:
-        authExternalPort = "8080"
-        auth_protocol = "HTTP"
         cert = lib.cert_arn_lookup(session, "auth.integration.theboss.io")
 
     config.add_loadbalancer("LoadBalancerAuth",
                             "elb-auth." + domain,
-                            [lib.create_elb_listener("443", "8080", "HTTPS", cert)],
-                            instances = ["Auth"],
-                            subnets = ["ExternalSubnet"],
+                            [("443", "8080", "HTTPS", cert)],
+                            subnets = external_subnets,
                             healthcheck_target = "HTTP:8080/index.html",
                             security_groups = ["InternalSecurityGroup", "AuthSecurityGroup"],
-                            depends_on = ["AuthSecurityGroup"])
+                            depends_on = ["AuthSecurityGroup", "AttachInternetGateway"])
 
     config.add_security_group("InternalSecurityGroup",
                               "internal",
@@ -137,13 +160,12 @@ def create_config(session, domain):
 
     config.add_security_group("AuthSecurityGroup",
                               "auth",
-                              [("tcp", "443", "443", "0.0.0.0/0"),
-                               ("tcp", "8080", "8080", "0.0.0.0/0")])
+                              [("tcp", "443", "443", "0.0.0.0/0")])
 
     # Create the internal route table to route traffic to the NAT Bastion
     config.add_route_table("InternalRouteTable",
                            "internal",
-                           subnets = ["InternalSubnet"])
+                           subnets = ["InternalSubnet"]) # Route to all internal subnets?
 
     config.add_route_table_route("InternalNatRoute",
                                  "InternalRouteTable",
@@ -151,9 +173,10 @@ def create_config(session, domain):
                                  depends_on = "Bastion")
 
     # Create the internet gateway and internet router
+    external_subnets.append("ExternalSubnet")
     config.add_route_table("InternetRouteTable",
                            "internet",
-                           subnets = ["ExternalSubnet"])
+                           subnets = external_subnets)
 
     config.add_route_table_route("InternetRoute",
                                  "InternetRouteTable",
@@ -165,7 +188,7 @@ def create_config(session, domain):
     return config
 
 def upload_realm_config(port, password):
-    URL = "http://localhost:{}".format(port)
+    URL = "http://localhost:{}".format(port) # TODO move out of tunnel and use public address
 
     kc = lib.KeyCloakClient(URL)
     kc.login("admin", password)
@@ -210,7 +233,8 @@ def configure_keycloak(session, domain):
                                   # make sure the process is actually killed
     call.ssh("sudo service keycloak start")
 
-    time.sleep(15) # wait for service to start
+    print("Waiting for Keycloak to restart")
+    time.sleep(60)
     call.ssh_tunnel(lambda p: upload_realm_config(p, password), 8080)
 
 def generate(folder, domain):
@@ -243,7 +267,7 @@ def post_init(session, domain):
     for i in range(6):
         try:
             call = lib.ExternalCalls(session, keypair, domain)
-            call.vault("vault-init")
+            call.vault_init()
             initialized = True
             break
         except requests.exceptions.ConnectionError:
@@ -252,7 +276,10 @@ def post_init(session, domain):
         print("Could not initialize Vault, manually call post-init before launching other machines")
         return
 
-    print("Configuring KeyCloak...")
+    print("Waiting for Keycloak to bootstrap")
+    time.sleep(60)
+
+    print("Configuring Keycloak...")
     configure_keycloak(session, domain)
 
     # Tell Scalyr to get CloudWatch metrics for these instances.

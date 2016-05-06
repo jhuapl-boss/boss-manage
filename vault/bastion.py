@@ -211,11 +211,35 @@ def create_session(cred_fh):
                       region_name = 'us-east-1')
     return session
 
+def machine_lookup_all(session, hostname, public_ip = True):
+    client = session.client('ec2')
+    response = client.describe_instances(Filters=[{"Name":"tag:Name", "Values":[hostname]},
+                                                  {"Name":"instance-state-name", "Values":["running"]}])
+
+    addresses = []
+    items = response['Reservations']
+    if len(items) > 0:
+        for i in items:
+            item = i['Instances'][0]
+            if 'PublicIpAddress' in item and public_ip:
+                addresses.append(item['PublicIpAddress'])
+            elif 'PrivateIpAddress' in item:
+                addresses.append(item['PrivateIpAddress'])
+    return addresses
+
 def machine_lookup(session, hostname, public_ip = True):
     """Lookup the running EC2 instance with the name hostname. If a machine
     exists then return the public IP address (if it exists) or the private
     IP address (if it exists).
     """
+
+    try:
+        idx, target = hostname.split('.', 1)
+        idx = int(idx) # if it is not a valid number, then it is a hostname
+        hostname = target
+    except:
+        idx = 0
+
     client = session.client('ec2')
     response = client.describe_instances(Filters=[{"Name":"tag:Name", "Values":[hostname]},
                                                   {"Name":"instance-state-name", "Values":["running"]}])
@@ -225,12 +249,13 @@ def machine_lookup(session, hostname, public_ip = True):
         print("Could not find IP address for '{}'".format(hostname))
         return None
     else:
-        item = item[0]['Instances']
-        if len(item) == 0:
-            print("Could not find IP address for '{}'".format(hostname))
+        item.sort(key = lambda i: i['Instances'][0]["InstanceId"])
+
+        if len(item) <= idx:
+            print("Could not find IP address for '{}' index '{}'".format(hostname, idx))
             return None
         else:
-            item = item[0]
+            item = item[idx]['Instances'][0]
             if 'PublicIpAddress' in item and public_ip:
                 return item['PublicIpAddress']
             elif 'PrivateIpAddress' in item:
