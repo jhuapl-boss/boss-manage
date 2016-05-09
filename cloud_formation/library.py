@@ -24,6 +24,7 @@ import string
 import subprocess
 import shlex
 import traceback
+import ssl
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 from urllib.error import HTTPError
@@ -98,9 +99,16 @@ def generate_password(length=16):
 
 
 class KeyCloakClient:
-    def __init__(self, url_base):
+    def __init__(self, url_base, verify_ssl=True):
         self.url_base = url_base
         self.token = None
+
+        if url.startswith("https") and not verify_ssl:
+            self.ctx = ssl.create_default_context()
+            self.ctx.check_hostname = False
+            self.ctx.verify_mode = ssl.CERT_NONE
+        else:
+            self.ctx = None
 
     def request(self, url, params=None, headers={}, convert=urlencode, method=None):
         request = Request(
@@ -111,7 +119,7 @@ class KeyCloakClient:
         )
 
         try:
-            response = urlopen(request).read().decode("utf-8")
+            response = urlopen(request, context=self.ctx).read().decode("utf-8")
             if len(response) > 0:
                 response = json.loads(response)
             return response
