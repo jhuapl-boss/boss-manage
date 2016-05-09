@@ -162,6 +162,7 @@ def create(session, domain):
 def post_init(session, domain):
     keypair = lib.keypair_lookup(session)
     call = lib.ExternalCalls(session, keypair, domain)
+    creds = call.vault_read("secret/auth")
 
     print("Configuring KeyCloak") # Should abstract for production and proofreader
     def configure_auth(auth_port):
@@ -171,11 +172,9 @@ def post_init(session, domain):
         uri = "http://{}".format(dns)
         call.vault_update(VAULT_DJANGO_AUTH, public_uri = uri)
 
-        creds = call.vault_read("secret/auth")
         kc = lib.KeyCloakClient("http://localhost:{}".format(auth_port))
         kc.login(creds["username"], creds["password"])
-        kc.add_redirect_uri("BOSS","endpoint", uri + "/*", False)
-        kc.add_web_origin("BOSS", "endpoint", uri)
+        kc.append_list_properties("BOSS", "endpoint", {"redirectUris": uri, "webOrigins": uri})
         kc.logout()
     call.set_ssh_target("auth")
     call.ssh_tunnel(configure_auth, 8080)

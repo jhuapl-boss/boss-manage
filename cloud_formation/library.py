@@ -194,22 +194,28 @@ class KeyCloakClient:
             method="PUT"
         )
 
-    def add_to_string_list_property(self, realm_name, client_id, key, value, auto_update=True):
+    def append_list_properties(self, realm_name, client_id, additions):
+        """
+        Append to client list properties.
+
+        Args:
+            realm_name (str): the realm
+            client_id (str): the client-id
+            additions (dict): dictionary of additions, each entry's key should correspond to a client key and that
+                              entry's (singular) value will be appended to the client's property.
+        """
         client = self.get_client(realm_name, client_id)
 
-        if key not in client:
-            client[key] = []
-        if value not in client[key]:
-            client[key].append(value)
+        for key, value in additions.items():
+            if key not in client:
+                client[key] = []
+            if value not in client[key]:
+                client[key].append(value)
 
-        if auto_update:
-            self.update_client(realm_name, client['id'], client)
+        self.update_client(realm_name, client['id'], client)
 
-    def add_redirect_uri(self, realm_name, client_id, uri, auto_update=True):
-        self.add_to_string_list_property(realm_name, client_id, "redirectUris", uri, auto_update)
-
-    def add_web_origin(self, realm_name, client_id, uri, auto_update=True):
-        self.add_to_string_list_property(realm_name, client_id, "webOrigins", uri, auto_update)
+    def add_redirect_uri(self, realm_name, client_id, uri):
+        self.append_list_properties(realm_name, client_id, {"redirectUris": uri})
 
     def get_client_installation_json(self, realm_name, client_id):
         client = self.get_client(realm_name, client_id)
