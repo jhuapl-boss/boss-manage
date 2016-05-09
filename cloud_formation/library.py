@@ -103,7 +103,7 @@ class KeyCloakClient:
         self.url_base = url_base
         self.token = None
 
-        if url.startswith("https") and not verify_ssl:
+        if self.url_base.startswith("https") and not verify_ssl:
             self.ctx = ssl.create_default_context()
             self.ctx.check_hostname = False
             self.ctx.verify_mode = ssl.CERT_NONE
@@ -225,18 +225,22 @@ class KeyCloakClient:
     def add_redirect_uri(self, realm_name, client_id, uri):
         self.append_list_properties(realm_name, client_id, {"redirectUris": uri})
 
-    def get_client_installation_json(self, realm_name, client_id):
+    def get_client_installation_url(self, realm_name, client_id):
+        """Returns information about this client installation (suitable for wget/curl).
+
+        Args:
+            realm_name (str): the realm.
+            client_id (str):  the client-id
+
+        Returns:
+            dict: contains keys 'url' for the complete URL to retrieve the client installation json and 'headers'
+                  for the authorization header populated with the bearer token.
+        """
         client = self.get_client(realm_name, client_id)
-
-        resp = self.request(
-            "/auth/admin/realms/{}/clients/{}/installation/providers/keycloak-oidc-keycloak-json".format(realm_name, client["id"]),
-            headers={
-                "Authorization": "Bearer " + self.token["access_token"],
-                "Content-Type": "application/json",
-            }
-        )
-
-        return resp
+        installation_endpoint = "{}/auth/admin/realms/{}/clients/{}/installation/providers/keycloak-oidc-keycloak-json"\
+            .format(self.url_base, realm_name, client["id"])
+        auth_header = "Authorization: Bearer {}".format(self.token["access_token"])
+        return {"url": installation_endpoint, "headers": auth_header}
 
 
 class ExternalCalls:

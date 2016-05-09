@@ -174,7 +174,7 @@ def post_init(session, domain):
 
         kc = lib.KeyCloakClient("http://localhost:{}".format(auth_port))
         kc.login(creds["username"], creds["password"])
-        kc.append_list_properties("BOSS", "endpoint", {"redirectUris": uri, "webOrigins": uri})
+        kc.append_list_properties("BOSS", "endpoint", {"redirectUris": uri + "/*", "webOrigins": uri})
         kc.logout()
     call.set_ssh_target("auth")
     call.ssh_tunnel(configure_auth, 8080)
@@ -188,3 +188,18 @@ def post_init(session, domain):
     call.ssh(migrate_cmd + "collectstatic --no-input")
     call.ssh("sudo service uwsgi-emperor reload")
     call.ssh("sudo service nginx restart")
+
+    print("Generating keycloak.json")
+    elb = lib.elb_public_lookup(session, "elb-auth." + domain)
+    kc = lib.KeyCloakClient("https://{}:{}".format(elb, 443), verify_ssl=False)
+    kc.login(creds["username"], creds["password"])
+    client_install = kc.get_client_installation_url("BOSS", "endpoint")
+
+    # NOTE: This will put a valid bearer token in the bash history until the history is cleared
+    call.ssh("sudo wget --header=\"{}\" --no-check-certificate {} -O /srv/www/html/keycloak.json"
+             .format(client_install["headers"], client_install["url"]))
+    # clear the history
+    call.ssh("history -c")
+
+    # this should invalidate the token anyways
+    kc.logout()
