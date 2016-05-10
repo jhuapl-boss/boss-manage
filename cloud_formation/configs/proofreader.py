@@ -190,7 +190,12 @@ def post_init(session, domain):
     call.ssh("sudo service nginx restart")
 
     print("Generating keycloak.json")
+    # this will be overwritten if there is a DNS with a cert
     elb = lib.elb_public_lookup(session, "elb-auth." + domain)
+
+    if domain in hosts.BASE_DOMAIN_CERTS.keys():
+        elb = "auth." + hosts.BASE_DOMAIN_CERTS[domain]
+
     kc = lib.KeyCloakClient("https://{}:{}".format(elb, 443), verify_ssl=False)
     kc.login(creds["username"], creds["password"])
     client_install = kc.get_client_installation_url("BOSS", "endpoint")
