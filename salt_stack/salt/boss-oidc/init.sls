@@ -16,6 +16,12 @@ djangooidc:
         - require:
             - pkg: bossoidc-prerequirements
 
+oidcauth:
+    pip.installed: # pip dependencies not resolving to our version
+        - bin_env: /usr/local/bin/pip3
+        - editable: git+https://github.com/jhuapl-boss/drf-oidc-auth.git#egg=drf-oidc-auth
+        - exists_action: w
+
 bossoidc:
     pip.installed:
         - bin_env: /usr/local/bin/pip3
@@ -23,3 +29,4 @@ bossoidc:
         - exists_action: w
         - require:
             - pip: djangooidc
+            - pip: oidcauth
