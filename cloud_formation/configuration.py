@@ -1173,6 +1173,28 @@ class CloudFormationConfiguration:
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
 
+    def add_route_53_record_set(self, key, full_domain_name, cname_value, hosted_zone_name="theboss.io."):
+        """
+        adds a route_53_recordset
+        Args:
+            key: unique identifier in cloudformation script for this recsource
+            full_domain_name: domain name that is being added.  Ex. api.integration.theboss.io
+            cname_value: public dns name of the underlying server or elb.
+
+        Returns:
+            None
+        """
+        self.resources[key] = {
+            "Type": "AWS::Route53::RecordSet",
+            "Properties": {
+                "HostedZoneName": hosted_zone_name,
+                'Name': full_domain_name,
+                'Type': 'CNAME',
+                'ResourceRecords': [cname_value],
+                'TTL': 300,
+            }
+        }
+
     def add_sns_topic(self, key, topic_name, depends_on=None ):
         """ Add alarms for Loadbalancer
         :arg key is the unique name (within the configuration) for this resource
