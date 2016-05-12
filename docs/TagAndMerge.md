@@ -109,3 +109,13 @@ $ git tag <release#>
 $ git push --tags
 $ git push
 ```
+
+## Building tagged AMIs
+
+To create AMIs for a specific version of repository code. All AMIs will be built
+in parallel. To check status view the logs at `boss-manage/packer/logs/<ami>.log`
+
+```shell
+$ cd boss-manage
+$ bin/packer.py all --name <sprint#|release#>
+```
