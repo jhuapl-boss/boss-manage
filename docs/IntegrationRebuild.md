@@ -155,24 +155,6 @@ sudo python3 manage.py test
 ```
 	output should say 36 Tests OK
 
-## Configure Route 53
-You must manually update Route 53 with the new LoadBalancer dns name for the Endpoint servers
-1. Under the EC2 page select LoadBalancers on the left
-2. Select the load balancer for the integration endpoint
-    - On description below will be `DNS Name`
-    - Copy this value
-4. Go into Route 53 AWS Service
-5. Select the hosted Zone theboss.io
-6. Select api.theboss.io
-7. On the right, paste the new DNS name over top of the old one.
-8. Click `Save Record Set`
-
-### Update the Auth redirect URL
-```shell
-$ cd cloud_formation/
-$ source ../config/set_vars.sh
-$ ./cloudformation.py create integration.boss update_auth
-```
 
 ## Proofreader Tests
 ````shell
@@ -194,8 +176,8 @@ results recorded, and developers notified of any problems.
 To be filled out
 
 ### Manual Checks
-* https://api.theboss.io/ping/
-* https://api.theboss.io/v0.3/info/collections/
-* https://api.theboss.io/v0.4/manage-data/collections
+* https://api.integration.theboss.io/ping/
+* https://api.integration.theboss.io/v0.3/info/collections/
+* https://api.integration.theboss.io/v0.4/manage-data/collections
 * Login into Scalyr and verify that the new instances appear on the overview page.
 * Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint and vault.
