@@ -14,7 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# NOTE: This requires Direct Access Grants to be enabled on the Keycloak Client
+"""A script for logging into Keycloak and getting a Bearer access token.
+
+Because the token is backed by a Keycloak session it will expire after a short
+period of time (the lifetime of the session before it expires).
+
+The Keycloak address is discovered by looking in AWS, using the supplied AWS credentials.
+
+The Keycloak token is save to a file called "keycloak.token" in the current directory.
+
+Environmental Variables:
+    AWS_CREDENTIALS : File path to a JSON encode file containing the following keys
+                      "aws_access_key" and "aws_secret_key"
+
+Author:
+    Derek Pryor <Derek.Pryor@jhuapl.edu>
+"""
 
 import argparse
 import os
@@ -29,7 +44,15 @@ from urllib.parse import urlencode
 from urllib.error import HTTPError
 
 def elb_public_lookup(session, hostname):
-    """Look up elb public hostname by boss hostname."""
+    """Lookup the public DNS name for an ELB based on the BOSS hostname.
+
+    Args:
+        session (Session) : Active Boto3 session used to lookup ELB
+        hostname (string) : Hostname of the desired ELB
+
+    Returns:
+        (None|string) : None if the ELB is not located or the public DNS name
+    """
     if session is None: return None
 
     client = session.client('elb')
@@ -43,8 +66,16 @@ def elb_public_lookup(session, hostname):
     return None
 
 def create_session(cred_fh):
-    """Read the AWS from the given JSON formated file and then create a boto3
-    connection to AWS with those credentials.
+    """Read AWS credentials from the given file object and create a Boto3 session.
+
+        Note: Currently is hardcoded to connect to Region US-East-1
+
+    Args:
+        cred_fh (file) : File object of a JSON formated data with the following keys
+                         "aws_access_key" and "aws_secret_key"
+
+    Returns:
+        (Session) : Boto3 session
     """
     credentials = json.load(cred_fh)
 
@@ -54,6 +85,24 @@ def create_session(cred_fh):
     return session
 
 def request(url, params = None, headers = {}, method = None, convert = urlencode):
+    """Make an HTTP(S) query and return the results.
+
+        Note: If the url starts with "https" SSL hostname and cert checking is disabled
+
+    Args:
+        url (string) : URL to query
+        params : None or an object that will be passed to the convert argument
+                 to produce a string
+        headers (dict) : Dictionary of HTTP headers
+        method (None|string) : HTTP method to use or None for the default method
+                               based on the different arguments
+        convert : Function to convert params into a string
+                  Defaults to urlencode, taking a dict and making a url encoded string
+
+    Returns:
+        (string) : Data returned from the request. If an error occured, the error
+                   is printed and any data returned by the server is returned.
+    """
     rq = Request(
         url,
         data = None if params is None else convert(params).encode("utf-8"),
@@ -87,7 +136,7 @@ if __name__ == "__main__":
                         help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
     parser.add_argument("--username", default = None, help = "KeyCloak Username")
     parser.add_argument("--password", default = None, help = "KeyCloak Password")
-    parser.add_argument("domain_name", help="Domain in which to execute the configuration (example: vpc.boss)")
+    parser.add_argument("domain_name", help="Domain in which to execute the configuration (example: auth.integration.boss or auth.integration.theboss.io)")
 
     args = parser.parse_args()
 
@@ -107,9 +156,13 @@ if __name__ == "__main__":
         password = args.password
 
     session = create_session(args.aws_credentials)
-    hostname = elb_public_lookup(session, "elb-auth." + args.domain_name)
+    if args.domain_name.endswith(".boss")
+        hostname = elb_public_lookup(session, "elb-auth." + args.domain_name)
+    else:
+        hostname = args.domain_name
 
     url = "https://" + hostname + "/auth/realms/BOSS/protocol/openid-connect/token"
+    print(url)
     params = {
         "grant_type": "password",
         "client_id": "endpoint",

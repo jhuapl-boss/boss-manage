@@ -13,6 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Script for building BOSS VM images using Packer.
+
+Script that creates a simple interface (with minimal commandline arguments) for
+building VM images using Packer and SaltStack.
+
+Author:
+    Derek Pryor <Derek.Pryor@jhuapl.edu>
+"""
+
 import argparse
 import sys
 import os
@@ -22,14 +31,26 @@ import subprocess
 from distutils.spawn import find_executable
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-os.environ["PATH"] += ":" + os.path.join(REPO_ROOT, "bin")
+os.environ["PATH"] += ":" + os.path.join(REPO_ROOT, "bin") # allow executing Packer from the bin/ directory
 
 def get_commit():
+    """Figure out the commit hash of the current git revision.
+        Note: Only works if the CWD is a git repository
+    Returns:
+        (string) : The git commit hash
+    """
     cmd = "git rev-parse HEAD"
     result = subprocess.run(shlex.split(cmd), stdout=subprocess.PIPE)
     return result.stdout.decode("utf-8").strip()
 
 def execute(cmd, output_file):
+    """Execuit the given command and redirect STDOUT and STDERR to output_file.
+    Args:
+        cmd (string) : Command to execute
+        outpout_file (string) : Name of file to redirect output to
+    Returns:
+        (Popen) : Popen object representing the executing command
+    """
     return subprocess.Popen(shlex.split(cmd), stderr=subprocess.STDOUT, stdout=open(output_file, "w"))
 
 if __name__ == '__main__':
