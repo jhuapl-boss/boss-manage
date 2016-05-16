@@ -20,6 +20,11 @@ import sys
 import os
 from boto3.session import Session
 import json
+
+# Add a reference to boss-manage/cloud_formation/ so that we can import those files
+cur_dir = os.path.dirname(os.path.realpath(__file__))
+cf_dir = os.path.normpath(os.path.join(cur_dir, "..", "cloud_formation"))
+sys.path.append(cf_dir)
 import library as lib
 
 
