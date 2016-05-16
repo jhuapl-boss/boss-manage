@@ -552,7 +552,6 @@ COMMANDS = {
     "vault-status": vault_status,
     "vault-provision": _vault_provision,
     "vault-revoke": _vault_revoke,
-    "verify":verify,
     "vault-shell":vault_shell,
     "vault-write":_vault_write,
     "vault-update":_vault_update,
