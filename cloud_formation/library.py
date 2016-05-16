@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Library for common methods that are used by the different configs scripts."""
+"""Library for common methods that are used by the different configs scripts.
+
+Library currently appends the boss-manage.git/vault/ directory to the system path
+so that it can import vault/bastion.py and vault/vault.py.
+
+Library contains a set of AWS lookup methods for locating AWS data and other related
+helper functions and classes.
+
+Author:
+    Derek Pryor <Derek.Pryor@jhuapl.edu>
+"""
 
 import sys
 import os
@@ -29,9 +39,6 @@ from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 from urllib.error import HTTPError
 
-
-import hosts
-
 # Add a reference to boss-manage/vault/ so that we can import those files
 cur_dir = os.path.dirname(os.path.realpath(__file__))
 vault_dir = os.path.normpath(os.path.join(cur_dir, "..", "vault"))
@@ -41,6 +48,11 @@ import vault
 
 
 def get_commit():
+    """Get the git commit hash of the current directory.
+
+    Returns:
+        (string) : The git commit hash or "unknown" if it could not be located
+    """
     try:
         cmd = "git rev-parse HEAD"
         result = subprocess.run(shlex.split(cmd), stdout=subprocess.PIPE)
@@ -50,23 +62,47 @@ def get_commit():
 
 
 def domain_to_stackname(domain):
-    """Create a CloudFormation Stackname from domain name by removing '.' and
-    capitalizing each part of the domain.
+    """Convert a domain name to a CloudFormation compliant Stackname.
+
+    Converts a domain name by removing the '.' and capitalizing each part of the domain
+
+    Args:
+        domain (string) : domain name
+
+    Returns:
+        (string) : CloudFormation stackname
     """
     return "".join(map(lambda x: x.capitalize(), domain.split(".")))
 
 
 def template_argument(key, value, use_previous=False):
-    """Create a JSON dictionary formated as a CloudFlormation template
-    argument.
+    """Creates a CloudFormation template formated argument.
 
-    use_previous is passed as UserPreviousValue to CloudFlormation.
+    Converts a key value pair into a CloudFormation template formatted fragment
+    (JSON formatted).
+
+    Args:
+        key (string) : CloudFormation template argument key name
+        value : CloudFormation template argument value (JSON convertable)
+        use_previous (bool) : Stored under the UsePreviousValue key
+
+    Returns:
+        (dict) : JSON converable dictory containing the argument
     """
     return {"ParameterKey": key, "ParameterValue": value, "UsePreviousValue": use_previous}
 
 
 def keypair_to_file(keypair):
-    """Look for a ssh key named <keypair> and alert if it does not exist."""
+    """Looks for the SSH private key for keypair under ~/.ssh/
+
+    Prints an error if the file doesn't exist.
+
+    Args:
+        keypair (string) : AWS keypair to locate a private key for
+
+    Returns:
+        (string|None) : SSH private key file path or None is the private key doesn't exist.
+    """
     file = os.path.expanduser("~/.ssh/{}.pem".format(keypair))
     if not os.path.exists(file):
         print("Error: SSH Key '{}' does not exist".format(file))
@@ -75,7 +111,16 @@ def keypair_to_file(keypair):
 
 
 def password(what):
-    """Prompt the user for a password and verify it."""
+    """Prompt the user for a password and verify it.
+
+    If password and verify don't match the user is prompted again
+
+    Args:
+        what (string) : What password to enter
+
+    Returns:
+        (string) : Password
+    """
     while True:
         pass_ = getpass.getpass("{} Password: ".format(what))
         pass__ = getpass.getpass("Verify {} Password: ".format(what))
@@ -86,20 +131,31 @@ def password(what):
 
 
 def generate_password(length=16):
-    """
-    Generate an alphanumeric password of the given length.
+    """Generate an alphanumeric password of the given length.
+
     Args:
-        length: length of the password to be generated
+        length (int) : length of the password to be generated
 
     Returns:
-        password
+        (string) : password
     """
     chars = string.ascii_letters + string.digits  #+ string.punctuation
     return "".join([chars[c % len(chars)] for c in os.urandom(length)])
 
 
 class KeyCloakClient:
+    """Client for connecting to Keycloak and using the REST API.
+
+    Client provides a method for issuing requests to the Keycloak REST API and
+    a set of methods to simplify Keycloak configuration.
+    """
     def __init__(self, url_base, verify_ssl=True):
+        """KeyCloakClient constructor
+
+        Args:
+            url_base (string) : The base URL to prepend to all request URLs
+            verify_ssl (bool) : Whether or not to verify HTTPS certs
+        """
         self.url_base = url_base
         self.token = None
 
@@ -111,6 +167,22 @@ class KeyCloakClient:
             self.ctx = None
 
     def request(self, url, params=None, headers={}, convert=urlencode, method=None):
+        """Make a request to the Keycloak server.
+
+        Args:
+            url (string) : REST API URL to query (appended to url_base from constructor)
+            params (None|dict) : None or a dict or key values that will be passed
+                                 to the convert argument to produce a string
+            headers (dict) : Dictionary of HTTP headers
+            convert : Function to convert params into a string
+                      Defaults to urlencode, taking a dict and making a url encoded string
+            method (None|string) : HTTP method to use or None for the default method
+                                   based on the different arguments
+
+        Returns:
+            (None) : If there is an exception raised
+            (dict) : Dictionary containing JSON encoded response
+        """
         request = Request(
             self.url_base + url,
             data=None if params is None else convert(params).encode("utf-8"),
@@ -122,6 +194,8 @@ class KeyCloakClient:
             response = urlopen(request, context=self.ctx).read().decode("utf-8")
             if len(response) > 0:
                 response = json.loads(response)
+            else:
+                response = {}
             return response
         except HTTPError as e:
             print("Error on '{}'".format(url))
@@ -129,6 +203,21 @@ class KeyCloakClient:
             return None
 
     def login(self, username, password):
+        """Login to the Keycloak master realm and retrieve an access token.
+
+        WARNING: If the base_url is not using HTTPS the password will be submitted
+                 in plain text over the network.
+
+        Note: A user must be logged in before any other method calls will work
+
+        The bearer access token is saved as self.token["access_token"]
+
+        An error will be printed if login failed
+
+        Args:
+            username (string) : Keycloak username
+            password (string) : Keycloak password
+        """
         self.token = self.request(
             "/auth/realms/master/protocol/openid-connect/token",
             params={
@@ -146,6 +235,11 @@ class KeyCloakClient:
             print("Could not authenticate to KeyCloak Server")
 
     def logout(self):
+        """Logout from Keycloak.
+
+        Logout will invalidate the Keycloak session and clean the local token (
+        self.token)
+        """
         if self.token is None:
             return
 
@@ -163,6 +257,13 @@ class KeyCloakClient:
         self.token = None
 
     def create_realm(self, realm):
+        """Create a new realm based on the JSON based configuration.
+
+            Note: User must be logged into Keycloak first
+
+        Args:
+            realm (dict) : JSON dictory configuration for the new realm
+        """
         resp = self.request(
             "/auth/admin/realms",
             params=realm,
@@ -174,6 +275,18 @@ class KeyCloakClient:
         )
 
     def get_client(self, realm_name, client_id):
+        """Get the realm's client configuration.
+
+            Note: User must be logged into Keycloak first
+
+        Args:
+            realm_name (string) : Name of the realm to look in for the client
+            client_id (string) : Client ID of client configuration to retrieve
+
+        Returns:
+            (None|dict) : None if the client couldn't be located or the JSON
+                          dictionary configuration of the client
+        """
         resp = self.request(
             "/auth/admin/realms/{}/clients".format(realm_name),
             headers={
@@ -190,9 +303,17 @@ class KeyCloakClient:
                 return client
         return None
 
-    def update_client(self, realm_name, id, client):
+    def update_client(self, realm_name, client):
+        """Update the realm's client configuration.
+
+            Note: User must be logged into Keycloak first
+
+        Args:
+            realm_name (string) : Name of the realm
+            client (dict) : JSON dictory configuration for the updated realm client
+        """
         resp = self.request(
-            "/auth/admin/realms/{}/clients/{}".format(realm_name, id),
+            "/auth/admin/realms/{}/clients/{}".format(realm_name, client['id']),
             params=client,
             headers={
                 "Authorization": "Bearer " + self.token["access_token"],
@@ -203,14 +324,20 @@ class KeyCloakClient:
         )
 
     def append_list_properties(self, realm_name, client_id, additions):
-        """
-        Append to client list properties.
+        """Append a set of key values to a realm's client configuration.
+
+        Download the current realm's client configuration, updated with the given
+        key values, and then upload the updated client configuration to the Keycloak
+        server.
+
+            Note: User must be logged into Keycloak first
 
         Args:
-            realm_name (str): the realm
-            client_id (str): the client-id
-            additions (dict): dictionary of additions, each entry's key should correspond to a client key and that
-                              entry's (singular) value will be appended to the client's property.
+            realm_name (string) : Name of the realm
+            client_id (string) : Client ID of client configuration to retrieve
+            additions (dict) : dictionary of additions, each entry's key should
+                               correspond to a client key and that entry's (singular)
+                               value will be appended to the client's property.
         """
         client = self.get_client(realm_name, client_id)
 
@@ -220,21 +347,33 @@ class KeyCloakClient:
             if value not in client[key]:
                 client[key].append(value)
 
-        self.update_client(realm_name, client['id'], client)
+        self.update_client(realm_name, client)
 
     def add_redirect_uri(self, realm_name, client_id, uri):
+        """Add the given uri as a valid redirectUri to a realm's client configuration.
+
+            Note: User must be logged into Keycloak first
+
+        Args:
+            realm_name (string) : Name of the realm
+            client_id (string) : Client ID of client configuration to retrieve
+            uri (string) : URL to add to the client's list of valid redirect URLs
+        """
         self.append_list_properties(realm_name, client_id, {"redirectUris": uri})
 
     def get_client_installation_url(self, realm_name, client_id):
         """Returns information about this client installation (suitable for wget/curl).
 
+            Note: User must be logged into Keycloak first
+
         Args:
-            realm_name (str): the realm.
-            client_id (str):  the client-id
+            realm_name (string) : Name of the realm
+            client_id (string) : Client ID of client configuration to retrieve
 
         Returns:
-            dict: contains keys 'url' for the complete URL to retrieve the client installation json and 'headers'
-                  for the authorization header populated with the bearer token.
+            (dict) : contains keys
+                      * 'url' for the complete URL to retrieve the client installation json
+                      * 'headers' for the authorization header populated with the bearer token.
         """
         client = self.get_client(realm_name, client_id)
         installation_endpoint = "{}/auth/admin/realms/{}/clients/{}/installation/providers/keycloak-oidc-keycloak-json"\
@@ -244,7 +383,20 @@ class KeyCloakClient:
 
 
 class ExternalCalls:
+    """Class that helps with forming connections from the local machine to machines
+    within a VPC through the VPC's bastion machine.
+    """
     def __init__(self, session, keypair, domain):
+        """ExternalCalls constructor
+
+        Args:
+            session (Session) : Boto3 session used to lookup machine IPs in AWS
+            keypair (string) : Name of the AWS EC2 keypair to use when connecting
+                               All AWS EC2 instances connected to need to use the
+                               same keypair
+                               Keypair is converted to file on disk using keypair_to_file()
+            domain (string) : BOSS internal VPC domain name
+        """
         self.session = session
         self.keypair_file = keypair_to_file(keypair)
         self.bastion_hostname = "bastion." + domain
@@ -255,7 +407,11 @@ class ExternalCalls:
         self.ssh_target = None
 
     def vault_init(self):
-        """ Call vault-init on the first machine and vault-unseal on all others"""
+        """Initialize and configure all of the vault servers.
+
+        Lookup all vault IPs for the VPC, initialize and configure the first server
+        and then unseal any other servers.
+        """
         vaults = bastion.machine_lookup_all(self.session, self.vault_hostname, public_ip=False)
 
         def connect(ip, func):
@@ -267,6 +423,17 @@ class ExternalCalls:
 
 
     def vault(self, cmd, *args, **kwargs):
+        """Call the specified vault command (from vault.py) with the given arguments
+
+        Args:
+            cmd (string) : Name of the vault command to execute (name of function
+                           defined in vault.py)
+            args (list) : Positional arguments to pass to the vault command
+            kwargs (dict) : Keyword arguments to pass to the vault command
+
+        Returns:
+            (object) : Value returned by the vault command
+        """
         def delegate():
             # Have to dynamically lookup the function because vault.COMMANDS
             # references the command line version of the commands we want to execute
@@ -275,25 +442,67 @@ class ExternalCalls:
         return bastion.connect_vault(self.keypair_file, self.vault_ip, self.bastion_ip, delegate)
 
     def vault_write(self, path, **kwargs):
+        """Vault vault-write with the given arguments
+
+        WARNING: vault-write will override any data at the given path
+
+        Args:
+            path (string) : Vault path to write data to
+            kwargs (dict) : Keyword key value pairs to store in Vault
+        """
         self.vault("vault-write", path, **kwargs)
 
     def vault_update(self, path, **kwargs):
+        """Vault vault-update with the given arguments
+
+        Args:
+            path (string) : Vault path to write data to
+            kwargs (dict) : Keyword key value pairs to store in Vault
+        """
         self.vault("vault-update", path, **kwargs)
 
     def vault_read(self, path):
+        """Vault vault-read for the given path
+
+        Args:
+            path (string) : Vault path to read data from
+
+        Returns:
+            (None|dict) : None if no data or dictionary of key value pairs stored
+                          at Vault path
+        """
         res = self.vault("vault-read", path)
         return None if res is None else res['data']
 
     def vault_delete(self, path):
+        """Vault vault-delete for the givne path
+
+        Args:
+            path (string) : Vault path to delete data from
+        """
         self.vault("vault-delete", path)
 
     def set_ssh_target(self, target):
+        """Set the target machine for the SSH commands
+
+        Args:
+            target (string) : target machine name. If the name is not fully qualified
+                              it is qualified using the domain given in the constructor.
+        """
         self.ssh_target = target
         if not target.endswith("." + self.domain):
             self.ssh_target += "." + self.domain
         self.ssh_target_ip = bastion.machine_lookup(self.session, self.ssh_target, public_ip=False)
 
     def ssh(self, cmd):
+        """Execute a command over SSH on the SSH target
+
+        Args:
+            cmd (string) : Command to execute on the SSH target
+
+        Returns:
+            (None)
+        """
         if self.ssh_target is None:
             raise Exception("No SSH Target Set")
 
@@ -303,16 +512,17 @@ class ExternalCalls:
                                cmd)
 
     def ssh_tunnel(self, cmd, port, local_port=None):
-        """
-        call to the bastion.ssh_tunnel command
+        """Execute a function within a SSH tunnel.
+
         Args:
-            cmd: command to run through ssh
-            port: remote port to use for tunnel
-            local_port: local port to use for tunnel
+            cmd (string) : Function to execute after the tunnel is established
+                           Function is passed the local port of the tunnel to use
+            port (int|string) : Remote port to use for tunnel
+            local_port (None|int|string : Local port to use for tunnel or None if
+                                          the function should select a random port
 
         Returns:
             None
-
         """
         if self.ssh_target is None:
             raise Exception("No SSH Target Set")

@@ -16,11 +16,15 @@
 
 """A library and script for manipulating a Vault instance.
 
-VAULT_TOKEN - The location to store and read the Vault's root token
-VAULT_KEY - The prefix location to store and read the Vault's crypto keys
-NEW_TOKEN - The location to store a new new access token for the Vault
+VAULT_TOKEN : The location to store and read the Vault's root token
+VAULT_KEY : The prefix location to store and read the Vault's crypto keys
+NEW_TOKEN : The location to store a new new access token for the Vault
+PROVISIONER_TOKEN : The location to store and read the Vault token for provisioning
 
-COMMANDS - A dictionary of available commands and the functions to call
+COMMANDS : A dictionary of available commands and the functions to call
+
+Author:
+    Derek Pryor <Derek.Pryor@jhuapl.edu>
 """
 
 import argparse
@@ -40,6 +44,13 @@ PROVISIONER_TOKEN = "provisioner_token"
 
 _CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 def get_path(machine, filename):
+    """Get the complete file path for given machine's private file.
+    Args:
+        machine (None|string) : Either None or the machine's full hostname
+        filename (string) : Name of the machine's private file
+    Returns:
+        (string) : Complete file path
+    """
     if machine is None:
         machine = ""
 
@@ -52,12 +63,11 @@ def get_path(machine, filename):
 def get_client(read_token = None, machine = None):
     """Open a connection to the Vault located at http://localhost:8200
 
-    If read_token == True then read the token from VAULT_TOKEN and verify
-    that the client is authenticated to the Vault.
+    If read_token is not None then read the token from get_path(machine, read_token)
+    and verify that the client is authenticated to the Vault.
 
-    Exits (sys.exit) if read_token and VAULT_TOKEN does not exists
-    Exits (sys.exit) if read_token and VAULT_TOKEN does not contain a valid
-                     token
+    Exits (sys.exit) if read_token does not exists
+    Exits (sys.exit) if read_token does not contain a valid token
     """
     client = hvac.Client(url="http://localhost:8200")
 
@@ -80,7 +90,12 @@ def vault_init(machine = None, secrets = 5, threashold = 3):
     initialized then initialize it with 5 secrets and a threashold of 3. The
     keys are stored as VAULT_KEY and root token is stored as VAULT_TOKEN.
 
-    After initializing the Vault it is unsealed for use.
+    After initializing the Vault it is unsealed for use and vault-configure is called.
+
+    Args:
+        machine (None|string) : hostname of the machine, used for saving unique data
+        secrets (int) : Total number of secrets to split the master key into
+        threashold (int) : The number of secrets required to reconstruct the master key
     """
 
     client = get_client(machine = machine)
@@ -125,6 +140,9 @@ def vault_configure(machine = None):
         * Configure AWS backend roles from policies/*.iam
         * Configure the PKI backend (if there is a certificate to use)
         * Configure PKI backend roles from policies/*.pki
+
+    Args:
+        machine (None|string) : hostname of the machine, used for reading/saving unique data
     """
     client = get_client(read_token = VAULT_TOKEN, machine = machine)
 
@@ -194,43 +212,15 @@ def vault_shell(machine = None):
     """Create a connection to Vault and then drop the user into an interactive
     shell (just like the python interperter) with 'client' holding the Vault
     connection object.
+
+    Args:
+        machine (None|string) : hostname of the machine, used for reading unique data
     """
     import code
 
     client = get_client(read_token = VAULT_TOKEN, machine = machine)
 
     code.interact(local=locals())
-
-def verify(machine = None):
-    """Development function that gets updated when I need to script changes
-    to Vault.
-    """
-    client = get_client(read_token = VAULT_TOKEN, machine = machine)
-
-    token_file = get_path(machine, PROVISIONER_TOKEN)
-    policy = "provisioner"
-
-    if False:
-        pprint(client.list_policies())
-        pprint(client.read("/sys/policy/" + policy))
-
-    if True:
-        client.delete_policy(policy)
-        with open("policies/{}.hcl".format(policy), "r") as fh:
-            client.set_policy(policy, fh.read())
-
-    if True:
-        with open(token_file, 'r') as fh:
-            result = client.revoke_token(fh.read())
-        with open(token_file, 'w') as fh:
-            result = client.create_token(policies=["provisioner","endpoint"])
-            pprint(result)
-            fh.write(result['auth']['client_token'])
-
-    if False:
-        with open(token_file, 'r') as fh:
-            result = client.lookup_token(fh.read())
-            pprint(result)
 
 def vault_unseal(machine = None):
     """Unseal a sealed Vault. Connect using get_client() and if the Vault is
@@ -239,6 +229,9 @@ def vault_unseal(machine = None):
     If there are not enough keys to completely unseal the Vault, print a
     status message about how many more keys are required to finish the
     process.
+
+    Args:
+        machine (None|string) : hostname of the machine, used for reading unique data
     """
 
     client = get_client(machine = machine)
@@ -271,6 +264,9 @@ def vault_seal(machine = None):
 
     Used to quickly protect a Vault without having to stop the Vault service
     on a protected VM.
+
+    Args:
+        machine (None|string) : hostname of the machine, used for reading unique data
     """
 
     client = get_client(read_token = VAULT_TOKEN, machine = machine)
@@ -292,6 +288,9 @@ def vault_status(machine = None):
      * Policies
      * Audit backends
      * Auth backends
+
+    Args:
+        machine (None|string) : hostname of the machine, used for reading unique data
     """
 
     client = get_client(machine = machine)
@@ -335,8 +334,14 @@ def vault_status(machine = None):
     print(json.dumps(client.list_auth_backends(), indent=True))
 
 def vault_provision(policy, machine = None):
-    """Create a new Vault access token. Connect using get_client(True),
-    request a new access token (default policy), and save it to NEW_TOKEN.
+    """Create a new Vault access token.
+
+    Args:
+        policy (string) : Name of the policy to attach to the new token
+        machine (None|string) : hostname of the machine, used for reading unique data
+
+    Returns:
+        (string) : String containing the new Vault token
     """
     client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
 
@@ -344,6 +349,16 @@ def vault_provision(policy, machine = None):
     return token["auth"]["client_token"]
 
 def _vault_provision(machine = None, policy = None):
+    """Create a new Vault access token.
+
+    Command line version of vault-provision. If policy is not given, then
+    prompt the user for the policy and then save to NEW_TOKEN file.
+
+    Args:
+        machine (None|string) : hostname of the machine, used for reading unique data
+        policy (None|string) : Name of the policy to attach to the new token
+                               If policy is None then the user is prompted for the policy name
+    """
     if policy is None:
         policy = input("policy: ")
     token = vault_provision(policy, machine)
@@ -354,26 +369,62 @@ def _vault_provision(machine = None, policy = None):
         fh.write(token)
 
 def vault_revoke(token, machine = None):
-    """Revoke a Vault access token. Connect using get_client(True), read the
-    token (using input()), and then revoke the token.
+    """Revoke a Vault access token.
+
+    Args:
+        token (string) : String containing the Vault token to revoke
+        machine (None|string) : hostname of the machine, used for reading unique data
     """
     client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
 
     client.revoke_token(token)
 
 def _vault_revoke(machine = None, token = None):
+    """Revoke a Vault access token.
+
+    Command line version of vault-revoke. If token is not given, then
+    prompt the user for the token to revoke
+
+    Args:
+        machine (None|string) : hostname of the machine, used for reading unique data
+        token (None|string) : String containing the Vault token to revoke
+                              If token is None then the user is prompted for the token value
+    """
     if token is None:
         token = input("token: ") # prompt for token or ready fron NEW_TOKEN (or REVOKE_TOKEN)?
     vault_revoke(token, machine)
 
 def vault_write(path, machine = None, **kwargs):
-    """A generic method for writing data into Vault, for use by CloudFormation
-    scripts.
+    """A generic method for writing data into Vault.
+
+        Note: vault-write will override any data already existing at path.
+              There is vault-update that will update data at path instead.
+
+    Args:
+        path (string) : Vault path to write data to
+        machine (None|string) : hostname of the machine, used for reading unique data
+        kwargs : Key value pairs to store at path
     """
     client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
     client.write(path, **kwargs)
 
 def _vault_write(machine = None, path = None, *args):
+    """A generic method for writing data into Vault.
+
+    Command line version of vault-write. If the path or arguments are not given,
+    then prompt the user for the path and data to store.
+
+        Note: vault-write will override any data already existing at path.
+              There is vault-update that will update data at path instead.
+
+    Args:
+        machine (None|string) : hostname of the machine, used for reading unique data
+        path (None|string) : Vault path to write data to
+                             if path is None then the user is prompted for the Vault path
+        args : List of "key=value" strings, that will be split and processed into a dict
+               if args is empty, the user will be prompted (one key/value at a time)
+               for the data to store at path.
+    """
     if path is None:
         path = input("path: ")
     entries = {}
@@ -392,8 +443,12 @@ def _vault_write(machine = None, path = None, *args):
     vault_write(path, machine, **entries)
 
 def vault_update(path, machine = None, **kwargs):
-    """A generic method for updating data in Vault, for use by CloudFormation
-    scripts.
+    """A generic method for adding/updating data to/in Vault.
+
+    Args:
+        path (string) : Vault path to write data to
+        machine (None|string) : hostname of the machine, used for reading unique data
+        kwargs : Key value pairs to store at path
     """
     client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
 
@@ -408,6 +463,19 @@ def vault_update(path, machine = None, **kwargs):
     client.write(path, **existing)
 
 def _vault_update(machine = None, path = None, *args):
+    """A generic method for adding/updating data to/in Vault.
+
+    Command line version of vault-update. If the path or arguments are not given,
+    then prompt the user for the path and data to store.
+
+    Args:
+        machine (None|string) : hostname of the machine, used for reading unique data
+        path (None|string) : Vault path to write data to
+                             if path is None then the user is prompted for the Vault path
+        args : List of "key=value" strings, that will be split and processed into a dict
+               if args is empty, the user will be prompted (one key/value at a time)
+               for the data to store at path.
+    """
     if path is None:
         path = input("path: ")
     entries = {}
@@ -426,26 +494,52 @@ def _vault_update(machine = None, path = None, *args):
     vault_update(path, machine, **entries)
 
 def vault_read(path, machine = None):
-    """A generic method for reading data from Vault, for use by CloudFormation
-    scripts.
+    """A generic method for reading data from Vault.
+
+    Args:
+        path (string) : Vault path to read data from
+        machine (None|string) : hostname of the machine, used for reading unique data
     """
     client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
     return client.read(path)
 
 def _vault_read(machine = None, path = None):
+    """A generic method for reading data from Vault.
+
+    Command line version of vault-read. If the path is not given, then prompt
+    the user for the path.
+
+    Args:
+        machine (None|string) : hostname of the machine, used for reading unique data
+        path (string) : Vault path to read data from
+                        if path is None then the user is prompted for the Vault path
+    """
     if path is None:
         path = input("path: ")
     results = vault_read(path, machine)
     pprint(results)
 
 def vault_delete(path, machine = None):
-    """A generic method for deleting data from Vault, for use by CloudFormation
-    scripts.
+    """A generic method for deleting data from Vault.
+
+    Args:
+        path (string) : Vault path to delete all data from
+        machine (None|string) : hostname of the machine, used for reading unique data
     """
     client = get_client(read_token = PROVISIONER_TOKEN, machine = machine)
     client.delete(path)
 
 def _vault_delete(machine = None, path = None):
+    """A generic method for deleting data from Vault.
+
+    Command line version of vault-delete. If the path is not given, then prompt
+    the user for the path.
+
+    Args:
+        machine (None|string) : hostname of the machine, used for reading unique data
+        path (string) : Vault path to delete all data from
+                        if path is None then the user is prompted for the Vault path
+    """
     if path is None:
         path = input("path: ")
     vault_delete(path, machine)
@@ -458,7 +552,6 @@ COMMANDS = {
     "vault-status": vault_status,
     "vault-provision": _vault_provision,
     "vault-revoke": _vault_revoke,
-    "verify":verify,
     "vault-shell":vault_shell,
     "vault-write":_vault_write,
     "vault-update":_vault_update,

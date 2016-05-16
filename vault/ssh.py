@@ -17,7 +17,19 @@
 """A script for looking up the IP address of an AWS instance and then starting
 an SSH session with the machine.
 
-SSH_OPTIONS - Extra command line options that are passed to every SSH call
+Environmental Variables:
+    AWS_CREDENTIALS : File path to a JSON encode file containing the following keys
+                      "aws_access_key" and "aws_secret_key"
+    SSH_KEY : File path to a SSH private key, protected as required by SSH,
+              (normally this means that the private key is only readable by the user)
+    BASTION_IP : IP / public DNS name of a bastion server that all SSH traffic
+                 needs to be routed through
+    BASTION_KEY : Same as SSH_KEY, but it is the SSH private key for the bastion server
+    BASTION_USER : The user account on the bastion server to use when creating the tunnel
+                   The BASTION_USER should be accessable via BASTION_KEY
+
+Author:
+    Derek Pryor <Derek.Pryor@jhuapl.edu>
 """
 
 import argparse
@@ -30,12 +42,21 @@ from bastion import *
 
 
 def tunnel_aplnis(ip):
-    """Read environmental variables to either return (None,None) or use the
-    given bastion server as the first machine to connect to and route other
-    tunnels through.
+    """Based on environmental variables form an optional tunnel through a bastion
+    machine that helps facilitate external SSH connections.
+
+    If the BASTION_IP, BASTION_KEY, BASTION_USER environmental variables are defined
+    then an SSH tunnel is formed through that machine to the target IP.
 
     This was added to support using a single machine given access through the
     APL firewall and tunnel all SSH connections through it.
+
+    Args:
+        ip (string) : The target IP to point the tunnel at
+
+    Returns:
+        (None, None) : if not all of the environmental variables are defined
+        (Popen, int) : SSH tunnel process and local port of the local tunnel endpoint
     """
     apl_bastion_ip = os.environ.get("BASTION_IP")
     apl_bastion_key = os.environ.get("BASTION_KEY")
@@ -52,7 +73,17 @@ def tunnel_aplnis(ip):
 
 def ssh(key, ip, user="ubuntu"):
     """Create an SSH session from the local machine to the given remote
-    remote IP address (using become_tty_fg).
+    remote IP address (using bastion.become_tty_fg).
+
+    Used tunnel_aplnis() form an optional tunnel before making the SSH connections.
+
+        Note: This function launches the SSH process into the foreground and will
+              stay active until the user closes the SSH connection.
+
+    Args:
+        key (string) : Path to a SSH private key, protected as required by SSH
+        ip (string) : IP of the target machine to form the SSH connection to
+        user (string) : User account to connect to the target machine as
     """
 
     proc, port = tunnel_aplnis(ip)
