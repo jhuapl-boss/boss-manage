@@ -153,7 +153,9 @@ sudo python3 manage.py createsuperuser
 	pass:  88secret88
 sudo python3 manage.py test
 ```
-	output should say 36 Tests OK
+	output should say 200 Tests OK with 13 skipped tests.
+	
+	There are 2 tests that need >2.5GB of memory to run. To run them, set an enviroment variable "RUN_HIGH_MEM_TESTS"
 
 
 ## Proofreader Tests
@@ -171,6 +173,15 @@ sudo python3 manage.py test
 After the integration instance is launched the following tests need to be run,
 results recorded, and developers notified of any problems.
 
+### Endpoint Integration Tests
+```shell
+cd /srv/www/django
+sudo python3 manage.py test --pattern="int_test_*.py"
+```
+	output should say 35 Tests OK with 2 skipped tests
+	
+	There are 2 tests that need >2.5GB of memory to run. To run them, set an enviroment variable "RUN_HIGH_MEM_TESTS"
+
 
 ### Automated Tests
 To be filled out
@@ -178,6 +189,6 @@ To be filled out
 ### Manual Checks
 * https://api.integration.theboss.io/ping/
 * https://api.integration.theboss.io/v0.3/info/collections/
-* https://api.integration.theboss.io/v0.4/manage-data/collections
+* https://api.integration.theboss.io/v0.4/resource/collections
 * Login into Scalyr and verify that the new instances appear on the overview page.
 * Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint and vault.
