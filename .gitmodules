@@ -13,4 +13,4 @@
 [submodule "salt_stack/salt/spdb/files/spdb.git"]
 	path = salt_stack/salt/spdb/files/spdb.git
 	url = ../spdb.git
-	branch = master
+	branch = integration
