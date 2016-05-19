@@ -30,6 +30,9 @@ import time
 import requests
 import scalyr
 
+import os
+import json
+
 keypair = None
 
 # Region core is created in.  Later versions of boto3 should allow us to
@@ -37,6 +40,11 @@ keypair = None
 CORE_REGION = 'us-east-1'
 
 INCOMING_SUBNET = "52.3.13.189/32" # microns-bastion elastic IP
+
+AUTH_CLUSTER_SIZE = { # Auth Server Cluster is a fixed size
+    "development" : 1,
+    "production": 3 # should be an odd number
+}
 
 def create_config(session, domain):
     """Create the CloudFormationConfiguration object."""
@@ -63,13 +71,7 @@ def create_config(session, domain):
     config.subnet_subnet = hosts.lookup(config.subnet_domain)
     config.add_subnet("ExternalSubnet")
 
-    subnets = []
-    for az, sub in lib.azs_lookup(session):
-        name = sub.capitalize() + "Subnet"
-        config.subnet_domain = sub + "." + domain
-        config.subnet_subnet = hosts.lookup(config.subnet_domain)
-        config.add_subnet(name, az = az)
-        subnets.append(name)
+    internal_subnets, external_subnets = config.add_all_azs(session)
 
     # Create the user data for Vault. No data is given to Bastion
     # because it is an AWS AMI designed for NAT work and does not
@@ -93,7 +95,59 @@ def create_config(session, domain):
                             subnet = "ExternalSubnet",
                             public_ip = True,
                             iface_check = False,
-                            security_groups = ["InternalSecurityGroup", "BastionSecurityGroup"])
+                            security_groups = ["InternalSecurityGroup", "BastionSecurityGroup"],
+                            depends_on = "AttachInternetGateway")
+
+    user_data["system"]["fqdn"] = "auth." + domain
+    user_data["system"]["type"] = "auth"
+
+    SCENARIO = os.environ["SCENARIO"]
+    USE_DB = SCENARIO in ("production",)
+    # Problem: If development scenario uses a local DB. If the auth server crashes
+    #          and is auto restarted by the autoscale group then the new auth server
+    #          will not have any of the previous configuration, because the old DB
+    #          was lost. Using an RDS for development fixes this at the cost of having
+    #          the core config taking longer to launch.
+    if USE_DB:
+        deps = ["AttachInternetGateway", "AuthDB"]
+        user_data["aws"]["db"] = "keycloak" # flag for init script for which config to use
+    else:
+        deps = ["AttachInternetGateway"]
+
+    config.add_autoscale_group("Auth",
+                               "auth." + domain,
+                               lib.ami_lookup(session, "auth.boss"),
+                               keypair,
+                               subnets = internal_subnets,
+                               security_groups = ["InternalSecurityGroup"],
+                               user_data = str(user_data),
+                               min = AUTH_CLUSTER_SIZE,
+                               max = AUTH_CLUSTER_SIZE,
+                               elb = "LoadBalancerAuth",
+                               depends_on = deps)
+    if USE_DB:
+        config.add_rds_db("AuthDB",
+                          "auth-db." + domain,
+                          "3306",
+                          "keycloak",
+                          "keycloak",
+                          "keycloak",
+                          internal_subnets,
+                          type_ = "db.t2.micro",
+                          security_groups = ["InternalSecurityGroup"])
+
+    if domain in hosts.BASE_DOMAIN_CERTS.keys():
+        cert = lib.cert_arn_lookup(session, "auth." + hosts.BASE_DOMAIN_CERTS[domain])
+    else:
+        cert = lib.cert_arn_lookup(session, "auth.integration.theboss.io")
+
+    config.add_loadbalancer("LoadBalancerAuth",
+                            "elb-auth." + domain,
+                            [("443", "8080", "HTTPS", cert)],
+                            subnets = external_subnets,
+                            healthcheck_target = "HTTP:8080/index.html",
+                            security_groups = ["InternalSecurityGroup", "AuthSecurityGroup"],
+                            depends_on = ["AuthSecurityGroup", "AttachInternetGateway"])
 
     config.add_security_group("InternalSecurityGroup",
                               "internal",
@@ -104,10 +158,14 @@ def create_config(session, domain):
                               "ssh",
                               [("tcp", "22", "22", INCOMING_SUBNET)])
 
+    config.add_security_group("AuthSecurityGroup",
+                              "auth",
+                              [("tcp", "443", "443", "0.0.0.0/0")])
+
     # Create the internal route table to route traffic to the NAT Bastion
     config.add_route_table("InternalRouteTable",
                            "internal",
-                           subnets = ["InternalSubnet"])
+                           subnets = ["InternalSubnet"]) # Route to all internal subnets?
 
     config.add_route_table_route("InternalNatRoute",
                                  "InternalRouteTable",
@@ -115,9 +173,10 @@ def create_config(session, domain):
                                  depends_on = "Bastion")
 
     # Create the internet gateway and internet router
+    external_subnets.append("ExternalSubnet")
     config.add_route_table("InternetRouteTable",
                            "internet",
-                           subnets = ["ExternalSubnet"])
+                           subnets = external_subnets)
 
     config.add_route_table_route("InternetRoute",
                                  "InternetRouteTable",
@@ -127,6 +186,56 @@ def create_config(session, domain):
     config.add_internet_gateway("InternetGateway")
 
     return config
+
+def upload_realm_config(port, password):
+    URL = "http://localhost:{}".format(port) # TODO move out of tunnel and use public address
+
+    kc = lib.KeyCloakClient(URL)
+    kc.login("admin", password)
+    if kc.token is None:
+        print("Could not upload BOSS.realm configuration, exiting...")
+        return
+
+    cur_dir = os.path.dirname(os.path.realpath(__file__))
+    realm_file = os.path.normpath(os.path.join(cur_dir, "..", "..", "salt_stack", "salt", "keycloak", "files", "BOSS.realm"))
+    print("Opening realm file at '{}'".format(realm_file))
+    with open(realm_file, "r") as fh:
+        realm = json.load(fh)
+
+    kc.create_realm(realm)
+    kc.logout()
+
+def configure_keycloak(session, domain):
+    # NOTE DP: if there is an ELB in front of the auth server, this needs to be
+    #          the public DNS address of the ELB.
+    auth_elb = lib.elb_public_lookup(session, "elb-auth." + domain)
+
+    if domain in hosts.BASE_DOMAIN_CERTS.keys():
+        auth_domain = 'auth.' + hosts.BASE_DOMAIN_CERTS[domain]
+        auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_domain)
+        lib.set_domain_to_dns_name(session, auth_domain, auth_elb)
+    else:
+        auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_elb)
+
+    password = lib.generate_password()
+    print("Setting Admin password to: " + password)
+
+    call = lib.ExternalCalls(session, keypair, domain)
+
+    call.vault_write("secret/auth", password = password, username = "admin")
+    call.vault_update("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
+    call.vault_update("secret/proofreader/auth", url = auth_discovery_url, client_id = "endpoint")
+
+    call.set_ssh_target("auth")
+    call.ssh("/srv/keycloak/bin/add-user.sh -r master -u admin -p " + password)
+    call.ssh("sudo service keycloak stop")
+    call.ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
+                                  # make sure the process is actually killed
+    call.ssh("sudo service keycloak start")
+
+    print("Waiting for Keycloak to restart")
+    time.sleep(60)
+    call.ssh_tunnel(lambda p: upload_realm_config(p, password), 8080)
 
 def generate(folder, domain):
     """Create the configuration and save it to disk"""
@@ -144,17 +253,35 @@ def create(session, domain):
         vpc_id = lib.vpc_id_lookup(session, domain)
         lib.rt_name_default(session, vpc_id, "internal." + domain)
 
+        print("Waiting 1 minute for VMs to start...")
+        time.sleep(60)
+        post_init(session, domain)
+
+def post_init(session, domain):
+    global keypair
+    if keypair is None:
+        keypair = lib.keypair_lookup(session)
+
+    print("Initializing Vault...")
+    initialized = False
+    for i in range(6):
         try:
-            print("Waiting 2.5 minutes for VMs to start...")
-            time.sleep(150)
-            print("Initializing Vault...")
-            lib.call_vault(session,
-                           lib.keypair_to_file(keypair),
-                           "bastion." + domain,
-                           "vault." + domain,
-                           "vault-init")
-            # Tell Scalyr to get CloudWatch metrics for these instances.
-            instances = [ "vault." + domain ]
-            scalyr.add_instances_to_scalyr(session, CORE_REGION, instances)
+            call = lib.ExternalCalls(session, keypair, domain)
+            call.vault_init()
+            initialized = True
+            break
         except requests.exceptions.ConnectionError:
-            print("Could not connect to Vault, manually initialize it before launching other machines")
+            time.sleep(30)
+    if not initialized:
+        print("Could not initialize Vault, manually call post-init before launching other machines")
+        return
+
+    print("Waiting for Keycloak to bootstrap")
+    time.sleep(60)
+
+    print("Configuring Keycloak...")
+    configure_keycloak(session, domain)
+
+    # Tell Scalyr to get CloudWatch metrics for these instances.
+    instances = [ "vault." + domain ]
+    scalyr.add_instances_to_scalyr(session, CORE_REGION, instances)

@@ -17,6 +17,19 @@ from environment variables.
 The file *set_vars.sh* can be sourced to set these variables,
 `source set_vars.sh`
 
+Hostnames
+---------
+Hostnames are the AWS EC2 instance name of the machine to connect to. The IP
+addresses are located by querying AWS for the Public or Private IP of the
+instance.
+
+Instances that are part of a AWS Auto Scaling Group there all have the same
+name. If you need to connect to a specific instance you can prefix the hostname
+with an index (ex 0.auth.integration.boss). The index is zero based (numbering
+starts at zero). If you don't specify an index for machines in an Auto Scaling
+Group, the first instance is used.
+
+**Note:** Instances are sorted by Instance Id before indexing
 
 ssh.py
 ------
@@ -27,16 +40,21 @@ bastion.py
 ----------
 Used to setup a ssh tunnel to an AWS bastion instance, allowing connections
 to internal AWS instances (a Vault instance for example). The script has to
-different operations. First (command 'ssh') is to form a ssh tunnel to the
-bastion host and then launch a ssh session to the internal host. Second
-(command 'vault-*') is to form a ssh tunnel to the bastion host and then
-call the specified method in vault.py to manipulate a remote Vault instance.
+different operations.
 
-**Note:** <bastion_hostname> and <internal_hostname> are the AWS instance names
-          of the machines to connect to. Their IP addresses are located by
-          querying AWS for the Public or Private IP of the instance.
+ * 'ssh': Forms a ssh tunnel to the bastion host and then launches a ssh session
+          to the internal host.
+ * 'ssh-cmd': Forms a ssh tunnel to the bastion host and then launches ssh with
+              the given command. If no command is given on the command line the
+              user will be prompted for the command.
+ * 'ssh-tunnel': Forms a ssh tunnel to the bastion host and then a second ssh
+                 tunnel to the target machine. The tunnel will be kept up until
+                 the user closes it. If the target port and local port are not
+                 specified on the command line the user will be prompted for them.
+ * 'vault-*': Form a ssh tunnel to the bastion host and then call the specified
+              method in vault.py to manipulate a remote Vault instance.
 
-**Note:** Currently the 'ssh' command only supports connecting to an internal
+**Note:** Currently the ssh commands only supports connecting to an internal
           instance that uses the same keypair as the bastion instance.
 
 **Example:** Logging into Vault via the bastion server.

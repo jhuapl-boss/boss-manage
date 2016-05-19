@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Library for common methods that are used by the different configs scripts."""
+"""Library for common methods that are used by the different configs scripts.
+
+Library currently appends the boss-manage.git/vault/ directory to the system path
+so that it can import vault/bastion.py and vault/vault.py.
+
+Library contains a set of AWS lookup methods for locating AWS data and other related
+helper functions and classes.
+
+Author:
+    Derek Pryor <Derek.Pryor@jhuapl.edu>
+"""
 
 import sys
 import os
@@ -24,12 +34,10 @@ import string
 import subprocess
 import shlex
 import traceback
+import ssl
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 from urllib.error import HTTPError
-
-
-import hosts
 
 # Add a reference to boss-manage/vault/ so that we can import those files
 cur_dir = os.path.dirname(os.path.realpath(__file__))
@@ -40,6 +48,11 @@ import vault
 
 
 def get_commit():
+    """Get the git commit hash of the current directory.
+
+    Returns:
+        (string) : The git commit hash or "unknown" if it could not be located
+    """
     try:
         cmd = "git rev-parse HEAD"
         result = subprocess.run(shlex.split(cmd), stdout=subprocess.PIPE)
@@ -49,23 +62,47 @@ def get_commit():
 
 
 def domain_to_stackname(domain):
-    """Create a CloudFormation Stackname from domain name by removing '.' and
-    capitalizing each part of the domain.
+    """Convert a domain name to a CloudFormation compliant Stackname.
+
+    Converts a domain name by removing the '.' and capitalizing each part of the domain
+
+    Args:
+        domain (string) : domain name
+
+    Returns:
+        (string) : CloudFormation stackname
     """
     return "".join(map(lambda x: x.capitalize(), domain.split(".")))
 
 
-def template_argument(key, value, use_previous = False):
-    """Create a JSON dictionary formated as a CloudFlormation template
-    argument.
+def template_argument(key, value, use_previous=False):
+    """Creates a CloudFormation template formated argument.
 
-    use_previous is passed as UserPreviousValue to CloudFlormation.
+    Converts a key value pair into a CloudFormation template formatted fragment
+    (JSON formatted).
+
+    Args:
+        key (string) : CloudFormation template argument key name
+        value : CloudFormation template argument value (JSON convertable)
+        use_previous (bool) : Stored under the UsePreviousValue key
+
+    Returns:
+        (dict) : JSON converable dictory containing the argument
     """
     return {"ParameterKey": key, "ParameterValue": value, "UsePreviousValue": use_previous}
 
 
 def keypair_to_file(keypair):
-    """Look for a ssh key named <keypair> and alert if it does not exist."""
+    """Looks for the SSH private key for keypair under ~/.ssh/
+
+    Prints an error if the file doesn't exist.
+
+    Args:
+        keypair (string) : AWS keypair to locate a private key for
+
+    Returns:
+        (string|None) : SSH private key file path or None is the private key doesn't exist.
+    """
     file = os.path.expanduser("~/.ssh/{}.pem".format(keypair))
     if not os.path.exists(file):
         print("Error: SSH Key '{}' does not exist".format(file))
@@ -73,45 +110,17 @@ def keypair_to_file(keypair):
     return file
 
 
-def call_vault(session, bastion_key, bastion_host, vault_host, command, *args, **kwargs):
-    """Call ../vault/bastion.py with a list of hardcoded AWS / SSH arguments.
-    This is a common function for any other function that needs to populate
-    or provision Vault when starting up new VMs.
-    """
-    bastion_ip = bastion.machine_lookup(session, bastion_host)
-    vault_ip = bastion.machine_lookup(session, vault_host, public_ip = False)
-    def cmd():
-        # Have to dynamically lookup the function because vault.COMMANDS
-        # references the command line version of the commands we want to execute
-        return vault.__dict__[command.replace('-','_')](*args, machine=vault_host, **kwargs)
-
-    return bastion.connect_vault(bastion_key, vault_ip, bastion_ip, cmd)
-
-
-def call_ssh(session, bastion_key, bastion_host, target_host, command):
-    """Call ../vault/bastion.py with a list of hardcoded AWS / SSH arguments.
-    This is a common function for any other function that needs to execute an
-    SSH command on a new VM.
-    """
-    bastion_ip = bastion.machine_lookup(session, bastion_host)
-    target_ip = bastion.machine_lookup(session, target_host, public_ip = False)
-
-    return bastion.ssh_cmd(bastion_key, target_ip, bastion_ip, command)
-
-
-def call_ssh_tunnel(session, bastion_key, bastion_host, target_host, command, port, local_port = None):
-    """Call ../vault/bastion.py with a list of hardcoded AWS / SSH arguments.
-    This is a common function for any other function that needs to execute an
-    arbitrary command within a SSH tunnel.
-    """
-    bastion_ip = bastion.machine_lookup(session, bastion_host)
-    target_ip = bastion.machine_lookup(session, target_host, public_ip = False)
-
-    return bastion.ssh_tunnel(bastion_key, target_ip, bastion_ip, port, local_port, command)
-
-
 def password(what):
-    """Prompt the user for a password and verify it."""
+    """Prompt the user for a password and verify it.
+
+    If password and verify don't match the user is prompted again
+
+    Args:
+        what (string) : What password to enter
+
+    Returns:
+        (string) : Password
+    """
     while True:
         pass_ = getpass.getpass("{} Password: ".format(what))
         pass__ = getpass.getpass("Verify {} Password: ".format(what))
@@ -121,29 +130,72 @@ def password(what):
             print("Passwords didn't match, try again.")
 
 
-def generate_password(length = 16):
-    """Generate an alphanumeric password of the given length."""
-    chars = string.ascii_letters + string.digits #+ string.punctuation
+def generate_password(length=16):
+    """Generate an alphanumeric password of the given length.
+
+    Args:
+        length (int) : length of the password to be generated
+
+    Returns:
+        (string) : password
+    """
+    chars = string.ascii_letters + string.digits  #+ string.punctuation
     return "".join([chars[c % len(chars)] for c in os.urandom(length)])
 
 
 class KeyCloakClient:
-    def __init__(self, url_base):
+    """Client for connecting to Keycloak and using the REST API.
+
+    Client provides a method for issuing requests to the Keycloak REST API and
+    a set of methods to simplify Keycloak configuration.
+    """
+    def __init__(self, url_base, verify_ssl=True):
+        """KeyCloakClient constructor
+
+        Args:
+            url_base (string) : The base URL to prepend to all request URLs
+            verify_ssl (bool) : Whether or not to verify HTTPS certs
+        """
         self.url_base = url_base
         self.token = None
 
-    def request(self, url, params = None, headers = {}, convert = urlencode, method = None):
+        if self.url_base.startswith("https") and not verify_ssl:
+            self.ctx = ssl.create_default_context()
+            self.ctx.check_hostname = False
+            self.ctx.verify_mode = ssl.CERT_NONE
+        else:
+            self.ctx = None
+
+    def request(self, url, params=None, headers={}, convert=urlencode, method=None):
+        """Make a request to the Keycloak server.
+
+        Args:
+            url (string) : REST API URL to query (appended to url_base from constructor)
+            params (None|dict) : None or a dict or key values that will be passed
+                                 to the convert argument to produce a string
+            headers (dict) : Dictionary of HTTP headers
+            convert : Function to convert params into a string
+                      Defaults to urlencode, taking a dict and making a url encoded string
+            method (None|string) : HTTP method to use or None for the default method
+                                   based on the different arguments
+
+        Returns:
+            (None) : If there is an exception raised
+            (dict) : Dictionary containing JSON encoded response
+        """
         request = Request(
             self.url_base + url,
-            data = None if params is None else convert(params).encode("utf-8"),
-            headers = headers,
-            method = method
+            data=None if params is None else convert(params).encode("utf-8"),
+            headers=headers,
+            method=method
         )
 
         try:
-            response = urlopen(request).read().decode("utf-8")
+            response = urlopen(request, context=self.ctx).read().decode("utf-8")
             if len(response) > 0:
                 response = json.loads(response)
+            else:
+                response = {}
             return response
         except HTTPError as e:
             print("Error on '{}'".format(url))
@@ -151,9 +203,24 @@ class KeyCloakClient:
             return None
 
     def login(self, username, password):
+        """Login to the Keycloak master realm and retrieve an access token.
+
+        WARNING: If the base_url is not using HTTPS the password will be submitted
+                 in plain text over the network.
+
+        Note: A user must be logged in before any other method calls will work
+
+        The bearer access token is saved as self.token["access_token"]
+
+        An error will be printed if login failed
+
+        Args:
+            username (string) : Keycloak username
+            password (string) : Keycloak password
+        """
         self.token = self.request(
             "/auth/realms/master/protocol/openid-connect/token",
-            params = {
+            params={
                 "username": username,
                 "password": password,
                 "grant_type": "password",
@@ -168,10 +235,15 @@ class KeyCloakClient:
             print("Could not authenticate to KeyCloak Server")
 
     def logout(self):
+        """Logout from Keycloak.
+
+        Logout will invalidate the Keycloak session and clean the local token (
+        self.token)
+        """
         if self.token is None:
             return
 
-        self.request( # no response
+        self.request(  # no response
             "/auth/realms/master/protocol/openid-connect/logout",
             params={
                 "refresh_token": self.token["refresh_token"],
@@ -185,17 +257,36 @@ class KeyCloakClient:
         self.token = None
 
     def create_realm(self, realm):
+        """Create a new realm based on the JSON based configuration.
+
+            Note: User must be logged into Keycloak first
+
+        Args:
+            realm (dict) : JSON dictory configuration for the new realm
+        """
         resp = self.request(
             "/auth/admin/realms",
-            params = realm,
+            params=realm,
             headers={
                 "Authorization": "Bearer " + self.token["access_token"],
                 "Content-Type": "application/json",
             },
-            convert = json.dumps
+            convert=json.dumps
         )
 
     def get_client(self, realm_name, client_id):
+        """Get the realm's client configuration.
+
+            Note: User must be logged into Keycloak first
+
+        Args:
+            realm_name (string) : Name of the realm to look in for the client
+            client_id (string) : Client ID of client configuration to retrieve
+
+        Returns:
+            (None|dict) : None if the client couldn't be located or the JSON
+                          dictionary configuration of the client
+        """
         resp = self.request(
             "/auth/admin/realms/{}/clients".format(realm_name),
             headers={
@@ -212,10 +303,18 @@ class KeyCloakClient:
                 return client
         return None
 
-    def update_client(self, realm_name, id, client):
+    def update_client(self, realm_name, client):
+        """Update the realm's client configuration.
+
+            Note: User must be logged into Keycloak first
+
+        Args:
+            realm_name (string) : Name of the realm
+            client (dict) : JSON dictory configuration for the updated realm client
+        """
         resp = self.request(
-            "/auth/admin/realms/{}/clients/{}".format(realm_name, id),
-            params = client,
+            "/auth/admin/realms/{}/clients/{}".format(realm_name, client['id']),
+            params=client,
             headers={
                 "Authorization": "Bearer " + self.token["access_token"],
                 "Content-Type": "application/json",
@@ -224,76 +323,234 @@ class KeyCloakClient:
             method="PUT"
         )
 
-    def add_redirect_uri(self, realm_name, client_id, uri):
+    def append_list_properties(self, realm_name, client_id, additions):
+        """Append a set of key values to a realm's client configuration.
+
+        Download the current realm's client configuration, updated with the given
+        key values, and then upload the updated client configuration to the Keycloak
+        server.
+
+            Note: User must be logged into Keycloak first
+
+        Args:
+            realm_name (string) : Name of the realm
+            client_id (string) : Client ID of client configuration to retrieve
+            additions (dict) : dictionary of additions, each entry's key should
+                               correspond to a client key and that entry's (singular)
+                               value will be appended to the client's property.
+        """
         client = self.get_client(realm_name, client_id)
 
-        key = "redirectUris"
-        if key not in client:
-            client[key] = []
-        client[key].append(uri) # DP: should probably check to see if the uri exists first
+        for key, value in additions.items():
+            if key not in client:
+                client[key] = []
+            if value not in client[key]:
+                client[key].append(value)
 
-        self.update_client(realm_name, client['id'], client)
+        self.update_client(realm_name, client)
+
+    def add_redirect_uri(self, realm_name, client_id, uri):
+        """Add the given uri as a valid redirectUri to a realm's client configuration.
+
+            Note: User must be logged into Keycloak first
+
+        Args:
+            realm_name (string) : Name of the realm
+            client_id (string) : Client ID of client configuration to retrieve
+            uri (string) : URL to add to the client's list of valid redirect URLs
+        """
+        self.append_list_properties(realm_name, client_id, {"redirectUris": uri})
+
+    def get_client_installation_url(self, realm_name, client_id):
+        """Returns information about this client installation (suitable for wget/curl).
+
+            Note: User must be logged into Keycloak first
+
+        Args:
+            realm_name (string) : Name of the realm
+            client_id (string) : Client ID of client configuration to retrieve
+
+        Returns:
+            (dict) : contains keys
+                      * 'url' for the complete URL to retrieve the client installation json
+                      * 'headers' for the authorization header populated with the bearer token.
+        """
+        client = self.get_client(realm_name, client_id)
+        installation_endpoint = "{}/auth/admin/realms/{}/clients/{}/installation/providers/keycloak-oidc-keycloak-json"\
+            .format(self.url_base, realm_name, client["id"])
+        auth_header = "Authorization: Bearer {}".format(self.token["access_token"])
+        return {"url": installation_endpoint, "headers": auth_header}
+
 
 class ExternalCalls:
+    """Class that helps with forming connections from the local machine to machines
+    within a VPC through the VPC's bastion machine.
+    """
     def __init__(self, session, keypair, domain):
+        """ExternalCalls constructor
+
+        Args:
+            session (Session) : Boto3 session used to lookup machine IPs in AWS
+            keypair (string) : Name of the AWS EC2 keypair to use when connecting
+                               All AWS EC2 instances connected to need to use the
+                               same keypair
+                               Keypair is converted to file on disk using keypair_to_file()
+            domain (string) : BOSS internal VPC domain name
+        """
         self.session = session
         self.keypair_file = keypair_to_file(keypair)
         self.bastion_hostname = "bastion." + domain
+        self.bastion_ip = bastion.machine_lookup(session, self.bastion_hostname)
         self.vault_hostname = "vault." + domain
+        self.vault_ip = bastion.machine_lookup(session, self.vault_hostname, public_ip=False)
         self.domain = domain
         self.ssh_target = None
 
+    def vault_init(self):
+        """Initialize and configure all of the vault servers.
+
+        Lookup all vault IPs for the VPC, initialize and configure the first server
+        and then unseal any other servers.
+        """
+        vaults = bastion.machine_lookup_all(self.session, self.vault_hostname, public_ip=False)
+
+        def connect(ip, func):
+            bastion.connect_vault(self.keypair_file, ip, self.bastion_ip, func)
+
+        connect(vaults[0], lambda: vault.vault_init(machine=self.vault_hostname))
+        for ip in vaults[1:]:
+            connect(ip, lambda: vault.vault_unseal(machine=self.vault_hostname))
+
+
     def vault(self, cmd, *args, **kwargs):
-        return call_vault(self.session,
-                          self.keypair_file,
-                          self.bastion_hostname,
-                          self.vault_hostname,
-                          cmd, *args, **kwargs)
+        """Call the specified vault command (from vault.py) with the given arguments
+
+        Args:
+            cmd (string) : Name of the vault command to execute (name of function
+                           defined in vault.py)
+            args (list) : Positional arguments to pass to the vault command
+            kwargs (dict) : Keyword arguments to pass to the vault command
+
+        Returns:
+            (object) : Value returned by the vault command
+        """
+        def delegate():
+            # Have to dynamically lookup the function because vault.COMMANDS
+            # references the command line version of the commands we want to execute
+            return vault.__dict__[cmd.replace('-', '_')](*args, machine=self.vault_hostname, **kwargs)
+
+        return bastion.connect_vault(self.keypair_file, self.vault_ip, self.bastion_ip, delegate)
 
     def vault_write(self, path, **kwargs):
+        """Vault vault-write with the given arguments
+
+        WARNING: vault-write will override any data at the given path
+
+        Args:
+            path (string) : Vault path to write data to
+            kwargs (dict) : Keyword key value pairs to store in Vault
+        """
         self.vault("vault-write", path, **kwargs)
 
     def vault_update(self, path, **kwargs):
+        """Vault vault-update with the given arguments
+
+        Args:
+            path (string) : Vault path to write data to
+            kwargs (dict) : Keyword key value pairs to store in Vault
+        """
         self.vault("vault-update", path, **kwargs)
 
     def vault_read(self, path):
+        """Vault vault-read for the given path
+
+        Args:
+            path (string) : Vault path to read data from
+
+        Returns:
+            (None|dict) : None if no data or dictionary of key value pairs stored
+                          at Vault path
+        """
         res = self.vault("vault-read", path)
         return None if res is None else res['data']
 
     def vault_delete(self, path):
+        """Vault vault-delete for the givne path
+
+        Args:
+            path (string) : Vault path to delete data from
+        """
         self.vault("vault-delete", path)
 
     def set_ssh_target(self, target):
+        """Set the target machine for the SSH commands
+
+        Args:
+            target (string) : target machine name. If the name is not fully qualified
+                              it is qualified using the domain given in the constructor.
+        """
         self.ssh_target = target
         if not target.endswith("." + self.domain):
             self.ssh_target += "." + self.domain
+        self.ssh_target_ip = bastion.machine_lookup(self.session, self.ssh_target, public_ip=False)
 
     def ssh(self, cmd):
+        """Execute a command over SSH on the SSH target
+
+        Args:
+            cmd (string) : Command to execute on the SSH target
+
+        Returns:
+            (None)
+        """
         if self.ssh_target is None:
             raise Exception("No SSH Target Set")
 
-        call_ssh(self.session,
-                 self.keypair_file,
-                 self.bastion_hostname,
-                 self.ssh_target,
-                 cmd)
+        return bastion.ssh_cmd(self.keypair_file,
+                               self.ssh_target_ip,
+                               self.bastion_ip,
+                               cmd)
 
-    def ssh_tunnel(self, cmd, port):
+    def ssh_tunnel(self, cmd, port, local_port=None):
+        """Execute a function within a SSH tunnel.
+
+        Args:
+            cmd (string) : Function to execute after the tunnel is established
+                           Function is passed the local port of the tunnel to use
+            port (int|string) : Remote port to use for tunnel
+            local_port (None|int|string : Local port to use for tunnel or None if
+                                          the function should select a random port
+
+        Returns:
+            None
+        """
         if self.ssh_target is None:
             raise Exception("No SSH Target Set")
 
-        call_ssh_tunnel(self.session,
-                        self.keypair_file,
-                        self.bastion_hostname,
-                        self.ssh_target,
-                        cmd, port)
+        return bastion.ssh_tunnel(self.keypair_file,
+                                  self.ssh_target_ip,
+                                  self.bastion_ip,
+                                  port,
+                                  local_port,
+                                  cmd)
+
 
 def vpc_id_lookup(session, vpc_domain):
-    """Lookup the Id for the VPC with the given domain name."""
-    if session is None: return None
+    """
+    Lookup the Id for the VPC with the given domain name.
+    Args:
+        session: amazon session
+        vpc_domain: vpc to lookup
+
+    Returns:
+        id of vpc
+
+    """
+    if session is None:
+        return None
 
     client = session.client('ec2')
-    response = client.describe_vpcs(Filters=[{"Name":"tag:Name", "Values":[vpc_domain]}])
+    response = client.describe_vpcs(Filters=[{"Name": "tag:Name", "Values": [vpc_domain]}])
     if len(response['Vpcs']) == 0:
         return None
     else:
@@ -301,11 +558,21 @@ def vpc_id_lookup(session, vpc_domain):
 
 
 def subnet_id_lookup(session, subnet_domain):
-    """Lookup the Id for the Subnet with the given domain name."""
-    if session is None: return None
+    """
+    Lookup the Id for the Subnet with the given domain name.
+    Args:
+        session: amazon session
+        subnet_domain: subnet domain to look up
+
+    Returns:
+        id of the subnet domain
+
+    """
+    if session is None:
+        return None
 
     client = session.client('ec2')
-    response = client.describe_subnets(Filters=[{"Name":"tag:Name", "Values":[subnet_domain]}])
+    response = client.describe_subnets(Filters=[{"Name": "tag:Name", "Values": [subnet_domain]}])
     if len(response['Subnets']) == 0:
         return None
     else:
@@ -313,8 +580,17 @@ def subnet_id_lookup(session, subnet_domain):
 
 
 def azs_lookup(session):
-    """Lookup all of the Availablity Zones for the connected region."""
-    if session is None: return []
+    """
+    Lookup all of the Availablity Zones for the connected region.
+    Args:
+        session: amazon session
+
+    Returns:
+        amazon availability zones
+
+    """
+    if session is None:
+        return []
 
     client = session.client('ec2')
     response = client.describe_availability_zones()
@@ -331,38 +607,59 @@ def _find(xs, predicate):
 
 
 def ami_lookup(session, ami_name):
-    """Lookup the Id for the AMI with the given name."""
-    if session is None: return None
+    """
+    Lookup the Id for the AMI with the given name.
+    Args:
+        session: amazon session
+        ami_name: name of the AMI
+
+    Returns:
+        tuple of imageId and Value Tag.
+
+    """
+    if session is None:
+        return None
 
     if ami_name.endswith(".boss"):
-        AMI_VERSION = os.environ["AMI_VERSION"]
-        if AMI_VERSION == "latest":
+        ami_version = os.environ["AMI_VERSION"]
+        if ami_version == "latest":
             # limit latest searching to only versions tagged with hash information
             ami_name += "-h*"
         else:
-            ami_name += "-" + AMI_VERSION
+            ami_name += "-" + ami_version
 
     client = session.client('ec2')
-    response = client.describe_images(Filters=[{"Name":"name", "Values":[ami_name]}])
+    response = client.describe_images(Filters=[{"Name": "name", "Values": [ami_name]}])
     if len(response['Images']) == 0:
         return None
     else:
         response['Images'].sort(key=lambda x: x["CreationDate"], reverse=True)
         image = response['Images'][0]
         ami = image['ImageId']
-        tag = _find(image.get('Tags',[]), lambda x: x["Key"] == "Commit")
+        tag = _find(image.get('Tags', []), lambda x: x["Key"] == "Commit")
         commit = None if tag is None else tag["Value"]
 
         return (ami, commit)
 
 
 def sg_lookup(session, vpc_id, group_name):
-    """Lookup the Id for the VPC Security Group with the given name."""
-    if session is None: return None
+    """
+    Lookup the Id for the VPC Security Group with the given name.
+    Args:
+        session: amazon session
+        vpc_id: id of VPC containting security group
+        group_name: name of security group to look up
+
+    Returns:
+        security group id of the security group with the passed in name.
+
+    """
+    if session is None:
+        return None
 
     client = session.client('ec2')
-    response = client.describe_security_groups(Filters=[{"Name":"vpc-id", "Values":[vpc_id]},
-                                                        {"Name":"tag:Name", "Values":[group_name]}])
+    response = client.describe_security_groups(Filters=[{"Name": "vpc-id", "Values": [vpc_id]},
+                                                        {"Name": "tag:Name", "Values": [group_name]}])
 
     if len(response['SecurityGroups']) == 0:
         return None
@@ -371,12 +668,23 @@ def sg_lookup(session, vpc_id, group_name):
 
 
 def rt_lookup(session, vpc_id, rt_name):
-    """Lookup the Id for the VPC Route Table with the given name."""
-    if session is None: return None
+    """
+    Lookup the Id for the VPC Route Table with the given name.
+    Args:
+        session: amazon session
+        vpc_id: id of VPC to look up route table in
+        rt_name: name of route table
+
+    Returns:
+        route table id for the route table with given name.
+
+    """
+    if session is None:
+        return None
 
     client = session.client('ec2')
-    response = client.describe_route_tables(Filters=[{"Name":"vpc-id", "Values":[vpc_id]},
-                                                     {"Name":"tag:Name", "Values":[rt_name]}])
+    response = client.describe_route_tables(Filters=[{"Name": "vpc-id", "Values": [vpc_id]},
+                                                     {"Name": "tag:Name", "Values": [rt_name]}])
 
     if len(response['RouteTables']) == 0:
         return None
@@ -385,12 +693,21 @@ def rt_lookup(session, vpc_id, rt_name):
 
 
 def rt_name_default(session, vpc_id, new_rt_name):
-    """Find the default VPC Route Table and give it a name so that it can be referenced latter.
-    Needed because by default the Route Table does not have a name and rt_lookup() will not find it. """
+    """
+    Find the default VPC Route Table and give it a name so that it can be referenced latter.
+    Needed because by default the Route Table does not have a name and rt_lookup() will not find it.
+    Args:
+        session: amazon session
+        vpc_id: ID of VPC
+        new_rt_name: new name for default VPC Route Table
 
+    Returns:
+        None
+
+    """
     client = session.client('ec2')
-    response = client.describe_route_tables(Filters=[{"Name":"vpc-id", "Values":[vpc_id]}])
-    rt_id = response['RouteTables'][0]['RouteTableId'] # TODO: verify that Tags does not already have a name tag
+    response = client.describe_route_tables(Filters=[{"Name": "vpc-id", "Values": [vpc_id]}])
+    rt_id = response['RouteTables'][0]['RouteTableId']  # TODO: verify that Tags does not already have a name tag
 
     resource = session.resource('ec2')
     rt = resource.RouteTable(rt_id)
@@ -398,15 +715,30 @@ def rt_name_default(session, vpc_id, new_rt_name):
 
 
 def peering_lookup(session, from_id, to_id):
-    """Lookup the Id for the Peering Connection between the two VPCs."""
-    if session is None: return None
+    """
+    Lookup the Id for the Peering Connection between the two VPCs.
+    Args:
+        session: amazon session
+        from_id: id of from VPC
+        to_id: id of to VPC
+
+    Returns:
+        peering connection id
+
+    """
+    if session is None:
+        return None
 
     client = session.client('ec2')
-    response = client.describe_vpc_peering_connections(Filters=[{"Name":"requester-vpc-info.vpc-id", "Values":[from_id]},
-                                                                {"Name":"requester-vpc-info.owner-id", "Values":["256215146792"]},
-                                                                {"Name":"accepter-vpc-info.vpc-id", "Values":[to_id]},
-                                                                {"Name":"accepter-vpc-info.owner-id", "Values":["256215146792"]},
-                                                                {"Name":"status-code", "Values":["active"]},
+    response = client.describe_vpc_peering_connections(Filters=[{"Name": "requester-vpc-info.vpc-id",
+                                                                 "Values": [from_id]},
+                                                                {"Name": "requester-vpc-info.owner-id",
+                                                                 "Values": ["256215146792"]},
+                                                                {"Name": "accepter-vpc-info.vpc-id",
+                                                                 "Values": [to_id]},
+                                                                {"Name": "accepter-vpc-info.owner-id",
+                                                                 "Values": ["256215146792"]},
+                                                                {"Name": "status-code", "Values": ["active"]},
                                                                 ])
 
     if len(response['VpcPeeringConnections']) == 0:
@@ -416,11 +748,31 @@ def peering_lookup(session, from_id, to_id):
 
 
 def keypair_lookup(session):
-    """Print the valid key pairs for the session and ask the user which to use."""
-    if session is None: return None
+    """
+    Print the valid key pairs for the session and ask the user which to use.
+    Args:
+        session: amazon session
+
+    Returns:
+        valid keypair
+
+    """
+    if session is None:
+        return None
 
     client = session.client('ec2')
     response = client.describe_key_pairs()
+
+    # If SSH_KEY exists and points to a valid Key Pair, use it
+    key = os.environ.get("SSH_KEY", None)  # reuse bastion.py env vars
+    if key is not None:
+        kp_name = os.path.basename(key)
+        if kp_name.endswith(".pem"):
+            kp_name = kp_name[:-4]
+        for kp in response['KeyPairs']:
+            if kp["KeyName"] == kp_name:
+                return kp_name
+
     print("Key Pairs")
     for i in range(len(response['KeyPairs'])):
         print("{}:  {}".format(i, response['KeyPairs'][i]['KeyName']))
@@ -431,17 +783,28 @@ def keypair_lookup(session):
             idx = input("[0]: ")
             idx = int(idx if len(idx) > 0 else "0")
             return response['KeyPairs'][idx]['KeyName']
+        except KeyboardInterrupt:
+            sys.exit(1)
         except:
             print("Invalid Key Pair number, try again")
 
 
 def instanceid_lookup(session, hostname):
-    """Look up instance id by hostname."""
-    if session is None: return None
+    """
+    Look up instance id by hostname.
+    Args:
+        session: amazon session
+        hostname: hostname to lookup
+
+    Returns:
+        InstanceId of hostname or None
+    """
+    if session is None:
+        return None
 
     client = session.client('ec2')
     response = client.describe_instances(
-        Filters=[{"Name":"tag:Name", "Values":[hostname]}])
+        Filters=[{"Name": "tag:Name", "Values": [hostname]}])
 
     item = response['Reservations']
     if len(item) == 0:
@@ -456,6 +819,7 @@ def instanceid_lookup(session, hostname):
                 return item['InstanceId']
             return None
 
+
 def cert_arn_lookup(session, domain_name):
     """
     Looks up the arn for a domain_name certificate
@@ -466,7 +830,8 @@ def cert_arn_lookup(session, domain_name):
     Returns:
         (string): arn
     """
-    if session is None: return None
+    if session is None:
+        return None
 
     client = session.client('acm')
     response = client.list_certificates()
@@ -477,8 +842,18 @@ def cert_arn_lookup(session, domain_name):
 
 
 def instance_public_lookup(session, hostname):
-    """Look up instance id by hostname."""
-    if session is None: return None
+    """
+    Look up instance id by hostname.
+    Args:
+        session: amazon session
+        hostname: hostname to lookup
+
+    Returns:
+        (string) Public DNS name or None if it does not exist.
+
+    """
+    if session is None:
+        return None
 
     client = session.client('ec2')
     response = client.describe_instances(
@@ -498,9 +873,19 @@ def instance_public_lookup(session, hostname):
                 return item['PublicDnsName']
             return None
 
+
 def elb_public_lookup(session, hostname):
-    """Look up instance id by hostname."""
-    if session is None: return None
+    """
+    Look up instance id by hostname.
+    Args:
+        session: amazon session
+        hostname: hostname to lookup
+
+    Returns: public DNS name of elb starting with hostname.
+
+    """
+    if session is None:
+        return None
 
     client = session.client('elb')
     responses = client.describe_load_balancers()
@@ -511,27 +896,6 @@ def elb_public_lookup(session, hostname):
         if response["LoadBalancerName"].startswith(hostname_):
             return response["DNSName"]
     return None
-
-def create_elb_listener(loadbalancer_port, instance_port, protocol, ssl_cert_id=None):
-    """
-    Creates an elastic loadbalancer listener
-    Args:
-        loadbalancer_port (string): string representation of port listening on
-        instance_port (string): string representation of port on instance elb sends to
-        protocol (string): protocol used, ex: HTTP, HTTPS
-        ssl_cert_id:
-
-    Returns: a map of the listener properly formatted
-
-    """
-    listener = {
-        "LoadBalancerPort": loadbalancer_port,
-        "InstancePort": instance_port,
-        "Protocol": protocol,
-    }
-    if ssl_cert_id is not None:
-        listener["SSLCertificateId"] = ssl_cert_id
-    return listener
 
 
 def lb_lookup(session, lb_name):
@@ -544,12 +908,11 @@ def lb_lookup(session, lb_name):
     Returns: true if a valid loadbalancer name
 
     """
-    if session is None: return None
+    if session is None:
+        return None
 
     client = session.client('elb')
-    response = client.describe_load_balancers()#Filters=[{"LoadBalancerName":lb_name}])
-
-    value = response['LoadBalancerDescriptions'][0]['LoadBalancerName']
+    response = client.describe_load_balancers()
 
     for i in range(len(response['LoadBalancerDescriptions'])):
         if (response['LoadBalancerDescriptions'][i]['LoadBalancerName']) == lb_name:
@@ -567,7 +930,8 @@ def sns_topic_lookup(session, topic_name):
     Returns: ARN for the topic or None if topic doesn't exist
 
     """
-    if session is None: return None
+    if session is None:
+        return None
 
     client = session.client('sns')
     response = client.list_topics()
@@ -577,3 +941,101 @@ def sns_topic_lookup(session, topic_name):
         if arn_topic_name == topic_name:
             return topic["TopicArn"]
     return None
+
+
+def request_cert(session, domain_name, validation_domain='theboss.io'):
+    """
+    Requests a certificate in the AWS Certificate Manager for the domain name
+    Args:
+        session: AWS session object used to make the request
+        domain_name: domain name the certificate is being requested for
+        validation_domain: domain suffix the request will be sent to.
+
+    Returns: response from the request_certificate()
+
+    """
+    if session is None:
+        return None
+
+    client = session.client('acm')
+    validation_options = [
+        {
+            'DomainName': domain_name,
+            'ValidationDomain': validation_domain
+        },
+    ]
+    response = client.request_certificate(DomainName=domain_name,
+                                          DomainValidationOptions=validation_options)
+    return response
+
+
+def get_hosted_zone_id(session, hosted_zone='theboss.io'):
+    """
+    given a hosted zone, fine the HostedZoneId
+    Args:
+        session: amazon session object
+        hosted_zone: the zone being hosted in route 53
+
+    Returns:  the Id for the hosted zone or None
+
+    """
+    if session is None:
+        return None
+
+    client = session.client('route53')
+    response = client.list_hosted_zones_by_name(
+        DNSName=hosted_zone,
+        MaxItems='1'
+    )
+    if len(response['HostedZones']) >= 1:
+        full_id = response['HostedZones'][0]['Id']
+        id_parts = full_id.split('/')
+        return id_parts.pop()
+    else:
+        return None
+
+
+def set_domain_to_dns_name(session, domain_name, dns_resource, hosted_zone='theboss.io'): # TODO move into CF config??
+    """
+    Sets the domain_name to use the dns name.
+    Args:
+        session: amazon session object
+        domain_name: full domain name.  (Ex:  auth.integration.theboss.io)
+        dns_resource: DNS name being assigned to this domain name  (Ex: DNS for loadbalancer)
+        hosted_zone: hosted zone being managed by route 53
+
+    Returns:  results from change_resource_record_sets
+
+    """
+    if session is None:
+        return None
+
+    client = session.client('route53')
+    hosted_zone_id = get_hosted_zone_id(session, hosted_zone)
+
+    if hosted_zone_id is None:
+        print("Error: Unable to find Route 53 Hosted Zone, " + hosted_zone + ",  Cannot set resource record for: " +
+              dns_resource)
+        return
+
+    response = client.change_resource_record_sets(
+        HostedZoneId=hosted_zone_id,
+        ChangeBatch={
+            'Changes': [
+                {
+                    'Action': 'UPSERT',
+                    'ResourceRecordSet': {
+                        'Name': domain_name,
+                        'Type': 'CNAME',
+                        'ResourceRecords': [
+                            {
+                                'Value': dns_resource
+                            },
+                        ],
+                        'TTL': 300,
+                    }
+                },
+            ]
+        }
+    )
+    return response

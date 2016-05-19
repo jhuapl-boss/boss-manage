@@ -26,6 +26,8 @@
         "redirectUris": ["/openid/callback/login/","/openid/callback/logout/"],
 
         "consentRequired": false,
-        "publicClient": true
+        "publicClient": true,
+
+        "directAccessGrantsEnabled": true
     }]
 }

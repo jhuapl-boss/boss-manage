@@ -1,18 +1,11 @@
 include:
     - python.python35
     - python.pip
+    - boss-oidc
 
 django:
   pip.installed:
     - name: django == 1.9.2
-    - bin_env: /usr/local/bin/pip3
-    - require:
-      - sls: python.python35
-      - sls: python.pip
-
-djangorestframework:
-  pip.installed:
-    - name: djangorestframework == 3.3.2
     - bin_env: /usr/local/bin/pip3
     - require:
       - sls: python.python35

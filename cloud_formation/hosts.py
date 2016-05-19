@@ -12,19 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Library for looking up IP subnets and IP addresses by name.
+"""Library containing IP subnet and SSL cert lookups.
 
-TLD - The Top Level Domain name for internal naming.
-BASE_IP / ROOT_CIDR - The top level subnet in which to start numbering.
-VPC_CIDR - The CIDR number for VPCs.
-SUBNET_CIDR - The CIDR number for Subnets.
+Library contains AWS VPC and VPC Subnet IP subnet allocation and lookup.
+
+Library contains SSL cert mapping between AWS VPC name and external DNS root
+
+
+TLD : The Top Level Domain name for internal naming.
+BASE_IP / ROOT_CIDR : The top level subnet in which to start numbering.
+VPC_CIDR : The CIDR number for VPCs.
+SUBNET_CIDR : The CIDR number for Subnets.
 
 NOTE: BASE_CIDR < VPC_CIDR < SUBNET_CIDR
 
-VPCS - A dictionary of names and Subnet number for each valid VPC.
-SUBNETS - A dictionary of names and Subnet number for each valid Subnet.
-STATIC - A dictionary of hostnames and IP address that are static and should
-         always be available
+VPCS : A dictionary of names and Subnet number for each valid VPC.
+       VPCS[vpc] = subnet index
+SUBNETS : A dictionary of names and Subnet number for each valid Subnet (per VPC)
+          SUBNETS[(vpc, subnet)] = subnet index
+
+BASE_DOMAIN_CERTS : A dictionary of VPC names and external DNS roots
+                    BASE_DOMAIN_CERTS[vpc.boss] = external DNS root
+
+Author:
+    Derek Pryor <Derek.Pryor@jhuapl.edu>
 """
 
 ##
@@ -73,13 +84,16 @@ SUBNETS = {
 # Dynamically add the following subnets to all VPCs
 for vpc in VPCS:
     # not all regions have all availability zones, but reserve them
-    subnets = ["internal", "external", "a", "b", "c", "d", "e"]
+    subnets = ["internal", "external",
+               "a-internal", "b-internal", "c-internal", "d-internal", "e-internal",
+               "a-external", "b-external", "c-external", "d-external", "e-external"]
     for subnet in subnets:
         SUBNETS[(vpc, subnet)] = subnets.index(subnet)
 
-# Static hostname, IP address enteries
-STATIC = {
-}
+# domains listed in this dictionary have certificates for the auth and api loadbalancers to use.
+BASE_DOMAIN_CERTS = {"production.boss": "theboss.io",
+                      "integration.boss": "integration.theboss.io",
+                      "hiderrt1.boss": "hiderrt1.theboss.io"}
 
 
 ##
@@ -90,82 +104,33 @@ import sys
 from ipaddress import IPv4Network
 
 def get_subnet(network, subnet_cidr, subnet_id):
-    """Subnet a IPv4Network and select subnet number <subnet_id>."""
+    """Lookup the specific subnet from the current network.
+
+    Args:
+        network (IPv4Network|string) : Starting network to derive the subnet from
+        subnet_cidr (int) : The CIDR used to divide network into
+        subnet_id (int) : Which of the subnet_cidr divided network subnets to select
+
+    Returns:
+        (IPv4Network) : The select subnet
+    """
     if type(network) != IPv4Network:
         network = IPv4Network(network)
 
     return list(network.subnets(new_prefix=subnet_cidr))[subnet_id]
 
-def get_ip(network, vpc_id, subnet_id, device_id):
-    """Given a starting network, find the vpc_id and subnet_id subnets, and
-    then select ip address number <device_id>.
+def lookup(domain):
+    """Lookup the subnet of the given domain name.
+
+        Note: domain should be in the format of vpc.boss or subnet.vpc.boss
+
+    Args:
+        domain (string) : domain name to locate the subnet of
+
+    Returns:
+        (string|None) : String containing the subnet in CIDR format or None if
+                        the domain is not a valid BOSS vpc or subnet domain name
     """
-    vpc_net = get_subnet(network, VPC_CIDR, vpc_id)
-    sub_net = get_subnet(vpc_net, SUBNET_CIDR, subnet_id)
-    device_ip = list(sub_net)[device_id]
-    return device_ip
-
-def get_entry(network, vpc_name, subnet_name, device_name, device_id):
-    """Given a starting network and the hostname components of a device,
-    generate the IP address and full hostname.
-    """
-    ip = get_ip(network, VPCS[vpc_name], SUBNETS[(vpc_name, subnet_name)], device_id)
-    name = ".".join([device_name, subnet_name, vpc_name, TLD])
-
-    return ip, name
-
-def gen_hosts(domain, devices):
-    """Itterate through all devices enteries to generate the set of IP
-    addresses and full hostnames for every device.
-
-    STATIC enteries are added to the results before being returned.
-    """
-    base_net = IPv4Network(BASE_IP + "/" + str(ROOT_CIDR))
-    addresses = {}
-
-    subnet_name, vpc_name, tld = domain.split(".")
-
-    for device in expand_devices(devices):
-        device_id = devices[device]
-        ip,name = get_entry(base_net, vpc_name, subnet_name, device, device_id)
-        addresses[ip] = name
-
-    for hostname in STATIC:
-        addresses[STATIC[hostname]] = hostname
-
-    return addresses
-
-def expand_devices(devices):
-    """Expand the range() and [] values in devices. Each value in the list
-    gets a unique hostname with the first hostname being the dictionary key
-    all following hostnames adding an incrementing number (web, web2, web3,
-    ...) .
-    """
-    rtn = {}
-
-    for device in devices:
-        device_id = devices[device]
-        if type(device_id) == range:
-            device_id = list(device_id)
-        if type(device_id) == list:
-            for i in device_id:
-                i_idx = device_id.index(i)
-                device_name = device + (str(i_idx) if i_idx > 0 else "")
-                rtn[device_name] = i
-        else:
-            rtn[device_name] = device_id
-
-    return rtn
-
-def lookup(domain, devices=None):
-    """Locate the subnet or IP address for the given domain name.
-
-    If the domain is not a VPC or Subnet and is not in STATIC then devices is
-    required to be specified and the dictionary is used to complete the
-    lookup.
-    """
-    if domain in STATIC:
-        return STATIC[domain]
 
     parts = domain.split(".")
 
@@ -199,15 +164,5 @@ def lookup(domain, devices=None):
         if len(parts) == 0:
             return str(subnet_net)
 
-    if len(parts) != 0 and devices is None:
-        print("ERROR: Need devices to lookup device hostname")
-        return None
-
-    devices = expand_devices(devices)
-    device_name = get_next()
-    if device_name not in devices:
-        print("ERROR: '{}' is not a valid device name for Subnet '{}'".format(device_name, subnet_name))
-        return None
-    else:
-        device_ip, _ = get_entry(base_net, vpc_name, subnet_name, device_name, devices[device_name])
-        return str(device_ip)
+    print("ERROR: domain contains extra information beyond Subnet and VPC")
+    return None

@@ -18,6 +18,7 @@ $ git submodule update --remote
 $ git add salt_stack/salt/boss/files/boss.git
 $ git add salt_stack/salt/boss-tools/files/boss-tools.git
 $ git add salt_stack/salt/proofreader-web/files/proofread.git
+$ git add salt_stack/salt/spdb/files/spdb.git
 $ git commit -m "Updated submodule references"
 $ git push
 ```
@@ -53,12 +54,28 @@ have to be pushed yet) so that the correct commit hash is used.*
 Before the new integration instance can be created, the existing CloudFormation
 Stacks need to be deleted.
 
+Using the CloudFormation console:
+
 1. Open a web browser
 2. Login to the AWS console and open up the CloudFormation console
-3. For *CloudwatchIntegrationBoss*, *LoadbalancerIntegrationBoss*, *ProofreaderIntegrationBoss*,
-   *ProductionIntegrationBoss*, *AuthIntegrationBoss*, *CoreIntegrationBoss*
+3. For *CloudwatchIntegrationBoss*, *ProofreaderIntegrationBoss*,
+   *ProductionIntegrationBoss*, *CoreIntegrationBoss*
   1. Right click on the Stack and select *Delete Stack*
   2. Wait for the stack to be deleted
+
+Alternatively, via the cloudformation script:
+
+```shell
+$ cd cloud_formation/
+$ source ../config/set_vars.sh
+
+# Deletion of cloudwatch, production, and proofreader can probably
+# be done in parallel.
+$ ./cloudformation.py delete integration.boss cloudwatch
+$ ./cloudformation.py delete integration.boss production
+$ ./cloudformation.py delete integration.boss proofreader
+$ ./cloudformation.py delete integration.boss core
+```
 
 ### Vault AWS configuration
 For Vault to be able to create AWS credentials (used by the Endpoint) you need a
@@ -97,20 +114,19 @@ export scalyr_readconfig_token='some key string'
 export scalyr_writeconfig_token='another key string'
 ```
 
-Create this script and save it for the next time you do the integration test
-build.  Run this script like so:
+Create this script and save it (config/set_scalyr_vars.sh) for the next time you do the integration test build.  Run this script like so:
 
 ```shell
-source set_scalyr_vars.sh
+source ../config/set_scalyr_vars.sh
 ```
 
 ### Launching configs
 
-For the *core*, *auth*, *production*, *proofreader*, *loadbalancer*, *cloudwatch* configurations
+For the *core*, *production*, *proofreader*, *cloudwatch* configurations
 run the following command. You have to wait for each command to finish before
 launching the next configuration as they build upon each other.
 ```shell
-$ ./cloudformation.py create integration.boss <config>
+$ ./cloudformation.py create integration.boss --scenario production <config>
 ```
 
 *Note: When launching some configurations there may be an message about manually
@@ -121,59 +137,26 @@ encounter this message.*
 that are named with a commit hash. Since you just rebuilt the AMIs they should be
 the latest ones.*
 
-*Manual Configuration: Because of restrictive Security Group rules you need to
-manually add the endpoint's IP address to the http.integration.boss Security Group.*
+*Note: By using the '--scenario production' flag you will be spinning up larger/more
+resources than in development mode. Omitting the '--scenerio' flag or setting it to 'development'
+will deploy the stack with the minimum set of resources.*
 
-1. Open the AWS web console to the EC2 section
-2. On the left side click *Instances*
-3. Locate the *endpoint.integration.boss* instance and record the public IP address
-4. On the lift side click *Security Groups*
-3. Locate the *http.integration.boss* Security Group
-4. Select the *Inbound* tab for the *http.integration.boss* Security Group
-5. Click *Edit*
-6. Click *Add Rule*
-7. Type is *Custom TCP Rule*
-8. Port Range is *8080*
-9. Source is *Custom IP* with a value of *<endpoint IP>/32*
-10. Click *Save*
 
 ## Initialize Endpoint and run unit tests
 ```shell
 cd vault
-./ssh.py endpoint.integration.boss
+./bastion.py bastion.integration.boss endpoint.integration.boss ssh
 cd /srv/www/django
-sudo python3 manage.py makemigrations
-sudo python3 manage.py makemigrations bosscore
-sudo python3 manage.py migrate
-sudo python3 manage.py collectstatic
-	: yes
 sudo python3 manage.py createsuperuser
 	user:  bossadmin
 	email: garbage@garbage.com
-	pass:  88secret88
-sudo service uwsgi-emperor reload
-sudo service nginx restart
+	pass:  xxxxxxxx
 sudo python3 manage.py test
 ```
-	output should say 36 Tests OK
+	output should say 203 Tests OK with 14 skipped tests.
+	
+	There are 2 tests that need >2.5GB of memory to run. To run them, set an enviroment variable "RUN_HIGH_MEM_TESTS"
 
-## Configure Route 53
-1. Update Route 53 with the new Loadbalancer dns name.
-2. Under the EC2 page select Loadbalancers
-3. On description page will be `DNS Name`
-3. Copy that
-4. Go into Route 53 AWS Service
-5. Hosted Zone theboss.io
-6. Check checkbox api.theboss.io
-7. Paste the new DNS name over top of the old one.
-8. `Save Record Set`
-
-### Update the Auth redirect URL
-```shell
-$ cd cloud_formation/
-$ source ../config/set_vars.sh
-$ ./cloudformation.py create integration.boss update_auth
-```
 
 ## Proofreader Tests
 ````shell
@@ -185,17 +168,28 @@ sudo python3 manage.py makemigrations --noinput common
 sudo python3 manage.py migrate
 sudo python3 manage.py test
 ````
+    output should say 333 Tests OK
 
 ## Integration Tests
 After the integration instance is launched the following tests need to be run,
 results recorded, and developers notified of any problems.
+
+### Endpoint Integration Tests
+```shell
+cd /srv/www/django
+sudo python3 manage.py test --pattern="int_test_*.py"
+```
+	output should say 35 Tests OK with 2 skipped tests
+	
+	There are 2 tests that need >2.5GB of memory to run. To run them, set an enviroment variable "RUN_HIGH_MEM_TESTS"
 
 
 ### Automated Tests
 To be filled out
 
 ### Manual Checks
-* https://api.theboss.io/ping/
-* https://api.theboss.io/v0.2/info/collections/
+* https://api.integration.theboss.io/ping/
+* https://api.integration.theboss.io/v0.3/info/collections/
+* https://api.integration.theboss.io/v0.4/resource/collections
 * Login into Scalyr and verify that the new instances appear on the overview page.
-* Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint and vault.
+* Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint and proofreader.

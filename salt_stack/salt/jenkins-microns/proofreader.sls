@@ -5,12 +5,16 @@ include:
     - mysql
     - python.coverage
     - python.pylint
+    - python.pylint-django
     - python.pep8
     - jenkins
     - jenkins.plugins
     - jenkins.slack
     - jenkins.django
     - jenkins.jobs
+    # The proofreader has both Django and stand-alone Python code.
+    - python.nose2-3
+    - python.nose2-cov-3
 
 test_db:
     mysql_user.present:

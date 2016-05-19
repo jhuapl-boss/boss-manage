@@ -34,6 +34,7 @@ You will need access to the following code repositories on Github:
 * [boss-tools.git](https://github.com/aplmicrons/boss-tools)
 * [boss.git](https://github.com/aplmicrons/boss)
 * [proofread.git](https://github.com/aplmicrons/proofread)
+* [spdb.git](https://github.com/aplmicrons/spdb)
 
 ## Install Procedures
 
@@ -82,7 +83,7 @@ Make sure that the Packer executable is either in $PATH (you can call it by just
 calling packer) or in the `bin/` directory of the boss-manage repository.
 
 ```shell
-$ bin/packer.py vault endpoint proofreader-web
+$ bin/packer.py vault auth endpoint proofreader-web
 ```
 
 *Note: because the packer.py script is running builds in parallel it is redirecting
@@ -155,7 +156,8 @@ AWS. Characters like '.' may be removed from the file name. It is important that
 the name matches exactly, plus '.pem'*
 
 ### Configure Route53
-Need instructions on how to configure everything needed in Route53
+Configure the domain theboss.io to be used by route53.
+
 
 ### Launch Configurations
 To fully create a new instance of the BOSS architecture several configuration
@@ -180,17 +182,40 @@ $ source ../vault/set_vars.sh
 $ source ../scalyr_keys.sh
 ```
 
-#### Launching
+### Setting up Certificates in Amazon Certificates Manage.
+You will need to create certificates for auth and api in the domain 
+(theboss.io) These only needs to be setup once. 
+You will need to create a EC2 instance to route mail.  Create a micro 
+Ubuntu instance.
+Installed postfix and setup theboss.io as a "virtual alias domain"
+sudo apt-get install postfix
 
-For the *core*, *production*, *proofreader*, and *loadbalancer* configurations
+change /etc/postfix/main.cf:
+    virtual_alias_domains = theboss.io
+    virtual_alias_maps = hash:/etc/postfix/virtual
+
+created new file /etc/postfix/virtual:
+    administrator@theboss.io	your-email-address
+your-email-address is a valild address that will recieve the request to 
+validate that the certicate should be created.
+
+In Route53 create an MX record for theboss.io and add your public instance DNS name to it.
+
+Now You will need to setup the request
+cd boss-manage/bin/
+python3.5 create_certificate.py api.theboss.io
+python3.5 create_certificate.py auth.theboss.io
+
+After you receive the certificate approval emails, turn off the mail instance. 
+
+
+#### Launching
+For the *core*, *production*, *proofreader* and *cloudwatch* configurations
 run the following command. You have to wait for each command to finish before
 launching the next configuration as they build upon each other.
 ```shell
-$ ./cloudformation.py create production.boss <config>
+$ ./cloudformation.py create production.boss --scenario production <config>
 ```
-
-*Note: make sure to select the keypair created earlier when launching the
-different configurations.*
 
 *Note: If when launching the core configuration you receive a message about
 manually initializing / configuring Vault then run the following commands. If
@@ -201,19 +226,17 @@ $ ./bastion.py bastion.production.boss vault.production.boss vault-init
 $ cd ../cloudformation/
 ```
 
-#### Update Route53
-Once launched there is a load balancer that acts as the single endpoint for all
-traffic to the endpoint web servers. The last step is to link the load balancer
-to the permanent DNS name that is associated with the new instance of the BOSS
-system.
-
-1. Open a web browser
-2. Login to the AWS console and open up the EC2 console
-3. Select **Load Balancers** from the left side menu
-4. Locate the newly create load balancer and copy it’s DNS Name (A Record)
-5. Login to the AWS console and open up the Route53 console
-6. Select **Hosted Zones** from the left side menu
-7. Click on the target domain name
-8. Click on the record to update
-9. In the right hand **Edit Record Set** column paste the hostname of the
-Elastic Load Balancer created into the Value field and click **Save Record Set**
+## Initialize Endpoint and run unit tests
+```shell
+cd vault
+./bastion.py bastion.integration.boss endpoint.integration.boss ssh
+cd /srv/www/django
+sudo python3 manage.py createsuperuser
+	user:  bossadmin
+	email: bossadmin@jhuapl.com
+	pass:  xxxxxxxx
+sudo python3 manage.py test
+```
+	output should say 203 Tests OK with 14 skipped tests.
+	
+	There are 2 tests that need >2.5GB of memory to run. To run them, set an enviroment variable "RUN_HIGH_MEM_TESTS"

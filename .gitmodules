@@ -12,5 +12,5 @@
 	branch = master
 [submodule "salt_stack/salt/spdb/files/spdb.git"]
 	path = salt_stack/salt/spdb/files/spdb.git
-	url = https://github.com/aplmicrons/spdb.git
-	branch = master
+	url = ../spdb.git
+	branch = integration

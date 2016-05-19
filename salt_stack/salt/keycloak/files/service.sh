@@ -18,7 +18,13 @@ ARGS="-N -n keycloak -u root -r"
 case "$1" in
  start)
    # start the keycloak server
-   daemon $ARGS -- /srv/keycloak/bin/standalone.sh
+   DB=`grep ^db /etc/boss/boss.config | cut -d= -f2 | tr -d ' '`
+   if [ -z "$DB" ]; then
+     CONFIG="standalone.xml"
+   else
+     CONFIG="standalone-ha.xml"
+   fi
+   daemon $ARGS -- /srv/keycloak/bin/standalone.sh --server-config=$CONFIG
    ;;
  stop)
    daemon $ARGS --stop

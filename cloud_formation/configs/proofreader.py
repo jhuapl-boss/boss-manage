@@ -33,6 +33,7 @@ INCOMING_SUBNET = "52.3.13.189/32" # microns-bastion elastic IP
 
 VAULT_DJANGO = "secret/proofreader/django"
 VAULT_DJANGO_DB = "secret/proofreader/django/db"
+VAULT_DJANGO_AUTH = "secret/proofreader/auth"
 
 def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     """Create the CloudFormationConfiguration object."""
@@ -77,7 +78,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                                                        internet_sg_id,
                                                        "ID of internal Security Group"))
 
-    az_subnets = config.find_all_availability_zones(session)
+    az_subnets, _ = config.find_all_availability_zones(session)
 
     config.add_ec2_instance("ProofreaderWeb",
                             "proofreader-web." + domain,
@@ -110,14 +111,7 @@ def create(session, domain):
     """Configure Vault, create the configuration, and launch it"""
     keypair = lib.keypair_lookup(session)
 
-    def call_vault(command, *args, **kwargs):
-        """A wrapper function around lib.call_vault() that populates most of
-        the needed arguments."""
-        return lib.call_vault(session,
-                              lib.keypair_to_file(keypair),
-                              "bastion." + domain,
-                              "vault." + domain,
-                              command, *args, **kwargs)
+    call = lib.ExternalCalls(session, keypair, domain)
 
     db = {
         "name": "microns_proofreader",
@@ -128,17 +122,19 @@ def create(session, domain):
 
     # Configure Vault and create the user data config that proofreader-web will
     # use for connecting to Vault and the DB instance
-    proofreader_token = call_vault("vault-provision", "proofreader")
+    proofreader_token = call.vault("vault-provision", "proofreader")
     user_data = configuration.UserData()
     user_data["vault"]["token"] = proofreader_token
     user_data["system"]["fqdn"] = "proofreader-web." + domain
     user_data["system"]["type"] = "proofreader-web"
     user_data["aws"]["db"] = "proofreader-db." + domain
+    user_data["auth"]["OIDC_VERIFY_SSL"] = str(domain in hosts.BASE_DOMAIN_CERTS.keys())
     user_data = str(user_data)
 
+
     # Should transition from vault-django to vault-write
-    call_vault("vault-write", VAULT_DJANGO, secret_key = str(uuid.uuid4()))
-    call_vault("vault-write", VAULT_DJANGO_DB, **db)
+    call.vault_write(VAULT_DJANGO, secret_key = str(uuid.uuid4()))
+    call.vault_write(VAULT_DJANGO_DB, **db)
 
     try:
         name = lib.domain_to_stackname("proofreader." + domain)
@@ -147,15 +143,68 @@ def create(session, domain):
         success = config.create(session, name)
         if not success:
             raise Exception("Create Failed")
+        else:
+            post_init(session, domain)
+
     except:
-        print("Error detected, revoking secrets")
+        print("Error detected, revoking secrets") # Do we want to revoke if an exception from post_init?
         try:
-            call_vault("vault-delete", VAULT_DJANGO)
-            call_vault("vault-delete", VAULT_DJANGO_DB)
+            call.vault_delete(VAULT_DJANGO)
+            call.vault_delete(VAULT_DJANGO_DB)
         except:
             print("Error revoking Django credentials")
         try:
-            call_vault("vault-revoke", proofreader_token)
+            call.vault("vault-revoke", proofreader_token)
         except:
             print("Error revoking Proofreader Server Vault access token")
         raise
+
+def post_init(session, domain):
+    keypair = lib.keypair_lookup(session)
+    call = lib.ExternalCalls(session, keypair, domain)
+    creds = call.vault_read("secret/auth")
+
+    print("Configuring KeyCloak") # Should abstract for production and proofreader
+    def configure_auth(auth_port):
+        # NOTE DP: If an ELB is created the public_uri should be the Public DNS Name
+        #          of the ELB. Endpoint Django instances may have to be restarted if running.
+        dns = lib.instance_public_lookup(session, "proofreader-web." + domain)
+        uri = "http://{}".format(dns)
+        call.vault_update(VAULT_DJANGO_AUTH, public_uri = uri)
+
+        kc = lib.KeyCloakClient("http://localhost:{}".format(auth_port))
+        kc.login(creds["username"], creds["password"])
+        kc.append_list_properties("BOSS", "endpoint", {"redirectUris": uri + "/*", "webOrigins": uri})
+        kc.logout()
+    call.set_ssh_target("auth")
+    call.ssh_tunnel(configure_auth, 8080)
+
+    print("Initializing Django")
+    call.set_ssh_target("proofreader-web")
+    migrate_cmd = "sudo python3 /srv/www/app/proofreader_apis/manage.py "
+    call.ssh(migrate_cmd + "makemigrations") # will hang if it cannot contact the auth server
+    call.ssh(migrate_cmd + "makemigrations common")
+    call.ssh(migrate_cmd + "migrate")
+    call.ssh(migrate_cmd + "collectstatic --no-input")
+    call.ssh("sudo service uwsgi-emperor reload")
+    call.ssh("sudo service nginx restart")
+
+    print("Generating keycloak.json")
+    # this will be overwritten if there is a DNS with a cert
+    elb = lib.elb_public_lookup(session, "elb-auth." + domain)
+
+    if domain in hosts.BASE_DOMAIN_CERTS.keys():
+        elb = "auth." + hosts.BASE_DOMAIN_CERTS[domain]
+
+    kc = lib.KeyCloakClient("https://{}:{}".format(elb, 443), verify_ssl=False)
+    kc.login(creds["username"], creds["password"])
+    client_install = kc.get_client_installation_url("BOSS", "endpoint")
+
+    # NOTE: This will put a valid bearer token in the bash history until the history is cleared
+    call.ssh("sudo wget --header=\"{}\" --no-check-certificate {} -O /srv/www/html/keycloak.json"
+             .format(client_install["headers"], client_install["url"]))
+    # clear the history
+    call.ssh("history -c")
+
+    # this should invalidate the token anyways
+    kc.logout()
