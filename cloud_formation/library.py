@@ -536,15 +536,15 @@ class ExternalCalls:
 
 
 def vpc_id_lookup(session, vpc_domain):
-    """
-    Lookup the Id for the VPC with the given domain name.
+    """Lookup the Id for the VPC with the given domain name.
+
     Args:
-        session: amazon session
-        vpc_domain: vpc to lookup
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
+        vpc_domain (string) : Name of VPC to lookup
 
     Returns:
-        id of vpc
-
+        (string|None) : VPC ID or None if the VPC could not be located
     """
     if session is None:
         return None
@@ -558,15 +558,15 @@ def vpc_id_lookup(session, vpc_domain):
 
 
 def subnet_id_lookup(session, subnet_domain):
-    """
-    Lookup the Id for the Subnet with the given domain name.
+    """Lookup the Id for the Subnet with the given domain name.
+
     Args:
-        session: amazon session
-        subnet_domain: subnet domain to look up
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
+        subnet_domain (string) : Name of Subnet to lookup
 
     Returns:
-        id of the subnet domain
-
+        (string|None) : Subnet ID or None if the Subnet could not be located
     """
     if session is None:
         return None
@@ -580,14 +580,14 @@ def subnet_id_lookup(session, subnet_domain):
 
 
 def azs_lookup(session):
-    """
-    Lookup all of the Availablity Zones for the connected region.
+    """Lookup all of the Availablity Zones for the connected region.
+
     Args:
-        session: amazon session
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
 
     Returns:
-        amazon availability zones
-
+        (list) : List of tuples (availability zone, zone letter)
     """
     if session is None:
         return []
@@ -600,6 +600,15 @@ def azs_lookup(session):
 
 
 def _find(xs, predicate):
+    """Locate an item in a list based on a predicate function.
+
+    Args:
+        xs (list) : List of  data
+        predicate (function) : Function taking a data item and returning bool
+
+    Returns:
+        (object|None) : The first list item that predicate returns True for or None
+    """
     for x in xs:
         if predicate(x):
             return x
@@ -607,15 +616,20 @@ def _find(xs, predicate):
 
 
 def ami_lookup(session, ami_name):
-    """
-    Lookup the Id for the AMI with the given name.
+    """Lookup the Id for the AMI with the given name.
+
+    If ami_name ends with '.boss', the AMI_VERSION environmental variable is used
+    to either search for the latest commit hash tagged AMI ('.boss-h<hash>') or
+    for the AMI with the specific tag ('.boss-<AMI_VERSION>').
+
     Args:
-        session: amazon session
-        ami_name: name of the AMI
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
+        ami_name (string) : Name of AMI to lookup
 
     Returns:
-        tuple of imageId and Value Tag.
-
+        (tuple|None) : Tuple of strings (AMI ID, Commit hash of AMI build) or None
+                       if AMI could not be located
     """
     if session is None:
         return None
@@ -643,16 +657,16 @@ def ami_lookup(session, ami_name):
 
 
 def sg_lookup(session, vpc_id, group_name):
-    """
-    Lookup the Id for the VPC Security Group with the given name.
+    """Lookup the Id for the VPC Security Group with the given name.
+
     Args:
-        session: amazon session
-        vpc_id: id of VPC containting security group
-        group_name: name of security group to look up
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
+        vpc_id (string) : VPC ID of the VPC to search in
+        group_name (string) : Name of the Security Group to lookup
 
     Returns:
-        security group id of the security group with the passed in name.
-
+        (string|None) : Security Group ID or None if the Security Group could not be located
     """
     if session is None:
         return None
@@ -668,16 +682,16 @@ def sg_lookup(session, vpc_id, group_name):
 
 
 def rt_lookup(session, vpc_id, rt_name):
-    """
-    Lookup the Id for the VPC Route Table with the given name.
+    """Lookup the Id for the VPC Route Table with the given name.
+
     Args:
-        session: amazon session
-        vpc_id: id of VPC to look up route table in
-        rt_name: name of route table
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
+        vpc_id (string) : VPC ID of the VPC to search in
+        rt_name (string) : Name of the Route Table to lookup
 
     Returns:
-        route table id for the route table with given name.
-
+        (string|None) : Route Table ID or None if the Route Table could not be located
     """
     if session is None:
         return None
@@ -693,38 +707,56 @@ def rt_lookup(session, vpc_id, rt_name):
 
 
 def rt_name_default(session, vpc_id, new_rt_name):
-    """
+    """Name the default Route Table that is created for a new VPC.
+
     Find the default VPC Route Table and give it a name so that it can be referenced latter.
     Needed because by default the Route Table does not have a name and rt_lookup() will not find it.
+
+    The default VPC Route Table is determined as the first Route Table without a
+    name.
+
     Args:
-        session: amazon session
-        vpc_id: ID of VPC
-        new_rt_name: new name for default VPC Route Table
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
+        vpc_id (string) : VPC ID of the VPC to search in
+        new_rt_name (string) : Name to give the VPC's default Route Table
 
     Returns:
         None
-
     """
     client = session.client('ec2')
     response = client.describe_route_tables(Filters=[{"Name": "vpc-id", "Values": [vpc_id]}])
-    rt_id = response['RouteTables'][0]['RouteTableId']  # TODO: verify that Tags does not already have a name tag
+
+    rt_id = None
+    for rt in response['RouteTables']:
+        nt = _find(rt['Tags'], lambda x: x['Key'] == 'Name')
+        if nt is None or nt['Value'] == '':
+            rt_id = rt['RouteTableId']
+
+    if rt_id is None:
+        print("Could not locate unnamed default route table")
+        return
 
     resource = session.resource('ec2')
     rt = resource.RouteTable(rt_id)
     response = rt.create_tags(Tags=[{"Key": "Name", "Value": new_rt_name}])
 
 
-def peering_lookup(session, from_id, to_id):
-    """
-    Lookup the Id for the Peering Connection between the two VPCs.
+def peering_lookup(session, from_id, to_id, owner_id="256215146792"):
+    """Lookup the Id for the Peering Connection between the two VPCs.
+
     Args:
-        session: amazon session
-        from_id: id of from VPC
-        to_id: id of to VPC
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
+        from_id (string) : VPC ID of the VPC from which the Peering Connection is
+                           made (Requester)
+        to_id (string) : VPC ID of the VPC to which the Peering Connection is made
+                         (Accepter)
+        owner_id (string) : Account ID that owns both of the VPCs that are connected
 
     Returns:
-        peering connection id
-
+        (string|None) : Peering Connection ID or None if the Peering Connection
+                        could not be located
     """
     if session is None:
         return None
@@ -733,11 +765,11 @@ def peering_lookup(session, from_id, to_id):
     response = client.describe_vpc_peering_connections(Filters=[{"Name": "requester-vpc-info.vpc-id",
                                                                  "Values": [from_id]},
                                                                 {"Name": "requester-vpc-info.owner-id",
-                                                                 "Values": ["256215146792"]},
+                                                                 "Values": [owner_id]},
                                                                 {"Name": "accepter-vpc-info.vpc-id",
                                                                  "Values": [to_id]},
                                                                 {"Name": "accepter-vpc-info.owner-id",
-                                                                 "Values": ["256215146792"]},
+                                                                 "Values": [owner_id]},
                                                                 {"Name": "status-code", "Values": ["active"]},
                                                                 ])
 
@@ -748,14 +780,18 @@ def peering_lookup(session, from_id, to_id):
 
 
 def keypair_lookup(session):
-    """
-    Print the valid key pairs for the session and ask the user which to use.
+    """Lookup the names of valid Key Pair.
+
+    If the SSH_KEY enviro variable is defined and points to a valid keypair, that
+    keypair name is returned. Else all of the keypairs are printed to stdout and
+    the user is prompted to select which keypair to use.
+
     Args:
-        session: amazon session
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
 
     Returns:
-        valid keypair
-
+        (string|None) : Key Pair Name or None if the session is None
     """
     if session is None:
         return None
@@ -790,14 +826,15 @@ def keypair_lookup(session):
 
 
 def instanceid_lookup(session, hostname):
-    """
-    Look up instance id by hostname.
+    """Look up instance id by hostname (instance name).
+
     Args:
-        session: amazon session
-        hostname: hostname to lookup
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
+        hostname (string) : Name of the Instance to lookup
 
     Returns:
-        InstanceId of hostname or None
+        (string|None) : Instance ID or None if the Instance could not be located
     """
     if session is None:
         return None
@@ -821,14 +858,15 @@ def instanceid_lookup(session, hostname):
 
 
 def cert_arn_lookup(session, domain_name):
-    """
-    Looks up the arn for a domain_name certificate
+    """Looks up the ARN for a SSL Certificate
+
     Args:
-        session: amazon session
-        domain_name: domain name the certificate was issued for.
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
+        domain_name (string) : Domain Name that the Certificate was issued for
 
     Returns:
-        (string): arn
+        (string|None) : Certificate ARN or None if the Certificate could not be located
     """
     if session is None:
         return None
@@ -842,15 +880,16 @@ def cert_arn_lookup(session, domain_name):
 
 
 def instance_public_lookup(session, hostname):
-    """
-    Look up instance id by hostname.
+    """Lookup the Public DNS name for a EC2 instance
+
     Args:
-        session: amazon session
-        hostname: hostname to lookup
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
+        hostname (string) : Name of the Instance to lookup
 
     Returns:
-        (string) Public DNS name or None if it does not exist.
-
+        (string|None) : Public DNS name or None if the Instance could not be
+                        located / has no Public DNS name
     """
     if session is None:
         return None
@@ -875,15 +914,17 @@ def instance_public_lookup(session, hostname):
 
 
 def elb_public_lookup(session, hostname):
-    """
-    Look up instance id by hostname.
+    """Lookup the Public DNS name for a ELB
+
     Args:
-        session: amazon session
-        hostname: hostname to lookup
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
+        hostname (string) : Name of the ELB to lookup
 
-    Returns: public DNS name of elb starting with hostname.
-
+    Returns:
+        (string|None) : Public DNS name or None if the ELB could not be located
     """
+
     if session is None:
         return None
 
@@ -898,15 +939,18 @@ def elb_public_lookup(session, hostname):
     return None
 
 
+# Should be something more like elb_check / elb_name_check, because
+# _lookup is normally used to return the ID of something
 def lb_lookup(session, lb_name):
-    """
-    Lookup the Id for the loadbalancer with the given name.
+    """Look up ELB Id by name
+
     Args:
-        session: session information used to peform lookups
-        lb_name: loadbalancer name to lookup
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
+        lb_name (string) : Name of the ELB to lookup
 
-    Returns: true if a valid loadbalancer name
-
+    Returns:
+        (bool) : If the lb_name is a valid ELB name
     """
     if session is None:
         return None
@@ -921,14 +965,15 @@ def lb_lookup(session, lb_name):
 
 
 def sns_topic_lookup(session, topic_name):
-    """
-    Lookups up SNS topic ARN given a topic name
+    """Lookup up SNS topic ARN given a topic name
+
     Args:
-        session: session information to perform lookups
-        topic_name: name of the topic
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
+        topic_name (string) : Name of the topic to lookup
 
-    Returns: ARN for the topic or None if topic doesn't exist
-
+    Returns:
+        (string|None) : ARN for the topic or None if the topic could not be located
     """
     if session is None:
         return None
@@ -944,15 +989,18 @@ def sns_topic_lookup(session, topic_name):
 
 
 def request_cert(session, domain_name, validation_domain='theboss.io'):
-    """
-    Requests a certificate in the AWS Certificate Manager for the domain name
+    """Requests a certificate in the AWS Certificate Manager for the domain name
+
     Args:
-        session: AWS session object used to make the request
-        domain_name: domain name the certificate is being requested for
-        validation_domain: domain suffix the request will be sent to.
+        session (Session|None) : Boto3 session used to communicate with AWS CertManager
+                                 If session is None no action is performed
+        domain_name (string) : domain name the certificate is being requested for
+        validation_domain (string) : domain suffix that request validation email
+                                     will be sent to.
 
-    Returns: response from the request_certificate()
-
+    Returns:
+        (dict|None) : Dictionary with the "CertificateArn" key containing the new
+                      certificate's ARN or None if the session is None
     """
     if session is None:
         return None
@@ -970,14 +1018,15 @@ def request_cert(session, domain_name, validation_domain='theboss.io'):
 
 
 def get_hosted_zone_id(session, hosted_zone='theboss.io'):
-    """
-    given a hosted zone, fine the HostedZoneId
+    """Look up Hosted Zone ID by DNS Name
+
     Args:
-        session: amazon session object
-        hosted_zone: the zone being hosted in route 53
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
+        hosted_zone (string) : DNS Name of the Hosted Zone to lookup
 
-    Returns:  the Id for the hosted zone or None
-
+    Returns:
+        (string|None) : Hosted Zone ID or None if the Hosted Zone could not be located
     """
     if session is None:
         return None
@@ -996,16 +1045,19 @@ def get_hosted_zone_id(session, hosted_zone='theboss.io'):
 
 
 def set_domain_to_dns_name(session, domain_name, dns_resource, hosted_zone='theboss.io'): # TODO move into CF config??
-    """
-    Sets the domain_name to use the dns name.
+    """Look up Hosted Zone ID by DNS Name
+
     Args:
-        session: amazon session object
-        domain_name: full domain name.  (Ex:  auth.integration.theboss.io)
-        dns_resource: DNS name being assigned to this domain name  (Ex: DNS for loadbalancer)
-        hosted_zone: hosted zone being managed by route 53
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
+        domain_name (string) : FQDN of the public record to create / update
+        dns_resource (string) : Public FQDN of the AWS resource to map domain_name to
+        hosted_zone (string) : DNS Name of the Hosted Zone that contains domain_name
 
-    Returns:  results from change_resource_record_sets
-
+    Returns:
+        (dict|None) : Dictionary with the "ChangeInfo" key containing a dict of
+                      information about the requested change or None if the session
+                      is None
     """
     if session is None:
         return None
@@ -1016,7 +1068,7 @@ def set_domain_to_dns_name(session, domain_name, dns_resource, hosted_zone='theb
     if hosted_zone_id is None:
         print("Error: Unable to find Route 53 Hosted Zone, " + hosted_zone + ",  Cannot set resource record for: " +
               dns_resource)
-        return
+        return None
 
     response = client.change_resource_record_sets(
         HostedZoneId=hosted_zone_id,
