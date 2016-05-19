@@ -150,7 +150,7 @@ cd /srv/www/django
 sudo python3 manage.py createsuperuser
 	user:  bossadmin
 	email: garbage@garbage.com
-	pass:  88secret88
+	pass:  xxxxxxxx
 sudo python3 manage.py test
 ```
 	output should say 203 Tests OK with 14 skipped tests.
