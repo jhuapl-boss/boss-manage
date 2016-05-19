@@ -153,7 +153,7 @@ sudo python3 manage.py createsuperuser
 	pass:  88secret88
 sudo python3 manage.py test
 ```
-	output should say 200 Tests OK with 13 skipped tests.
+	output should say 203 Tests OK with 14 skipped tests.
 	
 	There are 2 tests that need >2.5GB of memory to run. To run them, set an enviroment variable "RUN_HIGH_MEM_TESTS"
 
@@ -168,6 +168,7 @@ sudo python3 manage.py makemigrations --noinput common
 sudo python3 manage.py migrate
 sudo python3 manage.py test
 ````
+    output should say 333 Tests OK
 
 ## Integration Tests
 After the integration instance is launched the following tests need to be run,
@@ -191,4 +192,4 @@ To be filled out
 * https://api.integration.theboss.io/v0.3/info/collections/
 * https://api.integration.theboss.io/v0.4/resource/collections
 * Login into Scalyr and verify that the new instances appear on the overview page.
-* Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint and vault.
+* Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint and proofreader.
