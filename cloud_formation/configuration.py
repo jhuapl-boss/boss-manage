@@ -929,7 +929,7 @@ class CloudFormationConfiguration:
                              to create a DB SubnetGroup for the DB Instance to launch into
             security_groups (list) : A list of SecurityGroup unique names within the configuration
             type_ (string) : The ElastiCache instance type to create
-            port (int) : The port for the Redis instance to listen on
+            port (int|string) : The port for the Redis instance to listen on
             version (string) : Redis version to run on the instance
             clusters (int|string) : Number of cluster instances to create (1 - 5)
         """
@@ -1343,86 +1343,65 @@ class CloudFormationConfiguration:
                             "Domain of the VPC '{}'".format(vpc))
         self.add_arg(domain)
 
-    # TODO abstract a add_cloudwatch_alarm method that creates a single alarm
-    def add_cloudwatch(self, lb_name, alarm_actions, depends_on=None ):
-        """ Add alarms for Loadbalancer
-        :arg lb_name loadbalancer name
-        :arg alarm_actions name of SNS mailing list
-        :arg depends_on is a list of resources this loadbalancer depends on
+    def add_cloudwatch_alarm(self, key, description, statistic, metric, comparison, threashold, alarm_actions, dimensions={}, depends_on=None):
+        """Add CloudWatch Alarm for a LoadBalancer
+
+        Args:
+            key (string) : Unique name for the resource in the template
+            description (string) : Alarm description
+            statistic (string) : Alarm statistic
+            metric (string) : Statistic metric
+            comparison (string) : Alarm's comparison operation
+            threashold (string) : Threashold limit
+            alarm_actions (list) : List of ARN string of actions to execute when the alarm is triggered
+            dimensions (dict) : Dictionary of dimensions for the alarm's associated metric
+            depends_on (None|string|list): A unique name or list of unique names of resources within the
+                                           configuration and is used to determine the launch order of resources
         """
-        key = "Latency"
         self.resources[key] = {
               "Type": "AWS::CloudWatch::Alarm",
               "Properties": {
                 "ActionsEnabled": "true",
-                "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+                "AlarmDescription": description
+                "ComparisonOperator": comparison,
                 "EvaluationPeriods": "5",
-                "MetricName": "Latency",
+                "MetricName": metric,
                 "Namespace": "AWS/ELB",
                 "Period": "60",
-                "Statistic": "Average",
-                "Threshold": "2.0",
+                "Statistic": statistic,
+                "Threshold": threashold,
                 "AlarmActions": [alarm_actions],
-                "Dimensions": [
-                  {
-                    "Name": "LoadBalancerName",
-                    "Value": lb_name
-                  }
-                ]
+                "Dimensions": [{"Name": k, "Value": v} for k,v in dimensions.items()]
               }
         }
+
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
 
-        key = "SurgeCount"
-        self.resources[key] = {
-              "Type": "AWS::CloudWatch::Alarm",
-              "Properties": {
-                "ActionsEnabled": "true",
-                "AlarmDescription": "Surge Count in Load Balance",
-                "ComparisonOperator": "GreaterThanOrEqualToThreshold",
-                "EvaluationPeriods": "5",
-                "MetricName": "SurgeQueueLength",
-                "Namespace": "AWS/ELB",
-                "Period": "60",
-                "Statistic": "Average",
-                "Threshold": "3.0",
-                "AlarmActions": [alarm_actions],
-                "Dimensions": [
-                  {
-                    "Name": "LoadBalancerName",
-                    "Value": lb_name
-                  }
-                ]
-              }
-        }
-        if depends_on is not None:
-            self.resources[key]["DependsOn"] = depends_on
+    # XXX: are alarm_actions unique keys from the configuration?
+    def add_cloudwatch(self, lb_name, alarm_actions, depends_on=None ):
+        """ Add CloudWatch Alarms for LoadBalancer
 
-        key = "UnhealthyHostCount"
-        self.resources[key] = {
-              "Type": "AWS::CloudWatch::Alarm",
-              "Properties": {
-                "ActionsEnabled": "true",
-                "AlarmDescription": "Urnhealthy Host Count in Load Balance",
-                "ComparisonOperator": "GreaterThanOrEqualToThreshold",
-                "EvaluationPeriods": "5",
-                "MetricName": "UnHealthyHostCount",
-                "Namespace": "AWS/ELB",
-                "Period": "60",
-                "Statistic": "Minimum",
-                "Threshold": "1.0",
-                "AlarmActions": [alarm_actions],
-                "Dimensions": [
-                  {
-                    "Name": "LoadBalancerName",
-                    "Value": lb_name
-                  }
-                ]
-              }
-        }
-        if depends_on is not None:
-            self.resources[key]["DependsOn"] = depends_on
+        Adds CloudWatch Alarms for Latency, SurgeCount, and UnhealthyHostCount for an ELB
+
+        Args:
+            lb_name (string) : The LoadBalancer name
+            alarm_actions (string) : The name of SNS mailing list
+            depends_on (None|string|list): A unique name or list of unique names of resources within the
+                                           configuration and is used to determine the launch order of resources
+        """
+        self.add_cloudwatch_alarm("Latency", "",
+                                  "Latency", "Average", "GreaterThanOrEqualToThreshold", "2.0",
+                                  alarm_actions, {"LoadBalancerName": lb_name}, depends_on)
+
+        self.add_cloudwatch_alarm("SurgeCount", "Surge Count in Load Balance",
+                                  "SurgeQueueLength", "Average", "GreaterThanOrEqualToThreshold", "3.0",
+                                  alarm_actions, {"LoadBalancerName": lb_name}, depends_on)
+
+        self.add_cloudwatch_alarm("UnhealthyHostCount", "Unhealthy Host Count in Load Balance",
+                                  "UnHealthyHostCount", "Minimum", "GreaterThanOrEqualToThreshold", "1.0",
+                                  alarm_actions, {"LoadBalancerName": lb_name}, depends_on)
+
 
     # TODO move next to _add_record_cname
     # TODO merge / chain with _add_record_cname
