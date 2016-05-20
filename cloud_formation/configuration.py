@@ -387,6 +387,7 @@ class CloudFormationConfiguration:
         self.parameters = {}
         self.arguments = []
         self.region = region
+        self.keypairs = {}
 
         dots = len(domain.split("."))
         if dots == 2: # vpc.tld
@@ -633,7 +634,6 @@ class CloudFormationConfiguration:
 
         return (internal, external)
 
-    # ??? save hostname : keypair somewhere?
     def add_ec2_instance(self, key, hostname, ami, keypair, subnet="Subnet", type_="t2.micro", iface_check=True, public_ip=False, security_groups=None, user_data=None, meta_data=None, depends_on=None):
         """Add an EC2 instance to the configuration
 
@@ -708,6 +708,7 @@ class CloudFormationConfiguration:
 
         _key = Arg.KeyPair(key + "Key", keypair, hostname)
         self.add_arg(_key)
+        self.keypairs[hostname] = keypair
 
         _hostname = Arg.String(key + "Hostname", hostname,
                                "Hostname of the EC2 Instance '{}'".format(key))
@@ -1324,6 +1325,7 @@ class CloudFormationConfiguration:
 
         _key = Arg.KeyPair(key + "Key", keypair, hostname)
         self.add_arg(_key)
+        self.keypairs[hostname] = keypair
 
         _hostname = Arg.String(key + "Hostname", hostname,
                                "Hostname of the EC2 Instance '{}'".format(key))
