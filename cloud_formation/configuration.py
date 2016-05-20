@@ -1322,19 +1322,13 @@ class CloudFormationConfiguration:
         elif ec2: # Could create an A record type, with PrivateIP as the key
             address_key = "PrivateDnsName"
 
-        # TODO check address_key to make sure it is set
+        if address_key is None:
+            raise Exception("Unknown type of CNAME record to create")
 
-        self.resources[key + "Record"] = {
-            "Type" : "AWS::Route53::RecordSet",
-            "Properties" : {
-                "HostedZoneName" : { "Fn::Join" : ["", [{ "Ref" : vpc + "Domain" }, "."] ]},
-                "Name" : hostname,
-                "ResourceRecords" : [ { "Fn::GetAtt" : [ key, address_key ] } ],
-                "TTL" : ttl,
-                "Type" : "CNAME"
-            }
-        }
+        zone = { "Fn::Join" : ["", [{ "Ref" : vpc + "Domain" }, "."] ]}
+        target = { "Fn::GetAtt" : [ key, address_key ] }
 
+        self.add_route_53_record_set(key + "Record", hostname, target, zone, ttl)
 
         if "DNSZone" in self.resources:
             self.resources[key + "Record"]["DependsOn"] = "DNSZone"
@@ -1342,6 +1336,28 @@ class CloudFormationConfiguration:
         domain = Arg.String(vpc + "Domain", self.vpc_domain,
                             "Domain of the VPC '{}'".format(vpc))
         self.add_arg(domain)
+
+    def add_route_53_record_set(self, key, full_domain_name, cname_value, hosted_zone_name="theboss.io.", ttl=300):
+        """Add a CNAME RecordSet to the configuration
+
+        Args:
+            key (string) : Unique name for the resource in the template to create the RecordSet for
+            full_domain_name (string) : The FQDN DNS entry to create
+            cname_value (string) : The CNAME value to return for the full_domain_name
+            hosted_zone_name (string) : The name of the HostedZone (should end in a '.')
+            ttl (int|string) : The Time to live for the RecordSet
+
+        """
+        self.resources[key] = {
+            "Type": "AWS::Route53::RecordSet",
+            "Properties": {
+                "HostedZoneName": hosted_zone_name,
+                'Name': full_domain_name,
+                'Type': 'CNAME',
+                'ResourceRecords': [cname_value],
+                'TTL': ttl,
+            }
+        }
 
     def add_cloudwatch_alarm(self, key, description, statistic, metric, comparison, threashold, alarm_actions, dimensions={}, depends_on=None):
         """Add CloudWatch Alarm for a LoadBalancer
@@ -1401,31 +1417,6 @@ class CloudFormationConfiguration:
         self.add_cloudwatch_alarm("UnhealthyHostCount", "Unhealthy Host Count in Load Balance",
                                   "UnHealthyHostCount", "Minimum", "GreaterThanOrEqualToThreshold", "1.0",
                                   alarm_actions, {"LoadBalancerName": lb_name}, depends_on)
-
-
-    # TODO move next to _add_record_cname
-    # TODO merge / chain with _add_record_cname
-    def add_route_53_record_set(self, key, full_domain_name, cname_value, hosted_zone_name="theboss.io."):
-        """
-        adds a route_53_recordset
-        Args:
-            key: unique identifier in cloudformation script for this recsource
-            full_domain_name: domain name that is being added.  Ex. api.integration.theboss.io
-            cname_value: public dns name of the underlying server or elb.
-
-        Returns:
-            None
-        """
-        self.resources[key] = {
-            "Type": "AWS::Route53::RecordSet",
-            "Properties": {
-                "HostedZoneName": hosted_zone_name,
-                'Name': full_domain_name,
-                'Type': 'CNAME',
-                'ResourceRecords': [cname_value],
-                'TTL': 300,
-            }
-        }
 
     # XXX DP: Does this work, it looks like the keys topicMicronList and snspolicyMicronList should be self.resources keys, not subkeys
     # TODO clean up function and make generic, right now topic_name is not used and there are hardcoded email addresses
