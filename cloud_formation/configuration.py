@@ -652,18 +652,11 @@ class CloudFormationConfiguration:
             depends_on (None|string|list): A unique name or list of unique names of resources within the
                                            configuration and is used to determine the launch order of resources
         """
-        if type(type_) == dict:
-            scenario = os.environ["SCENARIO"]
-            type__ = type_.get(scenario, None)
-            if type__ is None:
-                type__ = type_.get("default", "t2.micro")
-            type_ = type__
-
         self.resources[key] = {
             "Type" : "AWS::EC2::Instance",
             "Properties" : {
                 "ImageId" : { "Ref" : key + "AMI" },
-                "InstanceType" : type_,
+                "InstanceType" : get_scenario(type_, "t2.micro"),
                 "KeyName" : { "Ref" : key + "Key" },
                 "SourceDestCheck": bool_str(iface_check),
                 "Tags" : [
@@ -733,17 +726,10 @@ class CloudFormationConfiguration:
             security_groups (None|list) : A list of SecurityGroup unique names within the configuration
         """
         scenario = os.environ["SCENARIO"]
-        if type(type_) == dict:
-            type__ = type_.get(scenario, None)
-            if type__ is None:
-                type__ = type_.get("default", "db.t2.micro")
-            type_ = type__
-
         multi_az = {
             "development": "false",
             "production": "true",
-        }
-        multi_az = multi_az.get(scenario, "false")
+        }.get(scenario, "false")
 
         self.resources[key] = {
             "Type" : "AWS::RDS::DBInstance",
@@ -752,7 +738,7 @@ class CloudFormationConfiguration:
                 "Engine" : "mysql",
                 "LicenseModel" : "general-public-license",
                 "EngineVersion" : "5.6.23",
-                "DBInstanceClass" : type_,
+                "DBInstanceClass" : get_scenario(type_, "db.t2.micro"),
                 "MultiAZ" : multi_az,
                 "StorageType" : "standard",
                 "AllocatedStorage" : str(storage),
@@ -899,18 +885,11 @@ class CloudFormationConfiguration:
             port (int) : The port for the Redis instance to listen on
             version (string) : Redis version to run on the instance
         """
-        if type(type_) == dict:
-            scenario = os.environ["SCENARIO"]
-            type__ = type_.get(scenario, None)
-            if type__ is None:
-                type__ = type_.get("default", "cache.t2.micro")
-            type_ = type__
-
         self.resources[key] =  {
             "Type" : "AWS::ElastiCache::CacheCluster",
             "Properties" : {
                 #"AutoMinorVersionUpgrade" : "false", # defaults to true - Indicates that minor engine upgrades will be applied automatically to the cache cluster during the maintenance window.
-                "CacheNodeType" : type_,
+                "CacheNodeType" : get_scenario(type_, "cache.t2.micro"),
                 "CacheSubnetGroupName" : { "Ref" : key + "SubnetGroup" },
                 "Engine" : "redis",
                 "EngineVersion" : version,
@@ -954,32 +933,17 @@ class CloudFormationConfiguration:
             version (string) : Redis version to run on the instance
             clusters (int|string) : Number of cluster instances to create (1 - 5)
         """
-        scenario = os.environ["SCENARIO"]
-        if type(type_) == dict:
-            type__ = type_.get(scenario, None)
-            if type__ is None:
-                type__ = type_.get("default", "cache.m3.medium")
-            type_ = type__
-
-        # TODO Should create a helper method to contain this logic
-        if type(clusters) == dict:
-            clusters__ = clusters.get(scenario, None)
-            if clusters__ is None:
-                clusters__ = clusters.get("default", 1)
-            clusters = clusters__
-        clusters = int(clusters)
-
         self.resources[key] =  {
             "Type" : "AWS::ElastiCache::ReplicationGroup",
             "Properties" : {
                 "AutomaticFailoverEnabled" : bool_str(clusters > 1),
                 #"AutoMinorVersionUpgrade" : "false", # defaults to true - Indicates that minor engine upgrades will be applied automatically to the cache cluster during the maintenance window.
-                "CacheNodeType" : type_,
+                "CacheNodeType" : get_scenario(type_, "cache.m3.medium"),
                 "CacheSubnetGroupName" : { "Ref" : key + "SubnetGroup" },
                 "Engine" : "redis",
                 "EngineVersion" : version,
-                "NumCacheClusters" : clusters,
-                "Port" : port,
+                "NumCacheClusters" : int(get_scenario(clusters, 1)),
+                "Port" : int(port),
                 #"PreferredCacheClusterAZs" : [ String, ... ],
                 #"PreferredMaintenanceWindow" : String, # don't know the default - site says minimum 60 minutes, infrequent and announced on AWS forum 2w prior
                 "ReplicationGroupDescription" : { "Ref" : key + "Hostname" },
