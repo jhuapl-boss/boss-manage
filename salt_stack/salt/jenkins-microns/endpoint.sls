@@ -5,13 +5,15 @@ include:
   - boss-tools.bossutils
   - boss-tools.credentials
   - boss.django
-  - django.openid-connect # install first and patch
+  - boss-oidc
   - mysql
   - dynamodb
   - python.coverage
   - python.pylint
   - python.pylint-django
   - python.pep8
+  - python.nose2-3
+  - python.nose2-cov-3
   - jenkins
   - jenkins.plugins
   - jenkins.slack
