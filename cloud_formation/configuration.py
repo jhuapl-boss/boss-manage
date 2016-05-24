@@ -933,6 +933,7 @@ class CloudFormationConfiguration:
             version (string) : Redis version to run on the instance
             clusters (int|string) : Number of cluster instances to create (1 - 5)
         """
+        clusters = int(get_scenario(clusters, 1))
         self.resources[key] =  {
             "Type" : "AWS::ElastiCache::ReplicationGroup",
             "Properties" : {
@@ -942,7 +943,7 @@ class CloudFormationConfiguration:
                 "CacheSubnetGroupName" : { "Ref" : key + "SubnetGroup" },
                 "Engine" : "redis",
                 "EngineVersion" : version,
-                "NumCacheClusters" : int(get_scenario(clusters, 1)),
+                "NumCacheClusters" : clusters,
                 "Port" : int(port),
                 #"PreferredCacheClusterAZs" : [ String, ... ],
                 #"PreferredMaintenanceWindow" : String, # don't know the default - site says minimum 60 minutes, infrequent and announced on AWS forum 2w prior
