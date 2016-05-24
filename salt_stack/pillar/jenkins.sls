@@ -14,3 +14,5 @@ jenkins:
       installed:
           boss-tools: /srv/salt/jenkins-jobs/boss-tools.xml
           boss-manage.cloud-formation: /srv/salt/jenkins-jobs/cloud-formation.xml
+          ndio: /srv/salt/jenkins-jobs/ndio.xml
+
