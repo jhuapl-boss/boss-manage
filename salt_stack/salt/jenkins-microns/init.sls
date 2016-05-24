@@ -13,3 +13,9 @@ include:
     - python.nose2-cov-3
     - vault.client
     - aws.boto3
+
+ndio-sdk:
+    pip.installed:
+        - bin_env: /usr/local/bin/pip3
+        - requirements: salt://jenkins-microns/files/ndio-requirements.txt
+

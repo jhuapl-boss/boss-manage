@@ -1379,7 +1379,7 @@ class CloudFormationConfiguration:
               "Type": "AWS::CloudWatch::Alarm",
               "Properties": {
                 "ActionsEnabled": "true",
-                "AlarmDescription": description
+                "AlarmDescription": description,
                 "ComparisonOperator": comparison,
                 "EvaluationPeriods": "5",
                 "MetricName": metric,

@@ -4,12 +4,12 @@
   <description></description>
   <keepDependencies>false</keepDependencies>
   <properties/>
-  <scm class="hudson.plugins.git.GitSCM" plugin="git@2.4.2">
+  <scm class="hudson.plugins.git.GitSCM" plugin="git@2.4.4">
     <configVersion>2</configVersion>
     <userRemoteConfigs>
       <hudson.plugins.git.UserRemoteConfig>
         <url>https://github.com/aplmicrons/boss</url>
-        <credentialsId>0fba2311-893b-4373-9d37-38fd2775864b</credentialsId>
+        <credentialsId>c313fd13-3b35-4c18-93f2-2109eab7565d</credentialsId>
       </hudson.plugins.git.UserRemoteConfig>
     </userRemoteConfigs>
     <branches>
@@ -291,10 +291,10 @@
         <encoding>default</encoding>
       </config>
     </hudson.plugins.violations.ViolationsPublisher>
-    <jenkins.plugins.slack.SlackNotifier plugin="slack@2.0">
+    <jenkins.plugins.slack.SlackNotifier plugin="slack@2.0.1">
       <teamDomain>apl-microns</teamDomain>
       <authToken>XAoRfwgxZJhScrKC03VXdgyI</authToken>
-      <buildServerUrl>http://localhost:8080/</buildServerUrl>
+      <buildServerUrl>http://ep-jenkins.jhuapl.edu:8080/</buildServerUrl>
       <room>#ci</room>
       <startNotification>false</startNotification>
       <notifySuccess>false</notifySuccess>
