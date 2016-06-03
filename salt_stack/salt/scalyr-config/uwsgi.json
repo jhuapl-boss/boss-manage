@@ -1,0 +1,8 @@
+// uwsgi log file.
+{
+    logs: [
+        {
+            path: "/var/log/uwsgi/emperor.log"
+        }
+    ]
+}
