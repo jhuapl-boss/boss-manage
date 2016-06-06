@@ -46,6 +46,11 @@ AUTH_CLUSTER_SIZE = { # Auth Server Cluster is a fixed size
     "production": 3 # should be an odd number
 }
 
+CONSUL_CLUSTER_SIZE = { # Consul Cluster is a fixed size
+    "development" : 1,
+    "production": 5 # should be an odd number
+}
+
 def create_config(session, domain):
     """Create the CloudFormationConfiguration object."""
     config = configuration.CloudFormationConfiguration(domain, CORE_REGION)
@@ -86,7 +91,8 @@ def create_config(session, domain):
                             keypair,
                             subnet = "InternalSubnet",
                             security_groups = ["InternalSecurityGroup"],
-                            user_data = str(user_data))
+                            user_data = str(user_data),
+                            depends_on = "Consul")
 
     config.add_ec2_instance("Bastion",
                             "bastion." + domain,
@@ -100,6 +106,7 @@ def create_config(session, domain):
 
     user_data["system"]["fqdn"] = "auth." + domain
     user_data["system"]["type"] = "auth"
+    deps = ["AttachInternetGateway", "DNSLambda", "DNSSNS", "DNSLambdaExecute"]
 
     SCENARIO = os.environ["SCENARIO"]
     USE_DB = SCENARIO in ("production",)
@@ -109,11 +116,10 @@ def create_config(session, domain):
     #          was lost. Using an RDS for development fixes this at the cost of having
     #          the core config taking longer to launch.
     if USE_DB:
-        deps = ["AttachInternetGateway", "AuthDB"]
+        deps.append("AuthDB")
         user_data["aws"]["db"] = "keycloak" # flag for init script for which config to use
-    else:
-        deps = ["AttachInternetGateway"]
 
+    # NOTE: Auth LoadBalancer doesn't have an internal DNS record, AutoScale instances do
     config.add_autoscale_group("Auth",
                                "auth." + domain,
                                lib.ami_lookup(session, "auth.boss"),
@@ -124,6 +130,7 @@ def create_config(session, domain):
                                min = AUTH_CLUSTER_SIZE,
                                max = AUTH_CLUSTER_SIZE,
                                elb = "LoadBalancerAuth",
+                               notifications = "DNSSNS",
                                depends_on = deps)
     if USE_DB:
         config.add_rds_db("AuthDB",
@@ -148,6 +155,36 @@ def create_config(session, domain):
                             healthcheck_target = "HTTP:8080/index.html",
                             security_groups = ["InternalSecurityGroup", "AuthSecurityGroup"],
                             depends_on = ["AuthSecurityGroup", "AttachInternetGateway"])
+
+    user_data["system"]["fqdn"] = "consul." + domain
+    user_data["system"]["type"] = "consul"
+    config.add_autoscale_group("Consul",
+                               "consul." + domain,
+                               lib.ami_lookup(session, "consul.boss"),
+                               keypair,
+                               subnets = internal_subnets,
+                               security_groups = ["InternalSecurityGroup"],
+                               user_data = str(user_data),
+                               min = CONSUL_CLUSTER_SIZE,
+                               max = CONSUL_CLUSTER_SIZE,
+                               notifications = "DNSSNS",
+                               depends_on = ["DNSLambda", "DNSSNS", "DNSLambdaExecute"])
+
+    config.add_lambda_file("DNSLambda",
+                           "dns." + domain,
+                           "lambda/updateRoute53/index.py",
+                           "DNSLambdaRole",
+                           depends_on="DNSZone")
+    role = "arn:aws:iam::256215146792:role/UpdateRoute53"
+    config.add_arg(configuration.Arg.String("DNSLambdaRole", role,
+                                            "IAM role for Lambda dns." + domain))
+
+    config.add_lambda_permission("DNSLambdaExecute", "DNSLambda")
+
+    config.add_sns_topic("DNSSNS",
+                         "dns." + domain,
+                         "dns." + domain,
+                         [("lambda", {"Fn::GetAtt": ["DNSLambda", "Arn"]})])
 
     config.add_security_group("InternalSecurityGroup",
                               "internal",
@@ -218,7 +255,6 @@ def configure_keycloak(session, domain):
         auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_elb)
 
     password = lib.generate_password()
-    print("Setting Admin password to: " + password)
 
     call = lib.ExternalCalls(session, keypair, domain)
 
@@ -285,3 +321,9 @@ def post_init(session, domain):
     # Tell Scalyr to get CloudWatch metrics for these instances.
     instances = [ "vault." + domain ]
     scalyr.add_instances_to_scalyr(session, CORE_REGION, instances)
+
+def delete(session, domain):
+    # NOTE: CloudWatch logs for the DNS Lambda are not deleted
+    lib.route53_delete_records(session, domain, "auth." + domain)
+    lib.sns_unsubscribe_all(session, "dns." + domain)
+    lib.delete_stack(session, domain, "test")
