@@ -1,4 +1,8 @@
 base:
+    'consul*':
+        - consul.server
+        - boss-tools.bossutils
+
     'vault*':
         - vault.server
         - boss-tools.bossutils
