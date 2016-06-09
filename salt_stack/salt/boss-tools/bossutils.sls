@@ -32,9 +32,18 @@ bossutils-user:
     user.present:
         - name: ubuntu
 
-logging:
-    file.directory:
-        - name: /var/log/boss
+logging-normal:
+    file.managed:
+        - name: /var/log/boss/boss.log
         - user: ubuntu
         - group: www-data
-        - dir_mode: 775
+        - makedirs: True
+        - mode: 775
+
+logging-critical:
+    file.managed:
+        - name: /var/log/boss/critical.log
+        - user: ubuntu
+        - group: www-data
+        - makedirs: True
+        - mode: 775

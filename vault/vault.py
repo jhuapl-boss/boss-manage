@@ -54,6 +54,10 @@ def get_path(machine, filename):
     if machine is None:
         machine = ""
 
+    # If the machine is X.vault.vpc.boss remove the X.
+    if machine.count(".") == 3:
+        machine = machine.split(".", 1)[1]
+
     path = os.path.join(_CURRENT_DIR, "private", machine, filename)
 
     os.makedirs(os.path.dirname(path), exist_ok = True)
