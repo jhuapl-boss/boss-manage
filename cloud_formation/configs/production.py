@@ -55,7 +55,7 @@ RDS_TYPE = {
 }
 
 REDIS_TYPE = {
-    "development": "cache.m3.medium",
+    "development": "cache.t2.small",
     "production": "cache.m3.xlarge",
 }
 

@@ -33,11 +33,14 @@ import getpass
 import string
 import subprocess
 import shlex
+import shutil
+import tempfile
 import traceback
 import ssl
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 from urllib.error import HTTPError
+from botocore.exceptions import ClientError
 
 # Add a reference to boss-manage/vault/ so that we can import those files
 cur_dir = os.path.dirname(os.path.realpath(__file__))
@@ -46,6 +49,14 @@ sys.path.append(vault_dir)
 import bastion
 import vault
 
+
+def zip_directory(directory, name = "lambda"):
+    target = os.path.join(tempfile.mkdtemp(), name)
+    return shutil.make_archive(target, "zip", directory, directory)
+
+def json_sanitize(data):
+    return (data.replace('"', '\"')
+                .replace('\\', '\\\\'))
 
 def get_commit():
     """Get the git commit hash of the current directory.
@@ -142,6 +153,48 @@ def generate_password(length=16):
     chars = string.ascii_letters + string.digits  #+ string.punctuation
     return "".join([chars[c % len(chars)] for c in os.urandom(length)])
 
+def delete_stack(session, domain, config):
+    """Deletes the given stack from CloudFormation.
+
+    Initiates the stack delete and waits for it to finish.  config and domain
+    are combined to identify the stack.
+
+    Args:
+        session (boto3.Session): An active session.
+        domain (string): Name of domain.
+        config (string): Name of config.
+
+    Returns:
+        (bool) : True if stack successfully deleted.
+    """
+    name = domain_to_stackname(config + "." + domain)
+    client = session.client("cloudformation")
+    client.delete_stack(StackName = name)
+    # waiter = client.get_waiter('stack_delete_complete')
+    # waiter.wait(StackName = name)
+
+    print("Waiting for delete ", end="", flush=True)
+
+    try:
+        response = client.describe_stacks(StackName = name)
+        get_status = lambda r: r['Stacks'][0]['StackStatus']
+        while get_status(response) == 'DELETE_IN_PROGRESS':
+            time.sleep(5)
+            print(".", end="", flush=True)
+            response = client.describe_stacks(StackName=name)
+        print(" done")
+
+        if get_status(response) == 'DELETE_COMPLETE':
+            print("Deleted stack '{}'".format(name))
+            return True
+
+        print("Status of stack '{}' is '{}'".format(name, get_status(response)))
+        return False
+    except ClientError as e:
+        # Stack doesn't exist or no longer exists.
+        print(" done")
+
+    return True
 
 class KeyCloakClient:
     """Client for connecting to Keycloak and using the REST API.
@@ -1091,3 +1144,71 @@ def set_domain_to_dns_name(session, domain_name, dns_resource, hosted_zone='theb
         }
     )
     return response
+
+def route53_delete_records(session, hosted_zone, cname):
+    """Delete all of the matching CNAME records from a DNS Zone
+
+    Args:
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no delete is performed
+        hosted_zone (string) : Name of the hosted zone
+        cname (string) : The DNS records to delete
+    """
+    if session is None:
+        return None
+
+    client = session.client('route53')
+    hosted_zone_id = get_hosted_zone_id(session, hosted_zone)
+
+    if hosted_zone_id is None:
+        print("Could not locate Route53 Hosted Zone '{}'".format(hosted_zone))
+        return None
+
+    response = client.list_resource_record_sets(
+        HostedZoneId=hosted_zone_id,
+        StartRecordName=cname,
+        StartRecordType='CNAME'
+    )
+
+    changes = []
+    for record in response['ResourceRecordSets']:
+        if not record['Name'].startswith(cname):
+            continue
+        changes.append({
+            'Action': 'DELETE',
+            'ResourceRecordSet': record
+        })
+
+    if len(changes) == 0:
+        print("No {} records to remove".format(cname))
+        return None
+
+    response = client.change_resource_record_sets(
+        HostedZoneId=hosted_zone_id,
+        ChangeBatch={'Changes': changes}
+    )
+    return response
+
+def sns_unsubscribe_all(session, topic, region="us-east-1", account="256215146792"):
+    """Unsubscribe all subscriptions for the given SNS topic
+
+    Args:
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no delete is performed
+        topic (string) : Name of the SNS topic
+        region (string) : AWS region where SNS topic resides
+        account (string) : AWS account ID
+    """
+    if session is None:
+        return None
+
+    topic = "arn:aws:sns:{}:{}:{}".format(region, account, topic.replace(".", "-"))
+
+    client = session.client('sns')
+    response = client.list_subscriptions()
+
+    for res in response['Subscriptions']:
+        if res['TopicArn'] == topic:
+            client.unsubscribe(SubscriptionArn=res['SubscriptionArn'])
+
+    return None

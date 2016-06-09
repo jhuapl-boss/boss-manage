@@ -1223,7 +1223,7 @@ class CloudFormationConfiguration:
         #     }
         # }
 
-    def add_autoscale_group(self, key, hostname, ami, keypair, subnets=["Subnet"], type_="t2.micro", public_ip=False, security_groups=[], user_data=None, min=1, max=1, elb=None, depends_on=None):
+    def add_autoscale_group(self, key, hostname, ami, keypair, subnets=["Subnet"], type_="t2.micro", public_ip=False, security_groups=[], user_data=None, min=1, max=1, elb=None, notifications=None, depends_on=None):
         """Add an AutoScalingGroup to the configuration
 
         Args:
@@ -1258,6 +1258,22 @@ class CloudFormationConfiguration:
                 "VPCZoneIdentifier" : [{ "Ref" : subnet } for subnet in subnets]
             }
         }
+
+        if notifications is not None:
+            if type(notifications) != list:
+                notifications = [notifications]
+            self.resources[key]["Properties"]["NotificationConfigurations"] = [
+                {
+                    "NotificationTypes": [
+                        "autoscaling:EC2_INSTANCE_LAUNCH",
+                        "autoscaling:EC2_INSTANCE_LAUNCH_ERROR",
+                        "autoscaling:EC2_INSTANCE_TERMINATE",
+                        "autoscaling:EC2_INSTANCE_TERMINATE_ERROR",
+                        "autoscaling:TEST_NOTIFICATION"
+                    ],
+                    "TopicARN" : {"Ref": topic}
+                } for topic in notifications
+            ]
 
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
@@ -1295,6 +1311,81 @@ class CloudFormationConfiguration:
         _hostname = Arg.String(key + "Hostname", hostname,
                                "Hostname of the EC2 Instance '{}'".format(key))
         self.add_arg(_hostname)
+
+    def add_lambda_file(self, key, name, file, role, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None):
+        """Create a Python Lambda from a single source file
+
+        Args:
+            key (string) : Unique name for the resource in the template
+            name (string) : Function name
+            file (string) : File path to file containing lambda source code
+            role (string) : IAM role the lambda will execute under
+            description (string) : Lambda description
+            memory (string|int) : Amount of memory (MB) to execute the lambda with
+                                  Note, CPU is linked to the amount of memory allocated
+            timeout (string|int) : Execution timeout (Seconds)
+            security_groups (None|list) : List of unique names of security groups to grant the lambda access to
+            subnets (None|list) : List of unique names of subnets to grant the lambda access to
+            depends_on (None|string|list) : A unique name or list of unique names of resources within the
+                                            configuration and is used to determine the launch order of resources
+        """
+        with open(file, "r") as fh:
+            code = lib.json_sanitize(fh.read())
+            if len(code) >= 4096:
+                raise Exception("Lambda code file is too large") # TODO need to figure out if / how to upload a manually created zip file
+
+        memory = int(memory)
+        if memory < 128 or 1536 < memory:
+            raise Exception("Lambda memory should be between 128 and 1536")
+        if memory % 64 != 0:
+            raise Exception("Lambda memory should be a multiple of 64")
+
+        self.resources[key] = {
+            "Type" : "AWS::Lambda::Function",
+            "Properties" : {
+                "Code": {"ZipFile": code},
+                "Description": description,
+                "FunctionName": name.replace('.', '-'),
+                "Handler": "index.handler",
+                "MemorySize": memory,
+                "Role": {"Ref": role},
+                "Runtime": "python2.7",
+                "Timeout": int(timeout)
+            }
+        }
+
+        if security_groups is not None and subnets is not None:
+            self.resources[key]["Properties"]["VpcConfig"] = {
+                "SecurityGroupIds": [{"Ref": sg} for sg in security_groups],
+                "SubnetIds": [{"Ref": sub} for sub in subnets]
+            }
+        elif security_groups is not None or subnets is not None:
+            raise Exception("security_groups and subnets should both be specified")
+
+        if depends_on is not None:
+            self.resources[key]["DependsOn"] = depends_on
+
+    def add_lambda_permission(self, key, lambda_, action="lambda:invokeFunction", principal="sns.amazonaws.com", source=None):
+        """Add permissions to a Lambda
+
+        Args:
+            key (string) : Unique name for the resource in the template
+            lambda_ (string) : Unique name of the lambda resource
+            action (string) : Permission action to grant the lambda
+            principal (string) : AWS principal to grant the action to
+            source (string) : Source ARN to restrict the permission to
+        """
+        self.resources[key] = {
+            "Type": "AWS::Lambda::Permission",
+            "Properties": {
+                "Action": action,
+                "FunctionName": {"Ref": lambda_},
+                "Principal": principal
+            }
+        }
+
+        if source is not None:
+            self.resources[key]["Properties"]["SourceArn"] = source
 
     def _add_record_cname(self, key, hostname, vpc="VPC", ttl="300", rds=False, cluster=False, replication=False, ec2=False):
         """Add a CNAME RecordSet to the configuration
@@ -1419,9 +1510,28 @@ class CloudFormationConfiguration:
                                   "UnHealthyHostCount", "Minimum", "GreaterThanOrEqualToThreshold", "1.0",
                                   alarm_actions, {"LoadBalancerName": lb_name}, depends_on)
 
+    def add_sns_topic(self, key, name, topic, subscriptions=[]):
+        """Create a SNS topic
+
+        Args:
+            key (string) : Unique name for the resource in the template
+            name (string): Display name of the SNS topic
+            topic (string): SNS topic name
+            subscriptions (list): List of tuples containing SNS scriptions to create
+                                  (protocol, endpoint)
+        """
+        self.resources[key] = {
+            "Type": "AWS::SNS::Topic",
+            "Properties": {
+                "DisplayName": name,
+                "Subscription": [{"Endpoint": ep, "Protocol": pt} for pt, ep in subscriptions],
+                "TopicName": topic.replace('.', '-')
+            }
+        }
+
     # XXX DP: Does this work, it looks like the keys topicMicronList and snspolicyMicronList should be self.resources keys, not subkeys
     # TODO clean up function and make generic, right now topic_name is not used and there are hardcoded email addresses
-    def add_sns_topic(self, key, topic_name, depends_on=None ):
+    def _add_sns_topic(self, key, topic_name, depends_on=None ):
         """ Add alarms for Loadbalancer
         :arg key is the unique name (within the configuration) for this resource
         :arg name is the name to give the
