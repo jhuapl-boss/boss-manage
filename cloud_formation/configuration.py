@@ -416,8 +416,7 @@ class CloudFormationConfiguration:
         return json.dumps({"AWSTemplateFormatVersion" : "2010-09-09",
                            "Description" : description,
                            "Parameters": self.parameters,
-                           "Resources": self.resources},
-                          indent=4)
+                           "Resources": self.resources})
 
     def generate(self, name, folder):
         """Generate the CloudFormation template and arguments files
