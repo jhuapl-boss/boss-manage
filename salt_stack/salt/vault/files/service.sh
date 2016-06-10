@@ -8,10 +8,11 @@
 # Default-Stop: 0 1 6
 # Short-Description: Vault
 # Description: This file starts and stops the Vault server
-# 
+#
 ### END INIT INFO
 
-ARGS="-N -n vault -u root -r"
+IP=`ifconfig eth0 | awk '/inet addr/{print substr($2,6)}'`
+ARGS="-N -n vault -u root -r -e VAULT_ADVERTISE_ADDR=$IP"
 
 case "$1" in
  start)

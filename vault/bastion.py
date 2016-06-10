@@ -298,7 +298,9 @@ def connect_vault(key, remote_ip, bastion_ip, cmd):
         cmd (function): vault.py function expect to connect to Vault at localhost:8200
     """
 
-    proc = create_tunnel_aplnis(key, 8200, remote_ip, 8200, bastion_ip)
+    #proc = create_tunnel_aplnis(key, 8200, remote_ip, 8200, bastion_ip)
+    # connection to bastion's http proxy server
+    proc = create_tunnel_aplnis(key, 3128, "localhost", 3128, bastion_ip)
     try:
         return cmd()
     finally:

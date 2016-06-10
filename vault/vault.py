@@ -73,19 +73,28 @@ def get_client(read_token = None, machine = None):
     Exits (sys.exit) if read_token does not exists
     Exits (sys.exit) if read_token does not contain a valid token
     """
-    client = hvac.Client(url="http://localhost:8200")
+
+    from bastion import machine_lookup
+    # if in cluster mode, is_authenticated will http redirect to the cluster leader
+    #client = hvac.Client(url="http://localhost:8200", allow_redirects=False)
+    client = hvac.Client(url="http://vault:8200", proxies={"http": "http://localhost:3128"})
 
     if read_token is not None:
         token_file = get_path(machine, read_token)
         if not os.path.exists(token_file):
             print("Need the root token to communicate with the Vault, exiting...")
-            sys.exit(1)
+            sys.exit(1) # TODO DP: need a better exit if running by another script...
 
         with open(token_file, "r") as fh:
             client.token = fh.read()
-            if not client.is_authenticated():
-                print("Vault token is not valid, cannot communicate with the Vault, exiting...")
-                sys.exit(1)
+            try:
+                if not client.is_authenticated():
+                    print("Vault token is not valid, cannot communicate with the Vault, exiting...")
+                    sys.exit(1) # TODO DP: need a better exit if running by another script...
+            except:
+                raise
+                print("Not connected to primary Vault server, not redirecting")
+                return None # TODO DP: figure out a better response, as above
 
     return client
 
