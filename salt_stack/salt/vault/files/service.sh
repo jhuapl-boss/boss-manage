@@ -12,7 +12,7 @@
 ### END INIT INFO
 
 IP=`ifconfig eth0 | awk '/inet addr/{print substr($2,6)}'`
-ARGS="-N -n vault -u root -r -e VAULT_ADVERTISE_ADDR=$IP"
+ARGS="-N -n vault -u root -r -e VAULT_ADVERTISE_ADDR=http://$IP:8200"
 
 case "$1" in
  start)
