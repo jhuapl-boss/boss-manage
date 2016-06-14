@@ -467,7 +467,7 @@ if __name__ == "__main__":
     elif args.command in ("ssh-tunnel",):
         ssh_tunnel(args.ssh_key, private, bastion, *args.arguments)
     elif args.command in vault.COMMANDS:
-        connect_vault(args.ssh_key, private, bastion, lambda: vault.COMMANDS[args.command](args.internal, *args.arguments))
+        connect_vault(args.ssh_key, private, bastion, lambda: vault.COMMANDS[args.command](args.internal, private, *args.arguments))
     else:
         parser.print_usage()
         sys.exit(1)
