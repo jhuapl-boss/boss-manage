@@ -47,12 +47,12 @@ AUTH_CLUSTER_SIZE = { # Auth Server Cluster is a fixed size
 }
 
 CONSUL_CLUSTER_SIZE = { # Consul Cluster is a fixed size
-    "development" : 5,
+    "development" : 1,
     "production": 5 # can tolerate 2 failures
 }
 
 VAULT_CLUSTER_SIZE = { # Vault Cluster is a fixed size
-    "development" : 3,
+    "development" : 1,
     "production": 3 # should be an odd number
 }
 
