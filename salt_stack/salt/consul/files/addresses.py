@@ -20,6 +20,7 @@ try:
     ec2 = boto3.client('ec2', region_name=region)
     config = bossutils.configuration.BossConfig()
     fqdn = config["system"]["fqdn"]
+    fqdn = "consul." + fqdn.split(".", 1)[1]
 
     log.info("Gathering IP addresses for " + fqdn)
 
@@ -43,6 +44,6 @@ try:
         log.info("No instances returned")
 
     print(str(addresses).replace("'", '"')) # we want the json style list of addresses
-except:
-    log.exception("Problem gathering IP addresses")
+except Exception as e:
+    log.error("Problem gathering IP addresses", e)
     print([])

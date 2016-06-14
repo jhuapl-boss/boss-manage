@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 ### BEGIN INIT INFO
 # Provides: consul
@@ -22,18 +22,26 @@ case "$1" in
    PEER="$(/usr/local/bin/python3 /usr/lib/boss/addresses.py)" # returned as an array
    NAME=`ifconfig eth0 | awk '/inet addr/{split(substr($2,6), a, "."); print a[3] a[4]}'`
    BOOTSTRAP=`grep ^cluster /etc/boss/boss.config | cut -d= -f2 | tr -d ' '`
+   if [ -n "$BOOTSTRAP" ]; then
+      BOOTSTRAP="\"bootstrap_expect\": $BOOTSTRAP,"
+   fi
+   if [ "`hostname`" == "consul" ]; then
+      SERVER="true"
+   else
+      SERVER="false"
+   fi
 
    # Create a config file to enable flags not available as command line options
    cat > /etc/consul/consul.config << EOF
 {
     "leave_on_terminate": true,
-    "bootstrap_expect": $BOOTSTRAP,
+    $BOOTSTRAP
     "data_dir" : "/srv/consul",
     "disable_remote_exec": true,
     "disable_update_check": true,
     "enable_syslog": true,
     "node_name": "$NAME",
-    "server": true,
+    "server": $SERVER,
     "start_join": $PEER,
     "addresses": { "http": "0.0.0.0" },
     "ports": { "http": 8500 }

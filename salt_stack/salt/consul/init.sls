@@ -1,5 +1,6 @@
-daemon:
-    pkg.installed: []
+consul-daemon:
+    pkg.installed:
+        - name: daemon
 
 consul-bin:
     file.managed:
@@ -27,7 +28,6 @@ consul-init.d:
         - group: root
         - mode: 555
         - require:
-            - pkg: daemon
             - file: consul-bin
             - file: consul-lib
     cmd.run:

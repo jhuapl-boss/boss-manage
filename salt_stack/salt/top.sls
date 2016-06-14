@@ -1,6 +1,6 @@
 base:
     'consul*':
-        - consul.server
+        - consul
         - boss-tools.bossutils
 
     'vault*':
