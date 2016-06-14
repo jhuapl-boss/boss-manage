@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.5
 
 # Copyright 2016 The Johns Hopkins University Applied Physics Laboratory
 #
@@ -422,11 +422,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description = "Script creating SSH Tunnels and connecting to internal VMs",
                                      formatter_class=argparse.RawDescriptionHelpFormatter,
                                      epilog=commands_help)
+
+
     parser.add_argument("--aws-credentials", "-a",
                         metavar = "<file>",
                         default = os.environ.get("AWS_CREDENTIALS"),
                         type = argparse.FileType('r'),
                         help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
+    parser.add_argument("--private-ip", "-p",
+                        action='store_true',
+                        default=False,
+                        help = "add this flag to type in a private IP address in internal command instead of a DNS name which is looked up")
     parser.add_argument("--ssh-key", "-s",
                         metavar = "<file>",
                         default = os.environ.get("SSH_KEY"),
@@ -458,7 +464,10 @@ if __name__ == "__main__":
 
     session = create_session(args.aws_credentials)
     bastion = machine_lookup(session, args.bastion)
-    private = machine_lookup(session, args.internal, public_ip = False)
+    if args.private_ip:
+        private = args.internal
+    else:
+        private = machine_lookup(session, args.internal, public_ip=False)
 
     if args.command in ("ssh",):
         ssh(args.ssh_key, private, bastion)
