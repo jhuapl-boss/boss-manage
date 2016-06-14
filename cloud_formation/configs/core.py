@@ -47,7 +47,7 @@ AUTH_CLUSTER_SIZE = { # Auth Server Cluster is a fixed size
 }
 
 CONSUL_CLUSTER_SIZE = { # Consul Cluster is a fixed size
-    "development" : 1,
+    "development" : 5,
     "production": 5 # can tolerate 2 failures
 }
 
@@ -150,19 +150,18 @@ runcmd:
     user_data["system"]["fqdn"] = "consul." + domain
     user_data["system"]["type"] = "consul"
     user_data["consul"]["cluster"] = str(configuration.get_scenario(CONSUL_CLUSTER_SIZE))
-    create_asg_elb(config,
-                   "Consul",
-                   "consul." + domain,
-                   lib.ami_lookup(session, "consul.boss"),
-                   keypair,
-                   str(user_data),
-                   CONSUL_CLUSTER_SIZE,
-                   internal_subnets,
-                   external_subnets,
-                   [("8500", "8500", "HTTP")],
-                   "HTTP:8500/v1/health/state/critical",
-                   public = False,
-                   role = "arn:aws:iam::256215146792:instance-profile/consul")
+    config.add_autoscale_group("Consul",
+                               "consul." + domain,
+                               lib.ami_lookup(session, "consul.boss"),
+                               keypair,
+                               subnets = internal_subnets,
+                               security_groups = ["InternalSecurityGroup"],
+                               user_data = str(user_data),
+                               min = CONSUL_CLUSTER_SIZE,
+                               max = CONSUL_CLUSTER_SIZE,
+                               notifications = "DNSSNS",
+                               role = "arn:aws:iam::256215146792:instance-profile/consul",
+                               depends_on = ["DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
     user_data = configuration.UserData()
     user_data["system"]["fqdn"] = "vault." + domain
@@ -233,6 +232,7 @@ runcmd:
                            "dns." + domain,
                            "lambda/updateRoute53/index.py",
                            "DNSLambdaRole",
+                           timeout=10,
                            depends_on="DNSZone")
     role = "arn:aws:iam::256215146792:role/UpdateRoute53"
     config.add_arg(configuration.Arg.String("DNSLambdaRole", role,
@@ -386,7 +386,7 @@ def post_init(session, domain):
 def delete(session, domain):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
     #lib.route53_delete_records(session, domain, "auth." + domain)
-    #lib.route53_delete_records(session, domain, "consul." + domain)
+    lib.route53_delete_records(session, domain, "consul." + domain)
     lib.route53_delete_records(session, domain, "vault." + domain)
-    #lib.sns_unsubscribe_all(session, "dns." + domain)
+    lib.sns_unsubscribe_all(session, "dns." + domain)
     lib.delete_stack(session, domain, "core")
