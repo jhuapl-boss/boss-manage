@@ -470,9 +470,9 @@ class ExternalCalls:
         def connect(ip, func):
             bastion.connect_vault(self.keypair_file, ip, self.bastion_ip, func)
 
-        connect(vaults[0], lambda: vault.vault_init(machine=self.vault_hostname))
+        connect(vaults[0], lambda: vault.vault_init(machine=self.vault_hostname, ip=vaults[0]))
         for ip in vaults[1:]:
-            connect(ip, lambda: vault.vault_unseal(machine=self.vault_hostname))
+            connect(ip, lambda: vault.vault_unseal(machine=self.vault_hostname, ip=ip))
 
 
     def vault(self, cmd, *args, **kwargs):
@@ -490,7 +490,7 @@ class ExternalCalls:
         def delegate():
             # Have to dynamically lookup the function because vault.COMMANDS
             # references the command line version of the commands we want to execute
-            return vault.__dict__[cmd.replace('-', '_')](*args, machine=self.vault_hostname, **kwargs)
+            return vault.__dict__[cmd.replace('-', '_')](*args, machine=self.vault_hostname, ip=self.vault_ip, **kwargs)
 
         return bastion.connect_vault(self.keypair_file, self.vault_ip, self.bastion_ip, delegate)
 

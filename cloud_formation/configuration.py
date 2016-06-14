@@ -1148,7 +1148,7 @@ class CloudFormationConfiguration:
         self.add_arg(peer_vpc_)
 
     def add_loadbalancer(self, key, name, listeners, instances=None, subnets=None, security_groups=None,
-                         healthcheck_target="HTTP:80/ping/", depends_on=None ):
+                         healthcheck_target="HTTP:80/ping/", public=True, depends_on=None ):
         """
         Add LoadBalancer to the configuration
 
@@ -1197,6 +1197,7 @@ class CloudFormationConfiguration:
                 "LBCookieStickinessPolicy" : [{"PolicyName": key + "Policy"}],
                 "LoadBalancerName": name.replace(".", "-"),  #elb names can't have periods in them
                 "Listeners": listener_defs,
+                "Scheme": "internet-facing" if public else "internal",
                 "Tags": [
                     {"Key": "Stack", "Value": { "Ref": "AWS::StackName"}}
                 ]
@@ -1222,7 +1223,9 @@ class CloudFormationConfiguration:
         #     }
         # }
 
-    def add_autoscale_group(self, key, hostname, ami, keypair, subnets=["Subnet"], type_="t2.micro", public_ip=False, security_groups=[], user_data=None, min=1, max=1, elb=None, notifications=None, depends_on=None):
+        self._add_record_cname(key, name, elb = True)
+
+    def add_autoscale_group(self, key, hostname, ami, keypair, subnets=["Subnet"], type_="t2.micro", public_ip=False, security_groups=[], user_data=None, min=1, max=1, elb=None, notifications=None, role=None, depends_on=None):
         """Add an AutoScalingGroup to the configuration
 
         Args:
@@ -1290,6 +1293,9 @@ class CloudFormationConfiguration:
                 "UserData" : "" if user_data is None else { "Fn::Base64" : user_data }
             }
         }
+
+        if role is not None:
+            self.resources[key + "Configuration"]["Properties"]["IamInstanceProfile"] = role
 
         if type(ami) == tuple:
             commit = ami[1]
@@ -1386,7 +1392,7 @@ class CloudFormationConfiguration:
         if source is not None:
             self.resources[key]["Properties"]["SourceArn"] = source
 
-    def _add_record_cname(self, key, hostname, vpc="VPC", ttl="300", rds=False, cluster=False, replication=False, ec2=False):
+    def _add_record_cname(self, key, hostname, vpc="VPC", ttl="300", rds=False, cluster=False, replication=False, ec2=False, elb=False):
         """Add a CNAME RecordSet to the configuration
 
         Note: Only one of rds/cluster/replication/ec2 should be specified for the call
@@ -1401,6 +1407,7 @@ class CloudFormationConfiguration:
             cluster (bool) : The key is a ElastiCache Cluster instance
             replication (bool) : The key is a ElastiCache ReplicationGroup instance
             ec2 (bool) : The key is a EC2 instance
+            elb (bool) : The key is a ELB
         """
         address_key = None
         if rds:
@@ -1412,6 +1419,8 @@ class CloudFormationConfiguration:
             address_key = "PrimaryEndPoint.Address"
         elif ec2: # Could create an A record type, with PrivateIP as the key
             address_key = "PrivateDnsName"
+        elif elb:
+            address_key = "DNSName"
 
         if address_key is None:
             raise Exception("Unknown type of CNAME record to create")

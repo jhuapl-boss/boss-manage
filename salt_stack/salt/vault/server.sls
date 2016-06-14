@@ -1,5 +1,6 @@
-daemon:
-    pkg.installed: []
+vault-daemon:
+    pkg.installed:
+        - name: daemon
 
 vault-config:
     file.managed:
@@ -29,7 +30,6 @@ vault-init.d:
         - group: root
         - mode: 555
         - require:
-            - pkg: daemon
             - file: vault-bin
     cmd.run:
         - name: update-rc.d vault defaults 99

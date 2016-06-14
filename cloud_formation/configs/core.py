@@ -48,8 +48,38 @@ AUTH_CLUSTER_SIZE = { # Auth Server Cluster is a fixed size
 
 CONSUL_CLUSTER_SIZE = { # Consul Cluster is a fixed size
     "development" : 1,
-    "production": 5 # should be an odd number
+    "production": 5 # can tolerate 2 failures
 }
+
+VAULT_CLUSTER_SIZE = { # Vault Cluster is a fixed size
+    "development" : 1,
+    "production": 3 # should be an odd number
+}
+
+def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, public=True, depends_on=None):
+    security_groups = ["InternalSecurityGroup"]
+    config.add_autoscale_group(key,
+                               hostname,
+                               ami,
+                               keypair,
+                               subnets = isubnets,
+                               security_groups = security_groups,
+                               user_data = user_data,
+                               min = size,
+                               max = size,
+                               elb = key + "LoadBalancer",
+                               role = role,
+                               depends_on = key + "LoadBalancer")
+
+    security_groups.extend(sgs)
+    config.add_loadbalancer(key + "LoadBalancer",
+                            hostname,
+                            listeners,
+                            subnets = esubnets if public else isubnets,
+                            healthcheck_target = check,
+                            security_groups = security_groups,
+                            public = public,
+                            depends_on = depends_on)
 
 def create_config(session, domain):
     """Create the CloudFormationConfiguration object."""
@@ -78,22 +108,33 @@ def create_config(session, domain):
 
     internal_subnets, external_subnets = config.add_all_azs(session)
 
-    # Create the user data for Vault. No data is given to Bastion
-    # because it is an AWS AMI designed for NAT work and does not
-    # have bossutils to use the user data config.
-    user_data = configuration.UserData()
-    user_data["system"]["fqdn"] = "vault." + domain
-    user_data["system"]["type"] = "vault"
+    # Configure Squid to allow clustered Vault access, restricted to connections from the Bastion
+    user_data = """#cloud-config
+packages:
+    - squid
 
-    config.add_ec2_instance("Vault",
-                            "vault." + domain,
-                            lib.ami_lookup(session, "vault.boss"),
-                            keypair,
-                            subnet = "InternalSubnet",
-                            security_groups = ["InternalSecurityGroup"],
-                            user_data = str(user_data),
-                            depends_on = "Consul")
+write_files:
+    - content: |
+            acl localhost src 127.0.0.1/32 ::1
+            acl to_localhost dst 127.0.0.0/8 0.0.0.0/32 ::1
+            acl localnet dst 10.0.0.0/8
+            acl Safe_ports port 8200
 
+            http_access deny !Safe_ports
+            http_access deny !localnet
+            http_access deny to_localhost
+            http_access allow localhost
+            http_access deny all
+
+            http_port 3128
+      path: /etc/squid/squid.conf
+      owner: root squid
+      permissions: '0644'
+
+runcmd:
+    - chkconfig squid on
+    - service squid start
+    """
     config.add_ec2_instance("Bastion",
                             "bastion." + domain,
                             lib.ami_lookup(session, "amzn-ami-vpc-nat-hvm-2015.03.0.x86_64-ebs"),
@@ -101,12 +142,46 @@ def create_config(session, domain):
                             subnet = "ExternalSubnet",
                             public_ip = True,
                             iface_check = False,
+                            user_data = user_data,
                             security_groups = ["InternalSecurityGroup", "BastionSecurityGroup"],
                             depends_on = "AttachInternetGateway")
 
+    user_data = configuration.UserData()
+    user_data["system"]["fqdn"] = "consul." + domain
+    user_data["system"]["type"] = "consul"
+    user_data["consul"]["cluster"] = str(configuration.get_scenario(CONSUL_CLUSTER_SIZE))
+    config.add_autoscale_group("Consul",
+                               "consul." + domain,
+                               lib.ami_lookup(session, "consul.boss"),
+                               keypair,
+                               subnets = internal_subnets,
+                               security_groups = ["InternalSecurityGroup"],
+                               user_data = str(user_data),
+                               min = CONSUL_CLUSTER_SIZE,
+                               max = CONSUL_CLUSTER_SIZE,
+                               notifications = "DNSSNS",
+                               role = "arn:aws:iam::256215146792:instance-profile/consul",
+                               depends_on = ["DNSLambda", "DNSSNS", "DNSLambdaExecute"])
+
+    user_data = configuration.UserData()
+    user_data["system"]["fqdn"] = "vault." + domain
+    user_data["system"]["type"] = "vault"
+    config.add_autoscale_group("Vault",
+                               "vault." + domain,
+                               lib.ami_lookup(session, "vault.boss"),
+                               keypair,
+                               subnets = internal_subnets,
+                               security_groups = ["InternalSecurityGroup"],
+                               user_data = str(user_data),
+                               min = VAULT_CLUSTER_SIZE,
+                               max = VAULT_CLUSTER_SIZE,
+                               notifications = "DNSSNS",
+                               depends_on = ["Consul", "DNSLambda", "DNSSNS", "DNSLambdaExecute"])
+
+
     user_data["system"]["fqdn"] = "auth." + domain
     user_data["system"]["type"] = "auth"
-    deps = ["AttachInternetGateway", "DNSLambda", "DNSSNS", "DNSLambdaExecute"]
+    deps = ["AuthSecurityGroup", "AttachInternetGateway"]
 
     SCENARIO = os.environ["SCENARIO"]
     USE_DB = SCENARIO in ("production",)
@@ -119,19 +194,28 @@ def create_config(session, domain):
         deps.append("AuthDB")
         user_data["aws"]["db"] = "keycloak" # flag for init script for which config to use
 
-    # NOTE: Auth LoadBalancer doesn't have an internal DNS record, AutoScale instances do
-    config.add_autoscale_group("Auth",
-                               "auth." + domain,
-                               lib.ami_lookup(session, "auth.boss"),
-                               keypair,
-                               subnets = internal_subnets,
-                               security_groups = ["InternalSecurityGroup"],
-                               user_data = str(user_data),
-                               min = AUTH_CLUSTER_SIZE,
-                               max = AUTH_CLUSTER_SIZE,
-                               elb = "LoadBalancerAuth",
-                               notifications = "DNSSNS",
-                               depends_on = deps)
+    if domain in hosts.BASE_DOMAIN_CERTS.keys():
+        cert = lib.cert_arn_lookup(session, "auth." + hosts.BASE_DOMAIN_CERTS[domain])
+    else:
+        cert = lib.cert_arn_lookup(session, "auth.integration.theboss.io")
+
+    user_data = configuration.UserData()
+    user_data["system"]["fqdn"] = "auth." + domain
+    user_data["system"]["type"] = "auth"
+    create_asg_elb(config,
+                   "Auth",
+                   "auth." + domain,
+                   lib.ami_lookup(session, "auth.boss"),
+                   keypair,
+                   str(user_data),
+                   AUTH_CLUSTER_SIZE,
+                   internal_subnets,
+                   external_subnets,
+                   [("443", "8080", "HTTPS", cert)],
+                   "HTTP:8080/index.html",
+                   sgs = ["AuthSecurityGroup"],
+                   depends_on=deps)
+
     if USE_DB:
         config.add_rds_db("AuthDB",
                           "auth-db." + domain,
@@ -143,37 +227,12 @@ def create_config(session, domain):
                           type_ = "db.t2.micro",
                           security_groups = ["InternalSecurityGroup"])
 
-    if domain in hosts.BASE_DOMAIN_CERTS.keys():
-        cert = lib.cert_arn_lookup(session, "auth." + hosts.BASE_DOMAIN_CERTS[domain])
-    else:
-        cert = lib.cert_arn_lookup(session, "auth.integration.theboss.io")
-
-    config.add_loadbalancer("LoadBalancerAuth",
-                            "elb-auth." + domain,
-                            [("443", "8080", "HTTPS", cert)],
-                            subnets = external_subnets,
-                            healthcheck_target = "HTTP:8080/index.html",
-                            security_groups = ["InternalSecurityGroup", "AuthSecurityGroup"],
-                            depends_on = ["AuthSecurityGroup", "AttachInternetGateway"])
-
-    user_data["system"]["fqdn"] = "consul." + domain
-    user_data["system"]["type"] = "consul"
-    config.add_autoscale_group("Consul",
-                               "consul." + domain,
-                               lib.ami_lookup(session, "consul.boss"),
-                               keypair,
-                               subnets = internal_subnets,
-                               security_groups = ["InternalSecurityGroup"],
-                               user_data = str(user_data),
-                               min = CONSUL_CLUSTER_SIZE,
-                               max = CONSUL_CLUSTER_SIZE,
-                               notifications = "DNSSNS",
-                               depends_on = ["DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
     config.add_lambda_file("DNSLambda",
                            "dns." + domain,
                            "lambda/updateRoute53/index.py",
                            "DNSLambdaRole",
+                           timeout=10,
                            depends_on="DNSZone")
     role = "arn:aws:iam::256215146792:role/UpdateRoute53"
     config.add_arg(configuration.Arg.String("DNSLambdaRole", role,
@@ -185,6 +244,7 @@ def create_config(session, domain):
                          "dns." + domain,
                          "dns." + domain,
                          [("lambda", {"Fn::GetAtt": ["DNSLambda", "Arn"]})])
+
 
     config.add_security_group("InternalSecurityGroup",
                               "internal",
@@ -200,9 +260,10 @@ def create_config(session, domain):
                               [("tcp", "443", "443", "0.0.0.0/0")])
 
     # Create the internal route table to route traffic to the NAT Bastion
+    internal_subnets.append("InternalSubnet")
     config.add_route_table("InternalRouteTable",
                            "internal",
-                           subnets = ["InternalSubnet"]) # Route to all internal subnets?
+                           subnets = internal_subnets)
 
     config.add_route_table_route("InternalNatRoute",
                                  "InternalRouteTable",
@@ -245,7 +306,7 @@ def upload_realm_config(port, password):
 def configure_keycloak(session, domain):
     # NOTE DP: if there is an ELB in front of the auth server, this needs to be
     #          the public DNS address of the ELB.
-    auth_elb = lib.elb_public_lookup(session, "elb-auth." + domain)
+    auth_elb = lib.elb_public_lookup(session, "auth." + domain)
 
     if domain in hosts.BASE_DOMAIN_CERTS.keys():
         auth_domain = 'auth.' + hosts.BASE_DOMAIN_CERTS[domain]
@@ -324,6 +385,8 @@ def post_init(session, domain):
 
 def delete(session, domain):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
-    lib.route53_delete_records(session, domain, "auth." + domain)
+    #lib.route53_delete_records(session, domain, "auth." + domain)
+    lib.route53_delete_records(session, domain, "consul." + domain)
+    lib.route53_delete_records(session, domain, "vault." + domain)
     lib.sns_unsubscribe_all(session, "dns." + domain)
-    lib.delete_stack(session, domain, "test")
+    lib.delete_stack(session, domain, "core")
