@@ -179,6 +179,7 @@ runcmd:
                                depends_on = ["Consul", "DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
 
+    user_data = configuration.UserData()
     user_data["system"]["fqdn"] = "auth." + domain
     user_data["system"]["type"] = "auth"
     deps = ["AuthSecurityGroup", "AttachInternetGateway"]
@@ -199,7 +200,6 @@ runcmd:
     else:
         cert = lib.cert_arn_lookup(session, "auth.integration.theboss.io")
 
-    user_data = configuration.UserData()
     user_data["system"]["fqdn"] = "auth." + domain
     user_data["system"]["type"] = "auth"
     create_asg_elb(config,
