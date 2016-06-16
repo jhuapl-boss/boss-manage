@@ -228,12 +228,12 @@ runcmd:
                           security_groups = ["InternalSecurityGroup"])
 
 
-    config.add_lambda_file("DNSLambda",
-                           "dns." + domain,
-                           "lambda/updateRoute53/index.py",
-                           "DNSLambdaRole",
-                           timeout=10,
-                           depends_on="DNSZone")
+    config.add_lambda("DNSLambda",
+                      "dns." + domain,
+                      "lambda/updateRoute53/index.py",
+                      "DNSLambdaRole",
+                      timeout=10,
+                      depends_on="DNSZone")
     role = "arn:aws:iam::256215146792:role/UpdateRoute53"
     config.add_arg(configuration.Arg.String("DNSLambdaRole", role,
                                             "IAM role for Lambda dns." + domain))
