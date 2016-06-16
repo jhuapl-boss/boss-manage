@@ -68,3 +68,10 @@ mysql-jar:
         - name: /srv/keycloak/modules/system/layers/base/com/mysql/main/mysql-connector-java-5.1.38-bin.jar
         - source: salt://keycloak/files/mysql-connector-java-5.1.38-bin.jar
         - makedirs: True
+
+jgroups-config:
+    file.managed:
+        - name: /srv/keycloak/modules/system/layers/base/org/jgroups/main/module.xml
+        - source: salt://keycloak/files/jgroups-module.xml
+        - makedirs: True
+
