@@ -200,8 +200,6 @@ runcmd:
     else:
         cert = lib.cert_arn_lookup(session, "auth.integration.theboss.io")
 
-    user_data["system"]["fqdn"] = "auth." + domain
-    user_data["system"]["type"] = "auth"
     create_asg_elb(config,
                    "Auth",
                    "auth." + domain,
