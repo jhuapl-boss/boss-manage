@@ -326,12 +326,13 @@ def configure_keycloak(session, domain):
     call.set_ssh_target("auth")
     call.ssh("/srv/keycloak/bin/add-user.sh -r master -u admin -p " + password)
     call.ssh("sudo service keycloak stop")
+    time.sleep(2)
     call.ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
                                   # make sure the process is actually killed
+    time.sleep(3)
     call.ssh("sudo service keycloak start")
-
     print("Waiting for Keycloak to restart")
-    time.sleep(60)
+    time.sleep(75)
     call.ssh_tunnel(lambda p: upload_realm_config(p, password), 8080)
 
 def generate(folder, domain):
@@ -374,7 +375,7 @@ def post_init(session, domain):
         return
 
     print("Waiting for Keycloak to bootstrap")
-    time.sleep(60)
+    time.sleep(75)
 
     print("Configuring Keycloak...")
     configure_keycloak(session, domain)
