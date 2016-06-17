@@ -200,8 +200,6 @@ runcmd:
     else:
         cert = lib.cert_arn_lookup(session, "auth.integration.theboss.io")
 
-    user_data["system"]["fqdn"] = "auth." + domain
-    user_data["system"]["type"] = "auth"
     create_asg_elb(config,
                    "Auth",
                    "auth." + domain,
@@ -228,12 +226,12 @@ runcmd:
                           security_groups = ["InternalSecurityGroup"])
 
 
-    config.add_lambda_file("DNSLambda",
-                           "dns." + domain,
-                           "lambda/updateRoute53/index.py",
-                           "DNSLambdaRole",
-                           timeout=10,
-                           depends_on="DNSZone")
+    config.add_lambda("DNSLambda",
+                      "dns." + domain,
+                      "lambda/updateRoute53/index.py",
+                      "DNSLambdaRole",
+                      timeout=10,
+                      depends_on="DNSZone")
     role = "arn:aws:iam::256215146792:role/UpdateRoute53"
     config.add_arg(configuration.Arg.String("DNSLambdaRole", role,
                                             "IAM role for Lambda dns." + domain))

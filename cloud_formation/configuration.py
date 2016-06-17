@@ -1317,14 +1317,16 @@ class CloudFormationConfiguration:
                                "Hostname of the EC2 Instance '{}'".format(key))
         self.add_arg(_hostname)
 
-    def add_lambda_file(self, key, name, file, role, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None):
-        """Create a Python Lambda from a single source file
+    def add_lambda(self, key, name, role, file=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None):
+        """Create a Python Lambda
 
         Args:
             key (string) : Unique name for the resource in the template
             name (string) : Function name
-            file (string) : File path to file containing lambda source code
             role (string) : IAM role the lambda will execute under
+            file (None|string) : File path to file containing lambda source code
+            s3 (None|tuple) : Tuple (bucket, key, handler) for the S3 location containing lambda source code
+                              handler is the Python function to execute
             description (string) : Lambda description
             memory (string|int) : Amount of memory (MB) to execute the lambda with
                                   Note, CPU is linked to the amount of memory allocated
@@ -1334,10 +1336,23 @@ class CloudFormationConfiguration:
             depends_on (None|string|list) : A unique name or list of unique names of resources within the
                                             configuration and is used to determine the launch order of resources
         """
-        with open(file, "r") as fh:
-            code = lib.json_sanitize(fh.read())
-            if len(code) >= 4096:
-                raise Exception("Lambda code file is too large") # TODO need to figure out if / how to upload a manually created zip file
+
+        if file is not None:
+            with open(file, "r") as fh:
+                code = lib.json_sanitize(fh.read())
+                if len(code) >= 4096:
+                    raise Exception("Lambda code file is too large") # TODO need to figure out if / how to upload a manually created zip file
+
+            code = {"ZipFile": code}
+            handler = "index.handler"
+        elif s3 is not None:
+            code = {
+                bucket, key, handler = s3
+                "S3Bucket": bucket,
+                "S3Key": key
+            }
+        else:
+            raise Exception("Need source file or S3 bucket")
 
         memory = int(memory)
         if memory < 128 or 1536 < memory:
@@ -1348,10 +1363,10 @@ class CloudFormationConfiguration:
         self.resources[key] = {
             "Type" : "AWS::Lambda::Function",
             "Properties" : {
-                "Code": {"ZipFile": code},
+                "Code": code,
                 "Description": description,
                 "FunctionName": name.replace('.', '-'),
-                "Handler": "index.handler",
+                "Handler": handler,
                 "MemorySize": memory,
                 "Role": {"Ref": role},
                 "Runtime": "python2.7",
@@ -1644,6 +1659,39 @@ class CloudFormationConfiguration:
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
 
+    def add_sqs_queue(self, key, name, hide=30, retention=5760, dead=None):
+        """Create a SQS Queue
+
+        Notes:
+            Maximum message size is 256KiB, which is the maximum size for SQS
+
+        Args:
+            key (string) : Unique name for the resource in the template
+            name (string): Display name of the SQS queue
+            hide (int) : Number of seconds to hide a queue item before it is again available for processing
+            retention (int) : Number of minute a message will be retained
+                              Limits are 1 minute to 14 days (default 4 days)
+            dead (None|tuple) : Dead letter queue tuple (targetARN, missedDeliveries)
+        """
+
+        if retention < 1 or 20160 > retention:
+            raise Exception("Rentention period is 1 minute to 14 days")
+
+        self.resources[key] = {
+            "Type": "AWS::SQS::Queue",
+            "Properties": {
+                "MessageRetentionPeriod": retention * 60,
+                "QueueName": name,
+                "VisibilityTimeout": int(hide)
+            }
+        }
+
+        if dead is not None:
+            arn, missed = dead
+            self.resources[key]["Properties"]["RedrivePolicy"] = {
+                "deadLetterTargetArn": arn,
+                "maxReceiveCount": missed
+            }
 
 
 class UserData:
