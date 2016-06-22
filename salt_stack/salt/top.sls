@@ -23,6 +23,9 @@ base:
         - scalyr.update_host
         - git
 
+    'lambda*':
+        - lambda-dev
+
     'ep-jenkins*':
         - jenkins-microns.endpoint
 
