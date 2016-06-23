@@ -318,6 +318,7 @@ def configure_keycloak(session, domain):
     call = lib.ExternalCalls(session, keypair, domain)
 
     call.vault_write("secret/auth", password = password, username = "admin")
+    call.vault_write("secret/endpoint/auth", password = password, username = "admin")
     call.vault_update("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
     call.vault_update("secret/proofreader/auth", url = auth_discovery_url, client_id = "endpoint")
 
