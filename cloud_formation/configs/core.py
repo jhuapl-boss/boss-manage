@@ -228,8 +228,8 @@ runcmd:
 
     config.add_lambda("DNSLambda",
                       "dns." + domain,
-                      "lambda/updateRoute53/index.py",
                       "DNSLambdaRole",
+                      "lambda/updateRoute53/index.py",
                       timeout=10,
                       depends_on="DNSZone")
     role = "arn:aws:iam::256215146792:role/UpdateRoute53"
