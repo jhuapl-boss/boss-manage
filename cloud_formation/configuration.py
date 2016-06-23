@@ -1346,8 +1346,8 @@ class CloudFormationConfiguration:
             code = {"ZipFile": code}
             handler = "index.handler"
         elif s3 is not None:
+            bucket, key, handler = s3
             code = {
-                bucket, key, handler = s3
                 "S3Bucket": bucket,
                 "S3Key": key
             }
