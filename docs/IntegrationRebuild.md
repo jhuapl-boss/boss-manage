@@ -50,49 +50,11 @@ have to be pushed yet) so that the correct commit hash is used.*
 
 ## Relaunching Integration Stack
 
-### Deleting existing stacks
-Before the new integration instance can be created, the existing CloudFormation
-Stacks need to be deleted.
-
-Using the CloudFormation console:
-
-1. Open a web browser
-2. Login to the AWS console and open up the CloudFormation console
-3. For *CloudwatchIntegrationBoss*, *ProofreaderIntegrationBoss*,
-   *ProductionIntegrationBoss*, *CoreIntegrationBoss*
-  1. Right click on the Stack and select *Delete Stack*
-  2. Wait for the stack to be deleted
-
-Alternatively, via the cloudformation script:
-
-```shell
-$ cd cloud_formation/
-$ source ../config/set_vars.sh
-
-# Deletion of cloudwatch, production, and proofreader can probably
-# be done in parallel.
-$ ./cloudformation.py delete integration.boss cloudwatch
-$ ./cloudformation.py delete integration.boss production
-$ ./cloudformation.py delete integration.boss proofreader
-$ ./cloudformation.py delete integration.boss core
-```
-
-### Vault AWS configuration
-For Vault to be able to create AWS credentials (used by the Endpoint) you need a
-configuration file located at `boss-manage.git/vault/private/vault_aws_credentials`.
-If you don't have this, talk to Derek Pryor to get the AWS API keys for an account.
-Once you have the needed API keys:
-
-1. Copy `boss-manage.git/packer/variables/aws-credentials.example` to
-`boss-manage.git/vault/private/vault_aws_credentials`
-  * You may have to create the directory "private"
-2. Open `vault_aws_credentials` in a text editor
-3. Copy the access key and secret key that you received into the text editor
-4. Save `vault_aws_credentials` and close the text editor
-
 ### Environment Setup
 The scripts make use of multiple environment variables to manage optional
-configuration elements.
+configuration elements. Edit `config/set_vars.sh` and review the variables being
+set. Verify that the SSH_KEY being used is the desired one and that it exists under
+`~/.ssh/` and is chmoded 0400.
 
 ```shell
 $ cd cloud_formation/
@@ -119,6 +81,38 @@ Create this script and save it (config/set_scalyr_vars.sh) for the next time you
 ```shell
 source ../config/set_scalyr_vars.sh
 ```
+
+### Deleting existing stacks
+Before the new integration instance can be created, the existing CloudFormation
+Stacks need to be deleted.
+
+```shell
+$ cd cloud_formation/
+$ source ../config/set_vars.sh
+
+# Deletion of cloudwatch, production, and proofreader can probably
+# be done in parallel.
+$ ./cloudformation.py delete integration.boss cloudwatch
+$ ./cloudformation.py delete integration.boss production
+$ ./cloudformation.py delete integration.boss proofreader
+$ ./cloudformation.py delete integration.boss core
+```
+
+*Note: If any fail to delete, try running the delete again. If that doesn't work
+you can view the problem through the AWS CloudFormation web console.*
+
+### Vault AWS configuration
+For Vault to be able to create AWS credentials (used by the Endpoint) you need a
+configuration file located at `boss-manage.git/vault/private/vault_aws_credentials`.
+If you don't have this, talk to Derek Pryor to get the AWS API keys for an account.
+Once you have the needed API keys:
+
+1. Copy `boss-manage.git/packer/variables/aws-credentials.example` to
+`boss-manage.git/vault/private/vault_aws_credentials`
+  * You may have to create the directory "private"
+2. Open `vault_aws_credentials` in a text editor
+3. Copy the access key and secret key that you received into the text editor
+4. Save `vault_aws_credentials` and close the text editor
 
 ### Launching configs
 
@@ -154,7 +148,7 @@ sudo python3 manage.py createsuperuser
 sudo python3 manage.py test
 ```
 	output should say 203 Tests OK with 14 skipped tests.
-	
+
 	There are 2 tests that need >2.5GB of memory to run. To run them, set an enviroment variable "RUN_HIGH_MEM_TESTS"
 
 
@@ -180,7 +174,7 @@ cd /srv/www/django
 sudo python3 manage.py test --pattern="int_test_*.py"
 ```
 	output should say 35 Tests OK with 2 skipped tests
-	
+
 	There are 2 tests that need >2.5GB of memory to run. To run them, set an enviroment variable "RUN_HIGH_MEM_TESTS"
 
 
