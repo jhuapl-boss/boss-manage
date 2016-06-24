@@ -67,3 +67,15 @@ lambda-boss-utils:
     - file_mode: 755
     - dirmode: 755
 
+lambda-boss-logger-config:
+  # Replace the default logger config with the lambda config.
+  # spdb does not specify a config file when creating BossLogger, so the
+  # default config file must be replaced.
+  file.copy:
+    - name: {{ bossutils_home }}/logger_conf.json
+    - source: {{ bossutils_home }}/lambda_logger_conf.json
+    - force: true
+    - user: {{ user }}
+    - group: {{ user }}
+    - mode: 755
+
