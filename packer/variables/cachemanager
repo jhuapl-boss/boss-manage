@@ -1,4 +1,4 @@
 {
-    "name": "auth",
-    "role": "auth"
+    "name": "cachemanager",
+    "role": "cachemanager"
 }

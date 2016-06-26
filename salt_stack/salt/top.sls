@@ -48,3 +48,10 @@ base:
         - git
         - vault.client
         - aws.boto3
+
+    'cachemanager*':
+        - boss-tools.bossutils
+        - boss-tools.cachemanager
+        - scalyr
+        - scalyr.update_host
+        - git
