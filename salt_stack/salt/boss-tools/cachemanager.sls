@@ -1,6 +1,7 @@
 include:
     - python.python35
     - boss-tools.bossutils
+    - aws.boto3
 
 service:
     file.managed:
