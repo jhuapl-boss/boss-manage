@@ -633,7 +633,7 @@ class CloudFormationConfiguration:
 
         return (internal, external)
 
-    def add_ec2_instance(self, key, hostname, ami, keypair, subnet="Subnet", type_="t2.micro", iface_check=True, public_ip=False, security_groups=None, user_data=None, meta_data=None, depends_on=None):
+    def add_ec2_instance(self, key, hostname, ami, keypair, subnet="Subnet", type_="t2.micro", iface_check=True, public_ip=False, security_groups=None, user_data=None, meta_data=None, role=None, depends_on=None):
         """Add an EC2 instance to the configuration
 
         Args:
@@ -693,6 +693,11 @@ class CloudFormationConfiguration:
 
         if user_data is not None:
             self.resources[key]["Properties"]["UserData"] = { "Fn::Base64" : user_data }
+
+        if role is not None:
+            self.resources[key]["Properties"]["IamInstanceProfile"] = role
+
+            self.resources[key]["Properties"]["IamInstanceProfile"] = { "Fn::Base64" : user_data }
 
         _ami = Arg.AMI(key + "AMI", ami,
                        "AMI for the EC2 Instance '{}'".format(key))
