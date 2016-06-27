@@ -13,14 +13,18 @@
 # limitations under the License.
 
 """
-Create the production configuration which consists of
-  * An endpoint web server in the external subnet
-  * A RDS DB Instance launched into two new subnets (A and B)
+Create the cachedb configuration which consists of
 
-The production configuration creates all of the resources needed to run the
-BOSS system. The production configuration expects to be launched / created
-in a VPC created by the core configuration. It also expects for the user to
-select the same KeyPair used when creating the core configuration.
+  * An cachmanager server to run three daemons for
+        * cache-write
+        * cache-miss
+        * cache-delayed write
+  * Lambdas
+  * SNS topics
+  * SQS queues
+
+This will most likely be merged into production once it is finished.
+
 """
 
 
@@ -36,32 +40,11 @@ import sys
 # extract this from the session variable.  Hard coding for now.
 PRODUCTION_REGION = 'us-east-1'
 
-DYNAMO_SCHEMA = '../salt_stack/salt/boss/files/boss.git/django/bosscore/dynamo_schema.json'
-
 INCOMING_SUBNET = "52.3.13.189/32"  # microns-bastion elastic IP
 
-VAULT_DJANGO = "secret/endpoint/django"
-VAULT_DJANGO_DB = "secret/endpoint/django/db"
-VAULT_DJANGO_AUTH = "secret/endpoint/auth"
-
-ENDPONT_TYPE = {
+CACHE_MANAGER_TYPE = {
     "development": "t2.micro",
-    "production": "m4.large",
-}
-
-RDS_TYPE = {
-    "development": "db.t2.micro",
-    "production": "db.t2.medium",
-}
-
-REDIS_TYPE = {
-    "development": "cache.t2.small",
-    "production": "cache.m3.xlarge",
-}
-
-REDIS_CLUSTER_SIZE = {
-    "development": 1,
-    "production": 2,
+    "production": "t2.medium",
 }
 
 
@@ -110,72 +93,23 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
 
     az_subnets, external_subnets = config.find_all_availability_zones(session)
 
-    if domain in hosts.BASE_DOMAIN_CERTS.keys():
-        cert = lib.cert_arn_lookup(session, "api." + hosts.BASE_DOMAIN_CERTS[domain])
-    else:
-        # default to using api.theboss.io
-        cert = lib.cert_arn_lookup(session, "api.theboss.io")
-    config.add_loadbalancer("LoadBalancer",
-                            "elb." + domain,
-                            [("443", "80", "HTTPS", cert)],
-                            ["Endpoint"],
-                            subnets=external_subnets,
-                            security_groups=["AllHTTPSSecurityGroup"],
-                            depends_on=["AllHTTPSSecurityGroup"])
 
-    config.add_ec2_instance("Endpoint",
-                            "endpoint." + domain,
-                            lib.ami_lookup(session, "endpoint.boss"),
-                            keypair,
-                            subnet="ExternalSubnet",
-                            public_ip=True,
-                            type_=ENDPONT_TYPE,
-                            security_groups=["InternalSecurityGroup"],
-                            user_data=user_data,
-                            depends_on="EndpointDB") # make sure the DB is launched before we start
+    user_data = configuration.UserData()
+    user_data["system"]["fqdn"] = "cachemanager." + domain
+    user_data["system"]["type"] = "cachemanager"
+    user_data["aws"]["cache"] = "cache." + domain
+    user_data["aws"]["cache-state"] = "cache-state." + domain
 
     config.add_ec2_instance("CacheManager",
-                            "cachemanager." + domain,
-                            lib.ami_lookup(session, "cachemanager.boss"),
-                            keypair,
-                            subnet="ExternalSubnet",
-                            public_ip=False,
-                            iface_check=False,
-                            user_data=user_data,
-                            security_groups=["InternalSecurityGroup"])
-
-    config.add_rds_db("EndpointDB",
-                      "endpoint-db." + domain,
-                      db_config.get("port"),
-                      db_config.get("name"),
-                      db_config.get("user"),
-                      db_config.get("password"),
-                      az_subnets,
-                      type_ = RDS_TYPE,
-                      security_groups=["InternalSecurityGroup"])
-
-    with open(DYNAMO_SCHEMA, 'r') as fh:
-        dynamo_cfg = json.load(fh)
-    config.add_dynamo_table_from_json("EndpointMetaDB",'bossmeta.' + domain, **dynamo_cfg)
-
-    config.add_redis_replication("Cache",
-                                 "cache." + domain,
-                                 az_subnets,
-                                 ["InternalSecurityGroup"],
-                                 type_=REDIS_TYPE,
-                                 clusters=REDIS_CLUSTER_SIZE)
-    config.add_redis_replication("CacheState",
-                                 "cache-state." + domain,
-                                 az_subnets,
-                                 ["InternalSecurityGroup"],
-                                 type_=REDIS_TYPE,
-                                 clusters=REDIS_CLUSTER_SIZE)
-
-    # Allow HTTPS access to endpoint loadbalancer from anywhere
-    config.add_security_group("AllHTTPSSecurityGroup",
-                              "https",
-                              [("tcp", "443", "443", "0.0.0.0/0")])
-
+                                "cachemanager." + domain,
+                                lib.ami_lookup(session, "endpoint.boss"),
+                                keypair,
+                                subnet="ExternalSubnet",
+                                public_ip=True,
+                                type_=CACHE_MANAGER_TYPE,
+                                security_groups=["InternalSecurityGroup"],
+                                user_data=user_data,
+                                role="arn:aws:iam::256215146792:instance-profile/cachemanager")
     return config
 
 
@@ -190,34 +124,10 @@ def create(session, domain):
     """Configure Vault, create the configuration, and launch it"""
     keypair = lib.keypair_lookup(session)
 
-    call = lib.ExternalCalls(session, keypair, domain)
-
-    db = {
-        "name":"boss",
-        "user":"testuser",
-        "password": lib.generate_password(),
-        "port": "3306"
-    }
-
-    # Configure Vault and create the user data config that the endpoint will
-    # use for connecting to Vault and the DB instance
-    endpoint_token = call.vault("vault-provision", "endpoint")
-    user_data = configuration.UserData()
-    user_data["vault"]["token"] = endpoint_token
-    user_data["system"]["fqdn"] = "endpoint." + domain
-    user_data["system"]["type"] = "endpoint"
-    user_data["aws"]["db"] = "endpoint-db." + domain
-    user_data["aws"]["cache"] = "cache." + domain
-    user_data["aws"]["cache-state"] = "cache-state." + domain
-    user_data["aws"]["meta-db"] = "bossmeta." + domain
-    user_data["auth"]["OIDC_VERIFY_SSL"] = str(domain in hosts.BASE_DOMAIN_CERTS.keys())
-
-    call.vault_write(VAULT_DJANGO, secret_key = str(uuid.uuid4()))
-    call.vault_write(VAULT_DJANGO_DB, **db)
 
     try:
-        name = lib.domain_to_stackname("production." + domain)
-        config = create_config(session, domain, keypair, str(user_data), db)
+        name = lib.domain_to_stackname("cachemanager." + domain)
+        config = create_config(session, domain, keypair, str(user_data))
 
         success = config.create(session, name)
         if not success:
@@ -225,59 +135,14 @@ def create(session, domain):
         else:
             post_init(session, domain)
     except:
-        print("Error detected, revoking secrets") # Do we want to revoke if an exception from post_init?
-        try:
-            call.vault_delete(VAULT_DJANGO)
-            call.vault_delete(VAULT_DJANGO_DB)
-        except:
-            print("Error revoking Django credentials")
-        try:
-            call.vault("vault-revoke", endpoint_token)
-        except:
-            print("Error revoking Endpoint Server Vault access token")
+        print("Error detected") # Do we want to revoke if an exception from post_init?
         raise
 
 
 def post_init(session, domain):
-    keypair = lib.keypair_lookup(session)
-    call = lib.ExternalCalls(session, keypair, domain)
-
-    print("Configuring KeyCloak")  # Should abstract for production and proofreader
-
-    def configure_auth(auth_port):
-        # NOTE DP: If an ELB is created the public_uri should be the Public DNS Name
-        #          of the ELB. Endpoint Django instances may have to be restarted if running.
-        dns = lib.elb_public_lookup(session, "elb." + domain)
-        if domain in hosts.BASE_DOMAIN_CERTS.keys():
-            dns_elb = dns
-            dns = "api." + hosts.BASE_DOMAIN_CERTS[domain]
-            lib.set_domain_to_dns_name(session, dns, dns_elb)
-        uri = "https://{}".format(dns)
-        call.vault_update(VAULT_DJANGO_AUTH, public_uri = uri)
-
-        print("Update KeyCloak Client Info")
-        creds = call.vault_read("secret/auth")
-        kc = lib.KeyCloakClient("http://localhost:{}".format(auth_port))
-        kc.login(creds["username"], creds["password"])
-
-        kc.add_redirect_uri("BOSS","endpoint", uri + "/*")
-        kc.logout()
-    call.set_ssh_target("auth")
-    call.ssh_tunnel(configure_auth, 8080)
-
-    print("Initializing Django")  # Should create ssh call with array of commands
-    call.set_ssh_target("endpoint")
-    migrate_cmd = "sudo python3 /srv/www/django/manage.py "
-    call.ssh(migrate_cmd + "makemigrations")  #
-    call.ssh(migrate_cmd + "makemigrations bosscore")  # will hang if it cannot contact the auth server
-    call.ssh(migrate_cmd + "migrate")
-    call.ssh(migrate_cmd + "collectstatic --no-input")
-    # http://stackoverflow.com/questions/6244382/how-to-automate-createsuperuser-on-django
-    # For how it is possible to script createsuperuser command
-    call.ssh("sudo service uwsgi-emperor reload")
-    call.ssh("sudo service nginx restart")
+    print("post_init") 
 
     # Tell Scalyr to get CloudWatch metrics for these instances.
-    instances = ["endpoint." + domain]
+    instances = ["cachemanager." + domain]
     scalyr.add_instances_to_scalyr(
         session, PRODUCTION_REGION, instances)
