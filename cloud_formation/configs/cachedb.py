@@ -140,7 +140,7 @@ def create(session, domain):
 
 
 def post_init(session, domain):
-    print("post_init") 
+    print("post_init")
 
     # Tell Scalyr to get CloudWatch metrics for these instances.
     instances = ["cachemanager." + domain]
