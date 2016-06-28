@@ -6,6 +6,7 @@
 {% set venv_home = '/home/' + user + '/lambdaenv' %}
 {% set spdb_home = venv_home + '/local/lib/python3.4/site-packages/spdb' %}
 {% set bossutils_home = venv_home + '/local/lib/python3.4/site-packages/bossutils' %}
+{% set lambda_home = venv_home + '/local/lib/python3.4/site-packages/lambda' %}
 
 dev-tools:
   pkg.group_installed:
@@ -67,6 +68,16 @@ lambda-spdb-lib:
     - unless: test -e {{ spdb_home }}/c_lib/c_version/ndlib.so
 
 lambda-boss-utils:
+  file.recurse:
+    - name: {{ bossutils_home }}
+    - source: salt://boss-tools/files/boss-tools.git/bossutils
+    - include_empty: true
+    - user: {{ user }}
+    - group: {{ user }}
+    - file_mode: 755
+    - dirmode: 755
+
+lambda-lambda:
   file.recurse:
     - name: {{ bossutils_home }}
     - source: salt://boss-tools/files/boss-tools.git/bossutils

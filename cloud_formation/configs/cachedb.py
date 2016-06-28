@@ -48,7 +48,7 @@ CACHE_MANAGER_TYPE = {
 }
 
 
-def create_config(session, domain, keypair=None, user_data=None, db_config={}):
+def create_config(session, domain, keypair=None, user_data=None):
     """
     Create the CloudFormationConfiguration object.
     Args:
@@ -91,45 +91,66 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                                                    internal_sg_id,
                                                    "ID of internal Security Group"))
 
-    az_subnets, external_subnets = config.find_all_availability_zones(session)
+    #az_subnets, external_subnets = config.find_all_availability_zones(session)
+
+    config.add_security_group("CacheMgrSecurityGroup",
+                              "cachemgr",
+                              [("tcp", "443", "443", "0.0.0.0/0")])
+
+    config.add_ec2_instance("CacheManager",
+                                "cachemanager." + domain,
+                                lib.ami_lookup(session, "cachemanager.boss"),
+                                keypair,
+                                subnet="InternalSubnet",
+                                public_ip=False,
+                                type_=CACHE_MANAGER_TYPE,
+                                security_groups=["InternalSecurityGroup"],
+                                user_data=user_data)
+                                #role="arn:aws:iam::256215146792:instance-profile/cachemanager")
+
+    # config.add_lambda("DNSLambda",
+    #                   "dns." + domain,
+    #                   "DNSLambdaRole",
+    #                   "lambda/updateRoute53/index.py",
+    #                   timeout=10,
+    #                   depends_on="DNSZone")
+    #
+    #
+    # role = "arn:aws:iam::256215146792:role/UpdateRoute53"
+    # config.add_arg(configuration.Arg.String("DNSLambdaRole", role,
+    #                                         "IAM role for Lambda dns." + domain))
+    #
+    # config.add_lambda_permission("DNSLambdaExecute", "DNSLambda")
+    #
+    # config.add_sns_topic("DNSSNS",
+    #                      "dns." + domain,
+    #                      "dns." + domain,
+    #                      [("lambda", {"Fn::GetAtt": ["DNSLambda", "Arn"]})])
+
+    return config
 
 
+def generate(folder, domain):
+    """Create the configuration and save it to disk"""
+    name = lib.domain_to_stackname("cachedb." + domain)
+    config = create_config(None, domain)
+    config.generate(name, folder)
+
+
+def create(session, domain):
+    """Create the configuration, and launch it"""
     user_data = configuration.UserData()
     user_data["system"]["fqdn"] = "cachemanager." + domain
     user_data["system"]["type"] = "cachemanager"
     user_data["aws"]["cache"] = "cache." + domain
     user_data["aws"]["cache-state"] = "cache-state." + domain
 
-    config.add_ec2_instance("CacheManager",
-                                "cachemanager." + domain,
-                                lib.ami_lookup(session, "endpoint.boss"),
-                                keypair,
-                                subnet="ExternalSubnet",
-                                public_ip=True,
-                                type_=CACHE_MANAGER_TYPE,
-                                security_groups=["InternalSecurityGroup"],
-                                user_data=user_data,
-                                role="arn:aws:iam::256215146792:instance-profile/cachemanager")
-    return config
-
-
-def generate(folder, domain):
-    """Create the configuration and save it to disk"""
-    name = lib.domain_to_stackname("production." + domain)
-    config = create_config(None, domain)
-    config.generate(name, folder)
-
-
-def create(session, domain):
-    """Configure Vault, create the configuration, and launch it"""
-    keypair = lib.keypair_lookup(session)
-
-
     try:
-        name = lib.domain_to_stackname("cachemanager." + domain)
-        config = create_config(session, domain, keypair, str(user_data))
+        name = lib.domain_to_stackname("cachedb." + domain)
+        config = create_config(session, domain, str(user_data))
 
         success = config.create(session, name)
+        print("finished config.create")
         if not success:
             raise Exception("Create Failed")
         else:
@@ -146,3 +167,11 @@ def post_init(session, domain):
     instances = ["cachemanager." + domain]
     scalyr.add_instances_to_scalyr(
         session, PRODUCTION_REGION, instances)
+
+def delete(session, domain):
+    # NOTE: CloudWatch logs for the DNS Lambda are not deleted
+    #lib.route53_delete_records(session, domain, "auth." + domain)
+    lib.route53_delete_records(session, domain, "consul." + domain)
+    lib.route53_delete_records(session, domain, "vault." + domain)
+    lib.sns_unsubscribe_all(session, "dns." + domain)
+    lib.delete_stack(session, domain, "cachedb")
