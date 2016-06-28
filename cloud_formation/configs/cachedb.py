@@ -174,22 +174,6 @@ def pre_init(session, domain):
 
     print("Creating Lambdas Environments..")
 
-    # def package_lambda(port):
-    #     # NOTE DP: If an ELB is created the public_uri should be the Public DNS Name
-    #     #          of the ELB. Endpoint Django instances may have to be restarted if running.
-    #     home_folder = "/home/ec2-user"
-    #     lambdaenv = "/home/ec2-user/lambdaenv"
-    #     package_name = "lambda.{}".format(domain)
-    #     args = ('lambdaPackage.sh', package_name)
-    #     #args = ('cp', '-r', '-q', lambdaenv, '.')
-    #     popen = subprocess.Popen(args, cwd=home_folder, stdout=subprocess.PIPE)
-    #     exit_code = popen.wait()
-    #     output = popen.stdout.read()
-    #     if not exit_code == 0:
-    #         print(str(output))
-    #         return False
-    #     return True
-
     package_name = "lambda.{}".format(domain)
     cmd =  "lambdaPackage.sh {}".format(package_name)
     ssh(keypair, "52.23.27.39", "ec2-user", cmd)
