@@ -152,6 +152,8 @@ def create(session, domain):
     user_data["aws"]["cache"] = "cache." + domain
     user_data["aws"]["cache-state"] = "cache-state." + domain
 
+    keypair = lib.keypair_lookup(session)
+
     try:
         name = lib.domain_to_stackname("cachedb." + domain)
         pre_init(session, domain);
@@ -192,3 +194,4 @@ def post_init(session, domain):
 def delete(session, domain):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
     lib.delete_stack(session, domain, "cachedb")
+
