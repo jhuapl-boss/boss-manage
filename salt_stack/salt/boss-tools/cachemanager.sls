@@ -5,13 +5,13 @@ include:
 
 service:
     file.managed:
-        - name: /etc/init.d/preftchd
+        - name: /etc/init.d/prefetchd
         - source: salt://boss-tools/files/boss-tools.git/cachemgr/prefetchd.py
         - user: root
         - group: root
         - mode: 555
     cmd.run:
-        - name: update-rc.d preftchd defaults 10
+        - name: update-rc.d prefetchd defaults 10
         - user: root
 
 servicedir:
@@ -20,4 +20,3 @@ servicedir:
         - user: root
         - group: root
         - dir_mode: 775
-
