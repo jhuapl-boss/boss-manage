@@ -35,6 +35,10 @@ import json
 import scalyr
 import uuid
 import sys
+import boto3
+import os
+import subprocess
+from ssh import *
 
 # Region production is created in.  Later versions of boto3 should allow us to
 # extract this from the session variable.  Hard coding for now.
@@ -93,20 +97,23 @@ def create_config(session, domain, keypair=None, user_data=None):
 
     #az_subnets, external_subnets = config.find_all_availability_zones(session)
 
+    # TODO removed this. It was a test to make sure the script is actually working
     config.add_security_group("CacheMgrSecurityGroup",
                               "cachemgr",
                               [("tcp", "443", "443", "0.0.0.0/0")])
 
-    config.add_ec2_instance("CacheManager",
-                                "cachemanager." + domain,
-                                lib.ami_lookup(session, "cachemanager.boss"),
-                                keypair,
-                                subnet="InternalSubnet",
-                                public_ip=False,
-                                type_=CACHE_MANAGER_TYPE,
-                                security_groups=["InternalSecurityGroup"],
-                                user_data=user_data)
-                                #role="arn:aws:iam::256215146792:instance-profile/cachemanager")
+    # config.add_ec2_instance("CacheManager",
+    #                             "cachemanager." + domain,
+    #                             lib.ami_lookup(session, "cachemanager.boss"),
+    #                             keypair,
+    #                             subnet="InternalSubnet",
+    #                             public_ip=False,
+    #                             type_=CACHE_MANAGER_TYPE,
+    #                             security_groups=["InternalSecurityGroup"],
+    #                             user_data=user_data)
+    #                             #role="arn:aws:iam::256215146792:instance-profile/cachemanager")
+
+
 
     # config.add_lambda("DNSLambda",
     #                   "dns." + domain,
@@ -147,6 +154,7 @@ def create(session, domain):
 
     try:
         name = lib.domain_to_stackname("cachedb." + domain)
+        pre_init(session, domain);
         config = create_config(session, domain, str(user_data))
 
         success = config.create(session, name)
@@ -159,6 +167,33 @@ def create(session, domain):
         print("Error detected") # Do we want to revoke if an exception from post_init?
         raise
 
+def pre_init(session, domain):
+    # setup lambda environments
+    keypair = lib.keypair_lookup(session)
+
+
+    print("Creating Lambdas Environments..")
+
+    # def package_lambda(port):
+    #     # NOTE DP: If an ELB is created the public_uri should be the Public DNS Name
+    #     #          of the ELB. Endpoint Django instances may have to be restarted if running.
+    #     home_folder = "/home/ec2-user"
+    #     lambdaenv = "/home/ec2-user/lambdaenv"
+    #     package_name = "lambda.{}".format(domain)
+    #     args = ('lambdaPackage.sh', package_name)
+    #     #args = ('cp', '-r', '-q', lambdaenv, '.')
+    #     popen = subprocess.Popen(args, cwd=home_folder, stdout=subprocess.PIPE)
+    #     exit_code = popen.wait()
+    #     output = popen.stdout.read()
+    #     if not exit_code == 0:
+    #         print(str(output))
+    #         return False
+    #     return True
+
+    package_name = "lambda.{}".format(domain)
+    cmd =  "lambdaPackage.sh {}".format(package_name)
+    ssh(keypair, "52.23.27.39", "ec2-user", cmd)
+
 
 def post_init(session, domain):
     print("post_init")
@@ -168,10 +203,8 @@ def post_init(session, domain):
     scalyr.add_instances_to_scalyr(
         session, PRODUCTION_REGION, instances)
 
+
+
 def delete(session, domain):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
-    #lib.route53_delete_records(session, domain, "auth." + domain)
-    lib.route53_delete_records(session, domain, "consul." + domain)
-    lib.route53_delete_records(session, domain, "vault." + domain)
-    lib.sns_unsubscribe_all(session, "dns." + domain)
     lib.delete_stack(session, domain, "cachedb")
