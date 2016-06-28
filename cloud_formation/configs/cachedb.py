@@ -173,7 +173,7 @@ def post_init(session, domain):
 def delete(session, domain):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
     #lib.route53_delete_records(session, domain, "auth." + domain)
-    lib.route53_delete_records(session, domain, "consul." + domain)
-    lib.route53_delete_records(session, domain, "vault." + domain)
-    lib.sns_unsubscribe_all(session, "dns." + domain)
+    # lib.route53_delete_records(session, domain, "consul." + domain)
+    # lib.route53_delete_records(session, domain, "vault." + domain)
+    # lib.sns_unsubscribe_all(session, "dns." + domain)
     lib.delete_stack(session, domain, "cachedb")
