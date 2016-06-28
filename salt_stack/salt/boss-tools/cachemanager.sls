@@ -16,7 +16,7 @@ service:
 
 servicedir:
     file.directory:
-        - name: /var/run/cachemanager
+        - name: /var/run/prefetchd
         - user: root
         - group: root
         - dir_mode: 775

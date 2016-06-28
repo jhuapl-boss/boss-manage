@@ -697,7 +697,6 @@ class CloudFormationConfiguration:
         if role is not None:
             self.resources[key]["Properties"]["IamInstanceProfile"] = role
 
-            self.resources[key]["Properties"]["IamInstanceProfile"] = { "Fn::Base64" : user_data }
 
         _ami = Arg.AMI(key + "AMI", ami,
                        "AMI for the EC2 Instance '{}'".format(key))
