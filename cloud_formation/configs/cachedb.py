@@ -145,9 +145,11 @@ def create(session, domain):
     user_data["aws"]["cache"] = "cache." + domain
     user_data["aws"]["cache-state"] = "cache-state." + domain
 
+    keypair = lib.keypair_lookup(session)
+
     try:
         name = lib.domain_to_stackname("cachedb." + domain)
-        config = create_config(session, domain, str(user_data))
+        config = create_config(session, domain, keypair, str(user_data))
 
         success = config.create(session, name)
         print("finished config.create")
