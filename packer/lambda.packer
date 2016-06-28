@@ -57,7 +57,7 @@
         "ssh_bastion_username": "{{user `aws_bastion_user`}}",
         "ssh_bastion_host": "{{user `aws_bastion_ip`}}",
         "ssh_bastion_private_key_file": "{{user `aws_bastion_priv_key_file`}}",
-        "force_deregister" : "{{user `force_deregister`}}"
+        "force_deregister" : "true"
     }],
 
     "provisioners": [
