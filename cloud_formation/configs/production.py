@@ -132,6 +132,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                             type_=ENDPONT_TYPE,
                             security_groups=["InternalSecurityGroup"],
                             user_data=user_data,
+                            role="endpoint",
                             depends_on="EndpointDB") # make sure the DB is launched before we start
 
     config.add_rds_db("EndpointDB",
