@@ -110,8 +110,8 @@ def create_config(session, domain, keypair=None, user_data=None):
                                 public_ip=False,
                                 type_=CACHE_MANAGER_TYPE,
                                 security_groups=["InternalSecurityGroup"],
-                                user_data=user_data)
-                                #role="arn:aws:iam::256215146792:instance-profile/cachemanager")
+                                user_data=user_data,
+                                role="cachemanager") # arn:aws:iam::256215146792:instance-profile/cachemanager"
 
 
 
