@@ -36,7 +36,7 @@ Place `microns-bastion20151117.pem` in the `bin` folder.
 
 ```shell
 $ cd bin
-$ ./packer.py auth vault endpoint proofreader-web
+$ ./packer.py auth vault endpoint proofreader-web consul
 ```
 
 *Note: because the packer.py script is running builds in parallel it is redirecting
@@ -118,7 +118,9 @@ Once you have the needed API keys:
 
 For the *core*, *production*, *proofreader*, *cloudwatch* configurations
 run the following command. You have to wait for each command to finish before
-launching the next configuration as they build upon each other.
+launching the next configuration as they build upon each other.  Only use the 
+*--scenario production* flag if you are rebuilding integration.  It is not used
+if you are following these instructions to build a developer environment.
 ```shell
 $ ./cloudformation.py create integration.boss --scenario production <config>
 ```

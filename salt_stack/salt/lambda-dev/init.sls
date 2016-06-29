@@ -6,6 +6,7 @@
 {% set venv_home = '/home/' + user + '/lambdaenv' %}
 {% set spdb_home = venv_home + '/local/lib/python3.4/site-packages/spdb' %}
 {% set bossutils_home = venv_home + '/local/lib/python3.4/site-packages/bossutils' %}
+{% set lambda_home = venv_home + '/local/lib/python3.4/site-packages/lambda' %}
 
 dev-tools:
   pkg.group_installed:
@@ -19,6 +20,15 @@ lambda-python:
       - python34-pip.noarch
       - python34-devel.x86_64
       - python34-virtualenv.noarch
+
+# Salt on Amazon Linux AMI uses python2.6 which doesn't have pip, so can't
+# use pip.installed.
+lambda-boto3:
+  cmd.run:
+    - name: /usr/bin/pip-3.4 install boto3
+#  pip.installed:
+#    - name: boto3
+#    - bin_env: /usr/bin/pip-3.4
 
 lambda-spdb-prerequirements:
   pkg.installed:
@@ -61,6 +71,16 @@ lambda-boss-utils:
   file.recurse:
     - name: {{ bossutils_home }}
     - source: salt://boss-tools/files/boss-tools.git/bossutils
+    - include_empty: true
+    - user: {{ user }}
+    - group: {{ user }}
+    - file_mode: 755
+    - dirmode: 755
+
+lambda-lambda:
+  file.recurse:
+    - name: {{ lambda_home }}
+    - source: salt://boss-tools/files/boss-tools.git/lambda
     - include_empty: true
     - user: {{ user }}
     - group: {{ user }}
