@@ -102,30 +102,30 @@ def create_config(session, domain, keypair=None, user_data=None):
                               "cachemgr",
                               [("tcp", "443", "443", "0.0.0.0/0")])
 
-    # config.add_ec2_instance("CacheManager",
-    #                             "cachemanager." + domain,
-    #                             lib.ami_lookup(session, "cachemanager.boss"),
-    #                             keypair,
-    #                             subnet="InternalSubnet",
-    #                             public_ip=False,
-    #                             type_=CACHE_MANAGER_TYPE,
-    #                             security_groups=["InternalSecurityGroup"],
-    #                             user_data=user_data)
-    #                             #role="arn:aws:iam::256215146792:instance-profile/cachemanager")
+    config.add_ec2_instance("CacheManager",
+                                "cachemanager." + domain,
+                                lib.ami_lookup(session, "cachemanager.boss"),
+                                keypair,
+                                subnet="InternalSubnet",
+                                public_ip=False,
+                                type_=CACHE_MANAGER_TYPE,
+                                security_groups=["InternalSecurityGroup"],
+                                user_data=user_data)
+                                #role="arn:aws:iam::256215146792:instance-profile/cachemanager")
 
 
 
-    # config.add_lambda("DNSLambda",
-    #                   "dns." + domain,
-    #                   "DNSLambdaRole",
+    # config.add_lambda("S3FlushLambda",
+    #                   "s3flushlambda." + domain,
+    #                   "LambdaCacheExecutionRole",
     #                   "lambda/updateRoute53/index.py",
     #                   timeout=10,
     #                   depends_on="DNSZone")
     #
     #
-    # role = "arn:aws:iam::256215146792:role/UpdateRoute53"
-    # config.add_arg(configuration.Arg.String("DNSLambdaRole", role,
-    #                                         "IAM role for Lambda dns." + domain))
+    # role = "arn:aws:iam::256215146792:role/lambda_cache_execution"
+    # config.add_arg(configuration.Arg.String("LambdaCacheExecutionRole", role,
+    #                                         "IAM role for s3flushlambda." + domain))
     #
     # config.add_lambda_permission("DNSLambdaExecute", "DNSLambda")
     #
@@ -157,7 +157,7 @@ def create(session, domain):
     try:
         name = lib.domain_to_stackname("cachedb." + domain)
         pre_init(session, domain);
-        config = create_config(session, domain, str(user_data))
+        config = create_config(session, domain, keypair, str(user_data))
 
         success = config.create(session, name)
         print("finished config.create")
@@ -169,16 +169,17 @@ def create(session, domain):
         print("Error detected") # Do we want to revoke if an exception from post_init?
         raise
 
+
 def pre_init(session, domain):
+    pass
     # setup lambda environments
-    keypair = lib.keypair_lookup(session)
-
-
-    print("Creating Lambdas Environments..")
-
-    package_name = "lambda.{}".format(domain)
-    cmd =  "lambdaPackage.sh {}".format(package_name)
-    ssh(keypair, "52.23.27.39", "ec2-user", cmd)
+    # TODO works except for ssh part, can't find key.
+    # keypair = lib.keypair_lookup(session)
+    # print("Creating Lambdas Environments..")
+    #
+    # package_name = "lambda.{}".format(domain)
+    # cmd =  "lambdaPackage.sh {}".format(package_name)
+    # ssh(keypair, "52.23.27.39", "ec2-user", cmd)
 
 
 def post_init(session, domain):
