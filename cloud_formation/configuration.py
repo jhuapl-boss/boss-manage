@@ -1474,14 +1474,14 @@ class CloudFormationConfiguration:
             }
         }
 
-    def add_cloudwatch_alarm(self, key, description, statistic, metric, comparison, threashold, alarm_actions, dimensions={}, depends_on=None):
+    def add_cloudwatch_alarm(self, key, description, metric, statistic, comparison, threashold, alarm_actions, dimensions={}, depends_on=None):
         """Add CloudWatch Alarm for a LoadBalancer
 
         Args:
             key (string) : Unique name for the resource in the template
             description (string) : Alarm description
-            statistic (string) : Alarm statistic
             metric (string) : Statistic metric
+            statistic (string) : Alarm statistic (SampleCount|Average|Sum|Minimum|Maximum)
             comparison (string) : Alarm's comparison operation
             threashold (string) : Threashold limit
             alarm_actions (list) : List of ARN string of actions to execute when the alarm is triggered
