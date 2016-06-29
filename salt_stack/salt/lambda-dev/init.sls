@@ -79,8 +79,8 @@ lambda-boss-utils:
 
 lambda-lambda:
   file.recurse:
-    - name: {{ bossutils_home }}
-    - source: salt://boss-tools/files/boss-tools.git/bossutils
+    - name: {{ lambda_home }}
+    - source: salt://boss-tools/files/boss-tools.git/lambda
     - include_empty: true
     - user: {{ user }}
     - group: {{ user }}
