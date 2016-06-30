@@ -74,6 +74,7 @@ VPCS = {
     "kleisdm1" : 105,
     "leea1"    : 106,
     "manavpj1" : 107,
+    "davismj1" : 108,
 
 }
 
@@ -93,7 +94,8 @@ for vpc in VPCS:
 # domains listed in this dictionary have certificates for the auth and api loadbalancers to use.
 BASE_DOMAIN_CERTS = {"production.boss": "theboss.io",
                       "integration.boss": "integration.theboss.io",
-                      "hiderrt1.boss": "hiderrt1.theboss.io"}
+                      "hiderrt1.boss": "hiderrt1.theboss.io",
+                      "manavpj1.boss": "manavpj1.theboss.io",}
 
 
 ##

@@ -15,3 +15,4 @@ jenkins:
       # security, when installing new jobs.
       installed:
           endpoint: /srv/salt/jenkins-jobs/endpoint.xml
+          spdb: /srv/salt/jenkins-jobs/spdb.xml

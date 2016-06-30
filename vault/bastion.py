@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.5
 
 # Copyright 2016 The Johns Hopkins University Applied Physics Laboratory
 #
@@ -298,7 +298,9 @@ def connect_vault(key, remote_ip, bastion_ip, cmd):
         cmd (function): vault.py function expect to connect to Vault at localhost:8200
     """
 
-    proc = create_tunnel_aplnis(key, 8200, remote_ip, 8200, bastion_ip)
+    #proc = create_tunnel_aplnis(key, 8200, remote_ip, 8200, bastion_ip)
+    # connection to bastion's http proxy server
+    proc = create_tunnel_aplnis(key, 3128, "localhost", 3128, bastion_ip)
     try:
         return cmd()
     finally:
@@ -420,11 +422,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description = "Script creating SSH Tunnels and connecting to internal VMs",
                                      formatter_class=argparse.RawDescriptionHelpFormatter,
                                      epilog=commands_help)
+
+
     parser.add_argument("--aws-credentials", "-a",
                         metavar = "<file>",
                         default = os.environ.get("AWS_CREDENTIALS"),
                         type = argparse.FileType('r'),
                         help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
+    parser.add_argument("--private-ip", "-p",
+                        action='store_true',
+                        default=False,
+                        help = "add this flag to type in a private IP address in internal command instead of a DNS name which is looked up")
     parser.add_argument("--ssh-key", "-s",
                         metavar = "<file>",
                         default = os.environ.get("SSH_KEY"),
@@ -456,7 +464,10 @@ if __name__ == "__main__":
 
     session = create_session(args.aws_credentials)
     bastion = machine_lookup(session, args.bastion)
-    private = machine_lookup(session, args.internal, public_ip = False)
+    if args.private_ip:
+        private = args.internal
+    else:
+        private = machine_lookup(session, args.internal, public_ip=False)
 
     if args.command in ("ssh",):
         ssh(args.ssh_key, private, bastion)
@@ -465,7 +476,7 @@ if __name__ == "__main__":
     elif args.command in ("ssh-tunnel",):
         ssh_tunnel(args.ssh_key, private, bastion, *args.arguments)
     elif args.command in vault.COMMANDS:
-        connect_vault(args.ssh_key, private, bastion, lambda: vault.COMMANDS[args.command](args.internal, *args.arguments))
+        connect_vault(args.ssh_key, private, bastion, lambda: vault.COMMANDS[args.command](args.internal, private, *args.arguments))
     else:
         parser.print_usage()
         sys.exit(1)

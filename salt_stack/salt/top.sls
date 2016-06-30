@@ -1,4 +1,8 @@
 base:
+    'consul*':
+        - consul
+        - boss-tools.bossutils
+
     'vault*':
         - vault.server
         - boss-tools.bossutils
@@ -18,6 +22,9 @@ base:
         - scalyr
         - scalyr.update_host
         - git
+
+    'lambda*':
+        - lambda-dev
 
     'ep-jenkins*':
         - jenkins-microns.endpoint
@@ -41,3 +48,10 @@ base:
         - git
         - vault.client
         - aws.boto3
+
+    'cachemanager*':
+        - boss-tools.bossutils
+        - boss-tools.cachemanager
+        - scalyr
+        - scalyr.update_host
+        - git

@@ -157,7 +157,7 @@ if __name__ == "__main__":
 
     session = create_session(args.aws_credentials)
     if args.domain_name.endswith(".boss"):
-        hostname = elb_public_lookup(session, "elb-auth." + args.domain_name)
+        hostname = elb_public_lookup(session, "auth." + args.domain_name)
     else:
         hostname = args.domain_name
 
