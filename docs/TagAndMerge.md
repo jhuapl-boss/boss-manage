@@ -15,6 +15,7 @@ For each of the following repositories
 * https://github.com/aplmicrons/proofread.git
 * https://github.com/aplmicrons/boss-tools.git
 * https://github.com/aplmicrons/spdb.git
+* https://github.com/jhuapl-boss/ndio.git (ndio is not a sub-module, but also needs tagging)
 
 
 If you don't have the repository already cloned
@@ -64,6 +65,7 @@ For each of the following repositories
 * https://github.com/aplmicrons/proofread.git
 * https://github.com/aplmicrons/boss-tools.git
 * https://github.com/aplmicrons/spdb.git
+* https://github.com/jhuapl-boss/ndio.git (ndio is not a sub-module, but also needs tagging)
 
 
 If you don't have the repository already cloned
