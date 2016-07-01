@@ -15,6 +15,7 @@ include:
     # The proofreader has both Django and stand-alone Python code.
     - python.nose2-3
     - python.nose2-cov-3
+    - python.jsonschema
 
 test_db:
     mysql_user.present:

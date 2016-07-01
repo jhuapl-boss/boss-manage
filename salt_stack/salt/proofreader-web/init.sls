@@ -7,14 +7,7 @@ include:
     - proofreader-web.django
     - python.python35
     - python.pip
-
-jsonschema:
-    pip.installed:
-        - name: jsonschema==2.5.1
-        - bin_env: /usr/local/bin/pip3
-        - require:
-            - sls: python.python35
-            - sls: python.pip
+    - python.jsonschema
 
 proofreader_client_build:
   file.recurse:
