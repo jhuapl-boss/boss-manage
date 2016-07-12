@@ -68,6 +68,7 @@ def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnet
                                min = size,
                                max = size,
                                elb = key + "LoadBalancer",
+                               notifications = "DNSSNS",
                                role = role,
                                depends_on = key + "LoadBalancer")
 
@@ -182,7 +183,7 @@ runcmd:
     user_data = configuration.UserData()
     user_data["system"]["fqdn"] = "auth." + domain
     user_data["system"]["type"] = "auth"
-    deps = ["AuthSecurityGroup", "AttachInternetGateway"]
+    deps = ["AuthSecurityGroup", "AttachInternetGateway", "DNSLambda", "DNSSNS", "DNSLambdaExecute"]
 
     SCENARIO = os.environ["SCENARIO"]
     USE_DB = SCENARIO in ("production",)
