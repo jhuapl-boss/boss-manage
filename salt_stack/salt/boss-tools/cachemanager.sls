@@ -3,21 +3,48 @@ include:
     - boss-tools.bossutils
     - aws.boto3
 
-delayedwrite-servicedir:
-    file.directory:
-        - name: /var/run/boss_delayedwrited
+service-cachemiss:
+    file.managed:
+        - name: /etc/init.d/boss-cachemissd
+        - source: salt://boss-tools/files/boss-tools.git/cachemgr/boss_cachemissd.py
         - user: root
         - group: root
-        - dir_mode: 775
+        - mode: 555
+    cmd.run:
+        - name: update-rc.d boss-cachemissd defaults 10
+        - user: root
 
-delayedwrite-service:
+service-deadletter:
     file.managed:
-        - name: /etc/init.d/boss_delayedwrited
+        - name: /etc/init.d/boss-deadletterd
+        - source: salt://boss-tools/files/boss-tools.git/cachemgr/boss_deadletterd.py
+        - user: root
+        - group: root
+        - mode: 555
+    cmd.run:
+        - name: update-rc.d boss-deadletterd defaults 10
+        - user: root
+
+service-delayedwrite:
+    file.managed:
+        - name: /etc/init.d/boss-delayedwrited
         - source: salt://boss-tools/files/boss-tools.git/cachemgr/boss_delayedwrited.py
         - user: root
         - group: root
         - mode: 555
     cmd.run:
-        - name: update-rc.d boss_delayedwrited defaults 10
+        - name: update-rc.d boss-delayedwrited defaults 10
         - user: root
+
+service-prefetch:
+    file.managed:
+        - name: /etc/init.d/boss-prefetchd
+        - source: salt://boss-tools/files/boss-tools.git/cachemgr/boss_prefetchd.py
+        - user: root
+        - group: root
+        - mode: 555
+    cmd.run:
+        - name: update-rc.d boss-prefetchd defaults 10
+        - user: root
+
 
