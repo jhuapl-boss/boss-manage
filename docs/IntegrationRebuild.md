@@ -118,7 +118,7 @@ Once you have the needed API keys:
 
 For the *core*, *production*, *proofreader*, *cloudwatch* configurations
 run the following command. You have to wait for each command to finish before
-launching the next configuration as they build upon each other.  Only use the 
+launching the next configuration as they build upon each other.  Only use the
 *--scenario production* flag if you are rebuilding integration.  It is not used
 if you are following these instructions to build a developer environment.
 ```shell
@@ -171,6 +171,9 @@ After the integration instance is launched the following tests need to be run,
 results recorded, and developers notified of any problems.
 
 ### Endpoint Integration Tests
+
+#### Test While Logged Onto the Endpoint VM
+
 ```shell
 cd /srv/www/django
 sudo python3 manage.py test --pattern="int_test_*.py"
@@ -179,6 +182,105 @@ sudo python3 manage.py test --pattern="int_test_*.py"
 
 	There are 2 tests that need >2.5GB of memory to run. To run them, set an enviroment variable "RUN_HIGH_MEM_TESTS"
 
+
+#### Test Using ndio From a Client
+
+ndio integration tests should be run from your local workstation or a VM
+**not** running within the integration VPC.
+
+First ensure ndio is current:
+
+```shell
+# Clone the repository if you do not already have it.
+git clone https://github.com/jhuapl-boss/ndio.git
+
+# Otherwise update with `pull`.
+# git pull
+
+# Make the repository the current working directory.
+cd ndio
+
+# Check out the integration branch.
+# If there is no current integration branch, use master.
+git checkout integration
+
+# Ensure dependencies are current.
+sudo pip3 install -r requirements.txt
+```
+
+In your browser, open https://api.integration.theboss.io/token
+
+Your browser should be redirected to the KeyCloak login page.
+
+Create a new account and return to the token page.
+
+Generate a token.
+
+This token will be copied-pasted into the ndio config file.
+
+```shell
+mkdir ~/.ndio
+EDITOR ~/.ndio/ndio.cfg
+```
+
+In your text editor, copy and paste the text config values below. Replace all
+all tokens with the token displayed in your browser.
+
+```
+[Project Service]
+protocol = https
+host = api.integration.theboss.io
+# Replace with your token.
+token = c23b48ceb35cae212b470a23d99d4185bac1c226
+
+[Metadata Service]
+protocol = https
+host = api.integration.theboss.io
+# Replace with your token.
+token = c23b48ceb35cae212b470a23d99d4185bac1c226
+
+[Volume Service]
+protocol = https
+host = api.integration.theboss.io
+# Replace with your token.
+token = c23b48ceb35cae212b470a23d99d4185bac1c226
+```
+
+##### Setup via the Django Admin Page
+
+In your browser, go to https://api.integration.theboss.io/admin
+
+Login using the bossadmin account created previously (this was created during
+the endpoint initialization and unit test step).
+
+Click on `Users` and determine the user name based on the email address you
+used during account creation (this step should soon be unnecessary, but at the
+time of writing, GUIDs are used for the user name).
+
+Click on `Boss roles`.
+
+Click on `ADD BOSS ROLE`.
+
+Find the user you created and add the `ADMIN` role to that user.
+
+
+##### Run ndio Integration Tests
+
+Finally, open a shell and run the integration tests:
+
+```shell
+# Go to the location of your cloned ndio repository.
+cd ndio.git
+python3 -m unittest discover -p int_test*
+```
+
+Output should say:
+
+```
+Ran x tests in x.xxxs.
+
+OK
+```
 
 ### Automated Tests
 To be filled out

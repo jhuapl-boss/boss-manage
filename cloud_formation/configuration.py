@@ -1152,7 +1152,7 @@ class CloudFormationConfiguration:
         self.add_arg(peer_vpc_)
 
     def add_loadbalancer(self, key, name, listeners, instances=None, subnets=None, security_groups=None,
-                         healthcheck_target="HTTP:80/ping/", public=True, depends_on=None ):
+                         healthcheck_target="HTTP:80/ping/", public=True, internal_dns=False, depends_on=None ):
         """
         Add LoadBalancer to the configuration
 
@@ -1169,6 +1169,8 @@ class CloudFormationConfiguration:
             subnets (None|list) : A list of Subnet unique names within the configuration to attach the LoadBalancer to
             security_groups (None|list) : A list of SecurityGroup unique names within the configuration to apply to the LoadBalancer
             healthcheck_target (string) : The URL used for for health checks Ex: "HTTP:80/"
+            public (bool) : If the ELB is public facing or internal
+            internal_dns (bool) : If the ELB should have an internal Router53 entry
             depends_on (None|string|list): A unique name or list of unique names of resources within the
                                            configuration and is used to determine the launch order of resources
         """
@@ -1227,7 +1229,9 @@ class CloudFormationConfiguration:
         #     }
         # }
 
-        self._add_record_cname(key, name, elb = True)
+        # Most ELB front ASGs that are generating their own DNS records
+        if internal_dns:
+            self._add_record_cname(key, name, elb = True)
 
     def add_autoscale_group(self, key, hostname, ami, keypair, subnets=["Subnet"], type_="t2.micro", public_ip=False, security_groups=[], user_data=None, min=1, max=1, elb=None, notifications=None, role=None, depends_on=None):
         """Add an AutoScalingGroup to the configuration
