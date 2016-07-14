@@ -102,16 +102,16 @@ def create_config(session, domain, keypair=None, user_data=None):
                               "cachemgr",
                               [("tcp", "443", "443", "0.0.0.0/0")])
 
-    config.add_ec2_instance("CacheManager",
-                                "cachemanager." + domain,
-                                lib.ami_lookup(session, "cachemanager.boss"),
-                                keypair,
-                                subnet="InternalSubnet",
-                                public_ip=False,
-                                type_=CACHE_MANAGER_TYPE,
-                                security_groups=["InternalSecurityGroup"],
-                                user_data=user_data,
-                                role="cachemanager") # arn:aws:iam::256215146792:instance-profile/cachemanager"
+    # config.add_ec2_instance("CacheManager",
+    #                             "cachemanager." + domain,
+    #                             lib.ami_lookup(session, "cachemanager.boss"),
+    #                             keypair,
+    #                             subnet="InternalSubnet",
+    #                             public_ip=False,
+    #                             type_=CACHE_MANAGER_TYPE,
+    #                             security_groups=["InternalSecurityGroup"],
+    #                             user_data=user_data,
+    #                             role="cachemanager") # arn:aws:iam::256215146792:instance-profile/cachemanager"
 
 
 
@@ -171,15 +171,15 @@ def create(session, domain):
 
 
 def pre_init(session, domain):
-    pass
+    # pass
     # setup lambda environments
     # TODO works except for ssh part, can't find key.
-    # keypair = lib.keypair_lookup(session)
-    # print("Creating Lambdas Environments..")
-    #
-    # package_name = "lambda.{}".format(domain)
-    # cmd =  "lambdaPackage.sh {}".format(package_name)
-    # ssh(keypair, "52.23.27.39", "ec2-user", cmd)
+    keypair = key = os.environ.get("SSH_KEY", None);
+    print("Creating Lambdas Environments..")
+
+    package_name = "lambda.{}".format(domain)
+    cmd =  "\"/home/ec2-user/lambdaPackage.sh {}\"".format(package_name)
+    ssh(keypair, "52.23.27.39", "ec2-user", cmd)
 
 
 def post_init(session, domain):
