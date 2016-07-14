@@ -64,20 +64,28 @@ REDIS_CLUSTER_SIZE = {
     "production": 2,
 }
 
+# Prefixes uses to generate names of SQS queues.
+S3FLUSH_QUEUE_PREFIX = 'S3flush.'
+DEADLETTER_QUEUE_PREFIX = 'Deadletter.'
+
 
 def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     """
     Create the CloudFormationConfiguration object.
     Args:
         session: amazon session object
-        domain: domain of the stack being created
+        domain (string): domain of the stack being created
         keypair: keypair used to by instances being created
-        user_data: information used by the endpoint instance and vault
-        db_config: information needed by rds
+        user_data (configuration.UserData): information used by the endpoint instance and vault.  Data will be run through the CloudFormation Fn::Join template intrinsic function so other template intrinsic functions used in the user_data will be parsed and executed.
+        db_config (dict): information needed by rds
 
     Returns: the config for the Cloud Formation stack
 
     """
+
+    # Prepare user data for parsing by CloudFormation.
+    parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
+
     config = configuration.CloudFormationConfiguration(domain, PRODUCTION_REGION)
 
     # do a couple of verification checks
@@ -115,6 +123,29 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     else:
         # default to using api.theboss.io
         cert = lib.cert_arn_lookup(session, "api.theboss.io")
+
+    # Create SQS queues and apply access control policies.
+    deadqname = lib.domain_to_stackname(DEADLETTER_QUEUE_PREFIX + domain)
+    config.add_sqs_queue(deadqname, deadqname, 30, 20160)
+
+    s3flushqname = lib.domain_to_stackname(S3FLUSH_QUEUE_PREFIX + domain)
+    max_receives = 3
+    deadq_arn = { 'Fn::GetAtt': [deadqname, 'Arn'] }
+    config.add_sqs_queue(
+        s3flushqname, s3flushqname, 30, dead=(deadq_arn, max_receives))
+
+    endpoint_role_arn = 'arn:aws:iam::256215146792:role/endpoint'
+    config.add_sqs_policy(
+        'sqsEndpointPolicy', 'sqsEndpointPolicy', 
+        [{'Ref': deadqname}, {'Ref': s3flushqname}],
+        endpoint_role_arn)
+
+    cachemanager_role_arn = 'arn:aws:iam::256215146792:role/cachemanager'
+    config.add_sqs_policy(
+        'sqsCachemgrPolicy', 'sqsCachemgrPolicy', 
+        [{'Ref': deadqname}, {'Ref': s3flushqname}],
+        cachemanager_role_arn)
+
     config.add_loadbalancer("LoadBalancer",
                             "elb." + domain,
                             [("443", "80", "HTTPS", cert)],
@@ -131,7 +162,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                             public_ip=True,
                             type_=ENDPONT_TYPE,
                             security_groups=["InternalSecurityGroup"],
-                            user_data=user_data,
+                            user_data=parsed_user_data,
                             role="endpoint",
                             depends_on="EndpointDB") # make sure the DB is launched before we start
 
@@ -190,6 +221,9 @@ def create(session, domain):
         "port": "3306"
     }
 
+    s3flushqname = lib.domain_to_stackname(S3FLUSH_QUEUE_PREFIX + domain)
+    deadqname = lib.domain_to_stackname(DEADLETTER_QUEUE_PREFIX + domain)
+
     # Configure Vault and create the user data config that the endpoint will
     # use for connecting to Vault and the DB instance
     endpoint_token = call.vault("vault-provision", "endpoint")
@@ -201,6 +235,10 @@ def create(session, domain):
     user_data["aws"]["cache"] = "cache." + domain
     user_data["aws"]["cache-state"] = "cache-state." + domain
     user_data["aws"]["meta-db"] = "bossmeta." + domain
+    # Use CloudFormation's Ref function so that queues' URLs are placed into
+    # the Boss config file.
+    user_data["aws"]["s3-flush-queue"] = '{{"Ref": "{}" }}'.format(s3flushqname)
+    user_data["aws"]["s3-flush-deadletter-queue"] = '{{"Ref": "{}" }}'.format(deadqname)
     user_data["auth"]["OIDC_VERIFY_SSL"] = str(domain in hosts.BASE_DOMAIN_CERTS.keys())
 
     call.vault_write(VAULT_DJANGO, secret_key = str(uuid.uuid4()))
@@ -208,7 +246,7 @@ def create(session, domain):
 
     try:
         name = lib.domain_to_stackname("production." + domain)
-        config = create_config(session, domain, keypair, str(user_data), db)
+        config = create_config(session, domain, keypair, user_data, db)
 
         success = config.create(session, name)
         if not success:
