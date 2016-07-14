@@ -7,6 +7,7 @@
 {% set spdb_home = venv_home + '/local/lib/python3.4/site-packages/spdb' %}
 {% set bossutils_home = venv_home + '/local/lib/python3.4/site-packages/bossutils' %}
 {% set lambda_home = venv_home + '/local/lib/python3.4/site-packages/lambda' %}
+{% set lambdautils_home = venv_home + '/local/lib/python3.4/site-packages/lambdautils' %}
 
 dev-tools:
   pkg.group_installed:
@@ -86,6 +87,18 @@ lambda-lambda:
     - group: {{ user }}
     - file_mode: 755
     - dirmode: 755
+
+lambda-lambdautils:
+  file.recurse:
+    - name: {{ lambdautils_home }}
+    - source: salt://boss-tools/files/boss-tools.git/lambdautils
+    - include_empty: true
+    - user: {{ user }}
+    - group: {{ user }}
+    - file_mode: 755
+    - dirmode: 755
+
+
 
 lambda-boss-logger-config:
   # Replace the default logger config with the lambda config.
