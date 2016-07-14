@@ -130,7 +130,7 @@ if __name__ == '__main__':
         "packer_file" : packer_file,
         "name" : "-" + args.name,
         "commit" : git_hash,
-        "deregister" : "true" if args.name == "test" else "false",
+        "deregister" : "true" if args.name in ["test", "sandy"] else "false",
         "machine" : "" # replace for each call
     }
 
