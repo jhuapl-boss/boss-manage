@@ -246,6 +246,9 @@ host = api.integration.theboss.io
 token = c23b48ceb35cae212b470a23d99d4185bac1c226
 ```
 
+Additionally, create a copy of `~/.ndio/ndio.cfg` as `test.cfg` in the ndio
+repository directory.
+
 ##### Setup via the Django Admin Page
 
 In your browser, go to https://api.integration.theboss.io/admin
