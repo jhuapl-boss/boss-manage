@@ -58,7 +58,7 @@ def handler(event, context):
                             'ResourceRecords': [{'Value': hostname}],
                             'TTL': 300,
                             'SetIdentifier': instance_id,
-                            'Weight': 0,
+                            'Weight': 1,
                         }
                     }]
                 }

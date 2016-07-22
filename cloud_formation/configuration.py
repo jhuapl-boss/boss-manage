@@ -1325,7 +1325,7 @@ class CloudFormationConfiguration:
                                "Hostname of the EC2 Instance '{}'".format(key))
         self.add_arg(_hostname)
 
-    def add_lambda(self, key, name, role, file=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None):
+    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None):
         """Create a Python Lambda
 
         Args:
@@ -1333,14 +1333,15 @@ class CloudFormationConfiguration:
             name (string) : Function name
             role (string) : IAM role the lambda will execute under
             file (None|string) : File path to file containing lambda source code
+            handler (None|string) : Name of lambda's handler function (the entry point).  If using a file, than the handler should be 'index.<name of function>'.  This value is ignored if using s3.
             s3 (None|tuple) : Tuple (bucket, key, handler) for the S3 location containing lambda source code
                               handler is the Python function to execute
             description (string) : Lambda description
             memory (string|int) : Amount of memory (MB) to execute the lambda with
                                   Note, CPU is linked to the amount of memory allocated
             timeout (string|int) : Execution timeout (Seconds)
-            security_groups (None|list) : List of unique names of security groups to grant the lambda access to
-            subnets (None|list) : List of unique names of subnets to grant the lambda access to
+            security_groups (None|list) : List of ids of security groups to grant the lambda access to
+            subnets (None|list) : List of ids of subnets to grant the lambda access to
             depends_on (None|string|list) : A unique name or list of unique names of resources within the
                                             configuration and is used to determine the launch order of resources
         """
@@ -1352,7 +1353,8 @@ class CloudFormationConfiguration:
                     raise Exception("Lambda code file is too large") # TODO need to figure out if / how to upload a manually created zip file
 
             code = {"ZipFile": code}
-            handler = "index.handler"
+            if handler is None:
+                handler = "index.handler"
         elif s3 is not None:
             bucket, key, handler = s3
             code = {
@@ -1383,9 +1385,19 @@ class CloudFormationConfiguration:
         }
 
         if security_groups is not None and subnets is not None:
+            # It looks like it's more convenient to use the functions
+            # in library.py to get the ids, at least for the first use
+            # of creating a lambda outside of the default VPC.  May have
+            # to make more generic in the case that the security groups and
+            # subnets are created within the same template - TG.
+            #
+            # self.resources[key]["Properties"]["VpcConfig"] = {
+            #     "SecurityGroupIds": [{"Ref": sg} for sg in security_groups],
+            #     "SubnetIds": [{"Ref": sub} for sub in subnets]
+            # }
             self.resources[key]["Properties"]["VpcConfig"] = {
-                "SecurityGroupIds": [{"Ref": sg} for sg in security_groups],
-                "SubnetIds": [{"Ref": sub} for sub in subnets]
+                "SecurityGroupIds": [sg for sg in security_groups],
+                "SubnetIds": [sub for sub in subnets]
             }
         elif security_groups is not None or subnets is not None:
             raise Exception("security_groups and subnets should both be specified")
@@ -1481,6 +1493,59 @@ class CloudFormationConfiguration:
                 'TTL': ttl,
             }
         }
+
+    def add_cloudwatch_rule(
+        self, key, targets, name=None, event=None, schedule=None, role_arn=None, description=None, depends_on=None, enable=True):
+        """Add an rule that routes CloudWatch Events to target(s).
+
+        Note that event and schedule cannot both be None.
+
+        Args:
+            key (string): Unique name for the resource in CloudFormation template.
+            targets (list): List of dicts with keys: Arn, Id, and optionally, Input and InputPath.  See Amazon CloudWatch Events Rule Target documentation.
+            name (optional[dict]): Name for rule.  One will be auto-generated if this isn't provided.
+            event (optional[dict]): See Amazon Events and Event Patterns documentation.
+            schedule (optional[string]): See Amazon Schedule Expression Syntax for Rules documentation.
+            role_arn (optional[string]): Role to assign to rule so it can invoke the target(s).
+            description (optional[string]): Description of rule, defaults to None.
+            depends_on (optional[string|list]) : A unique name or list of unique names of resources that should be created first.
+            enable (optional[bool]) Whether rule should be enabled when created.
+
+        Raises:
+            (exception): When neither event or schedule are provided.
+        """
+        if event is None and schedule is None:
+            raise Exception('event and schedule cannot both be None.')
+
+        props = { 'Targets': targets }
+
+        if enable:
+            props['State'] = 'ENABLED'
+        else:
+            props['State'] = 'DISABLED'
+
+        if name is not None:
+            props['Name'] = name
+
+        if description is not None:
+            props['Description'] = description
+
+        if schedule is not None:
+            props['ScheduleExpression'] = schedule
+
+        if event is not None:
+            props['EventPattern'] = event
+
+        if role_arn is not None:
+            props['RoleArn'] = role_arn
+
+        self.resources[key] = {
+            'Type': 'AWS::Events::Rule',
+            'Properties': props
+        }
+
+        if depends_on is not None:
+            self.resources[key]['DependsOn'] = depends_on
 
     def add_cloudwatch_alarm(self, key, description, metric, statistic, comparison, threashold, alarm_actions, dimensions={}, depends_on=None):
         """Add CloudWatch Alarm for a LoadBalancer
@@ -1707,11 +1772,11 @@ class CloudFormationConfiguration:
         Example call:
 
         self.add_sqs_policy(
-            'sqs_policy', 'sqs_policy', 
+            'sqs_policy', 'sqs_policy',
             [{'Ref': 'S3Flush'}, {'Ref': 'DeadLetter'}],
             'endpoint')
 
-        Note that the use of 'Ref' in the queue_list.  This lets you use the 
+        Note that the use of 'Ref' in the queue_list.  This lets you use the
         name of the queue rather than the full URL of the queue.
 
         Args:
@@ -1758,7 +1823,7 @@ class UserData:
     def __init__(self, config_file = "../salt_stack/salt/boss-tools/files/boss-tools.git/bossutils/boss.config.default", config_str = None):
         """Constructor.
 
-        If config_file is None, tries to read user data from config_str, 
+        If config_file is None, tries to read user data from config_str,
         instead.  Currently does not allow providing both a file and a string.
 
         Args:
@@ -1785,15 +1850,15 @@ class UserData:
     def format_for_cloudformation(self):
         """Returns user data as a list of strings suitable for the Fn::Join statement.
 
-        The returned list of strings is formatted so other intrinsic 
-        CloudFormation functions will be executed when parsed by 
-        CloudFormation.  This allows use of Ref and Fn::GetAtt which look up 
-        resources by logical name.  
-        
+        The returned list of strings is formatted so other intrinsic
+        CloudFormation functions will be executed when parsed by
+        CloudFormation.  This allows use of Ref and Fn::GetAtt which look up
+        resources by logical name.
+
         Example return value:
 
         [
-            '\n[aws]\n', 
+            '\n[aws]\n',
             'db = ', 'endpoint-db.theboss.io\n',
             'cache = ', 'cache.theboss.io\n',
             's3-flush-queue = ', {"Ref": "S3FlushQueue"}, '\n'

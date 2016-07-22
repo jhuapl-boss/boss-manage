@@ -231,6 +231,7 @@ runcmd:
                       "dns." + domain,
                       "DNSLambdaRole",
                       "lambda/updateRoute53/index.py",
+                      handler="index.handler"
                       timeout=10,
                       depends_on="DNSZone")
     role = "arn:aws:iam::256215146792:role/UpdateRoute53"

@@ -1,6 +1,12 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
+# Script to run Salt provisioning.  Pass the minion id from top.sls for the
+# type of instance you want to build.
+$salt = <<SCRIPT
+sudo salt-call --local state.highstate --file-root=/vagrant/salt_stack/salt --pillar-root=/vagrant/salt_stack/pillar --id=$1
+SCRIPT
+
 # All Vagrant configuration is done below. The "2" in Vagrant.configure
 # configures the configuration version (we support older styles for
 # backwards compatibility). Please don't change it unless you know what
@@ -21,6 +27,41 @@ Vagrant.configure(2) do |config|
     endpoint.vm.box = "packer/output/vagrant-virtualbox-endpoint.box"
   end
 
+  config.vm.define "epj" do |epj|
+    epj.vm.box = "packer/output/vagrant-virtualbox-pr-jenkins.box"
+    epj.vm.network "forwarded_port", guest: 8080, host: 8080
+    epj.vm.network "forwarded_port", guest: 8888, host: 8888
+    epj.vm.synced_folder "../boss", "/boss"
+    epj.vm.synced_folder "../spdb", "/spdb"
+    epj.vm.synced_folder "../boss-tools", "/boss-tools"
+    epj.vm.synced_folder "../ndio", "/ndio"
+    epj.vm.provision "shell" do |s|
+      s.inline = $salt
+      s.args = ["ep-jenkins"]
+    end
+  end
+
+  config.vm.define "proofreader" do |proofreader|
+    proofreader.vm.box = "packer/output/vagrant-virtualbox-proofreader-web.box"
+    proofreader.vm.network "forwarded_port", guest: 8080, host: 8080
+  end
+
+  config.vm.define "prj" do |prj|
+    prj.vm.box = "packer/output/vagrant-virtualbox-pr-jenkins.box"
+    prj.vm.network "forwarded_port", guest: 8080, host: 8080
+    prj.vm.synced_folder "../proofread", "/proofread"
+    prj.vm.provision "shell" do |s|
+      s.inline = $salt
+      s.args = ["pr-jenkins"]
+    end
+  end
+
+  config.vm.define "desktop" do |desktop|
+    desktop.vm.box = "virtualbox_ubuntu_desktop.box"
+    desktop.vm.synced_folder "../boss-tools", "/boss-tools"
+  end
+
+  # We use the microns account instead of vagrant for login.
   # We use the microns account instead of vagrant for login.
   config.ssh.username = "microns"
   config.ssh.password = "microns"
