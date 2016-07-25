@@ -23,6 +23,9 @@ PROTOCOL = 'http://'
 PORT = ':8200'
 ENDPOINT = '/v1/sys/health'
 
+NORMAL_ROUTE53_WEIGHT = 1
+SICK_ROUTE53_WEIGHT = 0
+
 def lambda_handler(event, context):
     """Entry point to AWS lambda function.
 
@@ -78,6 +81,10 @@ def lambda_handler(event, context):
                 raw = 'Unknown error.'
             else:
                 if validate(raw):
+                    # Set weight in Route53 to default to ensure it receives
+                    # traffic, normally.
+                    update_route53_weight(
+                        route53_client, vpc_name, inst, NORMAL_ROUTE53_WEIGHT)
                     continue
 
             # Health check failed.
@@ -87,7 +94,8 @@ def lambda_handler(event, context):
             sns_publish_sealed(sns_client, inst, raw, topic_arn, vpc_name)
 
             # Set weight in Route53 to 0 so instance gets no traffic.
-            update_route53_weight(route53_client, vpc_name, inst, 0)
+            update_route53_weight(
+                route53_client, vpc_name, inst, SICK_ROUTE53_WEIGHT)
 
 def validate(resp):
     """Check health status response from application.
