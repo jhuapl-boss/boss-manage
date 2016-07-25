@@ -15,6 +15,7 @@ make-base:
         - name: /home/ec2-user/makebaseenv
         - source: salt://lambda-dev/files/makebaseenv
         - mode: 755
+
         - user: {{ user }}
         - group: {{ user }}
 
