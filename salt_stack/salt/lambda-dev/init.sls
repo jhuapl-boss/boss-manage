@@ -12,7 +12,7 @@ dev-tools:
   pkg.group_installed:
     - name: 'Development Tools'
 
-# Install the latest Python supported by AWS Lambda.
+# Install the latest Python supported by AWS Lambda
 lambda-python:
   pkg.installed:
     - pkgs: 
