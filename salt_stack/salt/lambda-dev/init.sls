@@ -22,15 +22,6 @@ lambda-python:
       - python34-devel.x86_64
       - python34-virtualenv.noarch
 
-# Salt on Amazon Linux AMI uses python2.6 which doesn't have pip, so can't
-# use pip.installed.
-lambda-boto3:
-  cmd.run:
-    - name: /usr/bin/pip-3.4 install boto3
-#  pip.installed:
-#    - name: boto3
-#    - bin_env: /usr/bin/pip-3.4
-
 lambda-spdb-prerequirements:
   pkg.installed:
     - pkgs:
@@ -49,6 +40,16 @@ lambda-virtualenv:
     - user: {{ user }}
     - pip_upgrade: True
     - requirements: salt://spdb/files/spdb.git/requirements.txt
+
+# Salt on Amazon Linux AMI uses python2.6 which doesn't have pip, so can't
+# use pip.installed.
+lambda-boto3:
+  cmd.run:
+    - name: /usr/bin/pip-3.4 install boto3
+#  pip.installed:
+#    - name: boto3
+#    - bin_env: /usr/bin/pip-3.4
+
 
 lambda-spdb-lib:
   file.recurse:
