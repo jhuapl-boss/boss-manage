@@ -102,6 +102,7 @@ def create_config(session, domain, keypair=None, user_data=None):
                               "cachemgr",
                               [("tcp", "443", "443", "0.0.0.0/0")])
 
+    # TODO (SH) this works but is commented out to avoid running it while testing.
     # config.add_ec2_instance("CacheManager",
     #                             "cachemanager." + domain,
     #                             lib.ami_lookup(session, "cachemanager.boss"),
@@ -171,15 +172,16 @@ def create(session, domain):
 
 
 def pre_init(session, domain):
-    # pass
+    pass
     # setup lambda environments
-    # TODO works except for ssh part, can't find key.
-    keypair = key = os.environ.get("SSH_KEY", None);
-    print("Creating Lambdas Environments..")
-
-    package_name = "lambda.{}".format(domain)
-    cmd =  "\"/home/ec2-user/lambdaPackage.sh {}\"".format(package_name)
-    ssh(keypair, "52.23.27.39", "ec2-user", cmd)
+    # TODO (SH) will most likely need virtualwrappers to make this work.  Need to get SSH part working as well.
+    # keypair = key = os.environ.get("SSH_KEY", None);
+    # print("Creating Lambdas Environments..")
+    #
+    # package_name = "lambda.{}".format(domain)
+    # cmd =  "\"/home/ec2-user/lambdaPackage.sh {}\"".format(package_name)
+>>>>>>> Stashed changes
+    # ssh(keypair, "52.23.27.39", "ec2-user", cmd)
 
 
 def post_init(session, domain):
