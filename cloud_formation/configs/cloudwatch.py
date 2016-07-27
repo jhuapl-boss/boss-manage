@@ -59,7 +59,7 @@ def create_vault_consul_health_checks(session, domain, vpc_id, config):
         security_groups=[core_sec_group],
         subnets=subnets,
         handler='index.lambda_handler',
-        file='lambda/monitors/chk_vault.min.py',
+        file='lambda/monitors/chk_vault.py',
         )
 
     chk_consul_lambda = 'consulMonitor'
@@ -74,7 +74,7 @@ def create_vault_consul_health_checks(session, domain, vpc_id, config):
         security_groups=[core_sec_group],
         subnets=subnets,
         handler='index.lambda_handler',
-        file='lambda/monitors/chk_consul.min.py',
+        file='lambda/monitors/chk_consul.py',
         )
 
     vault_consul_topic = 'vaultConsulAlert'

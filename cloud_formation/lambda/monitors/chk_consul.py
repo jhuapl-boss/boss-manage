@@ -23,6 +23,10 @@ PROTOCOL = 'http://'
 PORT = ':8500'
 ENDPOINT = '/v1/health/node/'
 
+# Yes, max number of consul instances to retrieve from Route53 _should_ be a
+# string!
+MAX_CONSUL_INSTANCES = '20'
+
 NORMAL_ROUTE53_WEIGHT = 1
 SICK_ROUTE53_WEIGHT = 0
 
@@ -37,59 +41,102 @@ def lambda_handler(event, context):
     vpc_name = event['vpc_name']
     topic_arn = event['topic_arn']
 
-    ec2_client = boto3.client('ec2')
-    resp = ec2_client.describe_instances(Filters=[
-            {
-                'Name': 'tag:Name',
-                'Values': ['consul*']
-            },
-            {
-                'Name': 'vpc-id',
-                'Values': [vpc_id]
-            }
-        ])
-
     sns_client = boto3.client('sns')
     route53_client = boto3.client('route53')
 
-    if len(resp['Reservations']) == 0:
-        print('No consul instances found!')
-        sns_publish_no_consuls(sns_client, topic_arn, vpc_name)
+    zones = route53_client.list_hosted_zones_by_name(
+        DNSName=vpc_name, MaxItems='1')
+    if 'HostedZones' not in zones:
+        msg = 'Invalid response from Route53 - no HostedZones!'
+        sns_publish_no_consuls(sns_client, topic_arn, msg)
+        print(msg)
+        return
 
-    for reserv in resp['Reservations']:
+    zone_id = None
+    for zone in zones['HostedZones']:
+        # Route53 looks like it ends the name with a trailing period.
+        if zone['Name'].startswith(vpc_name):
+            zone_id = zone['Id']
+            break
 
-        for inst in reserv['Instances']:
-            ip = inst['PrivateIpAddress']
-            try:
-                node_id = get_node_id(ip)
-            except:
-                print('Could not construct node id from ip: {}'.format(ip))
+    if zone_id is None:
+        msg = '{} not found in Route53!'.format(vpc_name)
+        sns_publish_no_consuls(sns_client, topic_arn, msg)
+        print(msg)
+        return
+
+    dns_name = 'consul.' + vpc_name
+
+    hosts = route53_client.list_resource_record_sets(
+        HostedZoneId=zone_id,
+        StartRecordName=dns_name,
+        StartRecordType='CNAME',
+        MaxItems=MAX_CONSUL_INSTANCES)
+
+    if 'ResourceRecordSets' not in hosts or len(hosts['ResourceRecordSets']) < 1:
+        msg = 'Invalid response from Route53 - no ResourceRecordSets!'
+        sns_publish_no_consuls(sns_client, topic_arn, msg)
+        print(msg)
+        return
+
+    for record_set in hosts['ResourceRecordSets']:
+        if len(record_set['ResourceRecords']) < 1:
+            print('No ResourceRecords found.')
+            continue
+
+        if not record_set['Name'].startswith(dns_name):
+            # No more records for consul.
+            break
+
+        inst_id = record_set['SetIdentifier']
+        hostname = record_set['ResourceRecords'][0]['Value']
+        try:
+            ip = get_ip_from_host_name(hostname)
+            node_id = get_node_id(ip)
+        except:
+            print('Could not construct node id from ip: {}'.format(ip))
+            continue
+
+        url = PROTOCOL + ip + PORT + ENDPOINT + node_id
+        print('Checking consul server {} at {}...'.format(url, str(datetime.now())))
+
+        try:
+            raw = urlopen(url, timeout=4).read()
+        except:
+            raw = 'Error connecting to consul HTTP endpoint.'
+        else:
+            if validate(raw):
+                # Set weight in Route53 to default to ensure it receives
+                # traffic, normally.
+                update_route53_weight(
+                    route53_client, zone_id, dns_name, hostname, inst_id, NORMAL_ROUTE53_WEIGHT)
                 continue
 
-            url = PROTOCOL + ip + PORT + ENDPOINT + node_id
-            print('Checking consul server {} at {}...'.format(url, str(datetime.now())))
+        # Health check failed.
+        print(raw)
 
-            try:
-                raw = urlopen(url, timeout=4).read()
-            except:
-                raw = 'Error connecting to consul HTTP endpoint.'
-            else:
-                if validate(raw):
-                    # Set weight in Route53 to default to ensure it receives
-                    # traffic, normally.
-                    update_route53_weight(
-                        route53_client, vpc_name, inst, NORMAL_ROUTE53_WEIGHT)
-                    continue
+        # Publish failure to SNS topic.
+        sns_publish_sick(sns_client, inst_id, raw, topic_arn)
 
-            # Health check failed.
-            print(raw)
+        # Set weight in Route53 to 0 so instance gets no traffic.
+        update_route53_weight(
+            route53_client, zone_id, dns_name, hostname, inst_id, SICK_ROUTE53_WEIGHT)
 
-            # Publish failure to SNS topic.
-            sns_publish_sick(sns_client, inst, raw, topic_arn, vpc_name)
+def get_ip_from_host_name(name):
+    """Extract ip from host name.
 
-            # Set weight in Route53 to 0 so instance gets no traffic.
-            update_route53_weight(
-                route53_client, vpc_name, inst, SICK_ROUTE53_WEIGHT)
+    Host name is in this form: ip-xxx-xxx-xxx-xxx.ec2.internal
+
+    Args:
+        name (string): Host name.
+
+    Returns:
+        (string): ip address in xxx.xxx.xxx.xxx form.
+    """
+    parts = name.split('-')
+    last_octet = parts[4].split('.')[0]
+    ip = parts[1] + '.' + parts[2] + '.' + parts[3] + '.' + last_octet
+    return ip
 
 def get_node_id(ip):
     """A consul's node id is derived from the last two octets of its ip.
@@ -157,7 +204,7 @@ def find_name(xs):
     tag = where(xs, lambda x: x['Key'] == 'Name')
     return None if tag is None else tag['Value']
 
-def sns_publish_no_consuls(sns_client, topic_arn, vpc_name):
+def sns_publish_no_consuls(sns_client, topic_arn, msg):
     """Send notification of NO existing consul instances.
 
     Args:
@@ -168,20 +215,18 @@ def sns_publish_no_consuls(sns_client, topic_arn, vpc_name):
     sns_client.publish(
         TopicArn=topic_arn,
         Subject='No consul instances!',
-        Message='No consul instances found in {}!'.format(vpc_name)
+        Message=msg
     )
 
-def sns_publish_sick(sns_client, inst_data, raw_err, topic_arn, domain_name):
+def sns_publish_sick(sns_client, inst_id, raw_err, topic_arn):
     """Send notification of failed instance to SNS topic.
 
     Args:
         sns_client (boto3.SNS.Client): Client for interacting with SNS.
-        inst_data (dict): Instance info as returned by describe_instances().
+        inst_id (dict): EC2 instance ID.
         raw_err (string): Raw response from urlopen() or 'unreachable'.
         topic_arn (string): ARN of SNS topic to publish to.
-        domain_name (string): Domain name of VPC.
     """
-    inst_id = inst_data['InstanceId']
     sns_client.publish(
         TopicArn=topic_arn,
         Subject='consul instance not healthy',
@@ -192,21 +237,17 @@ It's possible that this is a new consul instance that's initializing.
 """.format(inst_id, raw_err)
     )
 
-def update_route53_weight(route53_client, vpc_name, inst_data, weight):
+def update_route53_weight(route53_client, zone_id, dns_name, private_dns_name, inst_id, weight):
     """Change weight for given instance in Route53 (DNS).
 
     Args:
         route53_client (boto3.Route53.Client): Client for interacting with Route53.
-        vpc_name: Name of VPC instance runs in.
-        inst_data (dict): Instance info as returned by describe_instances().
+        zone_id (string): Id of hosted zone.
+        dns_name (string): "Public" DNS name of consul instance.
+        private_dns_name (string): Internal DNS name of consul instance as known to Route53.
+        inst_id (dict): EC2 instance ID.
         weight (int): New weight for instance.
     """
-    zones_resp = route53_client.list_hosted_zones_by_name(
-        DNSName=vpc_name, MaxItems='1')
-    zone_id = zones_resp['HostedZones'][0]['Id'].split('/')[-1]
-    inst_id = inst_data['InstanceId']
-    dns_name = find_name(inst_data['Tags'])
-    private_dns_name = inst_data['PrivateDnsName']
     route53_client.change_resource_record_sets(
         HostedZoneId=zone_id,
         ChangeBatch = {
