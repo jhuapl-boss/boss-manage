@@ -134,13 +134,13 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     config.add_sqs_queue(
         s3flushqname, s3flushqname, 30, dead=(deadq_arn, max_receives))
 
-    endpoint_role_arn = 'arn:aws:iam::256215146792:role/endpoint'
+    endpoint_role_arn = lib.role_arn_lookup(session, "endpoint")
     config.add_sqs_policy(
         'sqsEndpointPolicy', 'sqsEndpointPolicy', 
         [{'Ref': deadqname}, {'Ref': s3flushqname}],
         endpoint_role_arn)
 
-    cachemanager_role_arn = 'arn:aws:iam::256215146792:role/cachemanager'
+    cachemanager_role_arn = lib.role_arn_lookup(session, 'cachemanager')
     config.add_sqs_policy(
         'sqsCachemgrPolicy', 'sqsCachemgrPolicy', 
         [{'Ref': deadqname}, {'Ref': s3flushqname}],
