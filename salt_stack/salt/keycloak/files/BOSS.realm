@@ -29,5 +29,9 @@
         "publicClient": true,
 
         "directAccessGrantsEnabled": true
-    }]
+    }],
+    
+    "roles": {
+        "realm":[{"name":"resource-manager"},{"name":"user-manager"},{"name":"admin"}]
+    }
 }
