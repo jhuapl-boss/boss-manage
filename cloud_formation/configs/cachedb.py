@@ -114,16 +114,29 @@ def create_config(session, domain, keypair=None, user_data=None):
     #                             user_data=user_data,
     #                             role="cachemanager") # arn:aws:iam::256215146792:instance-profile/cachemanager"
 
+#    add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3,
+#               security_groups=None, subnets=None, depends_on=None):
+
+    # might need to add subnets, it is required on the console.
+    lambda_sec_group = lib.sg_lookup(session, vpc_id, 'internal.' + domain)
+    filter_by_host_name = ([{
+        'Name': 'tag:Name',
+        'Values': ['*internal.' + domain]
+    }])
+    lambda_subnets = lib.multi_subnet_id_lookup(session, filter_by_host_name)
+
+    config.add_lambda("MultiLambda",
+                      "MultiLambda." + domain,
+                      "LambdaCacheExecutionRole",
+                      s3=("boss-lambda-env",
+                          "lambda.{}.zip".format(domain),
+                          "virtualenvs/{}/local/lib/python3.4/site-packages/lambda/lambda_loader.handler".format(domain)),
+                      timeout=60,
+                      ecurity_groups=lambda_sec_group,
+                      subnets=lambda_subnets,
+                      depends_on="DNSZone")
 
 
-    # config.add_lambda("S3FlushLambda",
-    #                   "s3flushlambda." + domain,
-    #                   "LambdaCacheExecutionRole",
-    #                   "lambda/updateRoute53/index.py",
-    #                   timeout=10,
-    #                   depends_on="DNSZone")
-    #
-    #
     # role = "arn:aws:iam::256215146792:role/lambda_cache_execution"
     # config.add_arg(configuration.Arg.String("LambdaCacheExecutionRole", role,
     #                                         "IAM role for s3flushlambda." + domain))
@@ -152,12 +165,14 @@ def create(session, domain):
     user_data["system"]["type"] = "cachemanager"
     user_data["aws"]["cache"] = "cache." + domain
     user_data["aws"]["cache-state"] = "cache-state." + domain
+    user_data["aws"]["cache-db"] = 0  ## cache-db and cache-stat-db need to be in user_data for lambda to get to them.
+    user_data["aws"]["cache-state-db"] = 0
 
     keypair = lib.keypair_lookup(session)
 
     try:
         name = lib.domain_to_stackname("cachedb." + domain)
-        pre_init(session, domain);
+        pre_init(session, domain)
         config = create_config(session, domain, keypair, str(user_data))
 
         success = config.create(session, name)
@@ -172,16 +187,15 @@ def create(session, domain):
 
 
 def pre_init(session, domain):
-    pass
     # setup lambda environments
     # TODO (SH) will most likely need virtualwrappers to make this work.  Need to get SSH part working as well.
-    # keypair = key = os.environ.get("SSH_KEY", None);
-    # print("Creating Lambdas Environments..")
-    #
-    # package_name = "lambda.{}".format(domain)
-    # cmd =  "\"/home/ec2-user/lambdaPackage.sh {}\"".format(package_name)
->>>>>>> Stashed changes
-    # ssh(keypair, "52.23.27.39", "ec2-user", cmd)
+
+    keypair = key = os.environ.get("SSH_KEY", None);
+    print("Creating Lambdas Environments..")
+
+    package_name = "lambda.{}".format(domain)
+    cmd =  "\"/home/ec2-user/ {}\"".format(package_name)
+    ssh(keypair, "52.23.27.39", "ec2-user", cmd)
 
 
 def post_init(session, domain):

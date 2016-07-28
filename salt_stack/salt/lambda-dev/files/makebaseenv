@@ -1,0 +1,26 @@
+#! /usr/bin/env bash
+# sets up virtualenv, virtualwrapper,
+
+cd /home/ec2-user
+sudo yum groupinstall -y "Development Tools"
+
+sudo yum install -y python34.x86_64 python34-pip.noarch python34-devel.x86_64 python34-virtualenv.noarch
+sudo alternatives --set python /usr/bin/python3.4
+
+#virtualenv lambdaenv -p /usr/bin/python3.4
+
+sudo pip install virtualenvwrapper
+
+mkdir ~/virtualenvs
+export WORKON_HOME=~/virtualenvs
+export VIRTUALENVWRAPPER_PYTHON='/usr/bin/python' # This needs to be placed before the virtualenvwrapper command
+source /usr/local/bin/virtualenvwrapper.sh
+mkvirtualenv lambdaenv
+workon lambdaenv
+
+pip install --upgrade pip
+
+sudo yum install -y libjpeg-turbo-devel.x86_64 zlib-devel.x86_64 libtiff-devel.x86_64 freetype.x86_64 lcms2-devel.x86_64 libwebp-devel.x86_64 openjpeg-devel.x86_64
+
+deactivate
+
