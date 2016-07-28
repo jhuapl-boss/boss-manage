@@ -23,6 +23,112 @@ import configuration
 import library as lib
 
 
+def create_vault_consul_health_checks(session, domain, vpc_id, config):
+    """Update CloudFormationConfiguration with resources for vault and consul health checks.
+
+    Add lambda functions for monitoring and responding to failed health checks
+    of the vault and consul instances.
+
+    Args:
+        session (boto3.Session): Active Boto3 session.
+        domain (string): DNS name of VPC.
+        vpc_id (string): Physical id of VPC.
+        config (CloudFormationConfiguration): config to update.
+    """
+    lambda_role = 'arn:aws:iam::256215146792:role/VaultConsulHealthChecker'
+    config.add_arg(configuration.Arg.String(
+        'VaultConsulHealthChecker', lambda_role,
+        'IAM role for vault/consul health check.' + domain))
+
+    core_sec_group = lib.sg_lookup(session, vpc_id, 'internal.' + domain)
+    filter_by_host_name = ([{
+        'Name': 'tag:Name',
+        'Values': ['*internal.' + domain]
+    }])
+    subnets = lib.multi_subnet_id_lookup(session, filter_by_host_name)
+
+    chk_vault_lambda = 'vaultMonitor'
+    chk_vault_lambda_logical_name = (
+        chk_vault_lambda + '-' + domain.replace('.', '-'))
+    config.add_lambda(
+        key=chk_vault_lambda,
+        name=chk_vault_lambda_logical_name,
+        description='Check health of vault instances.',
+        timeout=20,
+        role='VaultConsulHealthChecker',
+        security_groups=[core_sec_group],
+        subnets=subnets,
+        handler='index.lambda_handler',
+        file='lambda/monitors/chk_vault.py',
+        )
+
+    chk_consul_lambda = 'consulMonitor'
+    chk_consul_lambda_logical_name = (
+        chk_consul_lambda + '-' + domain.replace('.', '-'))
+    config.add_lambda(
+        key=chk_consul_lambda,
+        name=chk_consul_lambda_logical_name,
+        description='Check health of vault instances.',
+        timeout=20,
+        role='VaultConsulHealthChecker',
+        security_groups=[core_sec_group],
+        subnets=subnets,
+        handler='index.lambda_handler',
+        file='lambda/monitors/chk_consul.py',
+        )
+
+    vault_consul_topic = 'vaultConsulAlert'
+    vault_consul_topic_logical_name = (
+        vault_consul_topic + '-' + domain.replace('.', '-'))
+    vault_consul_subscribers = []
+    config.add_sns_topic(
+        vault_consul_topic, vault_consul_topic,
+        vault_consul_topic_logical_name, vault_consul_subscribers)
+
+    # json for rule's Input key.  Split into a list so it can be passed to
+    # Fn::Join for execution of the Ref function.
+    json_str_list = [
+        """{{
+            "vpc_id": "{}",
+            "vpc_name": "{}",
+            "topic_arn": \"""".format(vpc_id, domain),
+        { 'Ref': '{}'.format(vault_consul_topic) },
+        '"}']
+
+    chk_vault_consul_rule_name = 'checkVaultConsul'
+    chk_vault_consul_rule_logical_name = (
+        chk_vault_consul_rule_name + '-' + domain.replace('.', '-'))
+    config.add_cloudwatch_rule(
+        key=chk_vault_consul_rule_name,
+        targets=[
+            {
+                'Arn': { 'Fn::GetAtt': [chk_vault_lambda, 'Arn']},
+                'Id': chk_vault_lambda_logical_name,
+                'Input': { 'Fn::Join': ['', json_str_list] }
+            },
+            {
+                'Arn': { 'Fn::GetAtt': [chk_consul_lambda, 'Arn']},
+                'Id': chk_consul_lambda_logical_name,
+                'Input': { 'Fn::Join': ['', json_str_list] }
+            },
+        ],
+        name=chk_vault_consul_rule_logical_name,
+        schedule='rate(1 minute)',
+        description='Check health of vault and consul instances.',
+        depends_on=[vault_consul_topic, chk_vault_lambda, chk_consul_lambda]
+        )
+
+    config.add_lambda_permission(
+        'chkVaultConsulExecute', chk_vault_lambda,
+        principal='events.amazonaws.com',
+        source={'Fn::GetAtt': [chk_vault_consul_rule_name, 'Arn']})
+
+    config.add_lambda_permission(
+        'chkVaultConsulExecute', chk_consul_lambda,
+        principal='events.amazonaws.com',
+        source={'Fn::GetAtt': [chk_vault_consul_rule_name, 'Arn']})
+
+
 def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     """Create the CloudFormationConfiguration object.
     :arg session used to perform lookups
@@ -59,71 +165,8 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
 
     config.add_cloudwatch( loadbalancer_name, mailingListTopic)
 
-    lambda_role = 'arn:aws:iam::256215146792:role/VaultConsulHealthChecker'
-    config.add_arg(configuration.Arg.String(
-        'VaultConsulHealthChecker', lambda_role,
-        'IAM role for vault/consul health check.' + domain))
-
-    core_sec_group = lib.sg_lookup(session, vpc_id, 'internal.' + domain)
-    filter_by_host_name = ([{
-        'Name': 'tag:Name',
-        'Values': ['*internal.' + domain]
-    }])
-    subnets = lib.multi_subnet_id_lookup(session, filter_by_host_name)
-
-    chk_vault_consul_lambda = 'vaultConsulMonitor'
-    chk_vault_consul_lambda_logical_name = (
-        chk_vault_consul_lambda + '-' + domain.replace('.', '-'))
-    config.add_lambda(
-        key=chk_vault_consul_lambda,
-        name=chk_vault_consul_lambda_logical_name,
-        description='Check health of vault and consul instances.',
-        timeout=20,
-        role='VaultConsulHealthChecker',
-        security_groups=[core_sec_group],
-        subnets=subnets,
-        handler='index.lambda_handler',
-        file='lambda/monitors/chk_vault_consul.min.py',
-        )
-
-    vault_consul_topic = 'vaultConsulAlert'
-    vault_consul_topic_logical_name = (
-        vault_consul_topic + '-' + domain.replace('.', '-'))
-    vault_consul_subscribers = []
-    config.add_sns_topic(
-        vault_consul_topic, vault_consul_topic,
-        vault_consul_topic_logical_name, vault_consul_subscribers)
-
-    # json for rule's Input key.  Split into a list so it can be passed to
-    # Fn::Join for execution of the Ref function.
-    json_str_list = [
-        """{{
-            "vpc_id": "{}",
-            "vpc_name": "{}",
-            "topic_arn": \"""".format(vpc_id, domain),
-        { 'Ref': '{}'.format(vault_consul_topic) },
-        '"}']
-
-    chk_vault_consul_rule_name = 'checkVaultConsul'
-    chk_vault_consul_rule_logical_name = (
-        chk_vault_consul_rule_name + domain.replace('.', '-'))
-    config.add_cloudwatch_rule(
-        key=chk_vault_consul_rule_name,
-        targets=[{
-            'Arn': { 'Fn::GetAtt': [chk_vault_consul_lambda, 'Arn']},
-            'Id': chk_vault_consul_lambda_logical_name,
-            'Input': { 'Fn::Join': ['', json_str_list] }
-        }],
-        name=chk_vault_consul_rule_logical_name,
-        schedule='rate(1 minute)',
-        description='Check health of vault and consul instances.',
-        depends_on=[vault_consul_topic, chk_vault_consul_lambda]
-        )
-
-    config.add_lambda_permission(
-        'chkVaultConsulExecute', chk_vault_consul_lambda,
-        principal='events.amazonaws.com',
-        source={'Fn::GetAtt': [chk_vault_consul_rule_name, 'Arn']})
+    # Add lambda functions.
+    create_vault_consul_health_checks(session, domain, vpc_id, config)
 
     return config
 

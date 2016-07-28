@@ -1347,7 +1347,10 @@ class CloudFormationConfiguration:
         """
 
         if file is not None:
-            with open(file, "r") as fh:
+            minified_file = lib.python_minifiy(file)
+            with open(minified_file, "r") as fh:
+                # Warning, sanitizing process does not handle backslashes
+                # in strings properly!
                 code = lib.json_sanitize(fh.read())
                 if len(code) >= 4096:
                     raise Exception("Lambda code file is too large") # TODO need to figure out if / how to upload a manually created zip file

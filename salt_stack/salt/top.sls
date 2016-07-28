@@ -48,6 +48,7 @@ base:
         - git
         - vault.client
         - aws.boto3
+        - python.pyminifier
 
     'cachemanager*':
         - boss-tools.bossutils

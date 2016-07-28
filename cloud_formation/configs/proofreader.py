@@ -191,7 +191,7 @@ def post_init(session, domain):
 
     print("Generating keycloak.json")
     # this will be overwritten if there is a DNS with a cert
-    elb = lib.elb_public_lookup(session, "elb-auth." + domain)
+    elb = lib.elb_public_lookup(session, "auth." + domain)
 
     if domain in hosts.BASE_DOMAIN_CERTS.keys():
         elb = "auth." + hosts.BASE_DOMAIN_CERTS[domain]

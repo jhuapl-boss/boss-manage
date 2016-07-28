@@ -58,6 +58,37 @@ def json_sanitize(data):
     return (data.replace('"', '\"')
                 .replace('\\', '\\\\'))
 
+def python_minifiy(file):
+    """Outputs a minified version of the given Python file.
+
+    Runs pyminifier on the given file.  The minified filename has '.min'
+    added before the '.py' extension.  This function is used to help code
+    fit under the 4k limit when uploading lambda functions, directly, as
+    opposed to pointing to a zip file in S3.  The minification process
+    strips out all comments and uses minimal whitespace.
+
+    Example: lambda.py => lambda.min.py
+
+    Args:
+        file (string): File name of Python file to minify.
+
+    Returns:
+        (string): File name of minified file.
+
+    Raises:
+        (subprocess.CalledProcessError): on a non-zero return code from pyminifier.
+    """
+    file_parts = os.path.splitext(file)
+    min_filename = file_parts[0] + '.min' + file_parts[1]
+    cmd = 'pyminifier -o ' + min_filename + ' ' + file
+    result = subprocess.run(
+        shlex.split(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode != 0:
+        print(result.stderr)
+    # Package up exception with output and raise if there was a failure.
+    result.check_returncode()
+    return min_filename
+
 def get_commit():
     """Get the git commit hash of the current directory.
 
@@ -1228,3 +1259,24 @@ def sns_unsubscribe_all(session, topic, region="us-east-1", account="25621514679
             client.unsubscribe(SubscriptionArn=res['SubscriptionArn'])
 
     return None
+
+def role_arn_lookup(session, role_name):
+    """
+    Returns the arn associated the the role name.
+    Using this method avoids hardcoding the aws account into the arn name.
+    Args:
+        session:
+        role_name:
+
+    Returns:
+
+    """
+    if session is None:
+        return None
+
+    client = session.client('iam')
+    response = client.get_role(RoleName=role_name)
+    if response is None:
+        return None
+    else:
+        return response['Role']['Arn']
