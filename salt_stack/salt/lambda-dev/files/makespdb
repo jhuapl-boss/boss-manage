@@ -1,0 +1,16 @@
+#! /usr/bin/env bash
+
+cd /home/ec2-user
+export WORKON_HOME=~/virtualenvs
+export VIRTUALENVWRAPPER_PYTHON='/usr/bin/python' # This needs to be placed before the virtualenvwrapper command
+source /usr/local/bin/virtualenvwrapper.sh
+workon $1 
+
+cd $WORKON_HOME/$1/local/lib/python3.4/site-packages/spdb
+pip install -r requirements.txt
+
+cd c_lib/c_version
+cp makefile_LINUX makefile
+make
+deactivate
+

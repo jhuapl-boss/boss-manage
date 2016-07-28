@@ -1,0 +1,13 @@
+#! /usr/bin/env bash
+# $1 should be the domain, Ex: hiderrt1.boss
+# 
+# creates the default base virutalenv and installs yum libraries needed.
+
+cd /home/ec2-user
+export WORKON_HOME=~/virtualenvs
+export VIRTUALENVWRAPPER_PYTHON='/usr/bin/python' # This needs to be placed before the virtualenvwrapper command
+source /usr/local/bin/virtualenvwrapper.sh
+rm -rf $WORKON_HOME/$1
+cpvirtualenv lambdaenv $1
+
+# now python scripts can copy in spdb, lambda, lambda-utils and bossutils from local machine.
