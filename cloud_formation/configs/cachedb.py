@@ -38,7 +38,14 @@ import sys
 import boto3
 import os
 import subprocess
+import tempfile
+import shlex
+cur_dir = os.path.dirname(os.path.realpath(__file__))
+vault_dir = os.path.normpath(os.path.join(cur_dir, "..", "vault"))
+sys.path.append(vault_dir)
+import bastion
 from ssh import *
+
 
 # Region production is created in.  Later versions of boto3 should allow us to
 # extract this from the session variable.  Hard coding for now.
@@ -114,9 +121,6 @@ def create_config(session, domain, keypair=None, user_data=None):
     #                             user_data=user_data,
     #                             role="cachemanager") # arn:aws:iam::256215146792:instance-profile/cachemanager"
 
-#    add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3,
-#               security_groups=None, subnets=None, depends_on=None):
-
     # might need to add subnets, it is required on the console.
     lambda_sec_group = lib.sg_lookup(session, vpc_id, 'internal.' + domain)
     filter_by_host_name = ([{
@@ -187,15 +191,46 @@ def create(session, domain):
 
 
 def pre_init(session, domain):
-    # setup lambda environments
-    # TODO (SH) will most likely need virtualwrappers to make this work.  Need to get SSH part working as well.
+    # zip up spdb, bossutils, lambda and lambda_utils
+    tempname = tempfile.NamedTemporaryFile(delete=True)
+    zipname = tempname.name + '.zip'
+    print('zip file: ' + zipname)
+    cwd = os.getcwd()
+    os.chdir('../salt_stack/salt/spdb/files')
+    lib.write_to_zip('spdb.git', zipname, False)
+    os.chdir(cwd)
+    os.chdir('../salt_stack/salt/boss-tools/files/boss-tools.git')
+    lib.write_to_zip('bossutils', zipname)
+    lib.write_to_zip('lambda', zipname)
+    lib.write_to_zip('lambdautils', zipname)
 
-    keypair = key = os.environ.get("SSH_KEY", None);
-    print("Creating Lambdas Environments..")
+    keypair = os.environ.get("SSH_KEY", None);
+    print("Creating Lambda Environment..")
 
-    package_name = "lambda.{}".format(domain)
-    cmd =  "\"/home/ec2-user/ {}\"".format(package_name)
-    ssh(keypair, "52.23.27.39", "ec2-user", cmd)
+    #copy the zip file to lambda_build_server
+    apl_bastion_ip = os.environ.get("BASTION_IP")
+    apl_bastion_key = os.environ.get("BASTION_KEY")
+    apl_bastion_user = os.environ.get("BASTION_USER")
+    local_port = bastion.locate_port()
+    print("local port: " + str(local_port))
+    # create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user="ec2-user", bastion_port=22):
+    proc = bastion.create_tunnel(apl_bastion_key, local_port, "52.23.27.39", 22, apl_bastion_ip, bastion_user="ubuntu")
+    # scp -P 54321 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no localfile ubuntu@localhost:/home/ubuntu
+    scp_cmd = "scp -P {} {} {} ec2-user@localhost:sitezips/{}".format(local_port,
+                                                                                bastion.SSH_OPTIONS,
+                                                                                zipname,
+                                                                                domain + ".zip")
+    print(scp_cmd)
+    try:
+        return_code = subprocess.call(shlex.split(scp_cmd))  # close_fds=True, preexec_fn=bastion.become_tty_fg
+        print("return code: " + str(return_code))
+    finally:
+        proc.terminate()
+        proc.wait()
+    os.remove(zipname)
+
+    cmd = "\"/home/ec2-user/makedomainenv {}\"".format(domain)
+    ssh(apl_bastion_key, "52.23.27.39", "ec2-user", cmd)
 
 
 def post_init(session, domain):

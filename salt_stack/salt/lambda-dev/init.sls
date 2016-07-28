@@ -28,7 +28,6 @@ make-domain:
         - group: {{ user }}
 
 
-
 run-base:
     cmd.run:
         - name: |
