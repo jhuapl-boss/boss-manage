@@ -26,14 +26,6 @@ make-domain:
         - user: {{ user }}
         - group: {{ user }}
 
-make-spdb:
-    file.managed:
-        - name: /home/ec2-user/makespdb
-        - source: salt://lambda-dev/files/makespdb
-        - mode: 755
-        - user: {{ user }}
-        - group: {{ user }}
-
 run-base:
     cmd.run:
         - name: |

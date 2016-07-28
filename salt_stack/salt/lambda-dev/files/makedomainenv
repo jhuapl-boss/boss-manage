@@ -11,3 +11,16 @@ rm -rf $WORKON_HOME/$1
 cpvirtualenv lambdaenv $1
 
 # now python scripts can copy in spdb, lambda, lambda-utils and bossutils from local machine.
+
+unzip /home/ec2-user/sitezips/${1}.zip -d /home/ec2-user/virtualenvs/$1/local/lib/python3.4/site-packages
+
+cd $WORKON_HOME/$1/local/lib/python3.4/site-packages
+mv spdb.git spdb
+cd spdb
+pip install -r requirements.txt
+
+cd c_lib/c_version
+cp makefile_LINUX makefile
+make
+deactivate
+
