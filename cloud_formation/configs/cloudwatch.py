@@ -119,12 +119,12 @@ def create_vault_consul_health_checks(session, domain, vpc_id, config):
         )
 
     config.add_lambda_permission(
-        'chkVaultConsulExecute', chk_vault_lambda,
+        'chkVaultExecute', chk_vault_lambda,
         principal='events.amazonaws.com',
         source={'Fn::GetAtt': [chk_vault_consul_rule_name, 'Arn']})
 
     config.add_lambda_permission(
-        'chkVaultConsulExecute', chk_consul_lambda,
+        'chkConsulExecute', chk_consul_lambda,
         principal='events.amazonaws.com',
         source={'Fn::GetAtt': [chk_vault_consul_rule_name, 'Arn']})
 

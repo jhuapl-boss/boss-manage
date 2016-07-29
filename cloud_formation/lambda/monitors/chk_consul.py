@@ -116,7 +116,7 @@ def lambda_handler(event, context):
         print(raw)
 
         # Publish failure to SNS topic.
-        sns_publish_sick(sns_client, inst_id, raw, topic_arn)
+        sns_publish_sick(sns_client, ip, raw, topic_arn)
 
         # Set weight in Route53 to 0 so instance gets no traffic.
         update_route53_weight(
@@ -218,23 +218,21 @@ def sns_publish_no_consuls(sns_client, topic_arn, msg):
         Message=msg
     )
 
-def sns_publish_sick(sns_client, inst_id, raw_err, topic_arn):
+def sns_publish_sick(sns_client, ip, raw_err, topic_arn):
     """Send notification of failed instance to SNS topic.
 
     Args:
         sns_client (boto3.SNS.Client): Client for interacting with SNS.
-        inst_id (dict): EC2 instance ID.
+        ip (string): IP address of sick instance.
         raw_err (string): Raw response from urlopen() or 'unreachable'.
         topic_arn (string): ARN of SNS topic to publish to.
     """
     sns_client.publish(
         TopicArn=topic_arn,
         Subject='consul instance not healthy',
-        Message="""consul instance id {0} is failing its health check.
+        Message="""consul instance with ip: {0} is failing its health check.
 Raw health check: {1}
-
-It's possible that this is a new consul instance that's initializing.
-""".format(inst_id, raw_err)
+""".format(ip, raw_err)
     )
 
 def update_route53_weight(route53_client, zone_id, dns_name, private_dns_name, inst_id, weight):

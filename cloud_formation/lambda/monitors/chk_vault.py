@@ -73,6 +73,9 @@ def lambda_handler(event, context):
                 elif err.getcode() == 429:
                     # Vault returns 429 if it's unsealed and in standby mode.
                     # This is not an error condition.
+                    print('Unsealed and in standby mode.')
+                    update_route53_weight(
+                        route53_client, vpc_name, inst, NORMAL_ROUTE53_WEIGHT)
                     continue
                 else:
                     raw = 'Status code: {}, reason: {}'.format(
@@ -175,11 +178,11 @@ def sns_publish_sealed(sns_client, inst_data, raw_err, topic_arn, domain_name):
         topic_arn (string): ARN of SNS topic to publish to.
         domain_name (string): Domain name of VPC.
     """
-    inst_id = inst_data['InstanceId']
+    ip = inst_data['PrivateIpAddress']
     sns_client.publish(
         TopicArn=topic_arn,
         Subject='vault instance sealed',
-        Message="""Vault instance id {0} is uninitialized, sealed, or unreachable.
+        Message="""Vault instance with IP: {0} is uninitialized, sealed, or unreachable.
 Raw health check: {1}
 
 To unseal, from boss-manage.git/vault, run:
@@ -188,7 +191,7 @@ where # is the number of the vault instance that is sealed.
 
 Find the number of the sealed vault instance using:
 ./bastion/py bastion.{2} #-vault.{2} vault-status
-""".format(inst_id, raw_err, domain_name)
+""".format(ip, raw_err, domain_name)
     )
 
 def update_route53_weight(route53_client, vpc_name, inst_data, weight):
