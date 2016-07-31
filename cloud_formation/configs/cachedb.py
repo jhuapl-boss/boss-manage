@@ -212,14 +212,11 @@ def pre_init(session, domain):
     apl_bastion_key = os.environ.get("BASTION_KEY")
     apl_bastion_user = os.environ.get("BASTION_USER")
     local_port = bastion.locate_port()
-    print("local port: " + str(local_port))
-    # create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user="ec2-user", bastion_port=22):
     proc = bastion.create_tunnel(apl_bastion_key, local_port, "52.23.27.39", 22, apl_bastion_ip, bastion_user="ubuntu")
-    # scp -P 54321 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no localfile ubuntu@localhost:/home/ubuntu
     scp_cmd = "scp -P {} {} {} ec2-user@localhost:sitezips/{}".format(local_port,
-                                                                                bastion.SSH_OPTIONS,
-                                                                                zipname,
-                                                                                domain + ".zip")
+                                                                      bastion.SSH_OPTIONS,
+                                                                      zipname,
+                                                                      domain + ".zip")
     print(scp_cmd)
     try:
         return_code = subprocess.call(shlex.split(scp_cmd))  # close_fds=True, preexec_fn=bastion.become_tty_fg
@@ -229,8 +226,8 @@ def pre_init(session, domain):
         proc.wait()
     os.remove(zipname)
 
-    cmd = "\"/home/ec2-user/makedomainenv {}\"".format(domain)
-    ssh(apl_bastion_key, "52.23.27.39", "ec2-user", cmd)
+    # cmd = "\"source /home/ec2-user/makedomainenv {}\"".format(domain)
+    # ssh(apl_bastion_key, "52.23.27.39", "ec2-user", cmd)
 
 
 def post_init(session, domain):
