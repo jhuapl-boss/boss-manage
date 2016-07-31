@@ -18,6 +18,8 @@ make-base:
 
         - user: {{ user }}
         - group: {{ user }}
+        - user: {{ user }}
+        - group: {{ user }}
 
 make-domain:
     file.managed:
