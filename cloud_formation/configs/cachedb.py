@@ -134,9 +134,9 @@ def create_config(session, domain, keypair=None, user_data=None):
                       "LambdaCacheExecutionRole",
                       s3=("boss-lambda-env",
                           "lambda.{}.zip".format(domain),
-                          "virtualenvs/{}/local/lib/python3.4/site-packages/lambda/lambda_loader.handler".format(domain)),
+                          "local/lib/python3.4/site-packages/lambda/lambda_loader.handler"),
                       timeout=60,
-                      ecurity_groups=lambda_sec_group,
+                      security_groups=lambda_sec_group,
                       subnets=lambda_subnets,
                       depends_on="DNSZone")
 
@@ -226,6 +226,9 @@ def pre_init(session, domain):
         proc.wait()
     os.remove(zipname)
 
+    # This section will run makedomainenv on lambda-build-server however
+    # running it this way seems to cause the virtualenv to get messed up.
+    # Running this script manually on the build server does not have the problem.
     # cmd = "\"source /home/ec2-user/makedomainenv {}\"".format(domain)
     # ssh(apl_bastion_key, "52.23.27.39", "ec2-user", cmd)
 

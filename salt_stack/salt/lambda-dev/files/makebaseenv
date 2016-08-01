@@ -19,6 +19,17 @@ source /usr/local/bin/virtualenvwrapper.sh
 mkvirtualenv lambdaenv
 workon lambdaenv
 
+# virtualenvs have full path symlinks which break in lambda,  changing them to relative links.
+cd /home/ec2-user/virtualenvs/lambdaenv/local
+rm bin
+ln -s ../bin bin
+rm include
+ln -s ../include include
+rm lib
+ln -s ../lib lib
+rm lib64
+ln -s ../lib64 lib64
+
 pip install --upgrade pip
 
 sudo yum install -y libjpeg-turbo-devel.x86_64 zlib-devel.x86_64 libtiff-devel.x86_64 freetype.x86_64 lcms2-devel.x86_64 libwebp-devel.x86_64 openjpeg-devel.x86_64
