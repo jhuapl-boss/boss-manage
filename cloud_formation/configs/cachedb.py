@@ -102,26 +102,17 @@ def create_config(session, domain, keypair=None, user_data=None):
                                                    internal_sg_id,
                                                    "ID of internal Security Group"))
 
-    #az_subnets, external_subnets = config.find_all_availability_zones(session)
+    config.add_ec2_instance("CacheManager",
+                                "cachemanager." + domain,
+                                lib.ami_lookup(session, "cachemanager.boss"),
+                                keypair,
+                                subnet="InternalSubnet",
+                                public_ip=False,
+                                type_=CACHE_MANAGER_TYPE,
+                                security_groups=["InternalSecurityGroup"],
+                                user_data=user_data,
+                                role="cachemanager") # arn:aws:iam::256215146792:instance-profile/cachemanager"
 
-    # TODO removed this. It was a test to make sure the script is actually working
-    config.add_security_group("CacheMgrSecurityGroup",
-                              "cachemgr",
-                              [("tcp", "443", "443", "0.0.0.0/0")])
-
-    # TODO (SH) this works but is commented out to avoid running it while testing.
-    # config.add_ec2_instance("CacheManager",
-    #                             "cachemanager." + domain,
-    #                             lib.ami_lookup(session, "cachemanager.boss"),
-    #                             keypair,
-    #                             subnet="InternalSubnet",
-    #                             public_ip=False,
-    #                             type_=CACHE_MANAGER_TYPE,
-    #                             security_groups=["InternalSecurityGroup"],
-    #                             user_data=user_data,
-    #                             role="cachemanager") # arn:aws:iam::256215146792:instance-profile/cachemanager"
-
-    # might need to add subnets, it is required on the console.
     lambda_sec_group = lib.sg_lookup(session, vpc_id, 'internal.' + domain)
     filter_by_host_name = ([{
         'Name': 'tag:Name',
@@ -130,28 +121,18 @@ def create_config(session, domain, keypair=None, user_data=None):
     lambda_subnets = lib.multi_subnet_id_lookup(session, filter_by_host_name)
 
     config.add_lambda("MultiLambda",
-                      "MultiLambda." + domain,
+                      "multiLambda." + domain,
                       "LambdaCacheExecutionRole",
                       s3=("boss-lambda-env",
                           "lambda.{}.zip".format(domain),
                           "local/lib/python3.4/site-packages/lambda/lambda_loader.handler"),
                       timeout=60,
-                      security_groups=lambda_sec_group,
-                      subnets=lambda_subnets,
-                      depends_on="DNSZone")
+                      security_groups=[lambda_sec_group],
+                      subnets=lambda_subnets)
 
-
-    # role = "arn:aws:iam::256215146792:role/lambda_cache_execution"
-    # config.add_arg(configuration.Arg.String("LambdaCacheExecutionRole", role,
-    #                                         "IAM role for s3flushlambda." + domain))
-    #
-    # config.add_lambda_permission("DNSLambdaExecute", "DNSLambda")
-    #
-    # config.add_sns_topic("DNSSNS",
-    #                      "dns." + domain,
-    #                      "dns." + domain,
-    #                      [("lambda", {"Fn::GetAtt": ["DNSLambda", "Arn"]})])
-
+    role = lib.role_arn_lookup(session, "lambda_cache_execution")
+    config.add_arg(configuration.Arg.String("LambdaCacheExecutionRole", role,
+                                            "IAM role for multilambda." + domain))
     return config
 
 
@@ -169,8 +150,8 @@ def create(session, domain):
     user_data["system"]["type"] = "cachemanager"
     user_data["aws"]["cache"] = "cache." + domain
     user_data["aws"]["cache-state"] = "cache-state." + domain
-    user_data["aws"]["cache-db"] = 0  ## cache-db and cache-stat-db need to be in user_data for lambda to get to them.
-    user_data["aws"]["cache-state-db"] = 0
+    user_data["aws"]["cache-db"] = '0'  ## cache-db and cache-stat-db need to be in user_data for lambda to get to them.
+    user_data["aws"]["cache-state-db"] = '0'
 
     keypair = lib.keypair_lookup(session)
 
@@ -194,7 +175,7 @@ def pre_init(session, domain):
     # zip up spdb, bossutils, lambda and lambda_utils
     tempname = tempfile.NamedTemporaryFile(delete=True)
     zipname = tempname.name + '.zip'
-    print('zip file: ' + zipname)
+    print('Using temp zip file: ' + zipname)
     cwd = os.getcwd()
     os.chdir('../salt_stack/salt/spdb/files')
     lib.write_to_zip('spdb.git', zipname, False)
@@ -205,7 +186,7 @@ def pre_init(session, domain):
     lib.write_to_zip('lambdautils', zipname)
 
     keypair = os.environ.get("SSH_KEY", None);
-    print("Creating Lambda Environment..")
+    print("Copying local modules to lambda-build-server")
 
     #copy the zip file to lambda_build_server
     apl_bastion_ip = os.environ.get("BASTION_IP")
@@ -217,10 +198,9 @@ def pre_init(session, domain):
                                                                       bastion.SSH_OPTIONS,
                                                                       zipname,
                                                                       domain + ".zip")
-    print(scp_cmd)
     try:
         return_code = subprocess.call(shlex.split(scp_cmd))  # close_fds=True, preexec_fn=bastion.become_tty_fg
-        print("return code: " + str(return_code))
+        print("scp return code: " + str(return_code))
     finally:
         proc.terminate()
         proc.wait()
@@ -246,4 +226,6 @@ def post_init(session, domain):
 def delete(session, domain):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
     lib.delete_stack(session, domain, "cachedb")
+    lib.route53_delete_records(session, domain, "cachemanager." + domain)
+
 

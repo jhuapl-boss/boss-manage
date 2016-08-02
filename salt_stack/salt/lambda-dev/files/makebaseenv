@@ -12,6 +12,7 @@ sudo alternatives --set python /usr/bin/python3.4
 sudo pip install virtualenvwrapper
 
 mkdir ~/sitezips
+mkdir ~/lambda_zips
 mkdir ~/virtualenvs
 export WORKON_HOME=~/virtualenvs
 export VIRTUALENVWRAPPER_PYTHON='/usr/bin/python' # This needs to be placed before the virtualenvwrapper command

@@ -2,25 +2,35 @@
 # $1 should be the domain, Ex: hiderrt1.boss
 # 
 # creates the default base virutalenv and installs yum libraries needed.
+if [ "$#" -ne 1 ]; then
+    echo "ERROR.  Illegal number of arguments.  Script takes a single argument: domain_name"
+else
+   cd /home/ec2-user
+   export WORKON_HOME=~/virtualenvs
+   export VIRTUALENVWRAPPER_PYTHON='/usr/bin/python' # This needs to be placed before the virtualenvwrapper command
+   source /usr/local/bin/virtualenvwrapper.sh
+   rm -rf $WORKON_HOME/$1
+   cpvirtualenv lambdaenv $1
 
-cd /home/ec2-user
-export WORKON_HOME=~/virtualenvs
-export VIRTUALENVWRAPPER_PYTHON='/usr/bin/python' # This needs to be placed before the virtualenvwrapper command
-source /usr/local/bin/virtualenvwrapper.sh
-rm -rf $WORKON_HOME/$1
-cpvirtualenv lambdaenv $1
+   # now python scripts can copy in spdb, lambda, lambda-utils and bossutils from local machine.
 
-# now python scripts can copy in spdb, lambda, lambda-utils and bossutils from local machine.
+   unzip /home/ec2-user/sitezips/${1}.zip -d /home/ec2-user/virtualenvs/$1/local/lib/python3.4/site-packages
 
-unzip /home/ec2-user/sitezips/${1}.zip -d /home/ec2-user/virtualenvs/$1/local/lib/python3.4/site-packages
+   cd $WORKON_HOME/$1/local/lib/python3.4/site-packages
+   mv spdb.git spdb
+   cd spdb
+   pip install -r requirements.txt
 
-cd $WORKON_HOME/$1/local/lib/python3.4/site-packages
-mv spdb.git spdb
-cd spdb
-pip install -r requirements.txt
+   cd c_lib/c_version
+   cp makefile_LINUX makefile
+   make
 
-cd c_lib/c_version
-cp makefile_LINUX makefile
-make
-deactivate
+   #if [ -e ~/lambda-zips/lambda.${1}.zip ]
+   #then
+   #   rm ~/lambda-zips/lambda.${1}.zip
+   #fi
+   #python ~/virtualenvs/${1}/local/lib/python3.4/site-packages/lambdautils/deploy_lambdas.py /home/ec2-user/virtualenvs/$1 ~/lambda-zips/lambda.${1}.zip
+
+   deactivate
+fi
 
