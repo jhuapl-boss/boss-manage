@@ -648,6 +648,7 @@ class CloudFormationConfiguration:
             security_groups (None|list) : A list of SecurityGroup unique names within the configuration
             user_data (None|string) : A string of user-data to give to the instance when launching
             meta_data (None|dict) : A dictionary of meta-data to include with the configuration
+            role (None|string) : The role name of that the ec2 instance can assume.
             depends_on (None|string|list): A unique name or list of unique names of resources within the
                                            configuration and is used to determine the launch order of resources
         """
@@ -1359,10 +1360,10 @@ class CloudFormationConfiguration:
             if handler is None:
                 handler = "index.handler"
         elif s3 is not None:
-            bucket, key, handler = s3
+            bucket, s3key, handler = s3
             code = {
                 "S3Bucket": bucket,
-                "S3Key": key
+                "S3Key": s3key
             }
         else:
             raise Exception("Need source file or S3 bucket")

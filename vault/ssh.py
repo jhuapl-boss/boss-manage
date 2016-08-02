@@ -96,7 +96,9 @@ def ssh(key, ip, user="ubuntu", cmd=None):
         ssh_cmd = "ssh -i {} {} -p {} {}@{}".format(key, SSH_OPTIONS, port, user, ip)
         if(cmd):
             ssh_cmd = "{} {}".format(ssh_cmd, cmd)
-        subprocess.call(shlex.split(ssh_cmd), close_fds=True, preexec_fn=become_tty_fg)
+            subprocess.call(shlex.split(ssh_cmd))
+        else:
+            subprocess.call(shlex.split(ssh_cmd), close_fds=True, preexec_fn=become_tty_fg)
     finally:
         if proc is not None:
             proc.terminate()
