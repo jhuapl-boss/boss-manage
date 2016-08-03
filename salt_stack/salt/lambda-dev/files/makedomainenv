@@ -5,17 +5,37 @@
 if [ "$#" -ne 1 ]; then
     echo "ERROR.  Illegal number of arguments.  Script takes a single argument: domain_name"
 else
+   STARTTIME=`date +"%Y%m%d-%H%M%S"`
    cd /home/ec2-user
    export WORKON_HOME=~/virtualenvs
    export VIRTUALENVWRAPPER_PYTHON='/usr/bin/python' # This needs to be placed before the virtualenvwrapper command
    source /usr/local/bin/virtualenvwrapper.sh
-   rm -rf $WORKON_HOME/$1
-   cpvirtualenv lambdaenv $1
+
+   # Creating env and usr files to help debug when virtualenv fails to install correctly.
+   find /usr -print > ~/debug/usr-before-${STARTTIME}.txt
+   rmvirtualenv $1
+   mkvirtualenv $1
+   workon $1
+   env > ~/debug/env-before-${STARTTIME}.txt
+
+   # virtualenvs have full path symlinks which break in lambda,  changing them to relative links.
+   cd /home/ec2-user/virtualenvs/$1/local
+   rm bin
+   ln -s ../bin bin
+   rm include
+   ln -s ../include include
+   rm lib
+   ln -s ../lib lib
+   rm lib64
+   ln -s ../lib64 lib64
+
+   pip install --upgrade pip
+
 
    # now python scripts can copy in spdb, lambda, lambda-utils and bossutils from local machine.
 
    unzip /home/ec2-user/sitezips/${1}.zip -d /home/ec2-user/virtualenvs/$1/local/lib/python3.4/site-packages
-
+   #cp -r ~/spdb $WORKON_HOME/$1/local/lib/python3.4/site-packages/spdb.git
    cd $WORKON_HOME/$1/local/lib/python3.4/site-packages
    mv spdb.git spdb
    cd spdb
@@ -25,11 +45,24 @@ else
    cp makefile_LINUX makefile
    make
 
-   #if [ -e ~/lambda-zips/lambda.${1}.zip ]
-   #then
-   #   rm ~/lambda-zips/lambda.${1}.zip
-   #fi
-   #python ~/virtualenvs/${1}/local/lib/python3.4/site-packages/lambdautils/deploy_lambdas.py /home/ec2-user/virtualenvs/$1 ~/lambda-zips/lambda.${1}.zip
+   # (SH) When virtualenv fails, numpy is not listed in freeze.  This check will help debug the problem when it occurs again.
+   pip freeze | grep numpy
+   if [ $? -eq 0 ]
+   then
+       # removing debug files since virtualenv successfully installed
+       rm ~/debug/usr-before-${STARTTIME}.txt
+       rm  ~/debug/env-before-${STARTTIME}.txt
+       echo zipping up lambda and sending to s3
+       if [ -e ~/lambdazips/lambda.${1}.zip ]
+       then
+          rm ~/lambdazips/lambda.${1}.zip
+       fi
+       python ~/virtualenvs/${1}/local/lib/python3.4/site-packages/lambdautils/deploy_lambdas.py /home/ec2-user/virtualenvs/$1 ~/lambdazips/multilambda.${1}.zip
+   else
+       echo Virtualenv not working correctly.  Not creating lambda zip.
+       env > ~/debug/env-after-failing-${STARTTIME}.txt
+       find /usr -print > ~/debug/usr-after-failing-${STARTTIME}.txt
+   fi
 
    deactivate
 fi
