@@ -35,7 +35,7 @@
   <builders/>
   <publishers>
     <hudson.tasks.BuildTrigger>
-      <childProjects>endpoint</childProjects>
+      <childProjects>spdb</childProjects>
       <threshold>
         <name>SUCCESS</name>
         <ordinal>0</ordinal>
