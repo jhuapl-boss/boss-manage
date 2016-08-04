@@ -124,7 +124,7 @@ def create_config(session, domain, keypair=None, user_data=None):
                       "multiLambda." + domain,
                       "LambdaCacheExecutionRole",
                       s3=("boss-lambda-env",
-                          "lambda.{}.zip".format(domain),
+                          "multilambda.{}.zip".format(domain),
                           "local/lib/python3.4/site-packages/lambda/lambda_loader.handler"),
                       timeout=60,
                       security_groups=[lambda_sec_group],
@@ -175,6 +175,7 @@ def pre_init(session, domain):
     # zip up spdb, bossutils, lambda and lambda_utils
     tempname = tempfile.NamedTemporaryFile(delete=True)
     zipname = tempname.name + '.zip'
+    tempname.close()
     print('Using temp zip file: ' + zipname)
     cwd = os.getcwd()
     os.chdir('../salt_stack/salt/spdb/files')
@@ -209,8 +210,10 @@ def pre_init(session, domain):
     # This section will run makedomainenv on lambda-build-server however
     # running it this way seems to cause the virtualenv to get messed up.
     # Running this script manually on the build server does not have the problem.
-    # cmd = "\"source /home/ec2-user/makedomainenv {}\"".format(domain)
-    # ssh(apl_bastion_key, "52.23.27.39", "ec2-user", cmd)
+    print("calling makedomainenv on lambda-build-server")
+    #cmd = "\"shopt login_shell\""
+    cmd = "\"source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {}\"".format(domain)
+    ssh(apl_bastion_key, "52.23.27.39", "ec2-user", cmd)
 
 
 def post_init(session, domain):
