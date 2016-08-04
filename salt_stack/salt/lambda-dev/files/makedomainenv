@@ -13,9 +13,9 @@ else
    #source /usr/local/bin/virtualenvwrapper.sh
 
    # needed for BLAS before installing numpy
-   export ATLAS=./usr/lib64/atlas/libatlas.so
-   export BLAS=./usr/lib64/atlas/libptf77blas.so
-   export LAPACK=./usr/lib64/atlas/liblapack.so
+   export ATLAS=~/virtualenvs/$1/usr/lib64/atlas/libatlas.so
+   export BLAS=~/virtualenvs/$1/usr/lib64/atlas/libptf77blas.so
+   export LAPACK=~/virtualenvs/$1/usr/lib64/atlas/liblapack.so
 
    # Creating env and usr files to help debug when virtualenv fails to install correctly.
    find /usr -print > ~/debug/usr-before-${STARTTIME}.txt
