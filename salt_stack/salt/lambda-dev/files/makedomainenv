@@ -5,38 +5,47 @@
 if [ "$#" -ne 1 ]; then
     echo "ERROR.  Illegal number of arguments.  Script takes a single argument: domain_name"
 else
+   #check if I am running non-login shell
+   #shopt login_shell | grep off
+   #if [ $? -eq 0 ]; then
+   #   echo nonlogin
+   #   source /etc/profile
+   #   source ~/.bash_profile
+   #fi 
+   #echo $PATH
+   #exit
    STARTTIME=`date +"%Y%m%d-%H%M%S"`
    cd /home/ec2-user
-   export WORKON_HOME=~/virtualenvs
-   export VIRTUALENVWRAPPER_PYTHON='/usr/bin/python' # This needs to be placed before the virtualenvwrapper command
-   source /usr/local/bin/virtualenvwrapper.sh
+   #export WORKON_HOME=~/virtualenvs
+   #export VIRTUALENVWRAPPER_PYTHON='/usr/bin/python' # This needs to be placed before the virtualenvwrapper command
+   #source /usr/local/bin/virtualenvwrapper.sh
+
+   # needed for BLAS before installing numpy
+   export ATLAS=/usr/lib64/atlas/libatlas.so
+   export BLAS=/usr/lib64/atlas/libptf77blas.so
+   export LAPACK=/usr/lib64/atlas/liblapack.so
 
    # Creating env and usr files to help debug when virtualenv fails to install correctly.
    find /usr -print > ~/debug/usr-before-${STARTTIME}.txt
-   rmvirtualenv $1
-   mkvirtualenv $1
-   workon $1
+
+   if [ -d ~/lambdazips/$1 ]; then
+      rm -rf ~/virtualenvs/$1
+   fi
+   python3 -m virtualenv ~/virtualenvs/$1 
+   source ~/virtualenvs/$1/bin/activate
+   #workon $1
    env > ~/debug/env-before-${STARTTIME}.txt
+   
+   #pip install --upgrade pip
 
-   # virtualenvs have full path symlinks which break in lambda,  changing them to relative links.
-   cd /home/ec2-user/virtualenvs/$1/local
-   rm bin
-   ln -s ../bin bin
-   rm include
-   ln -s ../include include
-   rm lib
-   ln -s ../lib lib
-   rm lib64
-   ln -s ../lib64 lib64
+   cd ~/virtualenvs/$1/lib/python3.4/site-packages
+   # cloud formation config should have already zipped spdb, lambda, lambda-utils and bossutils from local machine.
+   unzip /home/ec2-user/sitezips/${1}.zip -d /home/ec2-user/virtualenvs/$1/lib/python3.4/site-packages
+   #unzip /home/ec2-user/sitezips/${1}.zip -d /home/ec2-user/virtualenvs/$1/local/lib/python3.4/site-packages
 
-   pip install --upgrade pip
-
-
-   # now python scripts can copy in spdb, lambda, lambda-utils and bossutils from local machine.
-
-   unzip /home/ec2-user/sitezips/${1}.zip -d /home/ec2-user/virtualenvs/$1/local/lib/python3.4/site-packages
    #cp -r ~/spdb $WORKON_HOME/$1/local/lib/python3.4/site-packages/spdb.git
-   cd $WORKON_HOME/$1/local/lib/python3.4/site-packages
+
+   #cd ~/virtualenvs/$1/local/lib/python3.4/site-packages
    mv spdb.git spdb
    cd spdb
    pip install -r requirements.txt
@@ -49,6 +58,7 @@ else
    pip freeze | grep numpy
    if [ $? -eq 0 ]
    then
+       echo virtualenv installed correctly.
        # removing debug files since virtualenv successfully installed
        rm ~/debug/usr-before-${STARTTIME}.txt
        rm  ~/debug/env-before-${STARTTIME}.txt
@@ -57,13 +67,40 @@ else
        then
           rm ~/lambdazips/lambda.${1}.zip
        fi
-       python ~/virtualenvs/${1}/local/lib/python3.4/site-packages/lambdautils/deploy_lambdas.py /home/ec2-user/virtualenvs/$1 ~/lambdazips/multilambda.${1}.zip
+       # zip up virtualenv unzip and convert local back to symlinks, then zip up again keeping symlinks.
+       # we do this because other symlinks point to files outside of our virtualenv.  We also have a limited 
+       # size on a lambda directory, this decreases the size.
+       if [ -e  ~/lambdazips/multilambda.${1}.zip ]; then
+          rm  ~/lambdazips/multilambda.${1}.zip
+       fi
+       cd ~/virtualenvs/${1}
+       zip -r -q  ~/lambdazips/multilambda.${1}.zip .
+
+       if [ -d ~/lambdazips/$1 ]; then
+          rm -rf ~/lambdazips/$1
+       fi
+       mkdir ~/lambdazips/$1
+       cd ~/lambdazips/$1
+       unzip -q ~/lambdazips/multilambda.${1}.zip
+
+       rm -rf local
+       mkdir local
+       cd local
+       ln -s ../bin bin
+       ln -s ../include include
+       ln -s ../lib lib
+       ln -s ../lib64 lib64
+       cd ~/lambdazips/$1
+       rm ~/lambdazips/multilambda.${1}.zip
+       zip --symlinks -r -q  ~/lambdazips/multilambda.${1}.zip .
+
+       python ~/virtualenvs/${1}/lib/python3.4/site-packages/lambdautils/deploy_lambdas.py /home/ec2-user/virtualenvs/$1 ~/lambdazips/multilambda.${1}.zip --upload-only
    else
        echo Virtualenv not working correctly.  Not creating lambda zip.
        env > ~/debug/env-after-failing-${STARTTIME}.txt
        find /usr -print > ~/debug/usr-after-failing-${STARTTIME}.txt
    fi
-
+   echo deactivating
    deactivate
 fi
 
