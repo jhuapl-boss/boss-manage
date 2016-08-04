@@ -793,7 +793,7 @@ class CloudFormationConfiguration:
 
         self._add_record_cname(key, hostname, rds = True)
 
-    def add_dynamo_table_from_json(self, key, name, KeySchema, AttributeDefinitions, ProvisionedThroughput):
+    def add_dynamo_table_from_json(self, key, name, KeySchema, AttributeDefinitions, ProvisionedThroughput, GlobalSecondaryIndexes=None):
         """Add DynamoDB table to the configuration using DynamoDB's calling convention.
 
         Example:
@@ -814,6 +814,7 @@ class CloudFormationConfiguration:
             KeySchema (list) : List of dict of AttributeName / KeyType
             AttributeDefinitions (list) : List of dict of AttributeName / AttributeType
             ProvisionedThroughput (dictionary) : Dictionary of ReadCapacityUnits / WriteCapacityUnits
+            GlobalSecondaryIndexes (optional[list]): List of dicts representing global secondary indexes.  Defaults to None.
         """
 
         props = {
@@ -822,6 +823,9 @@ class CloudFormationConfiguration:
             "AttributeDefinitions" : AttributeDefinitions,
             "ProvisionedThroughput" : ProvisionedThroughput
         }
+
+        if GlobalSecondaryIndexes is not None:
+            props["GlobalSecondaryIndexes"] = GlobalSecondaryIndexes
 
         self.resources[key] = {
             "Type" : "AWS::DynamoDB::Table",

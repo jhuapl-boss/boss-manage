@@ -38,6 +38,8 @@ PRODUCTION_REGION = 'us-east-1'
 
 DYNAMO_SCHEMA = '../salt_stack/salt/boss/files/boss.git/django/bosscore/dynamo_schema.json'
 
+DYNAMO_S3_INDEX_SCHEMA = '../salt_stack/salt/spdb/files/spdb.git/spatialdb/dynamo/s3_index_table.json'
+
 INCOMING_SUBNET = "52.3.13.189/32"  # microns-bastion elastic IP
 
 VAULT_DJANGO = "secret/endpoint/django"
@@ -136,13 +138,13 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
 
     endpoint_role_arn = lib.role_arn_lookup(session, "endpoint")
     config.add_sqs_policy(
-        'sqsEndpointPolicy', 'sqsEndpointPolicy', 
+        'sqsEndpointPolicy', 'sqsEndpointPolicy',
         [{'Ref': deadqname}, {'Ref': s3flushqname}],
         endpoint_role_arn)
 
     cachemanager_role_arn = lib.role_arn_lookup(session, 'cachemanager')
     config.add_sqs_policy(
-        'sqsCachemgrPolicy', 'sqsCachemgrPolicy', 
+        'sqsCachemgrPolicy', 'sqsCachemgrPolicy',
         [{'Ref': deadqname}, {'Ref': s3flushqname}],
         cachemanager_role_arn)
 
@@ -179,6 +181,10 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     with open(DYNAMO_SCHEMA, 'r') as fh:
         dynamo_cfg = json.load(fh)
     config.add_dynamo_table_from_json("EndpointMetaDB",'bossmeta.' + domain, **dynamo_cfg)
+
+    with open(DYNAMO_S3_INDEX_SCHEMA , 'r') as s3fh:
+        dynamo_s3_cfg = json.load(s3fh)
+    config.add_dynamo_table_from_json('s3_index_table', 's3index.' + domain, **dynamo_s3_cfg)
 
     config.add_redis_replication("Cache",
                                  "cache." + domain,
