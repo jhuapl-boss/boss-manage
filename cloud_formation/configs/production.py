@@ -184,7 +184,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
 
     with open(DYNAMO_S3_INDEX_SCHEMA , 'r') as s3fh:
         dynamo_s3_cfg = json.load(s3fh)
-    config.add_dynamo_table_from_json('s3_index_table', 's3index.' + domain, **dynamo_s3_cfg)
+    config.add_dynamo_table_from_json('s3Index', 's3index.' + domain, **dynamo_s3_cfg)
 
     config.add_redis_replication("Cache",
                                  "cache." + domain,
@@ -240,8 +240,10 @@ def create(session, domain):
     user_data["aws"]["db"] = "endpoint-db." + domain
     user_data["aws"]["cache"] = "cache." + domain
     user_data["aws"]["cache-state"] = "cache-state." + domain
-    user_data["aws"]["cache-db"] = 0  ## cache-db and cache-stat-db need to be in user_data for lambda to access them.
-    user_data["aws"]["cache-state-db"] = 0
+
+    ## cache-db and cache-stat-db need to be in user_data for lambda to access them.
+    user_data["aws"]["cache-db"] = "0"
+    user_data["aws"]["cache-state-db"] = "0"
     user_data["aws"]["meta-db"] = "bossmeta." + domain
     # Use CloudFormation's Ref function so that queues' URLs are placed into
     # the Boss config file.
