@@ -249,6 +249,7 @@ def create(session, domain):
     # the Boss config file.
     user_data["aws"]["s3-flush-queue"] = '{{"Ref": "{}" }}'.format(s3flushqname)
     user_data["aws"]["s3-flush-deadletter-queue"] = '{{"Ref": "{}" }}'.format(deadqname)
+    user_data["aws"]["cuboid_bucket"] = "cuboids." + domain
     user_data["auth"]["OIDC_VERIFY_SSL"] = str(domain in hosts.BASE_DOMAIN_CERTS.keys())
 
     call.vault_write(VAULT_DJANGO, secret_key = str(uuid.uuid4()))
