@@ -102,6 +102,18 @@ def create_config(session, domain, keypair=None, user_data=None):
                                                    internal_sg_id,
                                                    "ID of internal Security Group"))
 
+    role = lib.role_arn_lookup(session, "lambda_cache_execution")
+    config.add_arg(configuration.Arg.String("LambdaCacheExecutionRole", role,
+                                            "IAM role for multilambda." + domain))
+
+    index_bucket_name = "cuboids." + domain
+    if not lib.s3_bucket_exists(session, index_bucket_name):
+        config.add_s3_bucket("cuboidBucket", index_bucket_name)
+    config.add_s3_bucket_policy(
+        "cuboidBucketPolicy", index_bucket_name,
+        ['s3:GetObject', 's3:PutObject'],
+        { 'AWS': role})
+
     config.add_ec2_instance("CacheManager",
                                 "cachemanager." + domain,
                                 lib.ami_lookup(session, "cachemanager.boss"),
@@ -130,9 +142,6 @@ def create_config(session, domain, keypair=None, user_data=None):
                       security_groups=[lambda_sec_group],
                       subnets=lambda_subnets)
 
-    role = lib.role_arn_lookup(session, "lambda_cache_execution")
-    config.add_arg(configuration.Arg.String("LambdaCacheExecutionRole", role,
-                                            "IAM role for multilambda." + domain))
     return config
 
 
@@ -230,5 +239,3 @@ def delete(session, domain):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
     lib.delete_stack(session, domain, "cachedb")
     lib.route53_delete_records(session, domain, "cachemanager." + domain)
-
-

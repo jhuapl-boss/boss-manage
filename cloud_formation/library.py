@@ -1331,3 +1331,23 @@ def write_to_zip(path, zippath, append=True):
         write_zip_file(path, fzip)
     fzip.close()
 
+def s3_bucket_exists(session, name):
+    """Test for existence of an S3 bucket.
+
+    Note that this method can only test for the existence of buckets owned by
+    the user.
+
+    Args:
+        session (Session): Boto3 session used to lookup information in AWS.
+        name (string): Name of S3 bucket.
+
+    Returns:
+        (bool): True if bucket exists.
+    """
+    client = session.client('s3')
+    resp = client.list_buckets()
+    for bucket in resp['Buckets']:
+        if bucket['Name'] == name:
+            return True
+
+    return False
