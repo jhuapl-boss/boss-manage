@@ -252,6 +252,8 @@ def create(session, domain):
     user_data["aws"]["cuboid_bucket"] = "cuboids." + domain
     user_data["aws"]["s3-index-table"] = "s3index." + domain
     user_data["auth"]["OIDC_VERIFY_SSL"] = str(domain in hosts.BASE_DOMAIN_CERTS.keys())
+    user_data["lambda"]["flush_function"] = "multiLambda." + domain
+    user_data["lambda"]["page_in_function"] = "multiLambda." + domain
 
     call.vault_write(VAULT_DJANGO, secret_key = str(uuid.uuid4()))
     call.vault_write(VAULT_DJANGO_DB, **db)
