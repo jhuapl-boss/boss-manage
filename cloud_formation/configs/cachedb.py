@@ -132,8 +132,9 @@ def create_config(session, domain, keypair=None, user_data=None):
     }])
     lambda_subnets = lib.multi_subnet_id_lookup(session, filter_by_host_name)
 
+    multi_lambda_name = 'multiLambda-' + domain.replace('.', '-')
     config.add_lambda("MultiLambda",
-                      "multiLambda." + domain,
+                      multi_lambda_name,
                       "LambdaCacheExecutionRole",
                       s3=("boss-lambda-env",
                           "multilambda.{}.zip".format(domain),
@@ -168,6 +169,7 @@ def create(session, domain):
     try:
         name = lib.domain_to_stackname("cachedb." + domain)
         pre_init(session, domain)
+
         config = create_config(session, domain, keypair, str(user_data))
 
         success = config.create(session, name)
@@ -196,7 +198,9 @@ def pre_init(session, domain):
     lib.write_to_zip('lambda', zipname)
     lib.write_to_zip('lambdautils', zipname)
 
-    keypair = os.environ.get("SSH_KEY", None);
+    # Restore original working directory.
+    os.chdir(cwd)
+
     print("Copying local modules to lambda-build-server")
 
     #copy the zip file to lambda_build_server
@@ -209,6 +213,7 @@ def pre_init(session, domain):
                                                                       bastion.SSH_OPTIONS,
                                                                       zipname,
                                                                       domain + ".zip")
+
     try:
         return_code = subprocess.call(shlex.split(scp_cmd))  # close_fds=True, preexec_fn=bastion.become_tty_fg
         print("scp return code: " + str(return_code))
