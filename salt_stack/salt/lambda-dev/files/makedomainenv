@@ -54,6 +54,11 @@ else
    cp makefile_LINUX makefile
    make
 
+   # set the correct log config
+   echo configuring logging
+   cd ~/virtualenvs/$1/local/lib/python3.4/site-packages/bossutils/
+   mv ./lambda_logger_conf.json ./logger_conf.json
+
    # (SH) When virtualenv fails, numpy is not listed in freeze.  This check will help debug the problem when it occurs again.
    pip freeze | grep numpy
    if [ $? -eq 0 ]
