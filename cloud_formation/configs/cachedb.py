@@ -34,17 +34,7 @@ import hosts
 import json
 import scalyr
 import uuid
-import sys
-import boto3
-import os
-import subprocess
-import tempfile
-import shlex
-cur_dir = os.path.dirname(os.path.realpath(__file__))
-vault_dir = os.path.normpath(os.path.join(cur_dir, "..", "vault"))
-sys.path.append(vault_dir)
-import bastion
-from ssh import *
+from update_lambda_fcn import load_lambdas_on_s3
 
 
 # Region production is created in.  Later versions of boto3 should allow us to
@@ -184,52 +174,10 @@ def create(session, domain):
 
 
 def pre_init(session, domain):
-    # zip up spdb, bossutils, lambda and lambda_utils
-    tempname = tempfile.NamedTemporaryFile(delete=True)
-    zipname = tempname.name + '.zip'
-    tempname.close()
-    print('Using temp zip file: ' + zipname)
-    cwd = os.getcwd()
-    os.chdir('../salt_stack/salt/spdb/files')
-    lib.write_to_zip('spdb.git', zipname, False)
-    os.chdir(cwd)
-    os.chdir('../salt_stack/salt/boss-tools/files/boss-tools.git')
-    lib.write_to_zip('bossutils', zipname)
-    lib.write_to_zip('lambda', zipname)
-    lib.write_to_zip('lambdautils', zipname)
-
-    # Restore original working directory.
-    os.chdir(cwd)
-
-    print("Copying local modules to lambda-build-server")
-
-    #copy the zip file to lambda_build_server
-    apl_bastion_ip = os.environ.get("BASTION_IP")
-    apl_bastion_key = os.environ.get("BASTION_KEY")
-    apl_bastion_user = os.environ.get("BASTION_USER")
-    local_port = bastion.locate_port()
-    proc = bastion.create_tunnel(apl_bastion_key, local_port, "52.23.27.39", 22, apl_bastion_ip, bastion_user="ubuntu")
-    scp_cmd = "scp -P {} {} {} ec2-user@localhost:sitezips/{}".format(local_port,
-                                                                      bastion.SSH_OPTIONS,
-                                                                      zipname,
-                                                                      domain + ".zip")
-
-    try:
-        return_code = subprocess.call(shlex.split(scp_cmd))  # close_fds=True, preexec_fn=bastion.become_tty_fg
-        print("scp return code: " + str(return_code))
-    finally:
-        proc.terminate()
-        proc.wait()
-    os.remove(zipname)
-
-    # This section will run makedomainenv on lambda-build-server however
-    # running it this way seems to cause the virtualenv to get messed up.
-    # Running this script manually on the build server does not have the problem.
-    print("calling makedomainenv on lambda-build-server")
-    #cmd = "\"shopt login_shell\""
-    cmd = "\"source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {}\"".format(domain)
-    ssh(apl_bastion_key, "52.23.27.39", "ec2-user", cmd)
-
+    """Send spdb, bossutils, lambda, and lambda_utils to the lambda build
+    server, build the lambda environment, and upload to S3.
+    """
+    load_lambdas_on_s3(domain)
 
 def post_init(session, domain):
     print("post_init")

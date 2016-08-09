@@ -14,6 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Update an existing lambda function.  Note, that the lambda handler function
+is not changed.
+
+load_lambdas_on_s3() zips spdb, bossutils, lambda, and lambda_utils as found
+in boss-manage's submodules and places it on the lambda build server.  Next,
+makedomainenv is run on the lambda build server to create the virtualenv for
+the lambda function.  Finally, the virutalenv is zipped and uploaded to S3.
+
+update_lambda_code() tells AWS to point the existing lambda function at the
+new zip in S3.
+"""
+
 import argparse
 import boto3
 import configuration
@@ -69,6 +82,7 @@ def update_lambda_code(session, domain):
         S3Bucket=S3_BUCKET,
         S3Key=get_lambda_zip_name(domain),
         Publish=True)
+    print(resp)
 
 def load_lambdas_on_s3(domain):
     """Zip up spdb, bossutils, lambda and lambda_utils.  Upload to S3.
@@ -79,9 +93,6 @@ def load_lambdas_on_s3(domain):
 
     Args:
         domain (string): The VPC's domain name such as integration.boss.
-
-    Returns:
-        (string)
     """
     tempname = tempfile.NamedTemporaryFile(delete=True)
     zipname = tempname.name + '.zip'
@@ -183,5 +194,5 @@ if __name__ == '__main__':
 
     session = create_session(credentials)
 
-    # load_lambdas_on_s3(args.domain)
+    load_lambdas_on_s3(args.domain)
     update_lambda_code(session, args.domain)
