@@ -2,6 +2,7 @@ include:
     - python.python35
     - boss-tools.bossutils
     - aws.boto3
+    - spdb
 
 service-cachemiss:
     file.managed:
@@ -46,5 +47,3 @@ service-prefetch:
     cmd.run:
         - name: update-rc.d boss-prefetchd defaults 10
         - user: root
-
-
