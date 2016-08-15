@@ -48,6 +48,10 @@ CACHE_MANAGER_TYPE = {
     "production": "t2.medium",
 }
 
+# Prefixes uses to generate names of SQS queues.
+S3FLUSH_QUEUE_PREFIX = 'S3flush.'
+DEADLETTER_QUEUE_PREFIX = 'Deadletter.'
+
 
 def create_config(session, domain, keypair=None, user_data=None):
     """
@@ -146,13 +150,30 @@ def generate(folder, domain):
 
 def create(session, domain):
     """Create the configuration, and launch it"""
+    s3flushqname = lib.domain_to_stackname(S3FLUSH_QUEUE_PREFIX + domain)
+    deadqname = lib.domain_to_stackname(DEADLETTER_QUEUE_PREFIX + domain)
+
+    # Configure Vault and create the user data config that the endpoint will
+    # use for connecting to Vault and the DB instance
     user_data = configuration.UserData()
     user_data["system"]["fqdn"] = "cachemanager." + domain
     user_data["system"]["type"] = "cachemanager"
     user_data["aws"]["cache"] = "cache." + domain
     user_data["aws"]["cache-state"] = "cache-state." + domain
-    user_data["aws"]["cache-db"] = '0'  ## cache-db and cache-stat-db need to be in user_data for lambda to get to them.
-    user_data["aws"]["cache-state-db"] = '0'
+    user_data["aws"]["cache-db"] = "0"
+    user_data["aws"]["cache-state-db"] = "0"
+
+    # Use CloudFormation's Ref function so that queues' URLs are placed into
+    # the Boss config file.
+    user_data["aws"]["s3-flush-queue"] = '{{"Ref": "{}" }}'.format(s3flushqname)
+    user_data["aws"]["s3-flush-deadletter-queue"] = '{{"Ref": "{}" }}'.format(deadqname)
+    user_data["aws"]["cuboid_bucket"] = "cuboids." + domain
+    user_data["aws"]["s3-index-table"] = "s3index." + domain
+
+    # Lambda names can't have periods.
+    sanitized_domain = domain.replace('.', '-')
+    user_data["lambda"]["flush_function"] = "multiLambda-" + sanitized_domain
+    user_data["lambda"]["page_in_function"] = "multiLambda-" + sanitized_domain
 
     keypair = lib.keypair_lookup(session)
 
