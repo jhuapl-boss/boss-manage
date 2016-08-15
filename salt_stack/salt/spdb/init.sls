@@ -12,6 +12,19 @@ spdb-prerequirements:
             - libwebp-dev
             - libopenjpeg-dev
 
+# Install moto dependency separately.  Salt sets LC_ALL=C which breaks
+# install of httpretty due to a Unicode error.  Unfortunately, can't
+# override this variable in the pip.installed state using env_vars.  Salt
+# probably sets LC_ALL after it sets the environment to  the contents of
+# env_vars.  This will probably be fixed in a new version of Salt (newer
+# than 8/2015).  See https://github.com/saltstack/salt/issues/19924 and
+# https://github.com/saltstack/salt/pull/29340.
+httpretty:
+    cmd.run:
+        - name: |
+            export LC_ALL=en_US.UTF-8
+            sudo /usr/local/bin/pip3 install httpretty==0.8.10
+
 spdb-lib:
     pip.installed:
         - bin_env: /usr/local/bin/pip3
