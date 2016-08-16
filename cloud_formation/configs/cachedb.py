@@ -134,6 +134,16 @@ def create_config(session, domain, keypair=None, user_data=None):
                       security_groups=[lambda_sec_group],
                       subnets=lambda_subnets)
 
+    # Add topic to indicating that the object store has been write locked.
+    write_lock_topic = 'writeLockAlert'
+    write_lock_topic_logical_name = (
+        write_lock_topic + '-' + domain.replace('.', '-'))
+    # ToDo: add subscribers.
+    write_lock_subscribers = []
+    config.add_sns_topic(
+        write_lock_topic, write_lock_topic,
+        write_lock_topic_logical_name, write_lock_subscribers)
+
     return config
 
 
