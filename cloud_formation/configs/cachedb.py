@@ -52,6 +52,8 @@ CACHE_MANAGER_TYPE = {
 S3FLUSH_QUEUE_PREFIX = 'S3flush.'
 DEADLETTER_QUEUE_PREFIX = 'Deadletter.'
 
+WRITE_LOCK_SNS_PREFIX = 'WriteLockAlert'
+
 
 def create_config(session, domain, keypair=None, user_data=None):
     """
@@ -60,13 +62,22 @@ def create_config(session, domain, keypair=None, user_data=None):
         session: amazon session object
         domain: domain of the stack being created
         keypair: keypair used to by instances being created
-        user_data: information used by the endpoint instance and vault
+        user_data (configuration.UserData): information used by the endpoint instance and vault.  Data will be run through the CloudFormation Fn::Join template intrinsic function so other template intrinsic functions used in the user_data will be parsed and executed.
         db_config: information needed by rds
 
     Returns: the config for the Cloud Formation stack
 
     """
+
+    # Prepare user data for parsing by CloudFormation.
+    if user_data is not None:
+        parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
+    else:
+        parsed_user_data = user_data
+
     config = configuration.CloudFormationConfiguration(domain, PRODUCTION_REGION)
+    # Prepare user data for parsing by CloudFormation.
+    parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
 
     # do a couple of verification checks
     if config.subnet_domain is not None:
@@ -116,7 +127,7 @@ def create_config(session, domain, keypair=None, user_data=None):
                                 public_ip=False,
                                 type_=CACHE_MANAGER_TYPE,
                                 security_groups=["InternalSecurityGroup"],
-                                user_data=user_data,
+                                user_data=parsed_user_data,
                                 role="cachemanager") # arn:aws:iam::256215146792:instance-profile/cachemanager"
 
     lambda_sec_group = lib.sg_lookup(session, vpc_id, 'internal.' + domain)
@@ -139,7 +150,7 @@ def create_config(session, domain, keypair=None, user_data=None):
                       subnets=lambda_subnets)
 
     # Add topic to indicating that the object store has been write locked.
-    write_lock_topic = 'writeLockAlert'
+    write_lock_topic = WRITE_LOCK_SNS_PREFIX
     write_lock_topic_logical_name = (
         write_lock_topic + '-' + domain.replace('.', '-'))
     # ToDo: add subscribers.
@@ -175,13 +186,21 @@ def create(session, domain):
 
     # Use CloudFormation's Ref function so that queues' URLs are placed into
     # the Boss config file.
-    user_data["aws"]["s3-flush-queue"] = '{{"Ref": "{}" }}'.format(s3flushqname)
-    user_data["aws"]["s3-flush-deadletter-queue"] = '{{"Ref": "{}" }}'.format(deadqname)
+    # user_data["aws"]["s3-flush-queue"] = '{{"Ref": "{}" }}'.format(s3flushqname)
+    # user_data["aws"]["s3-flush-deadletter-queue"] = '{{"Ref": "{}" }}'.format(deadqname)
+
+    # Until merged with production.py, look up queue urls instead of using
+    # the Ref intrinsic function.
+    user_data["aws"]["s3-flush-queue"] = lib.sqs_lookup_url(session, s3flushqname)
+    user_data["aws"]["s3-flush-deadletter-queue"] = lib.sqs_lookup_url(session, deadqname)
+
     user_data["aws"]["cuboid_bucket"] = "cuboids." + domain
     user_data["aws"]["s3-index-table"] = "s3index." + domain
 
-    # Lambda names can't have periods.
+    # SNS and Lambda names can't have periods.
     sanitized_domain = domain.replace('.', '-')
+    user_data["aws"]["sns-write-locked"] = '{{"Ref": "{}"}}'.format(WRITE_LOCK_SNS_PREFIX)
+
     user_data["lambda"]["flush_function"] = "multiLambda-" + sanitized_domain
     user_data["lambda"]["page_in_function"] = "multiLambda-" + sanitized_domain
 
@@ -191,7 +210,7 @@ def create(session, domain):
         name = lib.domain_to_stackname("cachedb." + domain)
         pre_init(session, domain)
 
-        config = create_config(session, domain, keypair, str(user_data))
+        config = create_config(session, domain, keypair, user_data)
 
         success = config.create(session, name)
         print("finished config.create")

@@ -1089,6 +1089,23 @@ def sns_topic_lookup(session, topic_name):
     return None
 
 
+def sqs_lookup_url(session, queue_name):
+    """Lookup up SQS url given a name.
+
+    Args:
+        session (Session) : Boto3 session used to lookup information in AWS.
+        queue_name (string) : Name of the queue to lookup.
+
+    Returns:
+        (string) : URL for the queue.
+
+    Raises:
+        (boto3.ClientError): If queue not found.
+    """
+    client = session.client('sqs')
+    resp = client.get_queue_url(QueueName=queue_name)
+    return resp['QueueUrl']
+
 def request_cert(session, domain_name, validation_domain='theboss.io'):
     """Requests a certificate in the AWS Certificate Manager for the domain name
 
