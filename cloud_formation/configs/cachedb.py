@@ -34,17 +34,7 @@ import hosts
 import json
 import scalyr
 import uuid
-import sys
-import boto3
-import os
-import subprocess
-import tempfile
-import shlex
-cur_dir = os.path.dirname(os.path.realpath(__file__))
-vault_dir = os.path.normpath(os.path.join(cur_dir, "..", "vault"))
-sys.path.append(vault_dir)
-import bastion
-from ssh import *
+from update_lambda_fcn import load_lambdas_on_s3
 
 
 # Region production is created in.  Later versions of boto3 should allow us to
@@ -57,6 +47,10 @@ CACHE_MANAGER_TYPE = {
     "development": "t2.micro",
     "production": "t2.medium",
 }
+
+# Prefixes uses to generate names of SQS queues.
+S3FLUSH_QUEUE_PREFIX = 'S3flush.'
+DEADLETTER_QUEUE_PREFIX = 'Deadletter.'
 
 
 def create_config(session, domain, keypair=None, user_data=None):
@@ -102,6 +96,18 @@ def create_config(session, domain, keypair=None, user_data=None):
                                                    internal_sg_id,
                                                    "ID of internal Security Group"))
 
+    role = lib.role_arn_lookup(session, "lambda_cache_execution")
+    config.add_arg(configuration.Arg.String("LambdaCacheExecutionRole", role,
+                                            "IAM role for multilambda." + domain))
+
+    index_bucket_name = "cuboids." + domain
+    if not lib.s3_bucket_exists(session, index_bucket_name):
+        config.add_s3_bucket("cuboidBucket", index_bucket_name)
+    config.add_s3_bucket_policy(
+        "cuboidBucketPolicy", index_bucket_name,
+        ['s3:GetObject', 's3:PutObject'],
+        { 'AWS': role})
+
     config.add_ec2_instance("CacheManager",
                                 "cachemanager." + domain,
                                 lib.ami_lookup(session, "cachemanager.boss"),
@@ -120,19 +126,18 @@ def create_config(session, domain, keypair=None, user_data=None):
     }])
     lambda_subnets = lib.multi_subnet_id_lookup(session, filter_by_host_name)
 
+    multi_lambda_name = 'multiLambda-' + domain.replace('.', '-')
     config.add_lambda("MultiLambda",
-                      "multiLambda." + domain,
+                      multi_lambda_name,
                       "LambdaCacheExecutionRole",
                       s3=("boss-lambda-env",
                           "multilambda.{}.zip".format(domain),
                           "local/lib/python3.4/site-packages/lambda/lambda_loader.handler"),
                       timeout=60,
+                      memory=1024,
                       security_groups=[lambda_sec_group],
                       subnets=lambda_subnets)
 
-    role = lib.role_arn_lookup(session, "lambda_cache_execution")
-    config.add_arg(configuration.Arg.String("LambdaCacheExecutionRole", role,
-                                            "IAM role for multilambda." + domain))
     return config
 
 
@@ -145,19 +150,37 @@ def generate(folder, domain):
 
 def create(session, domain):
     """Create the configuration, and launch it"""
+    s3flushqname = lib.domain_to_stackname(S3FLUSH_QUEUE_PREFIX + domain)
+    deadqname = lib.domain_to_stackname(DEADLETTER_QUEUE_PREFIX + domain)
+
+    # Configure Vault and create the user data config that the endpoint will
+    # use for connecting to Vault and the DB instance
     user_data = configuration.UserData()
     user_data["system"]["fqdn"] = "cachemanager." + domain
     user_data["system"]["type"] = "cachemanager"
     user_data["aws"]["cache"] = "cache." + domain
     user_data["aws"]["cache-state"] = "cache-state." + domain
-    user_data["aws"]["cache-db"] = '0'  ## cache-db and cache-stat-db need to be in user_data for lambda to get to them.
-    user_data["aws"]["cache-state-db"] = '0'
+    user_data["aws"]["cache-db"] = "0"
+    user_data["aws"]["cache-state-db"] = "0"
+
+    # Use CloudFormation's Ref function so that queues' URLs are placed into
+    # the Boss config file.
+    user_data["aws"]["s3-flush-queue"] = '{{"Ref": "{}" }}'.format(s3flushqname)
+    user_data["aws"]["s3-flush-deadletter-queue"] = '{{"Ref": "{}" }}'.format(deadqname)
+    user_data["aws"]["cuboid_bucket"] = "cuboids." + domain
+    user_data["aws"]["s3-index-table"] = "s3index." + domain
+
+    # Lambda names can't have periods.
+    sanitized_domain = domain.replace('.', '-')
+    user_data["lambda"]["flush_function"] = "multiLambda-" + sanitized_domain
+    user_data["lambda"]["page_in_function"] = "multiLambda-" + sanitized_domain
 
     keypair = lib.keypair_lookup(session)
 
     try:
         name = lib.domain_to_stackname("cachedb." + domain)
         pre_init(session, domain)
+
         config = create_config(session, domain, keypair, str(user_data))
 
         success = config.create(session, name)
@@ -172,49 +195,10 @@ def create(session, domain):
 
 
 def pre_init(session, domain):
-    # zip up spdb, bossutils, lambda and lambda_utils
-    tempname = tempfile.NamedTemporaryFile(delete=True)
-    zipname = tempname.name + '.zip'
-    tempname.close()
-    print('Using temp zip file: ' + zipname)
-    cwd = os.getcwd()
-    os.chdir('../salt_stack/salt/spdb/files')
-    lib.write_to_zip('spdb.git', zipname, False)
-    os.chdir(cwd)
-    os.chdir('../salt_stack/salt/boss-tools/files/boss-tools.git')
-    lib.write_to_zip('bossutils', zipname)
-    lib.write_to_zip('lambda', zipname)
-    lib.write_to_zip('lambdautils', zipname)
-
-    keypair = os.environ.get("SSH_KEY", None);
-    print("Copying local modules to lambda-build-server")
-
-    #copy the zip file to lambda_build_server
-    apl_bastion_ip = os.environ.get("BASTION_IP")
-    apl_bastion_key = os.environ.get("BASTION_KEY")
-    apl_bastion_user = os.environ.get("BASTION_USER")
-    local_port = bastion.locate_port()
-    proc = bastion.create_tunnel(apl_bastion_key, local_port, "52.23.27.39", 22, apl_bastion_ip, bastion_user="ubuntu")
-    scp_cmd = "scp -P {} {} {} ec2-user@localhost:sitezips/{}".format(local_port,
-                                                                      bastion.SSH_OPTIONS,
-                                                                      zipname,
-                                                                      domain + ".zip")
-    try:
-        return_code = subprocess.call(shlex.split(scp_cmd))  # close_fds=True, preexec_fn=bastion.become_tty_fg
-        print("scp return code: " + str(return_code))
-    finally:
-        proc.terminate()
-        proc.wait()
-    os.remove(zipname)
-
-    # This section will run makedomainenv on lambda-build-server however
-    # running it this way seems to cause the virtualenv to get messed up.
-    # Running this script manually on the build server does not have the problem.
-    print("calling makedomainenv on lambda-build-server")
-    #cmd = "\"shopt login_shell\""
-    cmd = "\"source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {}\"".format(domain)
-    ssh(apl_bastion_key, "52.23.27.39", "ec2-user", cmd)
-
+    """Send spdb, bossutils, lambda, and lambda_utils to the lambda build
+    server, build the lambda environment, and upload to S3.
+    """
+    load_lambdas_on_s3(domain)
 
 def post_init(session, domain):
     print("post_init")
@@ -230,5 +214,3 @@ def delete(session, domain):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
     lib.delete_stack(session, domain, "cachedb")
     lib.route53_delete_records(session, domain, "cachemanager." + domain)
-
-

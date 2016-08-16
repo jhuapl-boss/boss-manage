@@ -793,7 +793,7 @@ class CloudFormationConfiguration:
 
         self._add_record_cname(key, hostname, rds = True)
 
-    def add_dynamo_table_from_json(self, key, name, KeySchema, AttributeDefinitions, ProvisionedThroughput):
+    def add_dynamo_table_from_json(self, key, name, KeySchema, AttributeDefinitions, ProvisionedThroughput, GlobalSecondaryIndexes=None):
         """Add DynamoDB table to the configuration using DynamoDB's calling convention.
 
         Example:
@@ -814,6 +814,7 @@ class CloudFormationConfiguration:
             KeySchema (list) : List of dict of AttributeName / KeyType
             AttributeDefinitions (list) : List of dict of AttributeName / AttributeType
             ProvisionedThroughput (dictionary) : Dictionary of ReadCapacityUnits / WriteCapacityUnits
+            GlobalSecondaryIndexes (optional[list]): List of dicts representing global secondary indexes.  Defaults to None.
         """
 
         props = {
@@ -822,6 +823,9 @@ class CloudFormationConfiguration:
             "AttributeDefinitions" : AttributeDefinitions,
             "ProvisionedThroughput" : ProvisionedThroughput
         }
+
+        if GlobalSecondaryIndexes is not None:
+            props["GlobalSecondaryIndexes"] = GlobalSecondaryIndexes
 
         self.resources[key] = {
             "Type" : "AWS::DynamoDB::Table",
@@ -1325,6 +1329,67 @@ class CloudFormationConfiguration:
         _hostname = Arg.String(key + "Hostname", hostname,
                                "Hostname of the EC2 Instance '{}'".format(key))
         self.add_arg(_hostname)
+
+    def add_s3_bucket(self, key, name, access_control=None, life_cycle_config=None, notification_config=None, tags=None):
+        """Create or configure a S3 bucket.
+
+        Bucket is configured to never be deleted for safety reasons.
+
+        Args:
+            key (string): Unique name for the resource in the template.
+            name (string): Bucket name.
+            access_control (optional[string]): A canned access control list (see Canned ACL in S3 docs).
+            life_cycle_config (optional[dict]): Life cycle configuration object.
+            notification_config (optional[dict]): Optionally send notification to lamba function/SQS/SNS.
+            tags (optional[dict]): Optional key-value pairs to add to bucket.
+
+        """
+        self.resources[key] = {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+                "BucketName": name
+            },
+            "DeletionPolicy": "Retain"
+        }
+
+        if access_control is not None:
+            self.resources[key]['Properties']['AccessControl'] = access_control
+
+        if life_cycle_config is not None:
+            self.resources[key]['Properties']['LifecycleConfiguration'] = life_cycle_config
+
+        if notification_config is not None:
+            self.resources[key]['Properties']['NotificationConfiguration'] = notification_config
+
+        if tags is not None:
+            self.resources[key]['Properties']['Tags'] = tags
+
+    def add_s3_bucket_policy(self, key, bucket_name, action, principal):
+        """Add permissions to an S3 bucket.
+
+        Args:
+            key (string): Unique name for the resource in the template.
+            bucket_name (string|dict): Bucket name or CloudFormation instrinsic function to determine name (example: {"Ref": "mybucket"}).
+            action (list): List of strings for the types of actions to allow.
+            principal (dict): Dictionary identifying the entity given permission to the S3 bucket.
+        """
+        self.resources[key] = {
+            'Type': 'AWS::S3::BucketPolicy',
+            'Properties': {
+                'Bucket': bucket_name,
+                'PolicyDocument': {
+                    'Statement': [
+                        {
+                            'Action': action,
+                            'Effect': 'Allow',
+                            'Resource': { 'Fn::Join': ['', ['arn:aws:s3:::', bucket_name, '/*']]},
+                            'Principal': principal
+                        }
+                    ]
+                }
+            }
+        }
+
 
     def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None):
         """Create a Python Lambda
