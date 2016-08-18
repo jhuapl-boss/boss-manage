@@ -36,7 +36,7 @@ Place `microns-bastion20151117.pem` in the `bin` folder.
 
 ```shell
 $ cd bin
-$ ./packer.py auth vault endpoint proofreader-web consul
+$ ./packer.py auth vault endpoint proofreader-web consul cachemanager
 ```
 
 *Note: because the packer.py script is running builds in parallel it is redirecting

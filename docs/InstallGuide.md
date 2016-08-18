@@ -11,9 +11,11 @@ directory of the cloned boss-manage.git repository.*
 ### Workstation
 You will need a Linux machine installed with the following software packages:
 * Python 3.5
-* Boto3 (pip install)
-* Hvac (pip install)
 * Packer ([download](https://www.packer.io/))
+* Install Python packages in boss-manage.git requirements.txt.  See *Install Procedures* below to install boss-manage.git then run: 
+```shell
+pip install -r requirements.txt
+```
 
 ### AWS Account
 You will need access to an Amazon AWS account with full access to the following
