@@ -263,11 +263,13 @@ Click on `Users` and determine the user name based on the email address you
 used during account creation (this step should soon be unnecessary, but at the
 time of writing, GUIDs are used for the user name).
 
+Now go back to the root admin page.
+
 Click on `Boss roles`.
 
 Click on `ADD BOSS ROLE`.
 
-Find the user you created and add the `ADMIN` role to that user.
+Find the user you created and add the `ADMIN` role to that user and save.
 
 
 ##### Run ndio Integration Tests
