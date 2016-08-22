@@ -1,0 +1,103 @@
+#! /usr/bin/env bash
+# $1 should be the domain, Ex: hiderrt1.boss
+# 
+# creates the default base virutalenv and installs yum libraries needed.
+
+if [ "$#" -ne 1 ]; then
+    echo "ERROR.  Illegal number of arguments.  Script takes a single argument: domain_name"
+else
+   STARTTIME=`date +"%Y%m%d-%H%M%S"`
+   cd /home/ec2-user
+
+   # needed for BLAS before installing numpy
+   export ATLAS=~/virtualenvs/$1/usr/lib64/atlas/libatlas.so
+   export BLAS=~/virtualenvs/$1/usr/lib64/atlas/libptf77blas.so
+   export LAPACK=~/virtualenvs/$1/usr/lib64/atlas/liblapack.so
+
+   # Creating env and usr files to help debug when virtualenv fails to install correctly.
+   find /usr -print > ~/debug/usr-before-${STARTTIME}.txt
+
+   if [ -d ~/virtualenvs/$1 ]; then
+      echo delete previous virtualenv for $1
+      rm -rf ~/virtualenvs/$1
+   fi
+   python3 -m virtualenv ~/virtualenvs/$1 
+   source ~/virtualenvs/$1/bin/activate
+
+   # copy the BLAS libraries into relative directories
+   mkdir ~/virtualenvs/$1/lib64/atlas
+   cp /usr/lib64/atlas/libatlas.so ~/virtualenvs/$1/lib64/atlas
+   cp /usr/lib64/atlas/libptf77blas.so ~/virtualenvs/$1/lib64/atlas
+   cp /usr/lib64/atlas/liblapack.so ~/virtualenvs/$1/lib64/atlas
+
+   env > ~/debug/env-before-${STARTTIME}.txt
+   
+   cd ~/virtualenvs/$1/lib/python3.4/site-packages
+   unzip /home/ec2-user/sitezips/${1}.zip -d /home/ec2-user/virtualenvs/$1/lib/python3.4/site-packages
+
+   mv spdb.git spdb
+   cd spdb
+   pip install -r requirements.txt
+
+   cd c_lib/c_version
+   cp makefile_LINUX makefile
+   make
+
+   # set the correct log config
+   echo configuring logging
+   cd ~/virtualenvs/$1/local/lib/python3.4/site-packages/bossutils/
+   mv ./lambda_logger_conf.json ./logger_conf.json
+
+   # (SH) When virtualenv fails, numpy is not listed in freeze.  This check will help debug the problem when it occurs again.
+   pip freeze | grep numpy
+   if [ $? -eq 0 ]
+   then
+       echo virtualenv installed correctly.
+       # removing debug files since virtualenv successfully installed
+       rm ~/debug/usr-before-${STARTTIME}.txt
+       rm  ~/debug/env-before-${STARTTIME}.txt
+       echo zipping up lambda and sending to s3
+       if [ -e ~/lambdazips/lambda.${1}.zip ]
+       then
+          rm ~/lambdazips/lambda.${1}.zip
+       fi
+       # we need to create a zip file with external symlinks removed but leave relative simlinks in place. We do 
+       # this because there is limit disk space in the lambda environment.  So we zip up virtualenv, which 
+       # converts all symlinks to underlying files.  Then we unzip and convert ./local and ./lib64 back to relative 
+       # symlinks, like there were originally (saving space), then we zip again with --symlinks option added, this 
+       # keeps the symlinks in place.     
+       if [ -e  ~/lambdazips/multilambda.${1}.zip ]; then
+          rm  ~/lambdazips/multilambda.${1}.zip
+       fi
+       cd ~/virtualenvs/${1}
+       zip -r -q  ~/lambdazips/multilambda.${1}.zip .
+
+       if [ -d ~/lambdazips/$1 ]; then
+          rm -rf ~/lambdazips/$1
+       fi
+       mkdir ~/lambdazips/$1
+       cd ~/lambdazips/$1
+       unzip -q ~/lambdazips/multilambda.${1}.zip
+       rm -rf lib64
+       ln -s lib lib64
+       rm -rf local
+       mkdir local
+       cd local
+       ln -s ../bin bin
+       ln -s ../include include
+       ln -s ../lib lib
+       ln -s ../lib64 lib64
+       cd ~/lambdazips/$1
+       rm ~/lambdazips/multilambda.${1}.zip
+       zip --symlinks -r -q  ~/lambdazips/multilambda.${1}.zip .
+
+       python ~/virtualenvs/${1}/lib/python3.4/site-packages/lambdautils/deploy_lambdas.py /home/ec2-user/virtualenvs/$1 ~/lambdazips/multilambda.${1}.zip --upload-only
+   else
+       echo Virtualenv not working correctly.  Not creating lambda zip.
+       env > ~/debug/env-after-failing-${STARTTIME}.txt
+       find /usr -print > ~/debug/usr-after-failing-${STARTTIME}.txt
+   fi
+   echo deactivating
+   deactivate
+fi
+

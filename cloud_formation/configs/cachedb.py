@@ -34,11 +34,8 @@ import hosts
 import json
 import scalyr
 import uuid
-import sys
-import boto3
-import os
-import subprocess
-from ssh import *
+from update_lambda_fcn import load_lambdas_on_s3
+
 
 # Region production is created in.  Later versions of boto3 should allow us to
 # extract this from the session variable.  Hard coding for now.
@@ -51,6 +48,12 @@ CACHE_MANAGER_TYPE = {
     "production": "t2.medium",
 }
 
+# Prefixes uses to generate names of SQS queues.
+S3FLUSH_QUEUE_PREFIX = 'S3flush.'
+DEADLETTER_QUEUE_PREFIX = 'Deadletter.'
+
+WRITE_LOCK_SNS_PREFIX = 'WriteLockAlert'
+
 
 def create_config(session, domain, keypair=None, user_data=None):
     """
@@ -59,13 +62,22 @@ def create_config(session, domain, keypair=None, user_data=None):
         session: amazon session object
         domain: domain of the stack being created
         keypair: keypair used to by instances being created
-        user_data: information used by the endpoint instance and vault
+        user_data (configuration.UserData): information used by the endpoint instance and vault.  Data will be run through the CloudFormation Fn::Join template intrinsic function so other template intrinsic functions used in the user_data will be parsed and executed.
         db_config: information needed by rds
 
     Returns: the config for the Cloud Formation stack
 
     """
+
+    # Prepare user data for parsing by CloudFormation.
+    if user_data is not None:
+        parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
+    else:
+        parsed_user_data = user_data
+
     config = configuration.CloudFormationConfiguration(domain, PRODUCTION_REGION)
+    # Prepare user data for parsing by CloudFormation.
+    parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
 
     # do a couple of verification checks
     if config.subnet_domain is not None:
@@ -95,12 +107,17 @@ def create_config(session, domain, keypair=None, user_data=None):
                                                    internal_sg_id,
                                                    "ID of internal Security Group"))
 
-    #az_subnets, external_subnets = config.find_all_availability_zones(session)
+    role = lib.role_arn_lookup(session, "lambda_cache_execution")
+    config.add_arg(configuration.Arg.String("LambdaCacheExecutionRole", role,
+                                            "IAM role for multilambda." + domain))
 
-    # TODO removed this. It was a test to make sure the script is actually working
-    config.add_security_group("CacheMgrSecurityGroup",
-                              "cachemgr",
-                              [("tcp", "443", "443", "0.0.0.0/0")])
+    index_bucket_name = "cuboids." + domain
+    if not lib.s3_bucket_exists(session, index_bucket_name):
+        config.add_s3_bucket("cuboidBucket", index_bucket_name)
+    config.add_s3_bucket_policy(
+        "cuboidBucketPolicy", index_bucket_name,
+        ['s3:GetObject', 's3:PutObject'],
+        { 'AWS': role})
 
     config.add_ec2_instance("CacheManager",
                                 "cachemanager." + domain,
@@ -110,29 +127,37 @@ def create_config(session, domain, keypair=None, user_data=None):
                                 public_ip=False,
                                 type_=CACHE_MANAGER_TYPE,
                                 security_groups=["InternalSecurityGroup"],
-                                user_data=user_data,
+                                user_data=parsed_user_data,
                                 role="cachemanager") # arn:aws:iam::256215146792:instance-profile/cachemanager"
 
+    lambda_sec_group = lib.sg_lookup(session, vpc_id, 'internal.' + domain)
+    filter_by_host_name = ([{
+        'Name': 'tag:Name',
+        'Values': ['*internal.' + domain]
+    }])
+    lambda_subnets = lib.multi_subnet_id_lookup(session, filter_by_host_name)
 
+    multi_lambda_name = 'multiLambda-' + domain.replace('.', '-')
+    config.add_lambda("MultiLambda",
+                      multi_lambda_name,
+                      "LambdaCacheExecutionRole",
+                      s3=("boss-lambda-env",
+                          "multilambda.{}.zip".format(domain),
+                          "local/lib/python3.4/site-packages/lambda/lambda_loader.handler"),
+                      timeout=60,
+                      memory=1024,
+                      security_groups=[lambda_sec_group],
+                      subnets=lambda_subnets)
 
-    # config.add_lambda("S3FlushLambda",
-    #                   "s3flushlambda." + domain,
-    #                   "LambdaCacheExecutionRole",
-    #                   "lambda/updateRoute53/index.py",
-    #                   timeout=10,
-    #                   depends_on="DNSZone")
-    #
-    #
-    # role = "arn:aws:iam::256215146792:role/lambda_cache_execution"
-    # config.add_arg(configuration.Arg.String("LambdaCacheExecutionRole", role,
-    #                                         "IAM role for s3flushlambda." + domain))
-    #
-    # config.add_lambda_permission("DNSLambdaExecute", "DNSLambda")
-    #
-    # config.add_sns_topic("DNSSNS",
-    #                      "dns." + domain,
-    #                      "dns." + domain,
-    #                      [("lambda", {"Fn::GetAtt": ["DNSLambda", "Arn"]})])
+    # Add topic to indicating that the object store has been write locked.
+    write_lock_topic = WRITE_LOCK_SNS_PREFIX
+    write_lock_topic_logical_name = (
+        write_lock_topic + '-' + domain.replace('.', '-'))
+    # ToDo: add subscribers.
+    write_lock_subscribers = []
+    config.add_sns_topic(
+        write_lock_topic, write_lock_topic,
+        write_lock_topic_logical_name, write_lock_subscribers)
 
     return config
 
@@ -146,18 +171,46 @@ def generate(folder, domain):
 
 def create(session, domain):
     """Create the configuration, and launch it"""
+    s3flushqname = lib.domain_to_stackname(S3FLUSH_QUEUE_PREFIX + domain)
+    deadqname = lib.domain_to_stackname(DEADLETTER_QUEUE_PREFIX + domain)
+
+    # Configure Vault and create the user data config that the endpoint will
+    # use for connecting to Vault and the DB instance
     user_data = configuration.UserData()
     user_data["system"]["fqdn"] = "cachemanager." + domain
     user_data["system"]["type"] = "cachemanager"
     user_data["aws"]["cache"] = "cache." + domain
     user_data["aws"]["cache-state"] = "cache-state." + domain
+    user_data["aws"]["cache-db"] = "0"
+    user_data["aws"]["cache-state-db"] = "0"
+
+    # Use CloudFormation's Ref function so that queues' URLs are placed into
+    # the Boss config file.
+    # user_data["aws"]["s3-flush-queue"] = '{{"Ref": "{}" }}'.format(s3flushqname)
+    # user_data["aws"]["s3-flush-deadletter-queue"] = '{{"Ref": "{}" }}'.format(deadqname)
+
+    # Until merged with production.py, look up queue urls instead of using
+    # the Ref intrinsic function.
+    user_data["aws"]["s3-flush-queue"] = lib.sqs_lookup_url(session, s3flushqname)
+    user_data["aws"]["s3-flush-deadletter-queue"] = lib.sqs_lookup_url(session, deadqname)
+
+    user_data["aws"]["cuboid_bucket"] = "cuboids." + domain
+    user_data["aws"]["s3-index-table"] = "s3index." + domain
+
+    # SNS and Lambda names can't have periods.
+    sanitized_domain = domain.replace('.', '-')
+    user_data["aws"]["sns-write-locked"] = '{{"Ref": "{}"}}'.format(WRITE_LOCK_SNS_PREFIX)
+
+    user_data["lambda"]["flush_function"] = "multiLambda-" + sanitized_domain
+    user_data["lambda"]["page_in_function"] = "multiLambda-" + sanitized_domain
 
     keypair = lib.keypair_lookup(session)
 
     try:
         name = lib.domain_to_stackname("cachedb." + domain)
-        pre_init(session, domain);
-        config = create_config(session, domain, keypair, str(user_data))
+        pre_init(session, domain)
+
+        config = create_config(session, domain, keypair, user_data)
 
         success = config.create(session, name)
         print("finished config.create")
@@ -171,16 +224,10 @@ def create(session, domain):
 
 
 def pre_init(session, domain):
-    pass
-    # setup lambda environments
-    # TODO works except for ssh part, can't find key.
-    # keypair = lib.keypair_lookup(session)
-    # print("Creating Lambdas Environments..")
-    #
-    # package_name = "lambda.{}".format(domain)
-    # cmd =  "lambdaPackage.sh {}".format(package_name)
-    # ssh(keypair, "52.23.27.39", "ec2-user", cmd)
-
+    """Send spdb, bossutils, lambda, and lambda_utils to the lambda build
+    server, build the lambda environment, and upload to S3.
+    """
+    load_lambdas_on_s3(domain)
 
 def post_init(session, domain):
     print("post_init")
@@ -195,4 +242,4 @@ def post_init(session, domain):
 def delete(session, domain):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
     lib.delete_stack(session, domain, "cachedb")
-
+    lib.route53_delete_records(session, domain, "cachemanager." + domain)

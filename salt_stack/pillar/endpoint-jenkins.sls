@@ -16,3 +16,4 @@ jenkins:
       installed:
           endpoint: /srv/salt/jenkins-jobs/endpoint.xml
           spdb: /srv/salt/jenkins-jobs/spdb.xml
+          boss-tools: /srv/salt/jenkins-jobs/ep-boss-tools.xml
