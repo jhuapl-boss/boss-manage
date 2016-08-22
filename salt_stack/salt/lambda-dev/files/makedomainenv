@@ -8,14 +8,11 @@ if [ "$#" -ne 1 ]; then
 else
    STARTTIME=`date +"%Y%m%d-%H%M%S"`
    cd /home/ec2-user
-   #export WORKON_HOME=~/virtualenvs
-   #export VIRTUALENVWRAPPER_PYTHON='/usr/bin/python' # This needs to be placed before the virtualenvwrapper command
-   #source /usr/local/bin/virtualenvwrapper.sh
 
    # needed for BLAS before installing numpy
-   export ATLAS=./usr/lib64/atlas/libatlas.so
-   export BLAS=./usr/lib64/atlas/libptf77blas.so
-   export LAPACK=./usr/lib64/atlas/liblapack.so
+   export ATLAS=~/virtualenvs/$1/usr/lib64/atlas/libatlas.so
+   export BLAS=~/virtualenvs/$1/usr/lib64/atlas/libptf77blas.so
+   export LAPACK=~/virtualenvs/$1/usr/lib64/atlas/liblapack.so
 
    # Creating env and usr files to help debug when virtualenv fails to install correctly.
    find /usr -print > ~/debug/usr-before-${STARTTIME}.txt
@@ -33,19 +30,11 @@ else
    cp /usr/lib64/atlas/libptf77blas.so ~/virtualenvs/$1/lib64/atlas
    cp /usr/lib64/atlas/liblapack.so ~/virtualenvs/$1/lib64/atlas
 
-   #workon $1
    env > ~/debug/env-before-${STARTTIME}.txt
    
-   #pip install --upgrade pip
-
    cd ~/virtualenvs/$1/lib/python3.4/site-packages
-   # cloud formation config should have already zipped spdb, lambda, lambda-utils and bossutils from local machine.
    unzip /home/ec2-user/sitezips/${1}.zip -d /home/ec2-user/virtualenvs/$1/lib/python3.4/site-packages
-   #unzip /home/ec2-user/sitezips/${1}.zip -d /home/ec2-user/virtualenvs/$1/local/lib/python3.4/site-packages
 
-   #cp -r ~/spdb $WORKON_HOME/$1/local/lib/python3.4/site-packages/spdb.git
-
-   #cd ~/virtualenvs/$1/local/lib/python3.4/site-packages
    mv spdb.git spdb
    cd spdb
    pip install -r requirements.txt

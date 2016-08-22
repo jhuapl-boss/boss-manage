@@ -36,7 +36,7 @@ Place `microns-bastion20151117.pem` in the `bin` folder.
 
 ```shell
 $ cd bin
-$ ./packer.py auth vault endpoint proofreader-web consul
+$ ./packer.py auth vault endpoint proofreader-web consul cachemanager
 ```
 
 *Note: because the packer.py script is running builds in parallel it is redirecting
@@ -119,7 +119,7 @@ Once you have the needed API keys:
 
 ### Launching configs
 
-For the *core*, *production*, *proofreader*, *cloudwatch* configurations
+For the *core*, *production*, *cachedb*, *proofreader*, *cloudwatch* configurations
 run the following command. You have to wait for each command to finish before
 launching the next configuration as they build upon each other.  Only use the
 *--scenario production* flag if you are rebuilding integration.  It is not used
@@ -263,11 +263,13 @@ Click on `Users` and determine the user name based on the email address you
 used during account creation (this step should soon be unnecessary, but at the
 time of writing, GUIDs are used for the user name).
 
+Now go back to the root admin page.
+
 Click on `Boss roles`.
 
 Click on `ADD BOSS ROLE`.
 
-Find the user you created and add the `ADMIN` role to that user.
+Find the user you created and add the `ADMIN` role to that user and save.
 
 
 ##### Run ndio Integration Tests
