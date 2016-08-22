@@ -159,7 +159,7 @@ def create_config(session, domain, keypair=None, user_data=None):
         write_lock_topic, write_lock_topic,
         write_lock_topic_logical_name, write_lock_subscribers)
 
-    DYNAMO_S3_INDEX_SCHEMA = '/spdb/spatialdb/dynamo/s3_index_table.json'
+    DYNAMO_S3_INDEX_SCHEMA = '../salt_stack/salt/spdb/files/spdb.git/spatialdb/dynamo/s3_index_table.json'
     with open(DYNAMO_S3_INDEX_SCHEMA , 'r') as s3fh:
         dynamo_s3_cfg = json.load(s3fh)
     config.add_dynamo_table_from_json('s3Index', 's3index.' + domain, **dynamo_s3_cfg)
