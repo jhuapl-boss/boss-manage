@@ -19,7 +19,6 @@ Create the cloudwatch alarms for the load balancer on top of a loadbalancer stac
 """
 
 
-import json
 import configuration
 import library as lib
 
@@ -103,11 +102,8 @@ def create_vault_consul_health_checks(session, domain, vpc_id, config):
         raise Exception("MailingList " + PRODUCTION_MAILING_LIST
      + "needs to be created before running cloudwatch")
 
-    json_input = {
-        "vpic_id": vpc_id,
-        "vpc_name": domain,
-        "topic_arn": mailing_list_arn
-    }
+    json_str = '{{ "vpc_id": "{}", "vpc_name": "{}", "topic_arn": "{}" }}'.format(
+        vpc_id, domain, mailing_list_arn)
     chk_vault_consul_rule_name = 'checkVaultConsul'
     chk_vault_consul_rule_logical_name = (
         chk_vault_consul_rule_name + '-' + domain.replace('.', '-'))
@@ -118,13 +114,13 @@ def create_vault_consul_health_checks(session, domain, vpc_id, config):
                 'Arn': { 'Fn::GetAtt': [chk_vault_lambda, 'Arn']},
                 'Id': chk_vault_lambda_logical_name,
                 # 'Input': { 'Fn::Join': ['', json_str_list] }
-                'Input': json.dumps(json_input)
+                'Input': json_str
             },
             {
                 'Arn': { 'Fn::GetAtt': [chk_consul_lambda, 'Arn']},
                 'Id': chk_consul_lambda_logical_name,
                 # 'Input': { 'Fn::Join': ['', json_str_list] }
-                'Input': json.dumps(json_input)
+                'Input': json_str
             },
         ],
         name=chk_vault_consul_rule_logical_name,
