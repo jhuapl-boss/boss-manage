@@ -96,6 +96,7 @@ $ source ../config/set_vars.sh
 # Deletion of cloudwatch, production, and proofreader can probably
 # be done in parallel.
 $ ./cloudformation.py delete integration.boss cloudwatch
+$ ./cloudformation.py delete integration.boss cachedb
 $ ./cloudformation.py delete integration.boss production
 $ ./cloudformation.py delete integration.boss proofreader
 $ ./cloudformation.py delete integration.boss core
@@ -152,7 +153,7 @@ sudo python3 manage.py createsuperuser
 	pass:  xxxxxxxx
 sudo python3 manage.py test
 ```
-	output should say 203 Tests OK with 14 skipped tests.
+	output should say 210 Tests OK with 11 skipped tests.
 
 	There are 2 tests that need >2.5GB of memory to run. To run them, set an enviroment variable "RUN_HIGH_MEM_TESTS"
 
@@ -167,7 +168,7 @@ sudo python3 manage.py makemigrations --noinput common
 sudo python3 manage.py migrate
 sudo python3 manage.py test
 ````
-    output should say 333 Tests OK
+    output should say 350 Tests OK
 
 ## Integration Tests
 After the integration instance is launched the following tests need to be run,
@@ -181,9 +182,22 @@ results recorded, and developers notified of any problems.
 cd /srv/www/django
 sudo python3 manage.py test --pattern="int_test_*.py"
 ```
-	output should say 35 Tests OK with 2 skipped tests
+	output should say 55 Tests OK with 7 skipped tests
 
 	There are 2 tests that need >2.5GB of memory to run. To run them, set an enviroment variable "RUN_HIGH_MEM_TESTS"
+
+
+### Cachemanager Integration Tests
+
+#### Test While Logged Onto the Cachemanager VM
+
+```shell
+cd /srv/salt/boss-tools/files/boss-tools.git/cachemgr
+sudo nose2
+sudo nose2 -c inttest.cfg
+```
+	there is currently issues with some of the tests not getting setup correctly. cache-DB and cache-state-db need to be manutally set to 1.
+	or the tests hang.
 
 
 #### Test Using ndio From a Client
@@ -295,7 +309,7 @@ To be filled out
 
 ### Manual Checks
 * https://api.integration.theboss.io/ping/
-* https://api.integration.theboss.io/v0.3/info/collections/
 * https://api.integration.theboss.io/v0.4/resource/collections
+* https://api.integration.theboss.io/v0.5/resource/collections
 * Login into Scalyr and verify that the new instances appear on the overview page.
 * Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint and proofreader.
