@@ -12,6 +12,11 @@ path "secret/endpoint/*" {
     policy = "read"
 }
 
+# User Management API
+path "secret/keycloak" {
+    policy = "read"
+}
+
 path "aws/creds/endpoint" {
     policy = "read"
 }

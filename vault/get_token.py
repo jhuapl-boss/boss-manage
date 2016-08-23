@@ -136,7 +136,7 @@ if __name__ == "__main__":
                         help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
     parser.add_argument("--username", default = None, help = "KeyCloak Username")
     parser.add_argument("--password", default = None, help = "KeyCloak Password")
-    parser.add_argument("domain_name", help="Domain in which to execute the configuration (example: auth.integration.boss or auth.integration.theboss.io)")
+    parser.add_argument("domain_name", help="Domain in which to execute the configuration (example: integration.boss or auth.integration.theboss.io)")
 
     args = parser.parse_args()
 

@@ -285,11 +285,11 @@ runcmd:
 
     return config
 
-def upload_realm_config(port, password):
+def upload_realm_config(port, username, password, realm_username, realm_password):
     URL = "http://localhost:{}".format(port) # TODO move out of tunnel and use public address
 
     kc = lib.KeyCloakClient(URL)
-    kc.login("admin", password)
+    kc.login(username, password)
     if kc.token is None:
         print("Could not upload BOSS.realm configuration, exiting...")
         return
@@ -299,6 +299,14 @@ def upload_realm_config(port, password):
     print("Opening realm file at '{}'".format(realm_file))
     with open(realm_file, "r") as fh:
         realm = json.load(fh)
+
+    try:
+        realm["users"][0]["username"] = realm_username
+        realm["users"][0]["credentials"][0]["value"] = realm_password
+    except:
+        print("Could not set realm admin's username or password, not creating user")
+        if "users" in realm:
+            del realm["users"]
 
     kc.create_realm(realm)
     kc.logout()
@@ -315,17 +323,21 @@ def configure_keycloak(session, domain):
     else:
         auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_elb)
 
+    username = "admin"
     password = lib.generate_password()
+    realm_username = "bossadmin"
+    realm_password = lib.generate_password()
 
     call = lib.ExternalCalls(session, keypair, domain)
 
-    call.vault_write("secret/auth", password = password, username = "admin")
-    call.vault_update("secret/endpoint/auth", password = password, username = "admin")
+    call.vault_write("secret/auth", password = password, username = username, client_id = "admin-cli")
+    call.vault_write("secret/auth/realm", username = realm_username, password = realm_password, client_id = "endpoint")
+    call.vault_update("secret/keycloak", password = password, username = username, client_id = "admin-cli")
     call.vault_update("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
     call.vault_update("secret/proofreader/auth", url = auth_discovery_url, client_id = "endpoint")
 
     call.set_ssh_target("auth")
-    call.ssh("/srv/keycloak/bin/add-user.sh -r master -u admin -p " + password)
+    call.ssh("/srv/keycloak/bin/add-user.sh -r master -u {} -p {}".format(username, password))
     call.ssh("sudo service keycloak stop")
     time.sleep(2)
     call.ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
@@ -334,7 +346,9 @@ def configure_keycloak(session, domain):
     call.ssh("sudo service keycloak start")
     print("Waiting for Keycloak to restart")
     time.sleep(75)
-    call.ssh_tunnel(lambda p: upload_realm_config(p, password), 8080)
+
+    upload = lambda p: upload_realm_config(p, username, password, realm_username, realm_password)
+    call.ssh_tunnel(upload, 8080)
 
 def generate(folder, domain):
     """Create the configuration and save it to disk"""

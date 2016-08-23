@@ -30,8 +30,24 @@
 
         "directAccessGrantsEnabled": true
     }],
-    
+
     "roles": {
-        "realm":[{"name":"resource-manager"},{"name":"user-manager"},{"name":"admin"}]
-    }
+        "realm":[
+            {"name":"resource-manager"},
+            {"name":"user-manager"},
+            {"name":"admin"},
+            {"name":"superuser"}
+        ]
+    },
+
+    "users": [{
+        "username": "xxxxxx",
+        "credentials": [{
+            "type": "password",
+            "value": "xxxxxx",
+            "temporary": false
+        }],
+        "enabled": true,
+        "realmRoles": ["superuser"]
+    }]
 }
