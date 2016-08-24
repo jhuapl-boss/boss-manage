@@ -101,7 +101,7 @@ def lambda_handler(event, context):
         print('Checking consul server {} at {}...'.format(url, str(datetime.now())))
 
         try:
-            raw = urlopen(url, timeout=4).read()
+            raw = urlopen(url, timeout=10).read()
         except:
             raw = 'Error connecting to consul HTTP endpoint.'
         else:
