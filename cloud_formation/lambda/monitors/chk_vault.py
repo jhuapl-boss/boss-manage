@@ -64,7 +64,7 @@ def lambda_handler(event, context):
             print('Checking vault server {} at {}...'.format(url, str(datetime.now())))
 
             try:
-                raw = urlopen(url, timeout=4).read()
+                raw = urlopen(url, timeout=10).read()
             except HTTPError as err:
                 if err.getcode() == 500:
                     # Vault returns a status code of 500 if sealed or not

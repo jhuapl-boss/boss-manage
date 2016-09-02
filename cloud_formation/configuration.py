@@ -1201,7 +1201,7 @@ class CloudFormationConfiguration:
                 "HealthCheck": {
                     "Target": healthcheck_target,
                     "HealthyThreshold": "2",
-                    "UnhealthyThreshold": "2",
+                    "UnhealthyThreshold": "5",
                     "Interval": "30",
                     "Timeout": "5"
                 },
