@@ -48,13 +48,13 @@ service-prefetch:
         - name: update-rc.d boss-prefetchd defaults 10
         - user: root
 
-#service-sqs-watcher:
-#    file.managed:
-#        - name: /etc/init.d/boss-sqs-watcherd
-#        - source: salt://boss-tools/files/boss-tools.git/cachemgr/boss_sqs_watcherd.py
-#        - user: root
-#        - group: root
-#        - mode: 555
-#    cmd.run:
-#        - name: update-rc.d boss-sqs-watcherd defaults 10
-#        - user: root
+service-sqs-watcher:
+    file.managed:
+        - name: /etc/init.d/boss-sqs-watcherd
+        - source: salt://boss-tools/files/boss-tools.git/cachemgr/boss_sqs_watcherd.py
+        - user: root
+        - group: root
+        - mode: 555
+    cmd.run:
+        - name: update-rc.d boss-sqs-watcherd defaults 10
+        - user: root
