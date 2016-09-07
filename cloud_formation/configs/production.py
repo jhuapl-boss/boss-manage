@@ -47,7 +47,7 @@ VAULT_DJANGO_DB = "secret/endpoint/django/db"
 VAULT_DJANGO_AUTH = "secret/endpoint/auth"
 
 ENDPONT_TYPE = {
-    "development": "t2.micro",
+    "development": "t2.small",
     "production": "m4.large",
 }
 
@@ -251,7 +251,7 @@ def create(session, domain):
     user_data["aws"]["s3-flush-deadletter-queue"] = '{{"Ref": "{}" }}'.format(deadqname)
     user_data["aws"]["cuboid_bucket"] = "cuboids." + domain
     user_data["aws"]["s3-index-table"] = "s3index." + domain
-    
+
     user_data["auth"]["OIDC_VERIFY_SSL"] = str(domain in hosts.BASE_DOMAIN_CERTS.keys())
 
     # Lambda names can't have periods.
