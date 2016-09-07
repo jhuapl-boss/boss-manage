@@ -29,6 +29,20 @@
         "publicClient": true,
 
         "directAccessGrantsEnabled": true
+    },{
+        "enabled": true,
+        "protocol": "openid-connect",
+
+        "clientId": "church",
+        "name": "BOSS Church",
+        "description": "BOSS Church team OpenID Connect Client",
+
+        "redirectUris": ["/openid/callback/login/","/openid/callback/logout/"],
+
+        "consentRequired": false,
+        "publicClient": true,
+
+        "directAccessGrantsEnabled": true
     }],
 
     "roles": {
