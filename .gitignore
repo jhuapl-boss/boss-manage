@@ -83,4 +83,8 @@ config/set_scalyr_vars.sh
 # Keycloack Stuff
 salt_stack/salt/keycloak/files/keycloak-*Final.tar.gz
 
+# pyminifier 
+*.min.py
+
+# Boss Set Vars
 config/set_vars_*.sh
