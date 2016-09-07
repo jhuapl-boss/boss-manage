@@ -151,6 +151,7 @@ runcmd:
     user_data["system"]["fqdn"] = "consul." + domain
     user_data["system"]["type"] = "consul"
     user_data["consul"]["cluster"] = str(configuration.get_scenario(CONSUL_CLUSTER_SIZE))
+    consul_role = lib.role_arn_lookup(session, 'consul')
     config.add_autoscale_group("Consul",
                                "consul." + domain,
                                lib.ami_lookup(session, "consul.boss"),
@@ -161,7 +162,7 @@ runcmd:
                                min = CONSUL_CLUSTER_SIZE,
                                max = CONSUL_CLUSTER_SIZE,
                                notifications = "DNSSNS",
-                               role = "arn:aws:iam::256215146792:instance-profile/consul",
+                               role = consul_role,
                                depends_on = ["DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
     user_data = configuration.UserData()
@@ -234,7 +235,8 @@ runcmd:
                       handler="index.handler",
                       timeout=10,
                       depends_on="DNSZone")
-    role = "arn:aws:iam::256215146792:role/UpdateRoute53"
+    role = lib.role_arn_lookup(session, 'UpdateRoute53')
+
     config.add_arg(configuration.Arg.String("DNSLambdaRole", role,
                                             "IAM role for Lambda dns." + domain))
 
@@ -404,5 +406,5 @@ def delete(session, domain):
     lib.route53_delete_records(session, domain, "auth." + domain)
     lib.route53_delete_records(session, domain, "consul." + domain)
     lib.route53_delete_records(session, domain, "vault." + domain)
-    lib.sns_unsubscribe_all(session, "dns." + domain)
+    lib.sns_unsubscribe_all(session, "dns." + domain, )
     lib.delete_stack(session, domain, "core")
