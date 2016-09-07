@@ -13,12 +13,12 @@
 # limitations under the License.
 
 """
-Create the production configuration which consists of
+Create the api configuration which consists of
   * An endpoint web server in the external subnet
   * A RDS DB Instance launched into two new subnets (A and B)
 
-The production configuration creates all of the resources needed to run the
-BOSS system. The production configuration expects to be launched / created
+The api configuration creates all of the resources needed to run the
+BOSS system. The api configuration expects to be launched / created
 in a VPC created by the core configuration. It also expects for the user to
 select the same KeyPair used when creating the core configuration.
 """
@@ -32,7 +32,7 @@ import scalyr
 import uuid
 import sys
 
-# Region production is created in.  Later versions of boto3 should allow us to
+# Region api is created in.  Later versions of boto3 should allow us to
 # extract this from the session variable.  Hard coding for now.
 PRODUCTION_REGION = 'us-east-1'
 
@@ -209,7 +209,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
 
 def generate(folder, domain):
     """Create the configuration and save it to disk"""
-    name = lib.domain_to_stackname("production." + domain)
+    name = lib.domain_to_stackname("api." + domain)
     config = create_config(None, domain)
     config.generate(name, folder)
 
@@ -263,7 +263,7 @@ def create(session, domain):
     call.vault_write(VAULT_DJANGO_DB, **db)
 
     try:
-        name = lib.domain_to_stackname("production." + domain)
+        name = lib.domain_to_stackname("api." + domain)
         config = create_config(session, domain, keypair, user_data, db)
 
         success = config.create(session, name)

@@ -12,7 +12,7 @@ directory of the cloned boss-manage.git repository.*
 You will need a Linux machine installed with the following software packages:
 * Python 3.5
 * Packer ([download](https://www.packer.io/))
-* Install Python packages in boss-manage.git requirements.txt.  See *Install Procedures* below to install boss-manage.git then run: 
+* Install Python packages in boss-manage.git requirements.txt.  See *Install Procedures* below to install boss-manage.git then run:
 ```shell
 pip install -r requirements.txt
 ```
@@ -185,9 +185,9 @@ $ source ../scalyr_keys.sh
 ```
 
 ### Setting up Certificates in Amazon Certificates Manage.
-You will need to create certificates for auth and api in the domain 
-(theboss.io) These only needs to be setup once. 
-You will need to create a EC2 instance to route mail.  Create a micro 
+You will need to create certificates for auth and api in the domain
+(theboss.io) These only needs to be setup once.
+You will need to create a EC2 instance to route mail.  Create a micro
 Ubuntu instance.
 Installed postfix and setup theboss.io as a "virtual alias domain"
 sudo apt-get install postfix
@@ -198,7 +198,7 @@ change /etc/postfix/main.cf:
 
 created new file /etc/postfix/virtual:
     administrator@theboss.io	your-email-address
-your-email-address is a valild address that will recieve the request to 
+your-email-address is a valild address that will recieve the request to
 validate that the certicate should be created.
 
 In Route53 create an MX record for theboss.io and add your public instance DNS name to it.
@@ -208,11 +208,11 @@ cd boss-manage/bin/
 python3.5 create_certificate.py api.theboss.io
 python3.5 create_certificate.py auth.theboss.io
 
-After you receive the certificate approval emails, turn off the mail instance. 
+After you receive the certificate approval emails, turn off the mail instance.
 
 
 #### Launching
-For the *core*, *production*, *proofreader* and *cloudwatch* configurations
+For the *core*, *api*, *proofreader* and *cloudwatch* configurations
 run the following command. You have to wait for each command to finish before
 launching the next configuration as they build upon each other.
 ```shell
@@ -240,5 +240,5 @@ sudo python3 manage.py createsuperuser
 sudo python3 manage.py test
 ```
 	output should say 203 Tests OK with 14 skipped tests.
-	
+
 	There are 2 tests that need >2.5GB of memory to run. To run them, set an enviroment variable "RUN_HIGH_MEM_TESTS"

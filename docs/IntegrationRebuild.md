@@ -93,11 +93,11 @@ Stacks need to be deleted.
 $ cd cloud_formation/
 $ source ../config/set_vars.sh
 
-# Deletion of cloudwatch, production, and proofreader can probably
+# Deletion of cloudwatch, api, and proofreader can probably
 # be done in parallel.
 $ ./cloudformation.py delete integration.boss cloudwatch
 $ ./cloudformation.py delete integration.boss cachedb
-$ ./cloudformation.py delete integration.boss production
+$ ./cloudformation.py delete integration.boss api
 $ ./cloudformation.py delete integration.boss proofreader
 $ ./cloudformation.py delete integration.boss core
 ```
@@ -120,7 +120,7 @@ Once you have the needed API keys:
 
 ### Launching configs
 
-For the *core*, *production*, *cachedb*, *proofreader*, *cloudwatch* configurations
+For the *core*, *api*, *cachedb*, *proofreader*, *cloudwatch* configurations
 run the following command. You have to wait for each command to finish before
 launching the next configuration as they build upon each other.  Only use the
 *--scenario production* flag if you are rebuilding integration.  It is not used
