@@ -1318,6 +1318,29 @@ def role_arn_lookup(session, role_name):
     else:
         return response['Role']['Arn']
 
+def instance_profile_arn_lookup(session, instance_profile_name):
+    """
+    Returns the arn associated the the role name.
+    Using this method avoids hardcoding the aws account into the arn name.
+    Args:
+        session:
+        role_name:
+
+    Returns:
+
+    """
+    if session is None:
+        return None
+
+    client = session.client('iam')
+    response = client.get_instance_profile(InstanceProfileName=instance_profile_name)
+    print(str(response))
+    if response is None:
+        return None
+    else:
+        return response['InstanceProfile']['Arn']
+
+
 def write_zip_file(full_path, zipfile_instance):
     """
     Writes the directory, file or symbolic link using the zipfile instance
