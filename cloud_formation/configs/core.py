@@ -151,7 +151,9 @@ runcmd:
     user_data["system"]["fqdn"] = "consul." + domain
     user_data["system"]["type"] = "consul"
     user_data["consul"]["cluster"] = str(configuration.get_scenario(CONSUL_CLUSTER_SIZE))
-    consul_role = lib.role_arn_lookup(session, 'consul')
+    #consul_role = lib.role_arn_lookup(session, 'consul')
+    consul_role = lib.instance_profile_arn_lookup(session, 'consul')
+    print(consul_role)
     config.add_autoscale_group("Consul",
                                "consul." + domain,
                                lib.ami_lookup(session, "consul.boss"),
@@ -406,5 +408,5 @@ def delete(session, domain):
     lib.route53_delete_records(session, domain, "auth." + domain)
     lib.route53_delete_records(session, domain, "consul." + domain)
     lib.route53_delete_records(session, domain, "vault." + domain)
-    lib.sns_unsubscribe_all(session, "dns." + domain, )
+    lib.sns_unsubscribe_all(session, "dns." + domain)
     lib.delete_stack(session, domain, "core")
