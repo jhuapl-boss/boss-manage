@@ -153,7 +153,6 @@ runcmd:
     user_data["consul"]["cluster"] = str(configuration.get_scenario(CONSUL_CLUSTER_SIZE))
     #consul_role = lib.role_arn_lookup(session, 'consul')
     consul_role = lib.instance_profile_arn_lookup(session, 'consul')
-    print(consul_role)
     config.add_autoscale_group("Consul",
                                "consul." + domain,
                                lib.ami_lookup(session, "consul.boss"),
