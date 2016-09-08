@@ -1334,7 +1334,6 @@ def instance_profile_arn_lookup(session, instance_profile_name):
 
     client = session.client('iam')
     response = client.get_instance_profile(InstanceProfileName=instance_profile_name)
-    print(str(response))
     if response is None:
         return None
     else:
