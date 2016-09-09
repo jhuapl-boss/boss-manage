@@ -232,9 +232,7 @@ def create(session, domain):
 
     # Configure Vault and create the user data config that the endpoint will
     # use for connecting to Vault and the DB instance
-    endpoint_token = call.vault("vault-provision", "endpoint")
     user_data = configuration.UserData()
-    user_data["vault"]["token"] = endpoint_token
     user_data["system"]["fqdn"] = "endpoint." + domain
     user_data["system"]["type"] = "endpoint"
     user_data["aws"]["db"] = "endpoint-db." + domain
@@ -276,12 +274,10 @@ def create(session, domain):
         try:
             call.vault_delete(VAULT_DJANGO)
             call.vault_delete(VAULT_DJANGO_DB)
+            call.vault_delete(VAULT_DJANGO_AUTH)
         except:
             print("Error revoking Django credentials")
-        try:
-            call.vault("vault-revoke", endpoint_token)
-        except:
-            print("Error revoking Endpoint Server Vault access token")
+
         raise
 
 
