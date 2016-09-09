@@ -313,6 +313,7 @@ def post_init(session, domain):
     migrate_cmd = "sudo python3 /srv/www/django/manage.py "
     call.ssh(migrate_cmd + "makemigrations")  #
     call.ssh(migrate_cmd + "makemigrations bosscore")  # will hang if it cannot contact the auth server
+    call.ssh(migrate_cmd + "makemigrations bossoidc")
     call.ssh(migrate_cmd + "migrate")
     call.ssh(migrate_cmd + "collectstatic --no-input")
     # http://stackoverflow.com/questions/6244382/how-to-automate-createsuperuser-on-django
