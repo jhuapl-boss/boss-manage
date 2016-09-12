@@ -385,6 +385,8 @@ def post_init(session, domain):
             break
         except requests.exceptions.ConnectionError:
             time.sleep(30)
+        except hvac.exceptions.VaultDown:
+            time.sleep(30)
     if not initialized:
         print("Could not initialize Vault, manually call post-init before launching other machines")
         return

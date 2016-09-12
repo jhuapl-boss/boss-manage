@@ -717,7 +717,7 @@ def _find(xs, predicate):
     return None
 
 
-def ami_lookup(session, ami_name):
+def ami_lookup(session, ami_name, version = None):
     """Lookup the Id for the AMI with the given name.
 
     If ami_name ends with '.boss', the AMI_VERSION environmental variable is used
@@ -728,6 +728,8 @@ def ami_lookup(session, ami_name):
         session (Session|None) : Boto3 session used to lookup information in AWS
                                  If session is None no lookup is performed
         ami_name (string) : Name of AMI to lookup
+        version (string|None) : Overrides the AMI_VERSION environment variable
+                                used to specify a specific version of an AMI
 
     Returns:
         (tuple|None) : Tuple of strings (AMI ID, Commit hash of AMI build) or None
@@ -736,18 +738,26 @@ def ami_lookup(session, ami_name):
     if session is None:
         return None
 
+    specific = False
     if ami_name.endswith(".boss"):
-        ami_version = os.environ["AMI_VERSION"]
+        ami_version = os.environ["AMI_VERSION"] if version is None else version
         if ami_version == "latest":
             # limit latest searching to only versions tagged with hash information
-            ami_name += "-h*"
+            ami_search = ami_name + "-h*"
         else:
-            ami_name += "-" + ami_version
+            ami_search = ami_name + "-" + ami_version
+            specific = True
+    else:
+        ami_search = ami_name
 
     client = session.client('ec2')
-    response = client.describe_images(Filters=[{"Name": "name", "Values": [ami_name]}])
+    response = client.describe_images(Filters=[{"Name": "name", "Values": [ami_search]}])
     if len(response['Images']) == 0:
-        return None
+        if specific:
+            print("Could not locate AMI '{}', trying to find the latest '{}' AMI".format(ami_search, ami_name))
+            return ami_lookup(session, ami_name, version = "latest")
+        else:
+            return None
     else:
         response['Images'].sort(key=lambda x: x["CreationDate"], reverse=True)
         image = response['Images'][0]
