@@ -29,6 +29,7 @@ import hosts
 import time
 import requests
 import scalyr
+import hvac
 
 import os
 import json
