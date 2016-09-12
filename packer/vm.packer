@@ -8,8 +8,7 @@
 
         "aws_instance_type": "t2.micro",
 
-        "aws_source_ami": "Ubuntu Server 14.04 LTS (HVM), SSD Volume Type",
-        "aws_source_ami": "ami-d05e75b8",
+        "aws_source_ami": null,
 
         "aws_force": "Overwrite an existing image",
         "aws_force": "false",
@@ -66,7 +65,8 @@
         "region": "{{user `aws_region`}}",
         "tags": {
             "Role": "{{user `role`}}",
-            "Commit": "{{user `commit`}}"
+            "Commit": "{{user `commit`}}",
+            "Base AMI": "{{user `aws_source_ami`}}"
         },
         "ssh_bastion_username": "{{user `aws_bastion_user`}}",
         "ssh_bastion_host": "{{user `aws_bastion_ip`}}",
