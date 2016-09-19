@@ -184,6 +184,7 @@ def post_init(session, domain):
     migrate_cmd = "sudo python3 /srv/www/app/proofreader_apis/manage.py "
     call.ssh(migrate_cmd + "makemigrations") # will hang if it cannot contact the auth server
     call.ssh(migrate_cmd + "makemigrations common")
+    call.ssh(migrate_cmd + "makemigrations bossoidc")
     call.ssh(migrate_cmd + "migrate")
     call.ssh(migrate_cmd + "collectstatic --no-input")
     call.ssh("sudo service uwsgi-emperor reload")
