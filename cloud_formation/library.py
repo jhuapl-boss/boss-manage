@@ -1412,7 +1412,8 @@ def s3_bucket_exists(session, name):
 
 def get_account_id_from_session(session):
     """
-    gets the account id from the session using the iam client.
+    gets the account id from the session using the iam client.  This method will work even
+    if you have assumed a role in another account.
     Args:
         session (Session): Boto3 session used to lookup information in AWS.
     Returns:
@@ -1422,4 +1423,4 @@ def get_account_id_from_session(session):
     if session is None:
         return None
 
-    return session.client('iam').get_user()['User']['Arn'].split(':')[4]
+    return session.client('iam').list_users(MaxItems=1)["Users"][0]["Arn"].split(':')[4]
