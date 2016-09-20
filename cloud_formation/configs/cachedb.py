@@ -128,7 +128,7 @@ def create_config(session, domain, keypair=None, user_data=None):
                                 type_=CACHE_MANAGER_TYPE,
                                 security_groups=["InternalSecurityGroup"],
                                 user_data=parsed_user_data,
-                                role="cachemanager") # arn:aws:iam::256215146792:instance-profile/cachemanager"
+                                role="cachemanager")
 
     lambda_sec_group = lib.sg_lookup(session, vpc_id, 'internal.' + domain)
     filter_by_host_name = ([{

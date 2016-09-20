@@ -205,7 +205,7 @@ def vault_configure(machine = None, ip = None):
         client.write('auth/aws-ec2/config/client', access_key = aws_creds["aws_access_key"],
                                                    secret_key = aws_creds["aws_secret_key"])
 
-        arn_prefix = 'arn:aws:iam::256215146792:instance-profile/' # DP TODO: extract out account id number
+        arn_prefix = 'arn:aws:iam::{}:instance-profile/'.format(aws_creds["aws_account"])
         policies = [p for p in provisioner_policies if p not in ('provisioner',)]
         for policy in policies:
             client.write('/auth/aws-ec2/role/' + policy, policies = policy,

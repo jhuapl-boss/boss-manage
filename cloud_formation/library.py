@@ -853,7 +853,7 @@ def rt_name_default(session, vpc_id, new_rt_name):
     response = rt.create_tags(Tags=[{"Key": "Name", "Value": new_rt_name}])
 
 
-def peering_lookup(session, from_id, to_id, owner_id="256215146792"):
+def peering_lookup(session, from_id, to_id, owner_id=None):
     """Lookup the Id for the Peering Connection between the two VPCs.
 
     Args:
@@ -863,7 +863,9 @@ def peering_lookup(session, from_id, to_id, owner_id="256215146792"):
                            made (Requester)
         to_id (string) : VPC ID of the VPC to which the Peering Connection is made
                          (Accepter)
-        owner_id (string) : Account ID that owns both of the VPCs that are connected
+        owner_id (string) : Account ID that owns both of the VPCs that are connected.
+                            If None is provided the Account ID will be looked up from
+                            the session.
 
     Returns:
         (string|None) : Peering Connection ID or None if the Peering Connection
@@ -871,6 +873,9 @@ def peering_lookup(session, from_id, to_id, owner_id="256215146792"):
     """
     if session is None:
         return None
+
+    if owner_id is None:
+        owner_id = get_account_id_from_session(session)
 
     client = session.client('ec2')
     response = client.describe_vpc_peering_connections(Filters=[{"Name": "requester-vpc-info.vpc-id",
@@ -1264,7 +1269,7 @@ def route53_delete_records(session, hosted_zone, cname):
     )
     return response
 
-def sns_unsubscribe_all(session, topic, region="us-east-1", account="256215146792"):
+def sns_unsubscribe_all(session, topic, region="us-east-1", account=None):
     """Unsubscribe all subscriptions for the given SNS topic
 
     Args:
@@ -1272,10 +1277,14 @@ def sns_unsubscribe_all(session, topic, region="us-east-1", account="25621514679
                                  If session is None no delete is performed
         topic (string) : Name of the SNS topic
         region (string) : AWS region where SNS topic resides
-        account (string) : AWS account ID
+        account (string) : AWS account ID.  If None is provided the account ID
+                           will be looked up from the session object using iam
     """
     if session is None:
         return None
+
+    if account is None:
+        account = get_account_id_from_session(session)
 
     topic = "arn:aws:sns:{}:{}:{}".format(region, account, topic.replace(".", "-"))
 
@@ -1308,6 +1317,28 @@ def role_arn_lookup(session, role_name):
         return None
     else:
         return response['Role']['Arn']
+
+def instance_profile_arn_lookup(session, instance_profile_name):
+    """
+    Returns the arn associated the the role name.
+    Using this method avoids hardcoding the aws account into the arn name.
+    Args:
+        session:
+        role_name:
+
+    Returns:
+
+    """
+    if session is None:
+        return None
+
+    client = session.client('iam')
+    response = client.get_instance_profile(InstanceProfileName=instance_profile_name)
+    if response is None:
+        return None
+    else:
+        return response['InstanceProfile']['Arn']
+
 
 def write_zip_file(full_path, zipfile_instance):
     """
@@ -1378,3 +1409,18 @@ def s3_bucket_exists(session, name):
             return True
 
     return False
+
+def get_account_id_from_session(session):
+    """
+    gets the account id from the session using the iam client.  This method will work even
+    if you have assumed a role in another account.
+    Args:
+        session (Session): Boto3 session used to lookup information in AWS.
+    Returns:
+        (str) AWS account id
+    """
+
+    if session is None:
+        return None
+
+    return session.client('iam').list_users(MaxItems=1)["Users"][0]["Arn"].split(':')[4]
