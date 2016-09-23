@@ -336,7 +336,7 @@ def configure_keycloak(session, domain):
 
     call.vault_write("secret/auth", password = password, username = username, client_id = "admin-cli")
     call.vault_write("secret/auth/realm", username = realm_username, password = realm_password, client_id = "endpoint")
-    call.vault_update("secret/keycloak", password = password, username = username, client_id = "admin-cli")
+    call.vault_update("secret/keycloak", password = password, username = username, client_id = "admin-cli", realm = "master")
     call.vault_update("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
     call.vault_update("secret/proofreader/auth", url = auth_discovery_url, client_id = "endpoint")
 
