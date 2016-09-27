@@ -173,6 +173,7 @@ The scripts make use of multiple environment variables to manage optional
 configuration elements. There are shell scripts that contain these environment
 variables that can be sourced before launching different scripts.
 
+0. Copy `config/set_vars.sh.example` to `config/set_vars.sh`
 1. Open `boss-manage.git/config/set_vars.sh` in a text editor
 2. Update SSH_KEY to contain the location of the EC2 Keypair created
 3. Update the BASTION_KEY to contain the location of the private key of the SSH bastion host
