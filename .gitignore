@@ -62,12 +62,13 @@ target/
 *.iso
 bin/packer
 packer/output/
-config/aws-credentials
 
 # Private Files
 *.pem
 *.ppk
 vault/private/
+config/aws-credentials
+config/set_vars.sh
 
 # Personal Vagrant files
 .vagrant/
