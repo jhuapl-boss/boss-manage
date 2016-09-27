@@ -186,21 +186,31 @@ $ source ../scalyr_keys.sh
 ```
 
 ### Setting up Certificates in Amazon Certificates Manage.
-You will need to create certificates for auth and api in the domain
-(theboss.io) These only needs to be setup once.
-You will need to create a EC2 instance to route mail.  Create a micro
-Ubuntu instance.
-Installed postfix and setup theboss.io as a "virtual alias domain"
+You will need to create certificates for auth and api in the domain (theboss.io).
+These only need to be set up once.
+
+You will need to create a EC2 instance to route mail
+
+1. Create a micro Ubuntu instance.
+2. Install postfix and set up theboss.io as a "virtual alias domain"
+
+```shell
 sudo apt-get install postfix
+```
 
-change /etc/postfix/main.cf:
-    virtual_alias_domains = theboss.io
-    virtual_alias_maps = hash:/etc/postfix/virtual
+change `/etc/postfix/main.cf`:
+```
+virtual_alias_domains = theboss.io
+virtual_alias_maps = hash:/etc/postfix/virtual
+```
 
-created new file /etc/postfix/virtual:
-    administrator@theboss.io	your-email-address
-your-email-address is a valild address that will recieve the request to
-validate that the certicate should be created.
+create a new file `/etc/postfix/virtual`:
+```
+administrator@theboss.io	your-email-address
+```
+
+`your-email-address` is a valid address that will receive the request to
+validate that the certificate should be created.
 
 In Route53 create an MX record for theboss.io and add your public instance DNS name to it.
 
