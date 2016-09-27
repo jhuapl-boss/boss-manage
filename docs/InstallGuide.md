@@ -143,7 +143,7 @@ few steps below.*
 ### Create EC2 Key Pair
 1. Open a web browser
 2. Login to the AWS console and open up the EC2 console
-3. Select **Key Pairs** from the left side menu
+3. Select [**Key Pairs**](https://console.aws.amazon.com/ec2/v2/home?region=us-east-1#KeyPairs:sort=keyName) from the left side menu
 4. Click **Create Key Pair**
 5. Name the key pair
 6. Click **Create**
