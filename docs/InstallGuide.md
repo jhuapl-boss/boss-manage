@@ -12,7 +12,7 @@ directory of the cloned boss-manage.git repository.*
 You will need a Linux machine installed with the following software packages:
 * Python 3.5
 * Packer ([download](https://www.packer.io/))
-* Install Python packages in boss-manage.git requirements.txt.  See *Install Procedures* below to install boss-manage.git then run: 
+* Install Python packages in boss-manage.git requirements.txt.  See *Install Procedures* below to install boss-manage.git then run:
 ```shell
 pip install -r requirements.txt
 ```
@@ -173,21 +173,21 @@ The scripts make use of multiple environment variables to manage optional
 configuration elements. There are shell scripts that contain these environment
 variables that can be sourced before launching different scripts.
 
-1. Open `boss-manage.git/vault/set_keys.sh` in a text editor
+1. Open `boss-manage.git/config/set_vars.sh` in a text editor
 2. Update SSH_KEY to contain the location of the EC2 Keypair created
 3. Update the BASTION_KEY to contain the location of the private key of the SSH bastion host
 4. Update the BASTION_IP to contain the IP of the SSH bastion host
-5. Save `set_keys.sh` and close the text editor
+5. Save `set_vars.sh` and close the text editor
 ```shell
 $ cd cloudformation/
-$ source ../vault/set_vars.sh
+$ source ../config/set_vars.sh
 $ source ../scalyr_keys.sh
 ```
 
 ### Setting up Certificates in Amazon Certificates Manage.
-You will need to create certificates for auth and api in the domain 
-(theboss.io) These only needs to be setup once. 
-You will need to create a EC2 instance to route mail.  Create a micro 
+You will need to create certificates for auth and api in the domain
+(theboss.io) These only needs to be setup once.
+You will need to create a EC2 instance to route mail.  Create a micro
 Ubuntu instance.
 Installed postfix and setup theboss.io as a "virtual alias domain"
 sudo apt-get install postfix
@@ -198,7 +198,7 @@ change /etc/postfix/main.cf:
 
 created new file /etc/postfix/virtual:
     administrator@theboss.io	your-email-address
-your-email-address is a valild address that will recieve the request to 
+your-email-address is a valild address that will recieve the request to
 validate that the certicate should be created.
 
 In Route53 create an MX record for theboss.io and add your public instance DNS name to it.
@@ -208,7 +208,7 @@ cd boss-manage/bin/
 python3.5 create_certificate.py api.theboss.io
 python3.5 create_certificate.py auth.theboss.io
 
-After you receive the certificate approval emails, turn off the mail instance. 
+After you receive the certificate approval emails, turn off the mail instance.
 
 
 #### Launching
@@ -240,5 +240,5 @@ sudo python3 manage.py createsuperuser
 sudo python3 manage.py test
 ```
 	output should say 203 Tests OK with 14 skipped tests.
-	
+
 	There are 2 tests that need >2.5GB of memory to run. To run them, set an enviroment variable "RUN_HIGH_MEM_TESTS"
