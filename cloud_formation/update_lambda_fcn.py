@@ -42,6 +42,9 @@ sys.path.append(vault_dir)
 import bastion
 from ssh import *
 
+# Server used to build spdb and assemble the final lambda zip file.
+LAMBDA_BUILD_SERVER = "52.23.27.39"
+
 AWS_REGION = 'us-east-1'
 
 # Name that is prepended to the domain name (periods are replaced with dashes).
@@ -107,6 +110,10 @@ def load_lambdas_on_s3(domain):
     lib.write_to_zip('lambda', zipname)
     lib.write_to_zip('lambdautils', zipname)
 
+    os.chdir(cwd)
+    os.chdir('../salt_stack/salt/ndingest/files')
+    lib.write_to_zip('ndingest.git', zipname)
+
     # Restore original working directory.
     os.chdir(cwd)
 
@@ -117,11 +124,15 @@ def load_lambdas_on_s3(domain):
     apl_bastion_key = os.environ.get("BASTION_KEY")
     apl_bastion_user = os.environ.get("BASTION_USER")
     local_port = bastion.locate_port()
-    proc = bastion.create_tunnel(apl_bastion_key, local_port, "52.23.27.39", 22, apl_bastion_ip, bastion_user="ubuntu")
-    scp_cmd = "scp -P {} {} {} ec2-user@localhost:sitezips/{}".format(local_port,
-                                                                      bastion.SSH_OPTIONS,
-                                                                      zipname,
-                                                                      domain + ".zip")
+    proc = bastion.create_tunnel(apl_bastion_key, local_port, LAMBDA_BUILD_SERVER, 22, apl_bastion_ip, bastion_user="ubuntu")
+
+    # Note: using bastion key as identity for scp.
+    scp_cmd = "scp -i {} -P {} {} {} ec2-user@localhost:sitezips/{}".format(
+        apl_bastion_key,
+        local_port,
+        bastion.SSH_OPTIONS,
+        zipname,
+        domain + ".zip")
 
     try:
         return_code = subprocess.call(shlex.split(scp_cmd))  # close_fds=True, preexec_fn=bastion.become_tty_fg
@@ -131,13 +142,14 @@ def load_lambdas_on_s3(domain):
         proc.wait()
     os.remove(zipname)
 
+
     # This section will run makedomainenv on lambda-build-server however
     # running it this way seems to cause the virtualenv to get messed up.
     # Running this script manually on the build server does not have the problem.
     print("calling makedomainenv on lambda-build-server")
     #cmd = "\"shopt login_shell\""
     cmd = "\"source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {}\"".format(domain)
-    ssh(apl_bastion_key, "52.23.27.39", "ec2-user", cmd)
+    ssh(apl_bastion_key, LAMBDA_BUILD_SERVER, "ec2-user", cmd)
 
 def create_session(credentials):
     """Read the AWS from the credentials dictionary and then create a boto3
