@@ -31,6 +31,7 @@ import json
 import scalyr
 import uuid
 import sys
+import names
 
 # Region api is created in.  Later versions of boto3 should allow us to
 # extract this from the session variable.  Hard coding for now.
@@ -39,6 +40,8 @@ PRODUCTION_REGION = 'us-east-1'
 DYNAMO_SCHEMA = '../salt_stack/salt/boss/files/boss.git/django/bosscore/dynamo_schema.json'
 
 DYNAMO_S3_INDEX_SCHEMA = '../salt_stack/salt/spdb/files/spdb.git/spatialdb/dynamo/s3_index_table.json'
+
+DYNAMO_TILE_INDEX_SCHEMA  = '../salt_stack/salt/ndingest/files/ndingest.git/nddynamo/schemas/boss_tile_index.json'
 
 INCOMING_SUBNET = "52.3.13.189/32"  # microns-bastion elastic IP
 
@@ -184,7 +187,11 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
 
     with open(DYNAMO_S3_INDEX_SCHEMA , 'r') as s3fh:
         dynamo_s3_cfg = json.load(s3fh)
-    config.add_dynamo_table_from_json('s3Index', 's3index.' + domain, **dynamo_s3_cfg)
+    config.add_dynamo_table_from_json('s3Index', names.get_s3_index(domain), **dynamo_s3_cfg)
+
+    with open(DYNAMO_TILE_INDEX_SCHEMA , 'r') as tilefh:
+        dynamo_tile_cfg = json.load(tilefh)
+    config.add_dynamo_table_from_json('tileIndex', names.get_tile_index(domain), **dynamo_s3_cfg)
 
     config.add_redis_replication("Cache",
                                  "cache." + domain,
@@ -247,15 +254,15 @@ def create(session, domain):
     # the Boss config file.
     user_data["aws"]["s3-flush-queue"] = '{{"Ref": "{}" }}'.format(s3flushqname)
     user_data["aws"]["s3-flush-deadletter-queue"] = '{{"Ref": "{}" }}'.format(deadqname)
-    user_data["aws"]["cuboid_bucket"] = "cuboids." + domain
-    user_data["aws"]["s3-index-table"] = "s3index." + domain
+    user_data["aws"]["cuboid_bucket"] = names.get_cuboid_bucket(domain )
+    user_data["aws"]["s3-index-table"] = names.get_s3_index(domain)
 
     user_data["auth"]["OIDC_VERIFY_SSL"] = str(domain in hosts.BASE_DOMAIN_CERTS.keys())
 
     # Lambda names can't have periods.
-    sanitized_domain = domain.replace('.', '-')
-    user_data["lambda"]["flush_function"] = "multiLambda-" + sanitized_domain
-    user_data["lambda"]["page_in_function"] = "multiLambda-" + sanitized_domain
+    multilambda = names.get_multi_lambda(domain).replace('.', '-')
+    user_data["lambda"]["flush_function"] = multilambda
+    user_data["lambda"]["page_in_function"] = multilambda
 
     call.vault_write(VAULT_DJANGO, secret_key = str(uuid.uuid4()))
     call.vault_write(VAULT_DJANGO_DB, **db)
