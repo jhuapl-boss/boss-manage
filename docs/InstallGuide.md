@@ -18,6 +18,26 @@ pip install -r requirements.txt
 ```
 
 ### AWS Account
+Under the main account - (logged in with the email address)
+* Under Billing and Cost Management -> Preferences
+** Check "Receive PDF Invoice By Email"
+** Check "Receive Billing Alerts" and configure Appropriate alarms in CloudWatch
+** Save Preferences
+
+Go into IAM 
+* Create Users
+* Create group aplAdminGroup and add Policy AdministratorAccess
+* under "Account Settings" setup appropriate password settings
+
+Run One time setup script to create 
+* Topics
+* Policies
+* Roles
+* Groups
+
+
+
+
 You will need access to an Amazon AWS account with full access to the following
 resources:
 * CloudFormation

@@ -145,7 +145,7 @@ def vault_init(machine = None, ip = None, secrets = 5, threashold = 3):
     client.unseal_multi(result["keys"])
 
     print()
-    print("Configuring Vault")
+    print("Configuring Vault")api
     vault_configure(machine, ip)
 
 def vault_configure(machine = None, ip = None):
@@ -234,7 +234,7 @@ def vault_configure(machine = None, ip = None):
         client.enable_secret_backend('pki')
         # Generate a self signed certificate for CA
         print("Generating self signed CA")
-        response = client.write("pki/root/generate/internal", common_name="boss.io")
+        response = client.write("pki/root/generate/internal", common_name=aws_creds["domain"])
         with open(get_path(machine, "ca.pem"), 'w') as fh:
             fh.write(response["data"]["certificate"])
 
