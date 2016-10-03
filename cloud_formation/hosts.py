@@ -57,6 +57,10 @@ BASE_IP = "10.0.0.0"
 ROOT_CIDR = 8
 VPC_CIDR = 16 # make sure VPC_CIDR is greater than ROOT_CIDR
 SUBNET_CIDR = 24 # make sure SUBNET_CIDR is greater than VPC_CIDR
+PROD_ACCOUNT = "451493790433"
+PROD_DOMAIN = "theboss.io"
+DEV_ACCOUNT = "256215146792"
+DEV_DOMAIN = "thebossdev.io"
 
 # Name and Subnet number (must fit within ROOT_CIDR to VPC_CIDR) of all VPCs
 VPCS = {
@@ -92,10 +96,8 @@ for vpc in VPCS:
         SUBNETS[(vpc, subnet)] = subnets.index(subnet)
 
 # domains listed in this dictionary have certificates for the auth and api loadbalancers to use.
-BASE_DOMAIN_CERTS = {"production.boss": "theboss.io",
-                      "integration.boss": "integration.theboss.io",
-                      "hiderrt1.boss": "hiderrt1.theboss.io",
-                      "manavpj1.boss": "manavpj1.theboss.io",}
+BASE_DOMAIN_CERTS = {"production.boss": PROD_DOMAIN,
+                      "integration.boss": "integration.{}".format(PROD_DOMAIN)}
 
 
 ##
