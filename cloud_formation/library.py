@@ -42,6 +42,7 @@ from urllib.parse import urlencode
 from urllib.error import HTTPError
 from botocore.exceptions import ClientError
 import zipfile
+import hosts
 
 # Add a reference to boss-manage/vault/ so that we can import those files
 cur_dir = os.path.dirname(os.path.realpath(__file__))
@@ -1121,7 +1122,7 @@ def sqs_lookup_url(session, queue_name):
     resp = client.get_queue_url(QueueName=queue_name)
     return resp['QueueUrl']
 
-def request_cert(session, domain_name, validation_domain='theboss.io'):
+def request_cert(session, domain_name, validation_domain):
     """Requests a certificate in the AWS Certificate Manager for the domain name
 
     Args:
@@ -1149,8 +1150,25 @@ def request_cert(session, domain_name, validation_domain='theboss.io'):
                                           DomainValidationOptions=validation_options)
     return response
 
+def get_hosted_zone(session):
+    """
+    Get hosted zone by looking up account name and using that to tell which
+     zone to return.
+    Args:
+        session: Boto3 Session
 
-def get_hosted_zone_id(session, hosted_zone='theboss.io'):
+    Returns:
+        Hosted zone name.
+    """
+    account = get_account_id_from_session(session)
+    if account == hosts.PROD_ACCOUNT:
+        return hosts.PROD_DOMAIN
+    elif account == hosts.DEV_ACCOUNT:
+        return hosts.DEV_DOMAIN
+    else:
+        return None
+
+def get_hosted_zone_id(session, hosted_zone):
     """Look up Hosted Zone ID by DNS Name
 
     Args:
@@ -1176,8 +1194,7 @@ def get_hosted_zone_id(session, hosted_zone='theboss.io'):
     else:
         return None
 
-
-def set_domain_to_dns_name(session, domain_name, dns_resource, hosted_zone='theboss.io'): # TODO move into CF config??
+def set_domain_to_dns_name(session, domain_name, dns_resource, hosted_zone):
     """Look up Hosted Zone ID by DNS Name
 
     Args:
@@ -1296,6 +1313,29 @@ def sns_unsubscribe_all(session, topic, region="us-east-1", account=None):
             client.unsubscribe(SubscriptionArn=res['SubscriptionArn'])
 
     return None
+
+
+def sns_create_topic(session, topic):
+    """
+        Creates a new Topic
+    Args:
+        session:
+        topic:
+
+    Returns:
+         TopicArn or None
+    """
+    if session is None:
+        return None
+
+    client = session.client("sns")
+    response = client.create_topic(Name=topic)
+    print(response)
+    if response is None:
+        return None
+    else:
+        return response['TopicArn']
+
 
 def role_arn_lookup(session, role_name):
     """
