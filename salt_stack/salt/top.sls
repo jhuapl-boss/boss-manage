@@ -16,13 +16,14 @@ base:
     'endpoint*':
         - boss-tools.bossutils
         - boss-tools.credentials
-        - boss-tools.ndingest
+        - ndingest
         - django.rest-framework # install first and patch
         - boss.django
         - django.login # patch, expects django to already be installed
         - scalyr
         - scalyr.update_host
         - git
+        - ingest-client.ingest
 
     'lambda*':
         - lambda-dev

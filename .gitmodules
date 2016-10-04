@@ -19,6 +19,7 @@
 	url = http://github.com/jhuapl-boss/ndingest.git
 	branch = integration
 [submodule "salt_stack/salt/ingest-client/files/ingest-client.git"]
-	path = salt_stack/salt/ingest-client/files/ingest-client.git
-	url = http://github.com/jhuapl-boss/ingest-client.git
-	branch = integration
+        path = salt_stack/salt/ingest-client/files/ingest-client.git
+        url = ../ingest-client.git
+        branch = integration
+
