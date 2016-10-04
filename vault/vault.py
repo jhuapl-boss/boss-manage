@@ -145,7 +145,7 @@ def vault_init(machine = None, ip = None, secrets = 5, threashold = 3):
     client.unseal_multi(result["keys"])
 
     print()
-    print("Configuring Vault")api
+    print("Configuring Vault")
     vault_configure(machine, ip)
 
 def vault_configure(machine = None, ip = None):
