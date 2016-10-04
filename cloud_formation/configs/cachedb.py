@@ -120,6 +120,14 @@ def create_config(session, domain, keypair=None, user_data=None):
         ['s3:GetObject', 's3:PutObject'],
         { 'AWS': role})
 
+    tile_bucket_name = names.get_tile_bucket(domain)
+    if not lib.s3_bucket_exists(session, tile_bucket_name):
+        config.add_s3_bucket("tileBucket", tile_bucket_name)
+    config.add_s3_bucket_policy(
+        "tileBucketPolicy", tile_bucket_name,
+        ['s3:GetObject', 's3:PutObject'],
+        { 'AWS': role})
+
     config.add_ec2_instance("CacheManager",
                                 names.get_cache_manager(domain),
                                 lib.ami_lookup(session, "cachemanager.boss"),
