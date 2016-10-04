@@ -254,8 +254,10 @@ def create(session, domain):
     # the Boss config file.
     user_data["aws"]["s3-flush-queue"] = '{{"Ref": "{}" }}'.format(s3flushqname)
     user_data["aws"]["s3-flush-deadletter-queue"] = '{{"Ref": "{}" }}'.format(deadqname)
-    user_data["aws"]["cuboid_bucket"] = names.get_cuboid_bucket(domain )
+    user_data["aws"]["cuboid_bucket"] = names.get_cuboid_bucket(domain)
+    user_data["aws"]["tile_bucket"] = names.get_tile_bucket(domain)
     user_data["aws"]["s3-index-table"] = names.get_s3_index(domain)
+    user_data["aws"]["tile-index-table"] = names.get_tile_index(domain)
 
     user_data["auth"]["OIDC_VERIFY_SSL"] = str(domain in hosts.BASE_DOMAIN_CERTS.keys())
 
