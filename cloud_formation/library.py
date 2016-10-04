@@ -43,6 +43,7 @@ from urllib.error import HTTPError
 from botocore.exceptions import ClientError
 import zipfile
 import hosts
+import re
 
 # Add a reference to boss-manage/vault/ so that we can import those files
 cur_dir = os.path.dirname(os.path.realpath(__file__))
@@ -50,6 +51,7 @@ vault_dir = os.path.normpath(os.path.join(cur_dir, "..", "vault"))
 sys.path.append(vault_dir)
 import bastion
 import vault
+
 
 
 def zip_directory(directory, name = "lambda"):
@@ -993,6 +995,10 @@ def cert_arn_lookup(session, domain_name):
     for certs in response['CertificateSummaryList']:
         if certs['DomainName'] == domain_name:
             return certs['CertificateArn']
+        if certs['DomainName'].startswith('*'):    # if it is a wildcard domain like "*.thebossdev.io"
+            cert_name = certs['DomainName'][1:] + '$'
+            if re.search(cert_name, domain_name) != None:
+                return certs['CertificateArn']
     return None
 
 
