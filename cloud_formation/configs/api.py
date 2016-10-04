@@ -317,6 +317,10 @@ def post_init(session, domain):
     call.set_ssh_target("auth")
     call.ssh_tunnel(configure_auth, 8080)
 
+    call.set_ssh_target("endpoint")
+    print("Create settings.ini for ndingest")
+    call.ssh("sudo python3 /srv/salt/ndingest/build_settings.py")
+
     print("Initializing Django")  # Should create ssh call with array of commands
     call.set_ssh_target("endpoint")
     migrate_cmd = "sudo python3 /srv/www/django/manage.py "
