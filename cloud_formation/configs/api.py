@@ -259,7 +259,7 @@ def create(session, domain):
     user_data["aws"]["s3-index-table"] = names.get_s3_index(domain)
     user_data["aws"]["tile-index-table"] = names.get_tile_index(domain)
 
-    user_data["auth"]["OIDC_VERIFY_SSL"] = True
+    user_data["auth"]["OIDC_VERIFY_SSL"] = str(domain in hosts.BASE_DOMAIN_CERTS.keys())  # TODO SH change to True once we get wildcard domain working correctly
 
     # Lambda names can't have periods.
     multilambda = names.get_multi_lambda(domain).replace('.', '-')
