@@ -57,6 +57,7 @@ VAULT_CLUSTER_SIZE = { # Vault Cluster is a fixed size
     "production": 3 # should be an odd number
 }
 
+
 def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, public=True, depends_on=None):
     security_groups = ["InternalSecurityGroup"]
     config.add_autoscale_group(key,
@@ -204,7 +205,6 @@ runcmd:
     else:
         cert = lib.cert_arn_lookup(session, "auth.{}.{}".format(domain.split(".")[0],
                                                                 hosts.DEV_DOMAIN))
-
     create_asg_elb(config,
                    "Auth",
                    "auth." + domain,
@@ -323,11 +323,10 @@ def configure_keycloak(session, domain):
 
     if domain in hosts.BASE_DOMAIN_CERTS.keys():
         auth_domain = 'auth.' + hosts.BASE_DOMAIN_CERTS[domain]
-        auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_domain)
     else:
-        auth_discovery_url = "https://auth.{}.{}/auth/realms/BOSS".format(domain.split(".")[0],
-                                                                          hosts.DEV_DOMAIN)
-    lib.set_domain_to_dns_name(session, auth_domain, auth_elb)
+        auth_domain = 'auth.{}.{}'.format(domain.split(".")[0], hosts.DEV_DOMAIN)
+    auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_domain)
+    lib.set_domain_to_dns_name(session, auth_domain, auth_elb, lib.get_hosted_zone(session))
 
     username = "admin"
     password = lib.generate_password()

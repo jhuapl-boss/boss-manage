@@ -123,12 +123,32 @@ configuration file located at `boss-manage.git/vault/private/vault_aws_credentia
 If you don't have this, talk to Derek Pryor to get the AWS API keys for an account.
 Once you have the needed API keys:
 
-1. Copy `boss-manage.git/packer/variables/aws-credentials.example` to
+1. Copy `boss-manage.git/config/aws-credentials.example` to
 `boss-manage.git/vault/private/vault_aws_credentials`
   * You may have to create the directory "private"
 2. Open `vault_aws_credentials` in a text editor
 3. Copy the access key and secret key that you received into the text editor
 4. Save `vault_aws_credentials` and close the text editor
+5. If you are building Integration you'll need to have vault_aws_credentials 
+for the production account.  It should have aws_account and domain filling in like this:  
+```
+{
+    "aws_access_key": "",
+    "aws_secret_key": "",
+    "aws_account": "451493790433",
+    "domain": "theboss.io"
+}
+```
+If you are building a personal developer domain it should have this:
+```
+{
+    "aws_access_key": "",
+    "aws_secret_key": "",
+    "aws_account": "256215146792",
+    "domain": "thebossdev.io"
+}
+```
+
 
 ### Launching configs
 
