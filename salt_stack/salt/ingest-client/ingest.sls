@@ -3,6 +3,10 @@ include:
     - python.python35
 
 ingest-client-lib:
+    pip.installed:
+        - bin_env: /usr/local/bin/pip3
+        - requirements: salt://ingest-client/files/ingest-client.git/requirements.txt
+
     file.recurse:
         - name: /usr/local/lib/python3/site-packages/ingest
         - source: salt://ingest-client/files/ingest-client.git/ingest
