@@ -128,7 +128,7 @@ def create(session, domain):
     user_data["system"]["fqdn"] = "proofreader-web." + domain
     user_data["system"]["type"] = "proofreader-web"
     user_data["aws"]["db"] = "proofreader-db." + domain
-    user_data["auth"]["OIDC_VERIFY_SSL"] = True
+    user_data["auth"]["OIDC_VERIFY_SSL"] = str(domain in hosts.BASE_DOMAIN_CERTS.keys())  # TODO SH change to True once we get wildcard domain working correctly
     user_data = str(user_data)
 
 
