@@ -25,6 +25,7 @@ import configs.cloudwatch as cloudwatch
 
 PRODUCTION_MAILING_TOPIC = cloudwatch.PRODUCTION_MAILING_LIST
 PRODUCTION_BILLING_TOPIC = "ProductionBillingList"
+MAX_ALARM_DOLLAR = 30  # Maximum size of alarms in $1,000s
 
 def create_session(credentials):
     """
@@ -41,6 +42,33 @@ def create_session(credentials):
                       region_name='us-east-1')
     return session
 
+def create_billing_alarms(session):
+    print("creating billing alarms")
+    billing_topic_arn = lib.sns_topic_lookup(session, PRODUCTION_BILLING_TOPIC)
+    client = session.client("cloudwatch")
+    alarm_parms = {
+        'AlarmName': 'Billing_1k',
+        'AlarmDescription': 'Alarm when spending reaches 1k',
+        'ActionsEnabled': True,
+        'OKActions': [],
+        'AlarmActions': [billing_topic_arn],
+        'InsufficientDataActions': [],
+        'MetricName': 'EstimatedCharges',
+        'Namespace': 'AWS/Billing',
+        'Statistic': 'Maximum',
+        'Dimensions': [{'Name': 'Currency', 'Value': 'USD'}],
+        'Period': 21600,
+        'EvaluationPeriods': 1,
+        'Threshold': 1000.0,
+        'ComparisonOperator': 'GreaterThanOrEqualToThreshold'
+    }
+
+    for num in range(1, MAX_ALARM_DOLLAR + 1):
+        print("   {}k".format(str(num)))
+        alarm_parms['AlarmName'] = "Billing_{}k".format(str(num))
+        alarm_parms['AlarmDescription'] = "Alarm when spending reaches {}k".format(str(num))
+        alarm_parms['Threshold'] = float(num * 1000)
+        response = client.put_metric_alarm(**alarm_parms)
 
 def create_initial_sns_accounts(session):
     print("Creating SNS Topics.")
@@ -77,3 +105,4 @@ if __name__ == '__main__':
     session = create_session(credentials)
 
     create_initial_sns_accounts(session)
+    create_billing_alarms(session)
