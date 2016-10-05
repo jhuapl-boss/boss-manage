@@ -191,7 +191,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
 
     with open(DYNAMO_TILE_INDEX_SCHEMA , 'r') as tilefh:
         dynamo_tile_cfg = json.load(tilefh)
-    config.add_dynamo_table_from_json('tileIndex', names.get_tile_index(domain), **dynamo_s3_cfg)
+    config.add_dynamo_table_from_json('tileIndex', names.get_tile_index(domain), **dynamo_tile_cfg)
 
     config.add_redis_replication("Cache",
                                  "cache." + domain,
@@ -327,6 +327,7 @@ def post_init(session, domain):
     call.ssh(migrate_cmd + "makemigrations")  #
     call.ssh(migrate_cmd + "makemigrations bosscore")  # will hang if it cannot contact the auth server
     call.ssh(migrate_cmd + "makemigrations bossoidc")
+    call.ssh(migrate_cmd + "makemigrations bossingest")
     call.ssh(migrate_cmd + "migrate")
     call.ssh(migrate_cmd + "collectstatic --no-input")
     # http://stackoverflow.com/questions/6244382/how-to-automate-createsuperuser-on-django
