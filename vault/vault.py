@@ -219,6 +219,8 @@ def vault_configure(machine = None, ip = None):
         client.write("aws/config/root", access_key = aws_creds["aws_access_key"],
                                         secret_key = aws_creds["aws_secret_key"],
                                         region = aws_creds.get("aws_region", "us-east-1"))
+        client.write("aws/config/lease", lease = aws_creds.get("lease_duration", "1h"),
+                                         lease_max = aws_creds.get("lease_max", "24h")) # DP TODO finalize default values
 
         path = os.path.join(_CURRENT_DIR, "policies", "*.iam")
         for iam in glob.glob(path):
