@@ -283,7 +283,7 @@ def create(session, domain):
         try:
             call.vault_delete(VAULT_DJANGO)
             call.vault_delete(VAULT_DJANGO_DB)
-            call.vault_delete(VAULT_DJANGO_AUTH)
+            #call.vault_delete(VAULT_DJANGO_AUTH)
         except:
             print("Error revoking Django credentials")
 
