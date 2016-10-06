@@ -50,6 +50,18 @@ have to be pushed yet) so that the correct commit hash is used.*
 
 **Note: Because the Packer output is redirected, check the logs and/or the AWS
 console to verify the creation of the AMIs.**
+```shell
+$ grep "artifact" ../packer/logs/*.logs
+```
+
+Success looks like this:
+==> Builds finished. The artifacts of successful builds are:
+Failure like this
+==> Builds finished but no artifacts were created.
+
+It can beneficial to check the logs before all the AMIs are completed, when 
+issues do occur, they frequently fail early.  Discovering this allows you to 
+relauch packer.py in another terminal for the failed AMIs, saving time overall.
 
 ## Relaunching Integration Stack
 
@@ -141,19 +153,22 @@ the latest ones.*
 resources than in development mode. Omitting the '--scenerio' flag or setting it to 'development'
 will deploy the stack with the minimum set of resources.*
 
+## Get bossadmin password
+```shell
+cd vault
+./bastion.py bastion.integration.boss vault.integration.boss vault-read secret/auth/realm
+```
+Login to https://api.integration.theboss.io/v0.5/resource/collections/
+Uses bossadmin and the password you now have to sync bossadmin to django
 
 ## Initialize Endpoint and run unit tests
 ```shell
 cd vault
 ./bastion.py bastion.integration.boss endpoint.integration.boss ssh
 cd /srv/www/django
-sudo python3 manage.py createsuperuser
-	user:  bossadmin
-	email: garbage@garbage.com
-	pass:  xxxxxxxx
 sudo python3 manage.py test
 ```
-	output should say 210 Tests OK with 11 skipped tests.
+	output should say 230 Tests OK with 11 skipped tests.
 
 	There are 2 tests that need >2.5GB of memory to run. To run them, set an enviroment variable "RUN_HIGH_MEM_TESTS"
 
@@ -178,13 +193,16 @@ results recorded, and developers notified of any problems.
 
 #### Test While Logged Onto the Endpoint VM
 
+If following these instructions for your personal development environment, skip the 
+export RUN_HIGH_MEM_TESTS line.  That line runs 2 tests that need >2.5GB of memory
+to run and will fail in your environment
+
 ```shell
 cd /srv/www/django
+export RUN_HIGH_MEM_TESTS=true
 sudo python3 manage.py test --pattern="int_test_*.py"
 ```
 	output should say 55 Tests OK with 7 skipped tests
-
-	There are 2 tests that need >2.5GB of memory to run. To run them, set an enviroment variable "RUN_HIGH_MEM_TESTS"
 
 
 ### Cachemanager Integration Tests

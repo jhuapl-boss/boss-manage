@@ -333,15 +333,21 @@ def configure_keycloak(session, domain):
     realm_password = lib.generate_password()
 
     call = lib.ExternalCalls(session, keypair, domain)
-
+    print("about to write secret/auth")
     call.vault_write("secret/auth", password = password, username = username, client_id = "admin-cli")
+    print("about to write secret/auth/realm")
     call.vault_write("secret/auth/realm", username = realm_username, password = realm_password, client_id = "endpoint")
+    print("about to write secret/keycloak")
     call.vault_update("secret/keycloak", password = password, username = username, client_id = "admin-cli", realm = "master")
+    print("about to write secret/endpoint/auth")
     call.vault_update("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
+    print("about to write secret/proofreader/auth")
     call.vault_update("secret/proofreader/auth", url = auth_discovery_url, client_id = "endpoint")
 
+    print("about to add bossadmin user to keycloak")
     call.set_ssh_target("auth")
     call.ssh("/srv/keycloak/bin/add-user.sh -r master -u {} -p {}".format(username, password))
+    print("about to restarting keycloak")
     call.ssh("sudo service keycloak stop")
     time.sleep(2)
     call.ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
@@ -349,7 +355,7 @@ def configure_keycloak(session, domain):
     time.sleep(3)
     call.ssh("sudo service keycloak start")
     print("Waiting for Keycloak to restart")
-    time.sleep(75)
+    time.sleep(100)
 
     upload = lambda p: upload_realm_config(p, username, password, realm_username, realm_password)
     call.ssh_tunnel(upload, 8080)
@@ -370,8 +376,8 @@ def create(session, domain):
         vpc_id = lib.vpc_id_lookup(session, domain)
         lib.rt_name_default(session, vpc_id, "internal." + domain)
 
-        print("Waiting 1 minute for VMs to start...")
-        time.sleep(60)
+        print("Waiting 75 seconds for VMs to start...")
+        time.sleep(75)
         post_init(session, domain)
 
 def post_init(session, domain):
@@ -396,7 +402,7 @@ def post_init(session, domain):
         return
 
     print("Waiting for Keycloak to bootstrap")
-    time.sleep(75)
+    time.sleep(90)
 
     print("Configuring Keycloak...")
     configure_keycloak(session, domain)
