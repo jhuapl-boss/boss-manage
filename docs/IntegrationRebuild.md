@@ -181,16 +181,20 @@ cd vault
 Login to https://api.integration.theboss.io/v0.5/resource/collections/
 Uses bossadmin and the password you now have to sync bossadmin to django
 
-## Initialize Endpoint and run unit tests
+## Run unit tests on Endpoint 
+
+If you are following these instructions for your personal development environment, skip the 
+export RUN_HIGH_MEM_TESTS line.  That line runs 2 tests that need >2.5GB of memory
+to run and will fail in your environment
+
 ```shell
 cd vault
 ./bastion.py bastion.integration.boss endpoint.integration.boss ssh
+export RUN_HIGH_MEM_TESTS=true
 cd /srv/www/django
 sudo python3 manage.py test
 ```
 	output should say 230 Tests OK with 11 skipped tests.
-
-	There are 2 tests that need >2.5GB of memory to run. To run them, set an enviroment variable "RUN_HIGH_MEM_TESTS"
 
 
 ## Proofreader Tests
@@ -213,13 +217,13 @@ results recorded, and developers notified of any problems.
 
 #### Test While Logged Onto the Endpoint VM
 
-If following these instructions for your personal development environment, skip the 
-export RUN_HIGH_MEM_TESTS line.  That line runs 2 tests that need >2.5GB of memory
-to run and will fail in your environment
+Again, Skip the RUN_HIGH_MEM_TESTS line below if you are following these instructions for 
+your personal development environment.  That line runs 2 tests that need >2.5GB 
+of memory to run and will fail in your environment
 
 ```shell
-cd /srv/www/django
 export RUN_HIGH_MEM_TESTS=true
+cd /srv/www/django
 sudo python3 manage.py test --pattern="int_test_*.py"
 ```
 	output should say 55 Tests OK with 7 skipped tests
