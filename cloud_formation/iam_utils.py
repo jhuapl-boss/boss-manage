@@ -15,7 +15,12 @@
 # limitations under the License.
 
 """IAM Utils script.  Used to pull roles, policies, instance_policies, groups
-from developer account into Production Account"""
+from Developer account into Production Account
+
+Currently setup to assume DeveloperAccess role in Production Account.
+Could also be used with Production Credentials to import from text files.
+
+"""
 
 import argparse
 import sys
@@ -474,16 +479,16 @@ class IamUtils:
 
 
 def assume_production_role(session):
+
     sts_client = session.client('sts')
+    role_arn = "arn:aws:iam::{}:role/DeveloperAccess".format(hosts.PROD_ACCOUNT)
     assumed_role_object = sts_client.assume_role(
-        RoleArn="arn:aws:iam::451493790433:role/DeveloperAccess",
+        RoleArn=role_arn,
         RoleSessionName="AssumeRoleSession5"
     )
     credentials = assumed_role_object['Credentials']
 
     # Use the temporary credentials create a new session object.
-    # print("region: " + str(session))
-    # print("assumed creds: " + str(credentials))
     production_session = boto3.Session(aws_access_key_id=credentials["AccessKeyId"],
                                        aws_secret_access_key=credentials["SecretAccessKey"],
                                        aws_session_token=credentials["SessionToken"],
