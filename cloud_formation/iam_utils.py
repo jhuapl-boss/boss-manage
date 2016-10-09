@@ -55,7 +55,8 @@ class IamUtils:
         self.role_keyword_filters = []
         self.role_whole_filters = []
         self.group_keyword_filters = []
-        self.group_whole_filters = ["aplSpeedTestGroup", " aplAdminGroup"]
+        self.group_whole_filters = ["aplSpeedTestGroup", " aplAdminGroup",  "aplDenyProductionAccountAccess",
+                                    "aplProductionAccountAccess"]
         self.policies = []
         self.groups = []
         self.roles = []
@@ -124,7 +125,7 @@ class IamUtils:
         with open(filename, 'w') as f:
             json.dump(self.policies, f, indent=4)
 
-    def import_policies_to_aws(self, use_assume_role=True):
+    def import_policies_to_aws(self, use_assume_role=False):
         if use_assume_role:
             import_session = assume_production_role(self.session)
         else:
@@ -199,7 +200,7 @@ class IamUtils:
         with open(filename, 'r') as f:
             self.role_inline_policies = json.load(f)
 
-    def import_roles_to_aws(self, use_assume_role=True):
+    def import_roles_to_aws(self, use_assume_role=False):
         if use_assume_role:
             import_session = assume_production_role(self.session)
         else:
@@ -215,7 +216,7 @@ class IamUtils:
                     print("error occur creating role: {}".format(role["RoleName"]))
                     print("   Details: {}".format(str(e)))
 
-    def import_role_managed_policies_to_aws(self, use_assume_role=True):
+    def import_role_managed_policies_to_aws(self, use_assume_role=False):
         if use_assume_role:
             import_session = assume_production_role(self.session)
         else:
@@ -232,7 +233,7 @@ class IamUtils:
                     print("error occur creating role managed policy: {} - {}".format(mp["RoleName"], mp["PolicyArn"]))
                     print("   Details: {}".format(str(e)))
 
-    def import_role_inline_policies_to_aws(self, use_assume_role=True):
+    def import_role_inline_policies_to_aws(self, use_assume_role=False):
         if use_assume_role:
             import_session = assume_production_role(self.session)
         else:
@@ -287,7 +288,7 @@ class IamUtils:
         with open(filename, 'r') as f:
             self.instance_policies_roles = json.load(f)
 
-    def import_instance_profiles_to_aws(self, use_assume_role=True):
+    def import_instance_profiles_to_aws(self, use_assume_role=False):
         if use_assume_role:
             import_session = assume_production_role(self.session)
         else:
@@ -303,7 +304,7 @@ class IamUtils:
                     print("error occur creating instance profile: {}".format(ip["InstanceProfileName"]))
                     print("   Details: {}".format(str(e)))
 
-    def import_instance_profiles_roles_to_aws(self, use_assume_role=True):
+    def import_instance_profiles_roles_to_aws(self, use_assume_role=False):
         if use_assume_role:
             import_session = assume_production_role(self.session)
         else:
@@ -451,6 +452,7 @@ class IamUtils:
         self.save_instance_policies(DEFAULT_INSTANCE_POLICIES_FILE)
         self.save_instance_policies_roles(DEFAULT_INSTANCE_POLICIES_ROLES_FILE)
 
+        self.extract_groups_from_iam_details()
         self.save_groups(DEFAULT_GROUP_FILE)
         self.save_group_managed_policies(DEFAULT_GROUP_MANAGED_POLICIES_FILE)
         self.save_group_inline_policies(DEFAULT_GROUP_INLINE_POLICIES_FILE)
@@ -466,16 +468,16 @@ class IamUtils:
         self.load_group_managed_policies_from_file(DEFAULT_GROUP_MANAGED_POLICIES_FILE)
         self.load_group_inline_policies_from_file(DEFAULT_GROUP_INLINE_POLICIES_FILE)
 
-    def import_to_aws(self, use_assume_role=True):
+    def import_to_aws(self, use_assume_role=False):
         self.import_policies_to_aws(use_assume_role)
         self.import_roles_to_aws(use_assume_role)
         self.import_instance_profiles_to_aws(use_assume_role)
         self.import_instance_profiles_roles_to_aws(use_assume_role)
         self.import_role_inline_policies_to_aws(use_assume_role)
         self.import_role_managed_policies_to_aws(use_assume_role)
-        self.import_groups_to_aws()
-        self.import_group_managed_policies_to_aws()
-        self.import_group_inline_policies_to_aws()
+        self.import_groups_to_aws(use_assume_role)
+        self.import_group_managed_policies_to_aws(use_assume_role)
+        self.import_group_inline_policies_to_aws(use_assume_role)
 
 
 def assume_production_role(session):
@@ -541,5 +543,5 @@ if __name__ == '__main__':
     iam.export_to_files()
     iam.load_from_files()
     print("Importing..")
-    iam.import_to_aws()
+    iam.import_to_aws(use_assume_role=True)
 

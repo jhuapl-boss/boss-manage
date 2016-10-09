@@ -105,7 +105,7 @@ Stacks need to be deleted.
 $ cd cloud_formation/
 $ source ../config/set_vars.sh
 
-# Deletion of cloudwatch, api, and proofreader can probably
+# Deletion of cloudwatch, api, proofreader and cachedb can probably
 # be done in parallel.
 $ ./cloudformation.py delete integration.boss cloudwatch
 $ ./cloudformation.py delete integration.boss cachedb
@@ -154,8 +154,8 @@ If you are building a personal developer domain it should have this:
 
 For the *core*, *api*, *cachedb*, *proofreader*, *cloudwatch* configurations
 run the following command. You have to wait for each command to finish before
-launching the next configuration as they build upon each other.  Only use the
-*--scenario production* flag if you are rebuilding integration.  It is not used
+launching the next configuration as they build upon each other.  **Only use the
+*--scenario production* flag** if you are rebuilding integration.  It is not used
 if you are following these instructions to build a developer environment.
 ```shell
 $ ./cloudformation.py create integration.boss --scenario production <config>

@@ -22,6 +22,7 @@ from boto3.session import Session
 import json
 import library as lib
 import configs.cloudwatch as cloudwatch
+import iam_utils
 
 PRODUCTION_MAILING_TOPIC = cloudwatch.PRODUCTION_MAILING_LIST
 PRODUCTION_BILLING_TOPIC = "ProductionBillingList"
@@ -80,6 +81,13 @@ def create_initial_sns_accounts(session):
     if topic_arn == None:
         print("Failed to create {} topic".format(PRODUCTION_BILLING_TOPIC))
 
+def import_iam_details_from_files(session):
+    iam = iam_utils.IamUtils(session)
+    iam.get_iam_details_from_aws()
+    iam.load_from_files()
+    print("Importing iam details to aws..")
+    iam.import_to_aws()
+
 
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
@@ -106,3 +114,4 @@ if __name__ == '__main__':
 
     create_initial_sns_accounts(session)
     create_billing_alarms(session)
+    import_iam_details_from_files(session)

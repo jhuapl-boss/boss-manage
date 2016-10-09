@@ -16,28 +16,6 @@ You will need a Linux machine installed with the following software packages:
 ```shell
 pip install -r requirements.txt
 ```
-
-### AWS Account
-Under the main account - (logged in with the email address)
-* Under Billing and Cost Management -> Preferences
-** Check "Receive PDF Invoice By Email"
-** Check "Receive Billing Alerts" and configure Appropriate alarms in CloudWatch
-** Save Preferences
-
-Go into IAM 
-* Create Users
-* Create group aplAdminGroup and add Policy AdministratorAccess
-* under "Account Settings" setup appropriate password settings
-
-Run One time setup script to create 
-* Topics
-* Policies
-* Roles
-* Groups
-
-
-
-
 You will need access to an Amazon AWS account with full access to the following
 resources:
 * CloudFormation
@@ -47,6 +25,53 @@ resources:
 * DynamoDB
 * IAM
 * Route53
+* Cloudwatch
+* Certificate Manager
+
+
+### AWS Account
+Under the main account - (logged in with the email address)
+* Under Billing and Cost Management -> Preferences
+  * Check "Receive PDF Invoice By Email"
+  * Check "Receive Billing Alerts" 
+  * Save Preferences
+
+####Go into IAM 
+* Create Users
+* Create group aplAdminGroup and add Policy AdministratorAccess
+* Create new Role DeveloperAccess  (only used if you have a Developer account)
+    * select "Role for Cross-Account Access" 
+    * select "Provide access between AWS accounts you own" 
+    * enter in the developer account number and continue
+    * enter AdministrativeAccess
+* In Developer Account create two new policies.
+    * aplDenyAssumeRoleInProduction
+```
+  {
+    "Version": "2012-10-17",
+    "Statement": {
+        "Effect": "Deny",
+        "Action": "sts:AssumeRole",
+        "Resource": "arn:aws:iam::451493790433:role/DeveloperAccess"
+    }
+  }
+```
+    * aplAllowAssumeRoleInProduction
+```
+  {
+    "Version": "2012-10-17",
+    "Statement": {
+        "Effect": "Allow",
+        "Action": "sts:AssumeRole",
+        "Resource": "arn:aws:iam::451493790433:role/DeveloperAccess"
+    }
+  }
+```
+* Now Create two new Groups and add policies above to them.
+    * aplDenyProductionAccountAccess
+    * aplProductionAccountAccess
+    
+* under "Account Settings" setup appropriate password settings
 
 *Note: you will also need access to the API keys for the AWS account.*
 
@@ -57,6 +82,8 @@ You will need access to the following code repositories on Github:
 * [boss.git](https://github.com/aplmicrons/boss)
 * [proofread.git](https://github.com/aplmicrons/proofread)
 * [spdb.git](https://github.com/aplmicrons/spdb)
+* [ingest.git](https://github.com/theboss/ingest-client)
+* [ndingest.git](https://github.com/theboss/ndingest)
 
 ## Install Procedures
 
@@ -96,6 +123,23 @@ It is assumed that this bastion host is an EC2 instance running within AWS.
 using one, then you can remove those extra arguments from the few steps where
 they are configured.*
 
+### Run One time setup script to create
+```shell
+$ /boss-manage/cloud_formation/one_time_aws_account_setup.py --aws-credentials /path/to/credentials
+```
+this is create 
+* Topics
+* Billing Alarms
+* Policies
+* Roles
+* Groups
+
+### Setup Hosted Zone for domain name: theboss.io
+In Route53 create a new hosted zone for the theboss.io
+Change the Name Servers within your domain registrar to use the ones listed
+in the newly created hosted zone.
+
+ 
 ### Create AMIs
 Several AWS Images (AMIs) need to be created. These images are preconfigured for
 specific roles within the architecture. These procedures expect the AWS
@@ -105,13 +149,27 @@ Make sure that the Packer executable is either in $PATH (you can call it by just
 calling packer) or in the `bin/` directory of the boss-manage repository.
 
 ```shell
-$ bin/packer.py vault auth endpoint proofreader-web
+$ bin/packer.py auth vault endpoint proofreader-web consul cachemanager
 ```
 
 *Note: because the packer.py script is running builds in parallel it is redirecting
 the output from each Packer subprocess to `packer/logs/<config>.log`. Because of
 buffering you may not see the file update with every new line. Tailing the log
 does seem to work (`tail -f packer/logs/<config>.log`)*
+Check for Success or failure with the command below:
+```shell
+$ grep "artifact" ../packer/logs/*.logs
+```
+
+Success looks like this:
+==> Builds finished. The artifacts of successful builds are:
+Failure like this
+==> Builds finished but no artifacts were created.
+
+It can beneficial to check the logs before all the AMIs are completed, 
+when issues do occur, they frequently fail early.  Discovering this 
+allows you to relauch packer.py in another terminal for the failed AMIs,
+saving time overall.
 
 ### Configure IAM Vault account
 For Vault to be able to generate AWS credentials it needs to be configured with
@@ -129,18 +187,13 @@ an AWS account that has access to specific resources.
 8. Make sure "Generate an access key for each user" is checked
 9. Click **Create**
 10. Copy the access key and secret key from the browser into the text editor
-11. Save `vault_aws_credentials` and close the text editor
-12. Click **Close** in the web browser
-13. Scroll down the user list and click on the new Vault account
-14. Click the **Permissions** tab
-15. Expand the **Inline Policies** section
-16. Click the **click here** link to create a policy
-17. Select **Custom Policy** and click the **Select** button
-18. Name the policy “IAM access”
-19. Copy the contents of `boss-manage.git/vault/policies/vault.iam.example` into
-the **Policy Document** area
-20. Click **Validate Policy**
-21. Click **Apply Policy**
+11. Verify the account and domain names are set correctly in credentials file
+12. Save `vault_aws_credentials` and close the text editor
+13. Click **Close** in the web browser
+14. Scroll down the user list and click on the new Vault account
+15. Click the **Permissions** tab
+16. Click **Attached Policy**
+17. Select **aplVaultPolicy** and click **Attach Policy**
 
 ### Configure Scalyr account
 1. Create `boss-manage.git/cloudformation/scalyr_keys.sh` with the following
@@ -176,9 +229,6 @@ $ chmod 400 ~/.ssh/<keypair>.pem
 *Note: Make sure they the name of the key is the same as the name as entered in
 AWS. Characters like '.' may be removed from the file name. It is important that
 the name matches exactly, plus '.pem'*
-
-### Configure Route53
-Configure the domain theboss.io to be used by route53.
 
 
 ### Launch Configurations
@@ -217,7 +267,7 @@ change /etc/postfix/main.cf:
     virtual_alias_maps = hash:/etc/postfix/virtual
 
 created new file /etc/postfix/virtual:
-    administrator@theboss.io	your-email-address
+    admin@theboss.io	your-email-address
 your-email-address is a valild address that will recieve the request to
 validate that the certicate should be created.
 
@@ -231,34 +281,235 @@ python3.5 create_certificate.py auth.theboss.io
 After you receive the certificate approval emails, turn off the mail instance.
 
 
-#### Launching
-For the *core*, *api*, *proofreader* and *cloudwatch* configurations
+### Launching configs
+
+For the *core*, *api*, *cachedb*, *proofreader*, *cloudwatch* configurations
 run the following command. You have to wait for each command to finish before
-launching the next configuration as they build upon each other.
+launching the next configuration as they build upon each other.  **Only use the
+*--scenario production* flag** if you are rebuilding integration.  It is not used
+if you are following these instructions to build a developer environment.
 ```shell
-$ ./cloudformation.py create production.boss --scenario production <config>
+$ ./cloudformation.py create integration.boss --scenario production <config>
 ```
 
-*Note: If when launching the core configuration you receive a message about
-manually initializing / configuring Vault then run the following commands. If
-they error out then please contact the repository maintainers.*
-```shell
-$ cd ../vault/
-$ ./bastion.py bastion.production.boss vault.production.boss vault-init
-$ cd ../cloudformation/
-```
+*Note: When launching some configurations there may be an message about manually
+configuring Scalyr monitoring.  Report this as an potential problem if you
+encounter this message.*
 
-## Initialize Endpoint and run unit tests
+*Note: The cloudformation.py script will automatically use the latest created AMIs
+that are named with a commit hash. Since you just rebuilt the AMIs they should be
+the latest ones.*
+
+*Note: By using the '--scenario production' flag you will be spinning up larger/more
+resources than in development mode. Omitting the '--scenerio' flag or setting it to 'development'
+will deploy the stack with the minimum set of resources.*
+
+## Get bossadmin password
+```shell
+cd vault
+./bastion.py bastion.integration.boss vault.integration.boss vault-read secret/auth/realm
+```
+Login to https://api.integration.theboss.io/v0.5/resource/collections/
+Uses bossadmin and the password you now have to sync bossadmin to django
+
+## Run unit tests on Endpoint 
+
+If you are following these instructions for your personal development environment, skip the 
+export RUN_HIGH_MEM_TESTS line.  That line runs 2 tests that need >2.5GB of memory
+to run and will fail in your environment
+
 ```shell
 cd vault
 ./bastion.py bastion.integration.boss endpoint.integration.boss ssh
+export RUN_HIGH_MEM_TESTS=true
 cd /srv/www/django
-sudo python3 manage.py createsuperuser
-	user:  bossadmin
-	email: bossadmin@jhuapl.com
-	pass:  xxxxxxxx
 sudo python3 manage.py test
 ```
-	output should say 203 Tests OK with 14 skipped tests.
+	output should say 230 Tests OK with 11 skipped tests.
 
-	There are 2 tests that need >2.5GB of memory to run. To run them, set an enviroment variable "RUN_HIGH_MEM_TESTS"
+
+## Proofreader Tests
+````shell
+cd vault
+./ssh.py proofreader-web.integration.boss
+cd /srv/www/app/proofreader_apis
+sudo python3 manage.py makemigrations --noinput
+sudo python3 manage.py makemigrations --noinput common
+sudo python3 manage.py migrate
+sudo python3 manage.py test
+````
+    output should say 350 Tests OK
+
+## Integration Tests
+After the integration instance is launched the following tests need to be run,
+results recorded, and developers notified of any problems.
+
+### Endpoint Integration Tests
+
+#### Test While Logged Onto the Endpoint VM
+
+Again, Skip the RUN_HIGH_MEM_TESTS line below if you are following these instructions for 
+your personal development environment.  That line runs 2 tests that need >2.5GB 
+of memory to run and will fail in your environment
+
+```shell
+export RUN_HIGH_MEM_TESTS=true
+cd /srv/www/django
+sudo python3 manage.py test --pattern="int_test_*.py"
+```
+	output should say 55 Tests OK with 7 skipped tests
+
+
+### Cachemanager Integration Tests
+
+#### Test While Logged Onto the Cachemanager VM
+
+```shell
+cd /srv/salt/boss-tools/files/boss-tools.git/cachemgr
+sudo nose2
+sudo nose2 -c inttest.cfg
+```
+	there is currently issues with some of the tests not getting setup correctly. cache-DB and cache-state-db need to be manutally set to 1.
+	or the tests hang.
+
+
+#### Test Using ndio From a Client
+
+ndio integration tests should be run from your local workstation or a VM
+**not** running within the integration VPC.
+
+First ensure ndio is current:
+
+```shell
+# Clone the repository if you do not already have it.
+git clone https://github.com/jhuapl-boss/ndio.git
+
+# Otherwise update with `pull`.
+# git pull
+
+# Make the repository the current working directory.
+cd ndio
+
+# Check out the integration branch.
+# If there is no current integration branch, use master.
+git checkout integration
+
+# Ensure dependencies are current.
+sudo pip3 install -r requirements.txt
+```
+
+In your browser, open https://api.integration.theboss.io/token
+
+Your browser should be redirected to the KeyCloak login page.
+
+Create a new account and return to the token page.
+
+Generate a token.
+
+This token will be copied-pasted into the ndio config file.
+
+```shell
+mkdir ~/.ndio
+EDITOR ~/.ndio/ndio.cfg
+```
+
+In your text editor, copy and paste the text config values below. Replace all
+all tokens with the token displayed in your browser.
+
+```
+[Project Service]
+protocol = https
+host = api.integration.theboss.io
+# Replace with your token.
+token = c23b48ceb35cae212b470a23d99d4185bac1c226
+
+[Metadata Service]
+protocol = https
+host = api.integration.theboss.io
+# Replace with your token.
+token = c23b48ceb35cae212b470a23d99d4185bac1c226
+
+[Volume Service]
+protocol = https
+host = api.integration.theboss.io
+# Replace with your token.
+token = c23b48ceb35cae212b470a23d99d4185bac1c226
+```
+
+Additionally, create a copy of `~/.ndio/ndio.cfg` as `test.cfg` in the ndio
+repository directory.
+
+##### Setup via the Django Admin Page
+
+In your browser, go to https://api.integration.theboss.io/admin
+
+Login using the bossadmin account created previously (this was created during
+the endpoint initialization and unit test step).
+
+Click on `Users` and determine the user name based on the email address you
+used during account creation (this step should soon be unnecessary, but at the
+time of writing, GUIDs are used for the user name).
+
+Now go back to the root admin page.
+
+Click on `Boss roles`.
+
+Click on `ADD BOSS ROLE`.
+
+Find the user you created and add the `ADMIN` role to that user and save.
+
+
+##### Run ndio Integration Tests
+
+Finally, open a shell and run the integration tests:
+
+```shell
+# Go to the location of your cloned ndio repository.
+cd ndio.git
+python3 -m unittest discover -p int_test*
+```
+
+Output should say:
+
+```
+Ran x tests in x.xxxs.
+
+OK
+```
+
+### Automated Tests
+To be filled out
+
+### Manual Checks
+* https://api.integration.theboss.io/ping/
+* https://api.integration.theboss.io/v0.4/resource/collections
+* https://api.integration.theboss.io/v0.5/resource/collections
+* Login into Scalyr and verify that the new instances appear on the overview page.
+* Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint and proofreader.
+
+
+### Setting Up Web Page
+Create a S3 bucket named: **www.theboss.io**
+Under propertes of the bucket in the **Static Website Hosting** section
+click **Enable Website Hosting**
+Index Document: index.html
+Redirect rules should have
+```
+<RoutingRules>
+    <RoutingRule>
+        <Redirect>
+            <Protocol>http</Protocol>
+            <HostName>docs.theboss.io</HostName>
+            <ReplaceKeyPrefixWith/>
+            <HttpRedirectCode>301</HttpRedirectCode>
+        </Redirect>
+    </RoutingRule>
+</RoutingRules>
+```
+
+Under Route53 two CNAME records in the hosted zone theboss.io 
+1. docs.theboss.io 
+    * the web server hosting theboss documentation.
+2. www.theboss.io
+    * the S3 bucket name which is currently:
+    * www.theboss.io.s3-website-us-east-1.amazonaws.com
