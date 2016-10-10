@@ -171,6 +171,27 @@ when issues do occur, they frequently fail early.  Discovering this
 allows you to relauch packer.py in another terminal for the failed AMIs,
 saving time overall.
 
+#### Running Lambda packer
+From the packer 
+```shell
+$ cd boss-manager/packer
+$ packer build -var-file=../config/aws-credentials -var-file=variables/lambda -var-file=../config/aws-bastion -var 'force_deregister=true' lambda.packer
+```
+
+Manually create security group for the lambda_build_server
+Group Name: Bastion-to-Default-VPC
+VPC: default-vpc
+Inbound ports: 22
+From: 52.3.13.189/32
+
+Manually create an instance of the new Lambda-AMI, 
+Role: lambda_build_server
+Security Group: Bastion-to-Default-VPC
+Instance Type: t2.micro
+Auto-assign Public IP: enabled
+VPC: default-vpc
+check: Protect against accidental termination
+
 ### Configure IAM Vault account
 For Vault to be able to generate AWS credentials it needs to be configured with
 an AWS account that has access to specific resources.

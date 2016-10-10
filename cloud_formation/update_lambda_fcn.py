@@ -60,7 +60,7 @@ from ssh import *
 #     os.remove(SPDB_LINK)
 
 # Server used to build spdb and assemble the final lambda zip file.
-LAMBDA_BUILD_SERVER = "52.23.27.39"
+LAMBDA_BUILD_SERVER = None
 
 AWS_REGION = 'us-east-1'
 
@@ -259,6 +259,7 @@ if __name__ == '__main__':
 
     session = create_session(credentials)
     S3_BUCKET = lib.get_lambda_s3_bucket(session)
+    LAMBDA_BUILD_SERVER = lib.get_lambda_server(session)
 
     load_lambdas_on_s3(args.domain)
     update_lambda_code(session, args.domain)

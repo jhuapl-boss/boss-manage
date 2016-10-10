@@ -61,10 +61,12 @@ SUBNET_CIDR = 24 # make sure SUBNET_CIDR is greater than VPC_CIDR
 PROD_ACCOUNT = "451493790433"
 PROD_DOMAIN = "theboss.io"
 PROD_LAMBDA_BUCKET = "boss-lambda-prod-env"
+PROD_LAMBDA_SERVER = "52.55.121.6"
 
 DEV_ACCOUNT = "256215146792"
 DEV_DOMAIN = "thebossdev.io"
 DEV_LAMBDA_BUCKET = "boss-lambda-env"
+DEV_LAMBDA_SERVER = "52.23.27.39"
 
 # Name and Subnet number (must fit within ROOT_CIDR to VPC_CIDR) of all VPCs
 VPCS = {

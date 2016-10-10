@@ -1488,3 +1488,19 @@ def get_lambda_s3_bucket(session):
         return hosts.DEV_LAMBDA_BUCKET
     else:
         raise NameError("Unknown session account used, {}, S3_BUCKET for Lambda unknown.".format(account))
+
+def get_lambda_server(session):
+    '''
+    returns the lambda server based on the session
+    Args:
+        session:
+
+    Returns:
+        (str) build server for lambdas
+    '''
+    account = get_account_id_from_session(session)
+    if account == hosts.PROD_ACCOUNT:
+    elif account == hosts.DEV_ACCOUNT:
+        return hosts.DEV_LAMBDA_SERVER
+    else:
+        raise NameError("Unknown session account used, {}, lambda_build_server for this session is unknown.".format(account))
