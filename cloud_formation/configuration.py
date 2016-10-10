@@ -1541,7 +1541,7 @@ class CloudFormationConfiguration:
                             "Domain of the VPC '{}'".format(vpc))
         self.add_arg(domain)
 
-    def add_route_53_record_set(self, key, full_domain_name, cname_value, hosted_zone_name="theboss.io.", ttl=300):
+    def add_route_53_record_set(self, key, full_domain_name, cname_value, hosted_zone_name, ttl=300):
         """Add a CNAME RecordSet to the configuration
 
         Args:

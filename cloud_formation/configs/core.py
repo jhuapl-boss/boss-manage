@@ -57,6 +57,7 @@ VAULT_CLUSTER_SIZE = { # Vault Cluster is a fixed size
     "production": 3 # should be an odd number
 }
 
+
 def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, public=True, depends_on=None):
     security_groups = ["InternalSecurityGroup"]
     config.add_autoscale_group(key,
@@ -202,8 +203,8 @@ runcmd:
     if domain in hosts.BASE_DOMAIN_CERTS.keys():
         cert = lib.cert_arn_lookup(session, "auth." + hosts.BASE_DOMAIN_CERTS[domain])
     else:
-        cert = lib.cert_arn_lookup(session, "auth.integration.theboss.io")
-
+        cert = lib.cert_arn_lookup(session, "auth.{}.{}".format(domain.split(".")[0],
+                                                                hosts.DEV_DOMAIN))
     create_asg_elb(config,
                    "Auth",
                    "auth." + domain,
@@ -322,10 +323,10 @@ def configure_keycloak(session, domain):
 
     if domain in hosts.BASE_DOMAIN_CERTS.keys():
         auth_domain = 'auth.' + hosts.BASE_DOMAIN_CERTS[domain]
-        auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_domain)
-        lib.set_domain_to_dns_name(session, auth_domain, auth_elb)
     else:
-        auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_elb)
+        auth_domain = 'auth.{}.{}'.format(domain.split(".")[0], hosts.DEV_DOMAIN)
+    auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_domain)
+    lib.set_domain_to_dns_name(session, auth_domain, auth_elb, lib.get_hosted_zone(session))
 
     username = "admin"
     password = lib.generate_password()
@@ -333,15 +334,21 @@ def configure_keycloak(session, domain):
     realm_password = lib.generate_password()
 
     call = lib.ExternalCalls(session, keypair, domain)
-
+    print("about to write secret/auth")
     call.vault_write("secret/auth", password = password, username = username, client_id = "admin-cli")
+    print("about to write secret/auth/realm")
     call.vault_write("secret/auth/realm", username = realm_username, password = realm_password, client_id = "endpoint")
+    print("about to write secret/keycloak")
     call.vault_update("secret/keycloak", password = password, username = username, client_id = "admin-cli", realm = "master")
+    print("about to write secret/endpoint/auth")
     call.vault_update("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
+    print("about to write secret/proofreader/auth")
     call.vault_update("secret/proofreader/auth", url = auth_discovery_url, client_id = "endpoint")
 
+    print("about to add bossadmin user to keycloak")
     call.set_ssh_target("auth")
     call.ssh("/srv/keycloak/bin/add-user.sh -r master -u {} -p {}".format(username, password))
+    print("about to restarting keycloak")
     call.ssh("sudo service keycloak stop")
     time.sleep(2)
     call.ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
@@ -349,7 +356,7 @@ def configure_keycloak(session, domain):
     time.sleep(3)
     call.ssh("sudo service keycloak start")
     print("Waiting for Keycloak to restart")
-    time.sleep(75)
+    time.sleep(100)
 
     upload = lambda p: upload_realm_config(p, username, password, realm_username, realm_password)
     call.ssh_tunnel(upload, 8080)
@@ -370,8 +377,8 @@ def create(session, domain):
         vpc_id = lib.vpc_id_lookup(session, domain)
         lib.rt_name_default(session, vpc_id, "internal." + domain)
 
-        print("Waiting 1 minute for VMs to start...")
-        time.sleep(60)
+        print("Waiting 75 seconds for VMs to start...")
+        time.sleep(75)
         post_init(session, domain)
 
 def post_init(session, domain):
@@ -396,7 +403,7 @@ def post_init(session, domain):
         return
 
     print("Waiting for Keycloak to bootstrap")
-    time.sleep(75)
+    time.sleep(90)
 
     print("Configuring Keycloak...")
     configure_keycloak(session, domain)

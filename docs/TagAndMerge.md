@@ -15,6 +15,8 @@ For each of the following repositories
 * https://github.com/aplmicrons/proofread.git
 * https://github.com/aplmicrons/boss-tools.git
 * https://github.com/aplmicrons/spdb.git
+* https://github.com/jhuapl-boss/ingest-client
+* https://github.com/jhuapl-boss/ndingest
 * https://github.com/jhuapl-boss/ndio.git (ndio is not a sub-module, but also needs tagging)
 
 
@@ -49,6 +51,8 @@ $ git add salt_stack/salt/boss/files/boss.git
 $ git add salt_stack/salt/boss-tools/files/boss-tools.git
 $ git add salt_stack/salt/proofreader-web/files/proofread.git
 $ git add salt_stack/salt/spdb/files/spdb.git
+$ git add salt_stack/salt/ndingest/files/ndingest.git
+$ git add salt_stack/salt/ingest-client/files/ingest-client.git
 # Review the SHA hash for each submodule to make sure it correctly points to the
 #   tagged version
 $ git commit -m "Updated submodule references"
@@ -65,6 +69,8 @@ For each of the following repositories
 * https://github.com/aplmicrons/proofread.git
 * https://github.com/aplmicrons/boss-tools.git
 * https://github.com/aplmicrons/spdb.git
+* https://github.com/jhuapl-boss/ingest-client
+* https://github.com/jhuapl-boss/ndingest
 * https://github.com/jhuapl-boss/ndio.git (ndio is not a sub-module, but also needs tagging)
 
 
@@ -104,6 +110,8 @@ $ git add salt_stack/salt/boss/files/boss.git
 $ git add salt_stack/salt/boss-tools/files/boss-tools.git
 $ git add salt_stack/salt/proofreader-web/files/proofread.git
 $ git add salt_stack/salt/spdb/files/spdb.git
+$ git add salt_stack/salt/ndingest/files/ndingest.git
+$ git add salt_stack/salt/ingest-client/files/ingest-client.git
 # Review the SHA hash for each submodule to make sure it correctly points to the
 #   tagged version
 $ git commit -m "Updated submodule references"

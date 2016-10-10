@@ -128,7 +128,7 @@ def create(session, domain):
     user_data["system"]["fqdn"] = "proofreader-web." + domain
     user_data["system"]["type"] = "proofreader-web"
     user_data["aws"]["db"] = "proofreader-db." + domain
-    user_data["auth"]["OIDC_VERIFY_SSL"] = str(domain in hosts.BASE_DOMAIN_CERTS.keys())
+    user_data["auth"]["OIDC_VERIFY_SSL"] = str(domain in hosts.BASE_DOMAIN_CERTS.keys())  # TODO SH change to True once we get wildcard domain working correctly
     user_data = str(user_data)
 
 
@@ -191,11 +191,11 @@ def post_init(session, domain):
     call.ssh("sudo service nginx restart")
 
     print("Generating keycloak.json")
-    # this will be overwritten if there is a DNS with a cert
-    elb = lib.elb_public_lookup(session, "auth." + domain)
-
     if domain in hosts.BASE_DOMAIN_CERTS.keys():
         elb = "auth." + hosts.BASE_DOMAIN_CERTS[domain]
+    else:
+        elb = "auth.{}.{}".format(domain.split(".")[0],
+                                  hosts.DEV_DOMAIN)
 
     kc = lib.KeyCloakClient("https://{}:{}".format(elb, 443), verify_ssl=False)
     kc.login(creds["username"], creds["password"])
