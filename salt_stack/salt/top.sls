@@ -15,7 +15,6 @@ base:
 
     'endpoint*':
         - boss-tools.bossutils
-        - boss-tools.credentials
         - ndingest
         - django.rest-framework # install first and patch
         - boss.django
