@@ -121,6 +121,7 @@ def create_config(session, domain, keypair=None, user_data=None):
         { 'AWS': role})
 
     tile_bucket_name = names.get_tile_bucket(domain)
+    print ("tile bucket name: " + tile_bucket_name)
     if not lib.s3_bucket_exists(session, tile_bucket_name):
         config.add_s3_bucket("tileBucket", tile_bucket_name)
     config.add_s3_bucket_policy(
@@ -147,10 +148,11 @@ def create_config(session, domain, keypair=None, user_data=None):
     lambda_subnets = lib.multi_subnet_id_lookup(session, filter_by_host_name)
 
     multi_lambda_name = names.get_multi_lambda(domain).replace('.', '-')
+    lambda_bucket = lib.get_lambda_s3_bucket(session)
     config.add_lambda("MultiLambda",
                       multi_lambda_name,
                       "LambdaCacheExecutionRole",
-                      s3=("boss-lambda-env",
+                      s3=(lambda_bucket,
                           "multilambda.{}.zip".format(domain),
                           "local/lib/python3.4/site-packages/lambda/lambda_loader.handler"),
                       timeout=60,
@@ -236,7 +238,7 @@ def pre_init(session, domain):
     """Send spdb, bossutils, lambda, and lambda_utils to the lambda build
     server, build the lambda environment, and upload to S3.
     """
-    load_lambdas_on_s3(domain)
+    load_lambdas_on_s3(session, domain)
 
 def post_init(session, domain):
     print("post_init")

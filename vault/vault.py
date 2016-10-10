@@ -236,7 +236,7 @@ def vault_configure(machine = None, ip = None):
         client.enable_secret_backend('pki')
         # Generate a self signed certificate for CA
         print("Generating self signed CA")
-        response = client.write("pki/root/generate/internal", common_name="boss.io")
+        response = client.write("pki/root/generate/internal", common_name=aws_creds["domain"])
         with open(get_path(machine, "ca.pem"), 'w') as fh:
             fh.write(response["data"]["certificate"])
 

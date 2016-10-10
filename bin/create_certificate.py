@@ -67,5 +67,5 @@ if __name__ == '__main__':
     credentials = json.load(args.aws_credentials)
     session = create_session(credentials)
 
-    results = lib.request_cert(session, args.domain_name)
+    results = lib.request_cert(session, args.domain_name, lib.get_hosted_zone(session))
     print(results)

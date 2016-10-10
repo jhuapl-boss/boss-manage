@@ -126,8 +126,8 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     if domain in hosts.BASE_DOMAIN_CERTS.keys():
         cert = lib.cert_arn_lookup(session, "api." + hosts.BASE_DOMAIN_CERTS[domain])
     else:
-        # default to using api.theboss.io
-        cert = lib.cert_arn_lookup(session, "api.theboss.io")
+        cert = lib.cert_arn_lookup(session, "api.{}.{}".format(domain.split(".")[0],
+                                                               hosts.DEV_DOMAIN))
 
     # Create SQS queues and apply access control policies.
     deadqname = lib.domain_to_stackname(DEADLETTER_QUEUE_PREFIX + domain)
@@ -259,7 +259,7 @@ def create(session, domain):
     user_data["aws"]["s3-index-table"] = names.get_s3_index(domain)
     user_data["aws"]["tile-index-table"] = names.get_tile_index(domain)
 
-    user_data["auth"]["OIDC_VERIFY_SSL"] = str(domain in hosts.BASE_DOMAIN_CERTS.keys())
+    user_data["auth"]["OIDC_VERIFY_SSL"] = str(domain in hosts.BASE_DOMAIN_CERTS.keys())  # TODO SH change to True once we get wildcard domain working correctly
 
     # Lambda names can't have periods.
     multilambda = names.get_multi_lambda(domain).replace('.', '-')
@@ -299,11 +299,14 @@ def post_init(session, domain):
     def configure_auth(auth_port):
         # NOTE DP: If an ELB is created the public_uri should be the Public DNS Name
         #          of the ELB. Endpoint Django instances may have to be restarted if running.
-        dns = lib.elb_public_lookup(session, "elb." + domain)
+        dns_elb = lib.elb_public_lookup(session, "elb." + domain)
         if domain in hosts.BASE_DOMAIN_CERTS.keys():
-            dns_elb = dns
             dns = "api." + hosts.BASE_DOMAIN_CERTS[domain]
-            lib.set_domain_to_dns_name(session, dns, dns_elb)
+        else:
+            dns = "api.{}.{}".format(domain.split('.')[0],
+                                     hosts.DEV_DOMAIN)
+        lib.set_domain_to_dns_name(session, dns, dns_elb, lib.get_hosted_zone(session))
+
         uri = "https://{}".format(dns)
         call.vault_update(VAULT_DJANGO_AUTH, public_uri = uri)
 

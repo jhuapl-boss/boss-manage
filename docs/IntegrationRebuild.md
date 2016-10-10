@@ -105,7 +105,7 @@ Stacks need to be deleted.
 $ cd cloud_formation/
 $ source ../config/set_vars.sh
 
-# Deletion of cloudwatch, api, and proofreader can probably
+# Deletion of cloudwatch, api, proofreader and cachedb can probably
 # be done in parallel.
 $ ./cloudformation.py delete integration.boss cloudwatch
 $ ./cloudformation.py delete integration.boss cachedb
@@ -123,19 +123,39 @@ configuration file located at `boss-manage.git/vault/private/vault_aws_credentia
 If you don't have this, talk to Derek Pryor to get the AWS API keys for an account.
 Once you have the needed API keys:
 
-1. Copy `boss-manage.git/packer/variables/aws-credentials.example` to
+1. Copy `boss-manage.git/config/aws-credentials.example` to
 `boss-manage.git/vault/private/vault_aws_credentials`
   * You may have to create the directory "private"
 2. Open `vault_aws_credentials` in a text editor
 3. Copy the access key and secret key that you received into the text editor
 4. Save `vault_aws_credentials` and close the text editor
+5. If you are building Integration you'll need to have vault_aws_credentials 
+for the production account.  It should have aws_account and domain filling in like this:  
+```
+{
+    "aws_access_key": "",
+    "aws_secret_key": "",
+    "aws_account": "451493790433",
+    "domain": "theboss.io"
+}
+```
+If you are building a personal developer domain it should have this:
+```
+{
+    "aws_access_key": "",
+    "aws_secret_key": "",
+    "aws_account": "256215146792",
+    "domain": "thebossdev.io"
+}
+```
+
 
 ### Launching configs
 
 For the *core*, *api*, *cachedb*, *proofreader*, *cloudwatch* configurations
 run the following command. You have to wait for each command to finish before
-launching the next configuration as they build upon each other.  Only use the
-*--scenario production* flag if you are rebuilding integration.  It is not used
+launching the next configuration as they build upon each other.  **Only use the
+*--scenario production* flag** if you are rebuilding integration.  It is not used
 if you are following these instructions to build a developer environment.
 ```shell
 $ ./cloudformation.py create integration.boss --scenario production <config>
@@ -161,16 +181,20 @@ cd vault
 Login to https://api.integration.theboss.io/v0.5/resource/collections/
 Uses bossadmin and the password you now have to sync bossadmin to django
 
-## Initialize Endpoint and run unit tests
+## Run unit tests on Endpoint 
+
+If you are following these instructions for your personal development environment, skip the 
+export RUN_HIGH_MEM_TESTS line.  That line runs 2 tests that need >2.5GB of memory
+to run and will fail in your environment
+
 ```shell
 cd vault
 ./bastion.py bastion.integration.boss endpoint.integration.boss ssh
+export RUN_HIGH_MEM_TESTS=true
 cd /srv/www/django
 sudo python3 manage.py test
 ```
 	output should say 230 Tests OK with 11 skipped tests.
-
-	There are 2 tests that need >2.5GB of memory to run. To run them, set an enviroment variable "RUN_HIGH_MEM_TESTS"
 
 
 ## Proofreader Tests
@@ -193,13 +217,13 @@ results recorded, and developers notified of any problems.
 
 #### Test While Logged Onto the Endpoint VM
 
-If following these instructions for your personal development environment, skip the 
-export RUN_HIGH_MEM_TESTS line.  That line runs 2 tests that need >2.5GB of memory
-to run and will fail in your environment
+Again, Skip the RUN_HIGH_MEM_TESTS line below if you are following these instructions for 
+your personal development environment.  That line runs 2 tests that need >2.5GB 
+of memory to run and will fail in your environment
 
 ```shell
-cd /srv/www/django
 export RUN_HIGH_MEM_TESTS=true
+cd /srv/www/django
 sudo python3 manage.py test --pattern="int_test_*.py"
 ```
 	output should say 55 Tests OK with 7 skipped tests
