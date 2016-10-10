@@ -20,6 +20,8 @@ $ git add salt_stack/salt/boss/files/boss.git
 $ git add salt_stack/salt/boss-tools/files/boss-tools.git
 $ git add salt_stack/salt/proofreader-web/files/proofread.git
 $ git add salt_stack/salt/spdb/files/spdb.git
+$ git add salt_stack/salt/ndingest/files/ndingest.git
+$ git add salt_stack/salt/ingest-client/files/ingest-client.git
 $ git commit -m "Updated submodule references"
 $ git push
 ```
