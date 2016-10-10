@@ -1500,6 +1500,7 @@ def get_lambda_server(session):
     '''
     account = get_account_id_from_session(session)
     if account == hosts.PROD_ACCOUNT:
+        return hosts.PROD_LAMBDA_SERVER
     elif account == hosts.DEV_ACCOUNT:
         return hosts.DEV_LAMBDA_SERVER
     else:

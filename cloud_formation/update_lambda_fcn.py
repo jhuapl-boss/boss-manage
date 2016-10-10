@@ -59,9 +59,6 @@ from ssh import *
 # finally:
 #     os.remove(SPDB_LINK)
 
-# Server used to build spdb and assemble the final lambda zip file.
-LAMBDA_BUILD_SERVER = None
-
 AWS_REGION = 'us-east-1'
 
 # Name that is prepended to the domain name (periods are replaced with dashes).
@@ -110,7 +107,7 @@ def update_lambda_code(session, domain):
         Publish=True)
     print(resp)
 
-def load_lambdas_on_s3(domain):
+def load_lambdas_on_s3(session, domain):
     """Zip up spdb, bossutils, lambda and lambda_utils.  Upload to S3.
 
     Uses the lambda build server (an Amazon Linux AMI) to compile C code and
@@ -118,6 +115,7 @@ def load_lambdas_on_s3(domain):
     in S3.
 
     Args:
+        session (Session): boto3.Session
         domain (string): The VPC's domain name such as integration.boss.
     """
     tempname = tempfile.NamedTemporaryFile(delete=True)
@@ -151,7 +149,8 @@ def load_lambdas_on_s3(domain):
     apl_bastion_key = os.environ.get("BASTION_KEY")
     apl_bastion_user = os.environ.get("BASTION_USER")
     local_port = bastion.locate_port()
-    proc = bastion.create_tunnel(apl_bastion_key, local_port, LAMBDA_BUILD_SERVER, 22, apl_bastion_ip, bastion_user="ubuntu")
+    lambda_build_server = lib.get_lambda_server(session)
+    proc = bastion.create_tunnel(apl_bastion_key, local_port, lambda_build_server, 22, apl_bastion_ip, bastion_user="ubuntu")
 
     # Note: using bastion key as identity for scp.
     scp_cmd = "scp -i {} -P {} {} {} ec2-user@localhost:sitezips/{}".format(
@@ -176,7 +175,9 @@ def load_lambdas_on_s3(domain):
     print("calling makedomainenv on lambda-build-server")
     #cmd = "\"shopt login_shell\""
     cmd = "\"source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {}\"".format(domain)
-    ssh(apl_bastion_key, LAMBDA_BUILD_SERVER, "ec2-user", cmd)
+    lambda_build_server = lib.get_lambda_server(session)
+
+    ssh(apl_bastion_key, lambda_build_server, "ec2-user", cmd)
 
 def create_ndingest_settings(domain, fp):
     """Create the settings.ini file for ndingest.
@@ -259,7 +260,6 @@ if __name__ == '__main__':
 
     session = create_session(credentials)
     S3_BUCKET = lib.get_lambda_s3_bucket(session)
-    LAMBDA_BUILD_SERVER = lib.get_lambda_server(session)
 
-    load_lambdas_on_s3(args.domain)
+    load_lambdas_on_s3(session, args.domain)
     update_lambda_code(session, args.domain)
