@@ -37,6 +37,7 @@ import os
 import shlex
 import sys
 import tempfile
+import hosts
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
 vault_dir = os.path.normpath(os.path.join(cur_dir, "..", "vault"))
@@ -67,7 +68,7 @@ AWS_REGION = 'us-east-1'
 LAMBDA_PREFIX = 'multiLambda-'
 
 # Bucket that stores all of our lambda functions.
-S3_BUCKET = 'boss-lambda-env'
+S3_BUCKET = None
 
 # Location of settings files for ndingest.
 NDINGEST_SETTINGS_FOLDER = '../salt_stack/salt/ndingest/files/ndingest.git/settings'
@@ -257,6 +258,7 @@ if __name__ == '__main__':
         credentials = json.load(args.aws_credentials)
 
     session = create_session(credentials)
+    S3_BUCKET = lib.get_lambda_s3_bucket(session)
 
     load_lambdas_on_s3(args.domain)
     update_lambda_code(session, args.domain)

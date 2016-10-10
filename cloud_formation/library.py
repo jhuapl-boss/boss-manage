@@ -1470,3 +1470,21 @@ def get_account_id_from_session(session):
         return None
 
     return session.client('iam').list_users(MaxItems=1)["Users"][0]["Arn"].split(':')[4]
+
+
+def get_lambda_s3_bucket(session):
+    '''
+    returns the lambda bucket based on the session
+    Args:
+        session:
+
+    Returns:
+        (str) bucket name to store lambdas
+    '''
+    account = get_account_id_from_session(session)
+    if account == hosts.PROD_ACCOUNT:
+        return hosts.PROD_LAMBDA_BUCKET
+    elif account == hosts.DEV_ACCOUNT:
+        return hosts.DEV_LAMBDA_BUCKET
+    else:
+        raise NameError("Unknown session account used, {}, S3_BUCKET for Lambda unknown.".format(account))

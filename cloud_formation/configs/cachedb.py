@@ -147,10 +147,11 @@ def create_config(session, domain, keypair=None, user_data=None):
     lambda_subnets = lib.multi_subnet_id_lookup(session, filter_by_host_name)
 
     multi_lambda_name = names.get_multi_lambda(domain).replace('.', '-')
+    lambda_bucket = lib.get_account_id_from_session(session)
     config.add_lambda("MultiLambda",
                       multi_lambda_name,
                       "LambdaCacheExecutionRole",
-                      s3=("boss-lambda-env",
+                      s3=(lambda_bucket,
                           "multilambda.{}.zip".format(domain),
                           "local/lib/python3.4/site-packages/lambda/lambda_loader.handler"),
                       timeout=60,
