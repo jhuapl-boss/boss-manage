@@ -14,6 +14,7 @@ following
 ```shell
 $ git checkout integration
 $ git pull
+$ git submodule init
 $ git submodule update --remote
 $ git add salt_stack/salt/boss/files/boss.git
 $ git add salt_stack/salt/boss-tools/files/boss-tools.git
