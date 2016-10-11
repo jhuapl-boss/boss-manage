@@ -24,3 +24,11 @@ path "secret/proofreader/*" {
 path "secret/auth" {
     policy = "write"
 }
+
+path "secret/auth/*" {
+    policy = "write"
+}
+
+path "secret/keycloak" {
+    policy = "write"
+}

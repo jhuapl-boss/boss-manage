@@ -189,17 +189,38 @@ def vault_configure(machine = None, ip = None):
     with open(token_file, "w") as fh:
         fh.write(token['auth']['client_token'])
 
-    # AWS Backend
+    # Read AWS credentials file
     vault_aws_creds = os.path.join(_CURRENT_DIR, "private", "vault_aws_credentials")
-    if not os.path.exists(vault_aws_creds):
-        print("Vault AWS credentials file does not exist, skipping...")
+    if os.path.exists(vault_aws_creds):
+        with open(vault_aws_creds, "r") as fh:
+            aws_creds = json.load(fh)
+    else:
+        aws_creds = None
+
+    # AWS Authentication Backend
+    if aws_creds is None:
+        print("Vault AWS credentials files does nto exist, skipping configuration of AWS-EC2 authentication backend")
+    else:
+        client.enable_auth_backend('aws-ec2')
+        client.write('auth/aws-ec2/config/client', access_key = aws_creds["aws_access_key"],
+                                                   secret_key = aws_creds["aws_secret_key"])
+
+        arn_prefix = 'arn:aws:iam::{}:instance-profile/'.format(aws_creds["aws_account"])
+        policies = [p for p in provisioner_policies if p not in ('provisioner',)]
+        for policy in policies:
+            client.write('/auth/aws-ec2/role/' + policy, policies = policy,
+                                                         bound_iam_role_arn = arn_prefix + policy)
+
+    # AWS Secret Backend
+    if aws_creds is None:
+        print("Vault AWS credentials file does not exist, skipping configuration of AWS secret backend")
     else:
         client.enable_secret_backend('aws')
-        with open(vault_aws_creds, "r") as fh:
-            creds = json.load(fh)
-            client.write("aws/config/root", access_key = creds["aws_access_key"],
-                                            secret_key = creds["aws_secret_key"],
-                                            region = creds.get("aws_region", "us-east-1"))
+        client.write("aws/config/root", access_key = aws_creds["aws_access_key"],
+                                        secret_key = aws_creds["aws_secret_key"],
+                                        region = aws_creds.get("aws_region", "us-east-1"))
+        client.write("aws/config/lease", lease = aws_creds.get("lease_duration", "1h"),
+                                         lease_max = aws_creds.get("lease_max", "24h")) # DP TODO finalize default values
 
         path = os.path.join(_CURRENT_DIR, "policies", "*.iam")
         for iam in glob.glob(path):
@@ -210,12 +231,12 @@ def vault_configure(machine = None, ip = None):
 
     # PKI Backend
     if True: # Disabled until we either have a CA cert or can generate a CA
-        print("Vault PKI cert file does not exist, skipping...")
+        print("Vault PKI cert file does not exist, skipping configuration of PKI secret backend")
     else:
         client.enable_secret_backend('pki')
         # Generate a self signed certificate for CA
         print("Generating self signed CA")
-        response = client.write("pki/root/generate/internal", common_name="boss.io")
+        response = client.write("pki/root/generate/internal", common_name=aws_creds["domain"])
         with open(get_path(machine, "ca.pem"), 'w') as fh:
             fh.write(response["data"]["certificate"])
 

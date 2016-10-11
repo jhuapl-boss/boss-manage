@@ -36,7 +36,7 @@ def create_vault_consul_health_checks(session, domain, vpc_id, config):
         vpc_id (string): Physical id of VPC.
         config (CloudFormationConfiguration): config to update.
     """
-    lambda_role = 'arn:aws:iam::256215146792:role/VaultConsulHealthChecker'
+    lambda_role = lib.role_arn_lookup(session, 'VaultConsulHealthChecker')
     config.add_arg(configuration.Arg.String(
         'VaultConsulHealthChecker', lambda_role,
         'IAM role for vault/consul health check.' + domain))
@@ -55,7 +55,7 @@ def create_vault_consul_health_checks(session, domain, vpc_id, config):
         key=chk_vault_lambda,
         name=chk_vault_lambda_logical_name,
         description='Check health of vault instances.',
-        timeout=20,
+        timeout=30,
         role='VaultConsulHealthChecker',
         security_groups=[core_sec_group],
         subnets=subnets,
@@ -70,7 +70,7 @@ def create_vault_consul_health_checks(session, domain, vpc_id, config):
         key=chk_consul_lambda,
         name=chk_consul_lambda_logical_name,
         description='Check health of vault instances.',
-        timeout=20,
+        timeout=30,
         role='VaultConsulHealthChecker',
         security_groups=[core_sec_group],
         subnets=subnets,

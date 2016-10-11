@@ -12,7 +12,7 @@ service-cachemiss:
         - group: root
         - mode: 555
     cmd.run:
-        - name: update-rc.d boss-cachemissd defaults 10
+        - name: update-rc.d boss-cachemissd defaults 99
         - user: root
 
 service-deadletter:
@@ -23,7 +23,7 @@ service-deadletter:
         - group: root
         - mode: 555
     cmd.run:
-        - name: update-rc.d boss-deadletterd defaults 10
+        - name: update-rc.d boss-deadletterd defaults 99
         - user: root
 
 service-delayedwrite:
@@ -34,7 +34,7 @@ service-delayedwrite:
         - group: root
         - mode: 555
     cmd.run:
-        - name: update-rc.d boss-delayedwrited defaults 10
+        - name: update-rc.d boss-delayedwrited defaults 99
         - user: root
 
 service-prefetch:
@@ -45,5 +45,16 @@ service-prefetch:
         - group: root
         - mode: 555
     cmd.run:
-        - name: update-rc.d boss-prefetchd defaults 10
+        - name: update-rc.d boss-prefetchd defaults 99
+        - user: root
+
+service-sqs-watcher:
+    file.managed:
+        - name: /etc/init.d/boss-sqs-watcherd
+        - source: salt://boss-tools/files/boss-tools.git/cachemgr/boss_sqs_watcherd.py
+        - user: root
+        - group: root
+        - mode: 555
+    cmd.run:
+        - name: update-rc.d boss-sqs-watcherd defaults 99
         - user: root

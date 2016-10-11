@@ -26,9 +26,11 @@ import argparse
 import sys
 import os
 import glob
+import json
 import shlex
 import subprocess
 from distutils.spawn import find_executable
+from boto3.session import Session
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 os.environ["PATH"] += ":" + os.path.join(REPO_ROOT, "bin") # allow executing Packer from the bin/ directory
@@ -52,6 +54,41 @@ def execute(cmd, output_file):
         (Popen) : Popen object representing the executing command
     """
     return subprocess.Popen(shlex.split(cmd), stderr=subprocess.STDOUT, stdout=open(output_file, "w"))
+
+def locate_ami(aws_config):
+    def contains(x, ys):
+        for y in ys:
+            if y not in x:
+                return False
+        return True
+
+    with open(aws_config) as fh:
+        cred = json.load(fh)
+        session = Session(aws_access_key_id = cred["aws_access_key"],
+                          aws_secret_access_key = cred["aws_secret_key"],
+                          region_name = 'us-east-1')
+
+        client = session.client('ec2')
+        response = client.describe_images(Filters=[
+                        {"Name": "owner-id", "Values": ["099720109477"]},
+                        {"Name": "virtualization-type", "Values": ["hvm"]},
+                        {"Name": "root-device-type", "Values": ["ebs"]},
+                        {"Name": "architecture", "Values": ["x86_64"]},
+                        #{"Name": "platform", "Values": ["Ubuntu"]},
+                        #{"Name": "name", "Values": ["hvm-ssd"]},
+                        #{"Name": "name", "Values": ["14.04"]},
+                   ])
+
+        images = response['Images']
+        images = [i for i in images if contains(i['Name'], ('hvm-ssd', '14.04', 'server'))]
+        images.sort(key=lambda x: x["CreationDate"], reverse=True)
+
+        if len(images) == 0:
+            print("Error: could not locate base AMI, exiting ....")
+            sys.exit(1)
+
+        print("Using {}".format(images[0]['Name']))
+        return images[0]['ImageId']
 
 if __name__ == '__main__':
     for cmd in ("git", "packer"):
@@ -117,11 +154,13 @@ if __name__ == '__main__':
     if not os.path.isdir(packer_logs):
         os.mkdir(packer_logs)
 
+    ami = locate_ami(credentials_config)
+
     cmd = """{packer} build
              {bastion} -var-file={credentials}
              -var-file={machine} -var 'name_suffix={name}'
              -var 'commit={commit}' -var 'force_deregister={deregister}'
-             -only={only} {packer_file}"""
+             -var 'aws_source_ami={ami}' -only={only} {packer_file}"""
     cmd_args = {
         "packer" : "packer",
         "bastion" : bastion_config if args.bastion else "",
@@ -130,6 +169,7 @@ if __name__ == '__main__':
         "packer_file" : packer_file,
         "name" : "-" + args.name,
         "commit" : git_hash,
+        "ami" : ami,
         "deregister" : "true" if args.name in ["test", "sandy"] else "false",
         "machine" : "" # replace for each call
     }

@@ -35,6 +35,7 @@ import json
 import scalyr
 import uuid
 from update_lambda_fcn import load_lambdas_on_s3
+import names
 
 
 # Region production is created in.  Later versions of boto3 should allow us to
@@ -111,7 +112,7 @@ def create_config(session, domain, keypair=None, user_data=None):
     config.add_arg(configuration.Arg.String("LambdaCacheExecutionRole", role,
                                             "IAM role for multilambda." + domain))
 
-    index_bucket_name = "cuboids." + domain
+    index_bucket_name = names.get_cuboid_bucket(domain)
     if not lib.s3_bucket_exists(session, index_bucket_name):
         config.add_s3_bucket("cuboidBucket", index_bucket_name)
     config.add_s3_bucket_policy(
@@ -119,8 +120,17 @@ def create_config(session, domain, keypair=None, user_data=None):
         ['s3:GetObject', 's3:PutObject'],
         { 'AWS': role})
 
+    tile_bucket_name = names.get_tile_bucket(domain)
+    print ("tile bucket name: " + tile_bucket_name)
+    if not lib.s3_bucket_exists(session, tile_bucket_name):
+        config.add_s3_bucket("tileBucket", tile_bucket_name)
+    config.add_s3_bucket_policy(
+        "tileBucketPolicy", tile_bucket_name,
+        ['s3:GetObject', 's3:PutObject'],
+        { 'AWS': role})
+
     config.add_ec2_instance("CacheManager",
-                                "cachemanager." + domain,
+                                names.get_cache_manager(domain),
                                 lib.ami_lookup(session, "cachemanager.boss"),
                                 keypair,
                                 subnet="InternalSubnet",
@@ -128,7 +138,7 @@ def create_config(session, domain, keypair=None, user_data=None):
                                 type_=CACHE_MANAGER_TYPE,
                                 security_groups=["InternalSecurityGroup"],
                                 user_data=parsed_user_data,
-                                role="cachemanager") # arn:aws:iam::256215146792:instance-profile/cachemanager"
+                                role="cachemanager")
 
     lambda_sec_group = lib.sg_lookup(session, vpc_id, 'internal.' + domain)
     filter_by_host_name = ([{
@@ -137,11 +147,12 @@ def create_config(session, domain, keypair=None, user_data=None):
     }])
     lambda_subnets = lib.multi_subnet_id_lookup(session, filter_by_host_name)
 
-    multi_lambda_name = 'multiLambda-' + domain.replace('.', '-')
+    multi_lambda_name = names.get_multi_lambda(domain).replace('.', '-')
+    lambda_bucket = lib.get_lambda_s3_bucket(session)
     config.add_lambda("MultiLambda",
                       multi_lambda_name,
                       "LambdaCacheExecutionRole",
-                      s3=("boss-lambda-env",
+                      s3=(lambda_bucket,
                           "multilambda.{}.zip".format(domain),
                           "local/lib/python3.4/site-packages/lambda/lambda_loader.handler"),
                       timeout=60,
@@ -164,7 +175,7 @@ def create_config(session, domain, keypair=None, user_data=None):
 
 def generate(folder, domain):
     """Create the configuration and save it to disk"""
-    name = lib.domain_to_stackname("cachedb." + domain)
+    name = lib.domain_to_stackname(names.get_cache_db(domain))
     config = create_config(None, domain)
     config.generate(name, folder)
 
@@ -177,7 +188,7 @@ def create(session, domain):
     # Configure Vault and create the user data config that the endpoint will
     # use for connecting to Vault and the DB instance
     user_data = configuration.UserData()
-    user_data["system"]["fqdn"] = "cachemanager." + domain
+    user_data["system"]["fqdn"] = names.get_cache_manager(domain)
     user_data["system"]["type"] = "cachemanager"
     user_data["aws"]["cache"] = "cache." + domain
     user_data["aws"]["cache-state"] = "cache-state." + domain
@@ -194,20 +205,20 @@ def create(session, domain):
     user_data["aws"]["s3-flush-queue"] = lib.sqs_lookup_url(session, s3flushqname)
     user_data["aws"]["s3-flush-deadletter-queue"] = lib.sqs_lookup_url(session, deadqname)
 
-    user_data["aws"]["cuboid_bucket"] = "cuboids." + domain
-    user_data["aws"]["s3-index-table"] = "s3index." + domain
+    user_data["aws"]["cuboid_bucket"] = names.get_cuboid_bucket(domain)
+    user_data["aws"]["s3-index-table"] = names.get_s3_index(domain)
 
     # SNS and Lambda names can't have periods.
-    sanitized_domain = domain.replace('.', '-')
+    multilambda = names.get_multi_lambda(domain).replace('.', '-')
     user_data["aws"]["sns-write-locked"] = '{{"Ref": "{}"}}'.format(WRITE_LOCK_SNS_PREFIX)
 
-    user_data["lambda"]["flush_function"] = "multiLambda-" + sanitized_domain
-    user_data["lambda"]["page_in_function"] = "multiLambda-" + sanitized_domain
+    user_data["lambda"]["flush_function"] = multilambda
+    user_data["lambda"]["page_in_function"] = multilambda
 
     keypair = lib.keypair_lookup(session)
 
     try:
-        name = lib.domain_to_stackname("cachedb." + domain)
+        name = lib.domain_to_stackname(names.get_cache_db(domain))
         pre_init(session, domain)
 
         config = create_config(session, domain, keypair, user_data)
@@ -227,13 +238,13 @@ def pre_init(session, domain):
     """Send spdb, bossutils, lambda, and lambda_utils to the lambda build
     server, build the lambda environment, and upload to S3.
     """
-    load_lambdas_on_s3(domain)
+    load_lambdas_on_s3(session, domain)
 
 def post_init(session, domain):
     print("post_init")
 
     # Tell Scalyr to get CloudWatch metrics for these instances.
-    instances = ["cachemanager." + domain]
+    instances = [names.get_cache_manager(domain)]
     scalyr.add_instances_to_scalyr(
         session, PRODUCTION_REGION, instances)
 
@@ -242,4 +253,4 @@ def post_init(session, domain):
 def delete(session, domain):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
     lib.delete_stack(session, domain, "cachedb")
-    lib.route53_delete_records(session, domain, "cachemanager." + domain)
+    lib.route53_delete_records(session, domain, names.get_cache_manager(domain))

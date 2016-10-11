@@ -29,6 +29,7 @@ import hosts
 import time
 import requests
 import scalyr
+import hvac
 
 import os
 import json
@@ -55,6 +56,7 @@ VAULT_CLUSTER_SIZE = { # Vault Cluster is a fixed size
     "development" : 1,
     "production": 3 # should be an odd number
 }
+
 
 def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, public=True, depends_on=None):
     security_groups = ["InternalSecurityGroup"]
@@ -151,6 +153,8 @@ runcmd:
     user_data["system"]["fqdn"] = "consul." + domain
     user_data["system"]["type"] = "consul"
     user_data["consul"]["cluster"] = str(configuration.get_scenario(CONSUL_CLUSTER_SIZE))
+    #consul_role = lib.role_arn_lookup(session, 'consul')
+    consul_role = lib.instance_profile_arn_lookup(session, 'consul')
     config.add_autoscale_group("Consul",
                                "consul." + domain,
                                lib.ami_lookup(session, "consul.boss"),
@@ -161,7 +165,7 @@ runcmd:
                                min = CONSUL_CLUSTER_SIZE,
                                max = CONSUL_CLUSTER_SIZE,
                                notifications = "DNSSNS",
-                               role = "arn:aws:iam::256215146792:instance-profile/consul",
+                               role = consul_role,
                                depends_on = ["DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
     user_data = configuration.UserData()
@@ -199,8 +203,8 @@ runcmd:
     if domain in hosts.BASE_DOMAIN_CERTS.keys():
         cert = lib.cert_arn_lookup(session, "auth." + hosts.BASE_DOMAIN_CERTS[domain])
     else:
-        cert = lib.cert_arn_lookup(session, "auth.integration.theboss.io")
-
+        cert = lib.cert_arn_lookup(session, "auth.{}.{}".format(domain.split(".")[0],
+                                                                hosts.DEV_DOMAIN))
     create_asg_elb(config,
                    "Auth",
                    "auth." + domain,
@@ -234,7 +238,8 @@ runcmd:
                       handler="index.handler",
                       timeout=10,
                       depends_on="DNSZone")
-    role = "arn:aws:iam::256215146792:role/UpdateRoute53"
+    role = lib.role_arn_lookup(session, 'UpdateRoute53')
+
     config.add_arg(configuration.Arg.String("DNSLambdaRole", role,
                                             "IAM role for Lambda dns." + domain))
 
@@ -285,11 +290,11 @@ runcmd:
 
     return config
 
-def upload_realm_config(port, password):
+def upload_realm_config(port, username, password, realm_username, realm_password):
     URL = "http://localhost:{}".format(port) # TODO move out of tunnel and use public address
 
     kc = lib.KeyCloakClient(URL)
-    kc.login("admin", password)
+    kc.login(username, password)
     if kc.token is None:
         print("Could not upload BOSS.realm configuration, exiting...")
         return
@@ -299,6 +304,14 @@ def upload_realm_config(port, password):
     print("Opening realm file at '{}'".format(realm_file))
     with open(realm_file, "r") as fh:
         realm = json.load(fh)
+
+    try:
+        realm["users"][0]["username"] = realm_username
+        realm["users"][0]["credentials"][0]["value"] = realm_password
+    except:
+        print("Could not set realm admin's username or password, not creating user")
+        if "users" in realm:
+            del realm["users"]
 
     kc.create_realm(realm)
     kc.logout()
@@ -310,22 +323,32 @@ def configure_keycloak(session, domain):
 
     if domain in hosts.BASE_DOMAIN_CERTS.keys():
         auth_domain = 'auth.' + hosts.BASE_DOMAIN_CERTS[domain]
-        auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_domain)
-        lib.set_domain_to_dns_name(session, auth_domain, auth_elb)
     else:
-        auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_elb)
+        auth_domain = 'auth.{}.{}'.format(domain.split(".")[0], hosts.DEV_DOMAIN)
+    auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_domain)
+    lib.set_domain_to_dns_name(session, auth_domain, auth_elb, lib.get_hosted_zone(session))
 
+    username = "admin"
     password = lib.generate_password()
+    realm_username = "bossadmin"
+    realm_password = lib.generate_password()
 
     call = lib.ExternalCalls(session, keypair, domain)
-
-    call.vault_write("secret/auth", password = password, username = "admin")
-    call.vault_update("secret/endpoint/auth", password = password, username = "admin")
+    print("about to write secret/auth")
+    call.vault_write("secret/auth", password = password, username = username, client_id = "admin-cli")
+    print("about to write secret/auth/realm")
+    call.vault_write("secret/auth/realm", username = realm_username, password = realm_password, client_id = "endpoint")
+    print("about to write secret/keycloak")
+    call.vault_update("secret/keycloak", password = password, username = username, client_id = "admin-cli", realm = "master")
+    print("about to write secret/endpoint/auth")
     call.vault_update("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
+    print("about to write secret/proofreader/auth")
     call.vault_update("secret/proofreader/auth", url = auth_discovery_url, client_id = "endpoint")
 
+    print("about to add bossadmin user to keycloak")
     call.set_ssh_target("auth")
-    call.ssh("/srv/keycloak/bin/add-user.sh -r master -u admin -p " + password)
+    call.ssh("/srv/keycloak/bin/add-user.sh -r master -u {} -p {}".format(username, password))
+    print("about to restarting keycloak")
     call.ssh("sudo service keycloak stop")
     time.sleep(2)
     call.ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
@@ -333,8 +356,10 @@ def configure_keycloak(session, domain):
     time.sleep(3)
     call.ssh("sudo service keycloak start")
     print("Waiting for Keycloak to restart")
-    time.sleep(75)
-    call.ssh_tunnel(lambda p: upload_realm_config(p, password), 8080)
+    time.sleep(100)
+
+    upload = lambda p: upload_realm_config(p, username, password, realm_username, realm_password)
+    call.ssh_tunnel(upload, 8080)
 
 def generate(folder, domain):
     """Create the configuration and save it to disk"""
@@ -352,8 +377,8 @@ def create(session, domain):
         vpc_id = lib.vpc_id_lookup(session, domain)
         lib.rt_name_default(session, vpc_id, "internal." + domain)
 
-        print("Waiting 1 minute for VMs to start...")
-        time.sleep(60)
+        print("Waiting 75 seconds for VMs to start...")
+        time.sleep(75)
         post_init(session, domain)
 
 def post_init(session, domain):
@@ -371,12 +396,14 @@ def post_init(session, domain):
             break
         except requests.exceptions.ConnectionError:
             time.sleep(30)
+        except hvac.exceptions.VaultDown:
+            time.sleep(30)
     if not initialized:
         print("Could not initialize Vault, manually call post-init before launching other machines")
         return
 
     print("Waiting for Keycloak to bootstrap")
-    time.sleep(75)
+    time.sleep(90)
 
     print("Configuring Keycloak...")
     configure_keycloak(session, domain)
@@ -390,5 +417,5 @@ def delete(session, domain):
     lib.route53_delete_records(session, domain, "auth." + domain)
     lib.route53_delete_records(session, domain, "consul." + domain)
     lib.route53_delete_records(session, domain, "vault." + domain)
-    lib.sns_unsubscribe_all(session, "dns." + domain)
+    lib.sns_unsubscribe_all(session, "dns." + domain, )
     lib.delete_stack(session, domain, "core")

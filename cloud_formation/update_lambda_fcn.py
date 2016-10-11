@@ -30,11 +30,14 @@ new zip in S3.
 import argparse
 import boto3
 import configuration
+import configparser
 import library as lib
+import names
 import os
 import shlex
 import sys
 import tempfile
+import hosts
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
 vault_dir = os.path.normpath(os.path.join(cur_dir, "..", "vault"))
@@ -42,13 +45,33 @@ sys.path.append(vault_dir)
 import bastion
 from ssh import *
 
+# This was an attempt to import CUBOIDSIZE from the spdb repo.  Can't import
+# without a compiling spdb's C library.
+#
+#SPDB_FOLDER = '../salt_stack/salt/spdb/files'
+#SPDB_REPO = os.path.normpath(os.path.join(cur_dir, SPDB_FOLDER + '/spdb.git'))
+#SPDB_LINK = os.path.normpath(os.path.join(cur_dir, SPDB_FOLDER + '/spdb'))
+# try:
+#     os.symlink(SPDB_REPO, SPDB_LINK, True)
+#     spdb_dir = os.path.normpath(os.path.join(cur_dir, SPDB_FOLDER))
+#     sys.path.append(spdb_dir)
+#     from spdb.c_lib.c_version.ndtype import CUBOIDSIZE
+# finally:
+#     os.remove(SPDB_LINK)
+
 AWS_REGION = 'us-east-1'
 
 # Name that is prepended to the domain name (periods are replaced with dashes).
 LAMBDA_PREFIX = 'multiLambda-'
 
 # Bucket that stores all of our lambda functions.
-S3_BUCKET = 'boss-lambda-env'
+S3_BUCKET = None
+
+# Location of settings files for ndingest.
+NDINGEST_SETTINGS_FOLDER = '../salt_stack/salt/ndingest/files/ndingest.git/settings'
+
+# Template used for ndingest settings.ini generation.
+NDINGEST_SETTINGS_TEMPLATE = NDINGEST_SETTINGS_FOLDER + '/settings.ini.apl'
 
 def get_lambda_name(domain):
     """Get the name of the lambda function as known to AWS.
@@ -84,7 +107,7 @@ def update_lambda_code(session, domain):
         Publish=True)
     print(resp)
 
-def load_lambdas_on_s3(domain):
+def load_lambdas_on_s3(session, domain):
     """Zip up spdb, bossutils, lambda and lambda_utils.  Upload to S3.
 
     Uses the lambda build server (an Amazon Linux AMI) to compile C code and
@@ -92,6 +115,7 @@ def load_lambdas_on_s3(domain):
     in S3.
 
     Args:
+        session (Session): boto3.Session
         domain (string): The VPC's domain name such as integration.boss.
     """
     tempname = tempfile.NamedTemporaryFile(delete=True)
@@ -107,6 +131,14 @@ def load_lambdas_on_s3(domain):
     lib.write_to_zip('lambda', zipname)
     lib.write_to_zip('lambdautils', zipname)
 
+    os.chdir(cwd)
+    with open(NDINGEST_SETTINGS_TEMPLATE, 'r') as tmpl:
+        # Generate settings.ini file for ndingest.
+        create_ndingest_settings(domain, tmpl)
+
+    os.chdir('../salt_stack/salt/ndingest/files')
+    lib.write_to_zip('ndingest.git', zipname)
+
     # Restore original working directory.
     os.chdir(cwd)
 
@@ -117,11 +149,16 @@ def load_lambdas_on_s3(domain):
     apl_bastion_key = os.environ.get("BASTION_KEY")
     apl_bastion_user = os.environ.get("BASTION_USER")
     local_port = bastion.locate_port()
-    proc = bastion.create_tunnel(apl_bastion_key, local_port, "52.23.27.39", 22, apl_bastion_ip, bastion_user="ubuntu")
-    scp_cmd = "scp -P {} {} {} ec2-user@localhost:sitezips/{}".format(local_port,
-                                                                      bastion.SSH_OPTIONS,
-                                                                      zipname,
-                                                                      domain + ".zip")
+    lambda_build_server = lib.get_lambda_server(session)
+    proc = bastion.create_tunnel(apl_bastion_key, local_port, lambda_build_server, 22, apl_bastion_ip, bastion_user="ubuntu")
+
+    # Note: using bastion key as identity for scp.
+    scp_cmd = "scp -i {} -P {} {} {} ec2-user@localhost:sitezips/{}".format(
+        apl_bastion_key,
+        local_port,
+        bastion.SSH_OPTIONS,
+        zipname,
+        domain + ".zip")
 
     try:
         return_code = subprocess.call(shlex.split(scp_cmd))  # close_fds=True, preexec_fn=bastion.become_tty_fg
@@ -131,13 +168,42 @@ def load_lambdas_on_s3(domain):
         proc.wait()
     os.remove(zipname)
 
+
     # This section will run makedomainenv on lambda-build-server however
     # running it this way seems to cause the virtualenv to get messed up.
     # Running this script manually on the build server does not have the problem.
     print("calling makedomainenv on lambda-build-server")
     #cmd = "\"shopt login_shell\""
     cmd = "\"source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {}\"".format(domain)
-    ssh(apl_bastion_key, "52.23.27.39", "ec2-user", cmd)
+    lambda_build_server = lib.get_lambda_server(session)
+
+    ssh(apl_bastion_key, lambda_build_server, "ec2-user", cmd)
+
+def create_ndingest_settings(domain, fp):
+    """Create the settings.ini file for ndingest.
+
+    The file is placed in ndingest's settings folder.j
+
+    Args:
+        domain (string): The VPC's domain name such as integration.boss.
+        fp (file-like object): File like object to read settings.ini template from.
+    """
+    parser = configparser.ConfigParser()
+    parser.read_file(fp)
+
+    parser['boss']['domain'] = domain
+
+    parser['aws']['tile_bucket'] = names.get_tile_bucket(domain)
+    parser['aws']['cuboid_bucket'] = names.get_cuboid_bucket(domain)
+    parser['aws']['tile_index_table'] = names.get_tile_index(domain)
+    parser['aws']['cuboid_index_table'] = names.get_s3_index(domain)
+
+    # parser['spdb']['SUPER_CUBOID_SIZE'] = CUBOIDSIZE[0]
+    # ToDo: find way to always get cuboid size from spdb.
+    parser['spdb']['SUPER_CUBOID_SIZE'] = '512, 512, 16'
+
+    with open(NDINGEST_SETTINGS_FOLDER + '/settings.ini', 'w') as out:
+        parser.write(out)
 
 def create_session(credentials):
     """Read the AWS from the credentials dictionary and then create a boto3
@@ -193,6 +259,7 @@ if __name__ == '__main__':
         credentials = json.load(args.aws_credentials)
 
     session = create_session(credentials)
+    S3_BUCKET = lib.get_lambda_s3_bucket(session)
 
-    load_lambdas_on_s3(args.domain)
+    load_lambdas_on_s3(session, args.domain)
     update_lambda_code(session, args.domain)

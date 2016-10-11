@@ -42,6 +42,8 @@ from urllib.parse import urlencode
 from urllib.error import HTTPError
 from botocore.exceptions import ClientError
 import zipfile
+import hosts
+import re
 
 # Add a reference to boss-manage/vault/ so that we can import those files
 cur_dir = os.path.dirname(os.path.realpath(__file__))
@@ -49,6 +51,7 @@ vault_dir = os.path.normpath(os.path.join(cur_dir, "..", "vault"))
 sys.path.append(vault_dir)
 import bastion
 import vault
+
 
 
 def zip_directory(directory, name = "lambda"):
@@ -717,7 +720,7 @@ def _find(xs, predicate):
     return None
 
 
-def ami_lookup(session, ami_name):
+def ami_lookup(session, ami_name, version = None):
     """Lookup the Id for the AMI with the given name.
 
     If ami_name ends with '.boss', the AMI_VERSION environmental variable is used
@@ -728,6 +731,8 @@ def ami_lookup(session, ami_name):
         session (Session|None) : Boto3 session used to lookup information in AWS
                                  If session is None no lookup is performed
         ami_name (string) : Name of AMI to lookup
+        version (string|None) : Overrides the AMI_VERSION environment variable
+                                used to specify a specific version of an AMI
 
     Returns:
         (tuple|None) : Tuple of strings (AMI ID, Commit hash of AMI build) or None
@@ -736,18 +741,26 @@ def ami_lookup(session, ami_name):
     if session is None:
         return None
 
+    specific = False
     if ami_name.endswith(".boss"):
-        ami_version = os.environ["AMI_VERSION"]
+        ami_version = os.environ["AMI_VERSION"] if version is None else version
         if ami_version == "latest":
             # limit latest searching to only versions tagged with hash information
-            ami_name += "-h*"
+            ami_search = ami_name + "-h*"
         else:
-            ami_name += "-" + ami_version
+            ami_search = ami_name + "-" + ami_version
+            specific = True
+    else:
+        ami_search = ami_name
 
     client = session.client('ec2')
-    response = client.describe_images(Filters=[{"Name": "name", "Values": [ami_name]}])
+    response = client.describe_images(Filters=[{"Name": "name", "Values": [ami_search]}])
     if len(response['Images']) == 0:
-        return None
+        if specific:
+            print("Could not locate AMI '{}', trying to find the latest '{}' AMI".format(ami_search, ami_name))
+            return ami_lookup(session, ami_name, version = "latest")
+        else:
+            return None
     else:
         response['Images'].sort(key=lambda x: x["CreationDate"], reverse=True)
         image = response['Images'][0]
@@ -843,7 +856,7 @@ def rt_name_default(session, vpc_id, new_rt_name):
     response = rt.create_tags(Tags=[{"Key": "Name", "Value": new_rt_name}])
 
 
-def peering_lookup(session, from_id, to_id, owner_id="256215146792"):
+def peering_lookup(session, from_id, to_id, owner_id=None):
     """Lookup the Id for the Peering Connection between the two VPCs.
 
     Args:
@@ -853,7 +866,9 @@ def peering_lookup(session, from_id, to_id, owner_id="256215146792"):
                            made (Requester)
         to_id (string) : VPC ID of the VPC to which the Peering Connection is made
                          (Accepter)
-        owner_id (string) : Account ID that owns both of the VPCs that are connected
+        owner_id (string) : Account ID that owns both of the VPCs that are connected.
+                            If None is provided the Account ID will be looked up from
+                            the session.
 
     Returns:
         (string|None) : Peering Connection ID or None if the Peering Connection
@@ -861,6 +876,9 @@ def peering_lookup(session, from_id, to_id, owner_id="256215146792"):
     """
     if session is None:
         return None
+
+    if owner_id is None:
+        owner_id = get_account_id_from_session(session)
 
     client = session.client('ec2')
     response = client.describe_vpc_peering_connections(Filters=[{"Name": "requester-vpc-info.vpc-id",
@@ -977,6 +995,10 @@ def cert_arn_lookup(session, domain_name):
     for certs in response['CertificateSummaryList']:
         if certs['DomainName'] == domain_name:
             return certs['CertificateArn']
+        if certs['DomainName'].startswith('*'):    # if it is a wildcard domain like "*.thebossdev.io"
+            cert_name = certs['DomainName'][1:] + '$'
+            if re.search(cert_name, domain_name) != None:
+                return certs['CertificateArn']
     return None
 
 
@@ -1106,7 +1128,7 @@ def sqs_lookup_url(session, queue_name):
     resp = client.get_queue_url(QueueName=queue_name)
     return resp['QueueUrl']
 
-def request_cert(session, domain_name, validation_domain='theboss.io'):
+def request_cert(session, domain_name, validation_domain):
     """Requests a certificate in the AWS Certificate Manager for the domain name
 
     Args:
@@ -1134,8 +1156,25 @@ def request_cert(session, domain_name, validation_domain='theboss.io'):
                                           DomainValidationOptions=validation_options)
     return response
 
+def get_hosted_zone(session):
+    """
+    Get hosted zone by looking up account name and using that to tell which
+     zone to return.
+    Args:
+        session: Boto3 Session
 
-def get_hosted_zone_id(session, hosted_zone='theboss.io'):
+    Returns:
+        Hosted zone name.
+    """
+    account = get_account_id_from_session(session)
+    if account == hosts.PROD_ACCOUNT:
+        return hosts.PROD_DOMAIN
+    elif account == hosts.DEV_ACCOUNT:
+        return hosts.DEV_DOMAIN
+    else:
+        return None
+
+def get_hosted_zone_id(session, hosted_zone):
     """Look up Hosted Zone ID by DNS Name
 
     Args:
@@ -1161,8 +1200,7 @@ def get_hosted_zone_id(session, hosted_zone='theboss.io'):
     else:
         return None
 
-
-def set_domain_to_dns_name(session, domain_name, dns_resource, hosted_zone='theboss.io'): # TODO move into CF config??
+def set_domain_to_dns_name(session, domain_name, dns_resource, hosted_zone):
     """Look up Hosted Zone ID by DNS Name
 
     Args:
@@ -1254,7 +1292,7 @@ def route53_delete_records(session, hosted_zone, cname):
     )
     return response
 
-def sns_unsubscribe_all(session, topic, region="us-east-1", account="256215146792"):
+def sns_unsubscribe_all(session, topic, region="us-east-1", account=None):
     """Unsubscribe all subscriptions for the given SNS topic
 
     Args:
@@ -1262,10 +1300,14 @@ def sns_unsubscribe_all(session, topic, region="us-east-1", account="25621514679
                                  If session is None no delete is performed
         topic (string) : Name of the SNS topic
         region (string) : AWS region where SNS topic resides
-        account (string) : AWS account ID
+        account (string) : AWS account ID.  If None is provided the account ID
+                           will be looked up from the session object using iam
     """
     if session is None:
         return None
+
+    if account is None:
+        account = get_account_id_from_session(session)
 
     topic = "arn:aws:sns:{}:{}:{}".format(region, account, topic.replace(".", "-"))
 
@@ -1277,6 +1319,29 @@ def sns_unsubscribe_all(session, topic, region="us-east-1", account="25621514679
             client.unsubscribe(SubscriptionArn=res['SubscriptionArn'])
 
     return None
+
+
+def sns_create_topic(session, topic):
+    """
+        Creates a new Topic
+    Args:
+        session:
+        topic:
+
+    Returns:
+         TopicArn or None
+    """
+    if session is None:
+        return None
+
+    client = session.client("sns")
+    response = client.create_topic(Name=topic)
+    print(response)
+    if response is None:
+        return None
+    else:
+        return response['TopicArn']
+
 
 def role_arn_lookup(session, role_name):
     """
@@ -1298,6 +1363,28 @@ def role_arn_lookup(session, role_name):
         return None
     else:
         return response['Role']['Arn']
+
+def instance_profile_arn_lookup(session, instance_profile_name):
+    """
+    Returns the arn associated the the role name.
+    Using this method avoids hardcoding the aws account into the arn name.
+    Args:
+        session:
+        role_name:
+
+    Returns:
+
+    """
+    if session is None:
+        return None
+
+    client = session.client('iam')
+    response = client.get_instance_profile(InstanceProfileName=instance_profile_name)
+    if response is None:
+        return None
+    else:
+        return response['InstanceProfile']['Arn']
+
 
 def write_zip_file(full_path, zipfile_instance):
     """
@@ -1368,3 +1455,53 @@ def s3_bucket_exists(session, name):
             return True
 
     return False
+
+def get_account_id_from_session(session):
+    """
+    gets the account id from the session using the iam client.  This method will work even
+    if you have assumed a role in another account.
+    Args:
+        session (Session): Boto3 session used to lookup information in AWS.
+    Returns:
+        (str) AWS account id
+    """
+
+    if session is None:
+        return None
+
+    return session.client('iam').list_users(MaxItems=1)["Users"][0]["Arn"].split(':')[4]
+
+
+def get_lambda_s3_bucket(session):
+    '''
+    returns the lambda bucket based on the session
+    Args:
+        session:
+
+    Returns:
+        (str) bucket name to store lambdas
+    '''
+    account = get_account_id_from_session(session)
+    if account == hosts.PROD_ACCOUNT:
+        return hosts.PROD_LAMBDA_BUCKET
+    elif account == hosts.DEV_ACCOUNT:
+        return hosts.DEV_LAMBDA_BUCKET
+    else:
+        raise NameError("Unknown session account used, {}, S3_BUCKET for Lambda unknown.".format(account))
+
+def get_lambda_server(session):
+    '''
+    returns the lambda server based on the session
+    Args:
+        session:
+
+    Returns:
+        (str) build server for lambdas
+    '''
+    account = get_account_id_from_session(session)
+    if account == hosts.PROD_ACCOUNT:
+        return hosts.PROD_LAMBDA_SERVER
+    elif account == hosts.DEV_ACCOUNT:
+        return hosts.DEV_LAMBDA_SERVER
+    else:
+        raise NameError("Unknown session account used, {}, lambda_build_server for this session is unknown.".format(account))
