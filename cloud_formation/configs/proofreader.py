@@ -128,7 +128,7 @@ def create(session, domain):
     user_data["system"]["fqdn"] = "proofreader-web." + domain
     user_data["system"]["type"] = "proofreader-web"
     user_data["aws"]["db"] = "proofreader-db." + domain
-    user_data["auth"]["OIDC_VERIFY_SSL"] = str(domain in hosts.BASE_DOMAIN_CERTS.keys())  # TODO SH change to True once we get wildcard domain working correctly
+    user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
     user_data = str(user_data)
 
 
@@ -164,7 +164,7 @@ def post_init(session, domain):
     call = lib.ExternalCalls(session, keypair, domain)
     creds = call.vault_read("secret/auth")
 
-    print("Configuring KeyCloak") # Should abstract for production and proofreader
+    print("Configuring KeyCloak") # Should abstract for api and proofreader
     def configure_auth(auth_port):
         # NOTE DP: If an ELB is created the public_uri should be the Public DNS Name
         #          of the ELB. Endpoint Django instances may have to be restarted if running.
@@ -194,10 +194,10 @@ def post_init(session, domain):
     if domain in hosts.BASE_DOMAIN_CERTS.keys():
         elb = "auth." + hosts.BASE_DOMAIN_CERTS[domain]
     else:
-        elb = "auth.{}.{}".format(domain.split(".")[0],
+        elb = "auth-{}.{}".format(domain.split(".")[0],
                                   hosts.DEV_DOMAIN)
 
-    kc = lib.KeyCloakClient("https://{}:{}".format(elb, 443), verify_ssl=False)
+    kc = lib.KeyCloakClient("https://{}:{}".format(elb, 443))
     kc.login(creds["username"], creds["password"])
     client_install = kc.get_client_installation_url("BOSS", "endpoint")
 

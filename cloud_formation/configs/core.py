@@ -203,7 +203,7 @@ runcmd:
     if domain in hosts.BASE_DOMAIN_CERTS.keys():
         cert = lib.cert_arn_lookup(session, "auth." + hosts.BASE_DOMAIN_CERTS[domain])
     else:
-        cert = lib.cert_arn_lookup(session, "auth.{}.{}".format(domain.split(".")[0],
+        cert = lib.cert_arn_lookup(session, "auth-{}.{}".format(domain.split(".")[0],
                                                                 hosts.DEV_DOMAIN))
     create_asg_elb(config,
                    "Auth",
@@ -324,7 +324,7 @@ def configure_keycloak(session, domain):
     if domain in hosts.BASE_DOMAIN_CERTS.keys():
         auth_domain = 'auth.' + hosts.BASE_DOMAIN_CERTS[domain]
     else:
-        auth_domain = 'auth.{}.{}'.format(domain.split(".")[0], hosts.DEV_DOMAIN)
+        auth_domain = 'auth-{}.{}'.format(domain.split(".")[0], hosts.DEV_DOMAIN)
     auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_domain)
     lib.set_domain_to_dns_name(session, auth_domain, auth_elb, lib.get_hosted_zone(session))
 
