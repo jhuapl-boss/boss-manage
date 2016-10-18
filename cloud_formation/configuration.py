@@ -1290,7 +1290,9 @@ class CloudFormationConfiguration:
         if internal_dns:
             self._add_record_cname(key, name, elb = True)
 
-    def add_autoscale_group(self, key, hostname, ami, keypair, subnets=["Subnet"], type_="t2.micro", public_ip=False, security_groups=[], user_data=None, min=1, max=1, elb=None, notifications=None, role=None, depends_on=None):
+    def add_autoscale_group(self, key, hostname, ami, keypair, subnets=["Subnet"], type_="t2.micro", public_ip=False,
+                            security_groups=[], user_data=None, min=1, max=1, elb=None, notifications=None,
+                            notifications_arn=False, role=None, health_check_grace_period=30, depends_on=None):
         """Add an AutoScalingGroup to the configuration
 
         Args:
@@ -1305,6 +1307,10 @@ class CloudFormationConfiguration:
             min (int|string) : The minimimum number of instances in the AutoScalingGroup
             max (int|string) : The maximum number of instances in the AutoScalingGroup
             elb (None|string) : The unique name of a LoadBalancer within the configuration to attach the AutoScalingGroup to
+            notifications (None|List|string) : list of topic references or a single topic reference, or a Arn of a topic already created.
+            notifications_arn (bool) : False then the notifications contains topic reference, True notifications contains Arn of already created topic
+            role (None|string) : Role name to use when creating instances
+            health_check_grace_period (int) : grace period in seconds to wait before checking newly created instances.
             depends_on (None|string|list): A unique name or list of unique names of resources within the
                                            configuration and is used to determine the launch order of resources
         """
@@ -1313,7 +1319,7 @@ class CloudFormationConfiguration:
             "Properties" : {
                 #"DesiredCapacity" : get_scenario(min, 1), Initial capacity, will min size also ensure the size on startup?
                 "HealthCheckType" : "EC2" if elb is None else "ELB",
-                "HealthCheckGracePeriod" : 30, # seconds
+                "HealthCheckGracePeriod" : health_check_grace_period, # seconds
                 "LaunchConfigurationName" : { "Ref": key + "Configuration" },
                 "LoadBalancerNames" : [] if elb is None else [{ "Ref": elb }],
                 "MaxSize" : str(get_scenario(max, 1)),
@@ -1349,7 +1355,7 @@ class CloudFormationConfiguration:
                         "autoscaling:EC2_INSTANCE_TERMINATE_ERROR",
                         "autoscaling:TEST_NOTIFICATION"
                     ],
-                    "TopicARN" : {"Ref": topic}
+                    "TopicARN" : {"Ref": topic} if not notifications_arn else topic
                 } for topic in notifications
             ]
 
@@ -1757,112 +1763,6 @@ class CloudFormationConfiguration:
             }
         }
 
-    # XXX DP: Does this work, it looks like the keys topicMicronList and snspolicyMicronList should be self.resources keys, not subkeys
-    # TODO clean up function and make generic, right now topic_name is not used and there are hardcoded email addresses
-    def _add_sns_topic(self, key, topic_name, depends_on=None ):
-        """ Add alarms for Loadbalancer
-        :arg key is the unique name (within the configuration) for this resource
-        :arg name is the name to give the
-        :arg depends_on is a list of resources this loadbalancer depends on
-        """
-        self.resources[key] = {
-            "topicMicronList": {
-                  "Type": "AWS::SNS::Topic",
-                  "Properties": {
-                    "DisplayName": "MicronList",
-                    "Subscription": [
-                      {
-                        "Endpoint": "13012544552",
-                        "Protocol": "sms"
-                      },
-                      {
-                        "Endpoint": "sandy.hider@jhuapl.edu",
-                        "Protocol": "email"
-                      }
-                    ]
-                  }
-                },
-                "snspolicyMicronList": {
-                  "Type": "AWS::SNS::TopicPolicy",
-                  "Properties": {
-                    "Topics": [
-                      {
-                        "Ref": "topicMicronList"
-                      }
-                    ],
-                    "PolicyDocument": {
-                      "Version": "2008-10-17",
-                      "Id": "__default_policy_ID",
-                      "Statement": [
-                        {
-                          "Sid": "__default_statement_ID",
-                          "Effect": "Allow",
-                          "Principal": {
-                            "AWS": "*"
-                          },
-                          "Action": [
-                            "SNS:ListSubscriptionsByTopic",
-                            "SNS:Subscribe",
-                            "SNS:DeleteTopic",
-                            "SNS:GetTopicAttributes",
-                            "SNS:Publish",
-                            "SNS:RemovePermission",
-                            "SNS:AddPermission",
-                            "SNS:Receive",
-                            "SNS:SetTopicAttributes"
-                          ],
-                          "Resource": {
-                            "Ref": "topicMicronList"
-                          },
-                          "Condition": {
-                            "StringEquals": {
-                              "AWS:SourceOwner": "256215146792"
-                            }
-                          }
-                        },
-                        {
-                          "Sid": "__console_pub_0",
-                          "Effect": "Allow",
-                          "Principal": {
-                            "AWS": "*"
-                          },
-                          "Action": "SNS:Publish",
-                          "Resource": {
-                            "Ref": "topicMicronList"
-                          }
-                        },
-                        {
-                          "Sid": "__console_sub_0",
-                          "Effect": "Allow",
-                          "Principal": {
-                            "AWS": "*"
-                          },
-                          "Action": [
-                            "SNS:Subscribe",
-                            "SNS:Receive"
-                          ],
-                          "Resource": {
-                            "Ref": "topicMicronList"
-                          },
-                          "Condition": {
-                            "StringEquals": {
-                              "SNS:Protocol": [
-                                "application",
-                                "sms",
-                                "email"
-                              ]
-                            }
-                          }
-                        }
-                      ]
-                    }
-                  }
-                }
-
-
-        }
-        if depends_on is not None:
-            self.resources[key]["DependsOn"] = depends_on
 
     def add_sqs_queue(self, key, name, hide=30, retention=5760, dead=None):
         """Create a SQS Queue
