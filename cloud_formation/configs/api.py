@@ -49,16 +49,10 @@ VAULT_DJANGO = "secret/endpoint/django"
 VAULT_DJANGO_DB = "secret/endpoint/django/db"
 VAULT_DJANGO_AUTH = "secret/endpoint/auth"
 
-ENDPOINT_TYPE = {
+ENDPONT_TYPE = {
     "development": "t2.small",
     "production": "m4.large",
 }
-
-ENDPOINT_CLUSTER_SIZE = {
-    "development": 1,
-    "production": 1,
-}
-
 
 RDS_TYPE = {
     "development": "db.t2.micro",
@@ -74,7 +68,6 @@ REDIS_CLUSTER_SIZE = {
     "development": 1,
     "production": 2,
 }
-
 
 # Prefixes uses to generate names of SQS queues.
 S3FLUSH_QUEUE_PREFIX = 'S3flush.'
@@ -158,37 +151,25 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
         [{'Ref': deadqname}, {'Ref': s3flushqname}],
         cachemanager_role_arn)
 
-    dns_arn = lib.sns_topic_lookup(session, 'dns-' + domain.replace(".", "-"))
-    if dns_arn is None:
-        raise Exception("SNS topic named dns." + domain + " does not exist.")
-
-    security_groups = ["InternalSecurityGroup"]
-    endpoint_role = lib.instance_profile_arn_lookup(session, 'endpoint')
-    config.add_autoscale_group("Endpoint",
-                               "endpoint." + domain,
-                               lib.ami_lookup(session, "endpoint.boss"),
-                               keypair,
-                               subnets=az_subnets,
-                               type_=ENDPOINT_TYPE,
-                               security_groups=security_groups,
-                               user_data=parsed_user_data,
-                               min=ENDPOINT_CLUSTER_SIZE,
-                               max=ENDPOINT_CLUSTER_SIZE,
-                               elb="EndpointLoadBalancer",
-                               notifications=dns_arn,
-                               notifications_arn=True,
-                               role=endpoint_role,
-                               health_check_grace_period=90,
-                               depends_on=["EndpointLoadBalancer", "EndpointDB"])
-
-    security_groups.extend(["AllHTTPSSecurityGroup"])
-    config.add_loadbalancer("EndpointLoadBalancer",
+    config.add_loadbalancer("LoadBalancer",
                             "elb." + domain,
                             [("443", "80", "HTTPS", cert)],
+                            ["Endpoint"],
                             subnets=external_subnets,
-                            security_groups=security_groups,
-                            public=True,
+                            security_groups=["AllHTTPSSecurityGroup"],
                             depends_on=["AllHTTPSSecurityGroup"])
+
+    config.add_ec2_instance("Endpoint",
+                            "endpoint." + domain,
+                            lib.ami_lookup(session, "endpoint.boss"),
+                            keypair,
+                            subnet="ExternalSubnet",
+                            public_ip=True,
+                            type_=ENDPONT_TYPE,
+                            security_groups=["InternalSecurityGroup"],
+                            user_data=parsed_user_data,
+                            role="endpoint",
+                            depends_on="EndpointDB") # make sure the DB is launched before we start
 
     config.add_rds_db("EndpointDB",
                       "endpoint-db." + domain,
