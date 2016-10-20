@@ -55,8 +55,14 @@ from boto3.session import Session
 import json
 import vault
 
+cur_dir = os.path.dirname(os.path.realpath(__file__))
+lib_dir = os.path.normpath(os.path.join(cur_dir, "..", "lib"))
+sys.path.append(lib_dir)
+from exceptions import SSHError, SSHTunnelError
+
 # Needed to prevent ssh from asking about the fingerprint from new machines
 SSH_OPTIONS = "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -q"
+TUNNEL_SLEEP = 10 # seconds
 
 def create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user="ec2-user", bastion_port=22):
     """Create a SSH tunnel.
@@ -86,7 +92,7 @@ def create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_u
                                  bastion_ip)
 
     proc = subprocess.Popen(shlex.split(fwd_cmd))
-    time.sleep(5) # wait for the tunnel to be setup
+    #time.sleep(5) # wait for the tunnel to be setup
     return proc
 
 def create_tunnel_aplnis(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user="ec2-user"):
@@ -115,15 +121,27 @@ def create_tunnel_aplnis(key, local_port, remote_ip, remote_port, bastion_ip, ba
     apl_bastion_key = os.environ.get("BASTION_KEY")
     apl_bastion_user = os.environ.get("BASTION_USER")
 
+    def check_tunnel(p):
+        try:
+            r = p.wait(TUNNEL_SLEEP)
+            if r == 255:
+                raise SSHError("Error establishing a SSH tunnel")
+            else:
+                raise SSHTunnelError("SSH tunnel exited with error code {}".format(ret))
+        except subprocess.TimeoutExpired:
+            pass # process is still running, tunnel is up
+
     if apl_bastion_ip is None or apl_bastion_key is None or apl_bastion_user is None:
         # traffic
         # localhost -> bastion -> remote
         print("Bastion information not defined, connecting directly")
-        return create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user)
+        proc = create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user)
+        check_tunnel(proc)
+        return proc
     else:
         # traffic
         # localhost -> apl_bastion -> bastion -> remote
-        print("Using Bastion host at {}".format(apl_bastion_ip))
+        #print("Using Bastion host at {}".format(apl_bastion_ip))
         wrapper = ProcWrapper()
         port = locate_port()
 
@@ -133,13 +151,21 @@ def create_tunnel_aplnis(key, local_port, remote_ip, remote_port, bastion_ip, ba
         # Open up a SSH tunnel to bastion_ip:22 through apl_bastion_ip
         # (to allow the second tunnel to be created)
         proc = create_tunnel(apl_bastion_key, port, bastion_ip, 22, apl_bastion_ip, apl_bastion_user)
+        check_tunnel(proc)
         wrapper.prepend(proc)
 
-        # Create our normal tunnel, but connect to localhost:port to use the
-        # first tunnel that we create
-        proc = create_tunnel(key, local_port, remote_ip, remote_port, "localhost", bastion_user, port)
-        wrapper.prepend(proc)
-        return wrapper
+        try:
+            # Create our normal tunnel, but connect to localhost:port to use the
+            # first tunnel that we create
+            proc = create_tunnel(key, local_port, remote_ip, remote_port, "localhost", bastion_user, port)
+            check_tunnel(proc)
+            wrapper.prepend(proc)
+            return wrapper
+        except:
+            # close the initial tunnel
+            wrapper.terminate()
+            wrapper.wait()
+            raise # raise initial exception
 
 class ProcWrapper(list):
     """Wrapper that holds multiple Popen objects and can call
@@ -181,6 +207,10 @@ def become_tty_fg():
     os.tcsetpgrp(tty, os.getpgrp())
     signal.signal(signal.SIGTTOU, hdlr)
 
+def check_ssh(ret):
+    if ret == 255:
+        raise SSHError("Error establishing a SSH connection")
+
 def ssh(key, remote_ip, bastion_ip):
     """Create SSH tunnel(s) through bastion machine(s) and start a foreground
     SSH process.
@@ -202,6 +232,8 @@ def ssh(key, remote_ip, bastion_ip):
     proc = create_tunnel_aplnis(key, ssh_port, remote_ip, 22, bastion_ip)
     try:
         ret = subprocess.call(shlex.split(ssh_cmd), close_fds=True, preexec_fn=become_tty_fg)
+        check_ssh(ret)
+        return ret
     finally:
         proc.terminate()
         proc.wait()
@@ -233,6 +265,8 @@ def ssh_cmd(key, remote_ip, bastion_ip, command = None):
     proc = create_tunnel_aplnis(key, ssh_port, remote_ip, 22, bastion_ip)
     try:
         ret = subprocess.call(shlex.split(ssh_cmd_str))
+        check_ssh(ret)
+        return ret
     finally:
         proc.terminate()
         proc.wait()
@@ -275,7 +309,7 @@ def ssh_tunnel(key, remote_ip, bastion_ip, port = None, local_port = None, cmd =
             print("Connect to localhost:{} to be forwarded to {}:{}".format(local_port, remote_ip, port))
             input("Waiting to close tunnel...")
         else:
-            cmd(local_port)
+            return cmd(local_port)
     finally:
         proc.terminate()
         proc.wait()
@@ -415,7 +449,7 @@ if __name__ == "__main__":
         return "\n" + header + "\n" + \
                "\n".join(map(lambda x: "  " + x, options)) + "\n"
 
-    commands = ["ssh", "ssh-cmd", "ssh-tunnel"]
+    commands = ["ssh", "ssh-cmd", "ssh-tunnel", "ssh-all"]
     commands.extend(vault.COMMANDS.keys())
     commands_help = create_help("command supports the following:", commands)
 
@@ -475,6 +509,12 @@ if __name__ == "__main__":
         ssh_cmd(args.ssh_key, private, bastion, *args.arguments)
     elif args.command in ("ssh-tunnel",):
         ssh_tunnel(args.ssh_key, private, bastion, *args.arguments)
+    elif args.command in ("ssh-all",):
+        addrs = machine_lookup_all(session, args.internal, public_ip=False)
+        for addr in addrs:
+            print("{} at {}".format(args.internal, addr))
+            ssh_cmd(args.ssh_key, addr, bastion, *args.arguments)
+            print()
     elif args.command in vault.COMMANDS:
         connect_vault(args.ssh_key, private, bastion, lambda: vault.COMMANDS[args.command](args.internal, private, *args.arguments))
     else:
