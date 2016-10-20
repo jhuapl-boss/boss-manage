@@ -52,7 +52,14 @@ sys.path.append(vault_dir)
 import bastion
 import vault
 
+def get_command(action=None):
+    argv = sys.argv[:]
+    if action:
+        # DP HACK: hardcoded list of supported actions, should figure out something else
+        actions = ["create", "update", "delete", "post-init", "pre-init", "generate"]
+        argv = [action if a in actions else a for a in argv]
 
+    return " ".join(argv)
 
 def zip_directory(directory, name = "lambda"):
     target = os.path.join(tempfile.mkdtemp(), name)
@@ -494,6 +501,21 @@ class ExternalCalls:
         self.domain = domain
         self.ssh_target = None
 
+    def vault_check(self, timeout=None):
+        """Vault status check to see if Vault is accessible
+        """
+        def delegate():
+            sleep = 15
+            for i in range(timeout):
+                if vault.vault_status_check(machine=self.vault_hostname, ip=self.vault_ip):
+                    return True
+                time.sleep(sleep)
+
+            #raise Exception("Cannot connect to Vault after {} seconds".format(sleep * timeout))
+            return False
+
+        return bastion.connect_vault(self.keypair_file, self.vault_ip, self.bastion_ip, delegate)
+
     def vault_init(self):
         """Initialize and configure all of the vault servers.
 
@@ -509,6 +531,18 @@ class ExternalCalls:
         for ip in vaults[1:]:
             connect(ip, lambda: vault.vault_unseal(machine=self.vault_hostname, ip=ip))
 
+    def vault_unseal(self):
+        """Unseal all of the vault servers.
+
+        Lookup all vault IPs for the VPC and unseal each server.
+        """
+        vaults = bastion.machine_lookup_all(self.session, self.vault_hostname, public_ip=False)
+
+        def connect(ip, func):
+            bastion.connect_vault(self.keypair_file, ip, self.bastion_ip, func)
+
+        for ip in vaults:
+            connect(ip, lambda: vault.vault_unseal(machine=self.vault_hostname, ip=ip))
 
     def vault(self, cmd, *args, **kwargs):
         """Call the specified vault command (from vault.py) with the given arguments
@@ -622,6 +656,42 @@ class ExternalCalls:
                                   local_port,
                                   cmd)
 
+    def keycloak_check(self, timeout=None):
+        """Keycloak status check to see if Keycloak is accessible
+        """
+        def delegate(port):
+            # Could move to connecting through the ELB, but then KC will have to be healthy
+            URL = "http://localhost:{}/auth/".format(port)
+
+            sleep = 15
+            for i in range(timeout):
+                res = urlopen(URL)
+                if res.getcode() == 200:
+                    return True
+                time.sleep(sleep)
+
+            #raise Exception("Cannot connect to Keycloak after {} seconds".format(sleep * timeout))
+            return False
+
+        self.set_ssh_target("auth")
+        return self.ssh_tunnel(delegate, 8080)
+
+def asg_restart(session, hostname, timeout):
+    """Terminate all of the instances for an ASG, with the given timeout between
+    each termination.
+    """
+    client = session.client('ec2')
+    resource = session.resource('ec2')
+    response = client.describe_instances(Filters=[{"Name":"tag:Name", "Values":[hostname]},
+                                                  {"Name":"instance-state-name", "Values":["running"]}])
+
+    for reservation in response['Reservations']:
+        for instance in reservation['Instances']:
+            id = instance['InstanceId']
+            print("Terminating {} instance {}".format(hostname, id))
+            resource.Instance(id).terminate()
+            print("Sleeping for {} minutes".format(timeout/60.0))
+            time.sleep(timeout)
 
 def vpc_id_lookup(session, vpc_domain):
     """Lookup the Id for the VPC with the given domain name.

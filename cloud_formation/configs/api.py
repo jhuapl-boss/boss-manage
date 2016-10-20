@@ -322,19 +322,24 @@ def post_init(session, domain):
 
     call.set_ssh_target("endpoint")
     print("Create settings.ini for ndingest")
-    call.ssh("sudo python3 /srv/salt/ndingest/build_settings.py")
+    ret = call.ssh("sudo python3 /srv/salt/ndingest/build_settings.py")
+    if ret != 0:
+        print("Building ndingest setttings file failed")
 
     print("Initializing Django")  # Should create ssh call with array of commands
     call.set_ssh_target("endpoint")
-    migrate_cmd = "sudo python3 /srv/www/django/manage.py "
-    call.ssh(migrate_cmd + "makemigrations")  #
-    call.ssh(migrate_cmd + "makemigrations bosscore")  # will hang if it cannot contact the auth server
-    call.ssh(migrate_cmd + "makemigrations bossoidc")
-    call.ssh(migrate_cmd + "makemigrations bossingest")
-    call.ssh(migrate_cmd + "migrate")
-    call.ssh(migrate_cmd + "collectstatic --no-input")
-    # http://stackoverflow.com/questions/6244382/how-to-automate-createsuperuser-on-django
-    # For how it is possible to script createsuperuser command
+    def django(cmd):
+        ret = call.ssh("sudo python3 /srv/www/django/manage.py " + cmd)
+        if ret != 0:
+            print("Django command '{}' did not sucessfully execute".format(cmd))
+
+    django("makemigrations")  # will hang if it cannot contact the auth server
+    django("makemigrations bosscore")
+    django("makemigrations bossoidc")
+    django("makemigrations bossingest")
+    django("migrate")
+    django("collectstatic --no-input")
+
     call.ssh("sudo service uwsgi-emperor reload")
     call.ssh("sudo service nginx restart")
 

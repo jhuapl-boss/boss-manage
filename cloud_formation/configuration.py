@@ -431,6 +431,21 @@ class CloudFormationConfiguration:
         with open(os.path.join(folder, name + ".arguments"), "w") as fh:
             json.dump(self.arguments, fh, indent=4)
 
+    def _poll(self, client, name, action, process):
+        get_status = lambda r: r['Stacks'][0]['StackStatus']
+        response = client.describe_stacks(StackName=name)
+        if len(response['Stacks']) == 0:
+            return None
+        else:
+            print("Waiting for {} ".format(action), end="", flush=True)
+            while get_status(response) == process:
+                time.sleep(5)
+                print(".", end="", flush=True)
+                response = client.describe_stacks(StackName=name)
+            print(" done")
+
+            return get_status(response)
+
     def create(self, session, name, wait = True):
         """Launch the template this object represents in CloudFormation.
 
@@ -460,24 +475,61 @@ class CloudFormationConfiguration:
 
         rtn = None
         if wait:
-            get_status = lambda r: r['Stacks'][0]['StackStatus']
-            response = client.describe_stacks(StackName=name)
-            if len(response['Stacks']) == 0:
-                print("Problem launching stack")
-            else:
-                print("Waiting for create ", end="", flush=True)
-                while get_status(response) == 'CREATE_IN_PROGRESS':
-                    time.sleep(5)
-                    print(".", end="", flush=True)
-                    response = client.describe_stacks(StackName=name)
-                print(" done")
+            status = self._poll(client, name, 'create', 'CREATE_IN_PROGRESS')
 
-                if get_status(response) == 'CREATE_COMPLETE':
-                    print("Created stack '{}'".format(name))
-                    rtn = True
-                else:
-                    print("Status of stack '{}' is '{}'".format(name, get_status(response)))
-                    rtn = False
+            if status is None:
+                print("Problem launching stack")
+            elif status == 'CREATE_COMPLETE':
+                print("Created stack '{}'".format(name))
+                rtn = True
+            else:
+                print("Status of stack '{}' is '{}'".format(name, status))
+                rtn = False
+        return rtn
+
+    def update(self, session, name, wait = True):
+        """Update the template this object represents in CloudFormation.
+
+        Args:
+            session (Session) : Boto3 session used to launch the configuration
+            name (string) : Name of the CloudFormation Stack
+            wait (bool) : If True, wait for the stack to be updated, printing
+                          status information
+
+        Returns:
+            (bool|None) : If wait is True, the result of launching the stack,
+                          else None
+        """
+        for argument in self.arguments:
+            if argument["ParameterValue"] is None:
+                raise Exception("Could not determine argument '{}'".format(argument["ParameterKey"]))
+
+        client = session.client('cloudformation')
+        response = client.update_stack(
+            StackName = name,
+            TemplateBody = self._create_template(),
+            Parameters = self.arguments,
+            Tags = [
+                {"Key": "Commit", "Value": lib.get_commit()}
+            ]
+        )
+
+        rtn = None
+        if wait:
+            status = self._poll(client, name, 'update', 'UPDATE_IN_PROGRESS')
+
+            if status is None:
+                print("Problem launching stack")
+            elif status == 'UPDATE_COMPLETE':
+                print("Updated stack '{}'".format(name))
+                rtn = True
+            elif status == 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS':
+                status = self._poll(client, name, 'update cleanup', 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS')
+                print("Updated stack '{}'".format(name))
+                rtn = True
+            else:
+                print("Status of stack '{}' is '{}'".format(name, status))
+                rtn = False
         return rtn
 
     def add_arg(self, arg):
@@ -1271,6 +1323,17 @@ class CloudFormationConfiguration:
                     {"Key" : "Name", "Value" : { "Ref": key + "Hostname" }, "PropagateAtLaunch": "true" }
                 ],
                 "VPCZoneIdentifier" : [{ "Ref" : subnet } for subnet in subnets]
+            #},
+            #"UpdatePolicy" : {
+            #    "AutoScalingRollingUpdate" : {
+            #        "MinInstancesInService" : str(get_scenario(min, 1) - 1),
+            #        "MaxBatchSize": "1",
+            #        #"WaitOnResourceSignals": "true", # need to have instances signal ready...
+            #        "PauseTime": "PT5M" # 5 minutes
+            #    },
+            #    "AutoScalingScheduledAction" : {
+            #        "IgnoreUnmodifiedGroupSizeProperties" : "true"
+            #    }
             }
         }
 

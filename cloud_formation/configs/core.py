@@ -30,6 +30,7 @@ import time
 import requests
 import scalyr
 import hvac
+from concurrent.futures import ThreadPoolExecutor
 
 import os
 import json
@@ -91,9 +92,6 @@ def create_config(session, domain):
     # do a couple of verification checks
     if config.subnet_domain is not None:
         raise Exception("Invalid VPC domain name")
-
-    if session is not None and lib.vpc_id_lookup(session, domain) is not None:
-        raise Exception("VPC already exists, exiting...")
 
     global keypair
     keypair = lib.keypair_lookup(session)
@@ -345,18 +343,26 @@ def configure_keycloak(session, domain):
     print("about to write secret/proofreader/auth")
     call.vault_update("secret/proofreader/auth", url = auth_discovery_url, client_id = "endpoint")
 
-    print("about to add bossadmin user to keycloak")
+
+    print("Creating initial Keycloak admin user")
     call.set_ssh_target("auth")
     call.ssh("/srv/keycloak/bin/add-user.sh -r master -u {} -p {}".format(username, password))
-    print("about to restarting keycloak")
+
+    print("Restarting Keycloak")
     call.ssh("sudo service keycloak stop")
     time.sleep(2)
     call.ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
                                   # make sure the process is actually killed
     time.sleep(3)
     call.ssh("sudo service keycloak start")
+
+
     print("Waiting for Keycloak to restart")
-    time.sleep(100)
+    if not call.keycloak_check(7): # 7*15s = 105s
+        print("Keycloak not restarted after 105 seconds, exiting...")
+        print("Check the server and run the following command")
+        print(lib.get_command("post-init"))
+        return
 
     upload = lambda p: upload_realm_config(p, username, password, realm_username, realm_password)
     call.ssh_tunnel(upload, 8080)
@@ -386,24 +392,30 @@ def post_init(session, domain):
     if keypair is None:
         keypair = lib.keypair_lookup(session)
 
+    call = lib.ExternalCalls(session, keypair, domain)
+
+    print("Waiting for Vault...")
+    if not call.vault_check(6): # 6*15s = 90s
+        print("Could not contact Vault, check networking and run the following command")
+        print(lib.get_command("post-init"))
+        return
+
     print("Initializing Vault...")
-    initialized = False
-    for i in range(6):
-        try:
-            call = lib.ExternalCalls(session, keypair, domain)
-            call.vault_init()
-            initialized = True
-            break
-        except requests.exceptions.ConnectionError:
-            time.sleep(30)
-        except hvac.exceptions.VaultDown:
-            time.sleep(30)
-    if not initialized:
-        print("Could not initialize Vault, manually call post-init before launching other machines")
+    try:
+        call.vault_init()
+    except Exception as ex:
+        print(ex)
+        print("Could not initialize Vault")
+        print("Call: {}".format(lib.get_command("post-init")))
+        print("Before launching other stacks")
         return
 
     print("Waiting for Keycloak to bootstrap")
-    time.sleep(90)
+    if not call.keycloak_check(6): # 6*15s = 90s
+        print("Keycloak not started after 115 seconds, exiting...")
+        print("Check the server and run the following command")
+        print(lib.get_command("post-init"))
+        return
 
     print("Configuring Keycloak...")
     configure_keycloak(session, domain)
@@ -411,6 +423,41 @@ def post_init(session, domain):
     # Tell Scalyr to get CloudWatch metrics for these instances.
     instances = [ "vault." + domain ]
     scalyr.add_instances_to_scalyr(session, CORE_REGION, instances)
+
+def update(session, domain):
+    # Only in the production scenario will data be preserved over the update
+    if os.environ["SCENARIO"] not in ("production",):
+        print("Can only update the production scenario")
+        return None
+
+    print("Update disabled for core")
+    return None
+
+    name = lib.domain_to_stackname("core." + domain)
+    config = create_config(session, domain)
+
+    success = config.update(session, name)
+
+    with ThreadPoolExecutor(max_workers=3) as tpe:
+        # Need time for the ASG to detect the terminated instance,
+        # launch the new instance, and have the instance cluster
+        tpe.submit(lib.asg_restart, session, "consul." + domain, 15*60)
+        tpe.submit(lib.asg_restart, session, "vault." + domain, 60)
+        tpe.submit(lib.asg_restart, session, "auth." + domain, 60)
+
+    if success:
+        keypair = lib.keypair_lookup(session)
+        call = lib.ExternalCalls(session, keypair, domain)
+
+        print("Waiting for Vault...")
+        if not call.vault_check(6): # 6*15s = 90s
+            print("Could not contact Vault, check networking and run the following command")
+            print("python3 bastion.py bastion.521.boss vault.521.boss vault-unseal")
+            return
+
+        call.vault_unseal()
+
+    return success
 
 def delete(session, domain):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
