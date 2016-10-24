@@ -93,6 +93,16 @@ def create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_u
 
     proc = subprocess.Popen(shlex.split(fwd_cmd))
     #time.sleep(5) # wait for the tunnel to be setup
+
+    try:
+        r = proc.wait(TUNNEL_SLEEP)
+        if r == 255:
+            raise SSHError("Error establishing a SSH tunnel")
+        else:
+            raise SSHTunnelError("SSH tunnel exited with error code {}".format(ret))
+    except subprocess.TimeoutExpired:
+        pass # process is still running, tunnel is up
+
     return proc
 
 def create_tunnel_aplnis(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user="ec2-user"):
@@ -121,22 +131,11 @@ def create_tunnel_aplnis(key, local_port, remote_ip, remote_port, bastion_ip, ba
     apl_bastion_key = os.environ.get("BASTION_KEY")
     apl_bastion_user = os.environ.get("BASTION_USER")
 
-    def check_tunnel(p):
-        try:
-            r = p.wait(TUNNEL_SLEEP)
-            if r == 255:
-                raise SSHError("Error establishing a SSH tunnel")
-            else:
-                raise SSHTunnelError("SSH tunnel exited with error code {}".format(ret))
-        except subprocess.TimeoutExpired:
-            pass # process is still running, tunnel is up
-
     if apl_bastion_ip is None or apl_bastion_key is None or apl_bastion_user is None:
         # traffic
         # localhost -> bastion -> remote
         print("Bastion information not defined, connecting directly")
         proc = create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user)
-        check_tunnel(proc)
         return proc
     else:
         # traffic
@@ -151,14 +150,12 @@ def create_tunnel_aplnis(key, local_port, remote_ip, remote_port, bastion_ip, ba
         # Open up a SSH tunnel to bastion_ip:22 through apl_bastion_ip
         # (to allow the second tunnel to be created)
         proc = create_tunnel(apl_bastion_key, port, bastion_ip, 22, apl_bastion_ip, apl_bastion_user)
-        check_tunnel(proc)
         wrapper.prepend(proc)
 
         try:
             # Create our normal tunnel, but connect to localhost:port to use the
             # first tunnel that we create
             proc = create_tunnel(key, local_port, remote_ip, remote_port, "localhost", bastion_user, port)
-            check_tunnel(proc)
             wrapper.prepend(proc)
             return wrapper
         except:
