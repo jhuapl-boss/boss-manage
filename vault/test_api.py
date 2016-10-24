@@ -1,4 +1,3 @@
-#!/usr/local/bin/python3
 #!/usr/bin/env python3
 
 # Copyright 2016 The Johns Hopkins University Applied Physics Laboratory
@@ -87,7 +86,11 @@ if __name__ == "__main__":
                         metavar = "<token>",
                         default = "keycloak.token",
                         type = argparse.FileType('r'),
-                        help = "File with Keycloak token (default: keycloak.token)")
+                        help = "File with API token (default: keycloak.token)")
+    parser.add_argument("--token-type", "-y",
+                        metavar = "<token-type>",
+                        default = "Bearer",
+                        help = "API Token type (default: Bearer)")
     parser.add_argument("--header", "-H",
                         metavar = "<header>",
                         action= "append",
@@ -120,13 +123,16 @@ if __name__ == "__main__":
         sys.exit(1)
 
     session = create_session(args.aws_credentials)
-    hostname = elb_public_lookup(session, "elb." + args.domain_name)
+    if args.domain_name.endswith(".boss"):
+        hostname = elb_public_lookup(session, "elb." + args.domain_name)
+    else:
+        hostname = args.domain_name
     token = args.token.read()
 
 
     url = "https://" + hostname + args.url
     headers = {}
-    headers["Authorization"] = "Bearer " + token
+    headers["Authorization"] = args.token_type + " " + token
     if args.json_data or args.json_file:
         headers["Content-Type"] = "application/json"
         convert = json.dumps
