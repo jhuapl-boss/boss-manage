@@ -122,6 +122,7 @@ def create(session, domain):
 
     # Configure Vault and create the user data config that proofreader-web will
     # use for connecting to Vault and the DB instance
+    # DP TODO: Remove token and use AWS-EC2 authentication with Vault
     proofreader_token = call.vault("vault-provision", "proofreader")
     user_data = configuration.UserData()
     user_data["vault"]["token"] = proofreader_token
@@ -136,16 +137,11 @@ def create(session, domain):
     call.vault_write(VAULT_DJANGO, secret_key = str(uuid.uuid4()))
     call.vault_write(VAULT_DJANGO_DB, **db)
 
+    name = lib.domain_to_stackname("proofreader." + domain)
+    config = create_config(session, domain, keypair, user_data, db)
+
     try:
-        name = lib.domain_to_stackname("proofreader." + domain)
-        config = create_config(session, domain, keypair, user_data, db)
-
         success = config.create(session, name)
-        if not success:
-            raise Exception("Create Failed")
-        else:
-            post_init(session, domain)
-
     except:
         print("Error detected, revoking secrets") # Do we want to revoke if an exception from post_init?
         try:
@@ -159,46 +155,79 @@ def create(session, domain):
             print("Error revoking Proofreader Server Vault access token")
         raise
 
+    if not success:
+        raise Exception("Create Failed")
+    else:
+        post_init(session, domain)
+
 def post_init(session, domain):
     keypair = lib.keypair_lookup(session)
     call = lib.ExternalCalls(session, keypair, domain)
+
+    # Get Keycloak admin account credentials
     creds = call.vault_read("secret/auth")
 
-    print("Configuring KeyCloak") # Should abstract for api and proofreader
-    def configure_auth(auth_port):
-        # NOTE DP: If an ELB is created the public_uri should be the Public DNS Name
-        #          of the ELB. Endpoint Django instances may have to be restarted if running.
-        dns = lib.instance_public_lookup(session, "proofreader-web." + domain)
-        uri = "http://{}".format(dns)
-        call.vault_update(VAULT_DJANGO_AUTH, public_uri = uri)
+    # Get Keycloak public address
+    if domain in hosts.BASE_DOMAIN_CERTS.keys():
+        auth = "auth." + hosts.BASE_DOMAIN_CERTS[domain]
+    else:
+        auth = "auth-{}.{}".format(domain.split(".")[0],
+                                  hosts.DEV_DOMAIN)
+    auth_url = "https://{}/".format(auth)
 
-        kc = lib.KeyCloakClient("http://localhost:{}".format(auth_port))
-        kc.login(creds["username"], creds["password"])
-        kc.append_list_properties("BOSS", "endpoint", {"redirectUris": uri + "/*", "webOrigins": uri})
-        kc.logout()
-    call.set_ssh_target("auth")
-    call.ssh_tunnel(configure_auth, 8080)
+    # Write data into Vault
+    dns = lib.instance_public_lookup(session, "proofreader-web." + domain)
+    uri = "http://{}".format(dns)
+    call.vault_update(VAULT_DJANGO_AUTH, public_uri = uri)
+
+    # Verify Django install doesn't have any issues
+    print("Checking Django status")
+    if not call.django_check("proofreader-web", "/srv/www/app/proofreader_apis/manage.py"):
+        print() # Space the error message so it stands out more
+        print("Problem with the proofreader's Django configuration, exiting...")
+        print("Check the Django install and run the following command")
+        print(lib.get_command("post-init"))
+        return
 
     print("Initializing Django")
     call.set_ssh_target("proofreader-web")
-    migrate_cmd = "sudo python3 /srv/www/app/proofreader_apis/manage.py "
-    call.ssh(migrate_cmd + "makemigrations") # will hang if it cannot contact the auth server
-    call.ssh(migrate_cmd + "makemigrations common")
-    call.ssh(migrate_cmd + "makemigrations bossoidc")
-    call.ssh(migrate_cmd + "migrate")
-    call.ssh(migrate_cmd + "collectstatic --no-input")
+    def django(cmd):
+        ret = call.ssh("sudo python3 /srv/www/app/proofreader_apis/manage.py " + cmd)
+        if ret != 0:
+            print("Django command '{}' did not sucessfully execute".format(cmd))
+
+    django("makemigrations") # will hang if it cannot contact the auth server
+    django("makemigrations common")
+    django("makemigrations bossoidc")
+    django("migrate")
+    django("collectstatic --no-input")
+
     call.ssh("sudo service uwsgi-emperor reload")
     call.ssh("sudo service nginx restart")
 
-    print("Generating keycloak.json")
-    if domain in hosts.BASE_DOMAIN_CERTS.keys():
-        elb = "auth." + hosts.BASE_DOMAIN_CERTS[domain]
-    else:
-        elb = "auth-{}.{}".format(domain.split(".")[0],
-                                  hosts.DEV_DOMAIN)
+    # Verify Keycloak is accessible
+    TIMEOUT_KEYCLOAK = 90
+    print("Checking for Keycloak availability")
+    if not call.http_check(auth_url + "auth/", TIMEOUT_KEYCLOAK):
+        print() # Space the error message so it stands out more
+        print("Cannot contact Keycloak after {} seconds, exiting...".format(TIMEOUT_KEYCLOAK))
+        print("Check the server and run the following command")
+        print(lib.get_command("post-init"))
+        return
 
-    kc = lib.KeyCloakClient("https://{}:{}".format(elb, 443))
+    kc = lib.KeyCloakClient(auth_url)
     kc.login(creds["username"], creds["password"])
+    if kc.token is None:
+        print() # Space the error message so it stands out more
+        print("Could not log into Keycloak, exiting...")
+        print("Check the server and run the following command")
+        print(lib.get_command("post-init"))
+        return
+
+    print("Configuring KeyCloak")
+    kc.append_list_properties("BOSS", "endpoint", {"redirectUris": uri + "/*", "webOrigins": uri})
+
+    print("Generating keycloak.json")
     client_install = kc.get_client_installation_url("BOSS", "endpoint")
 
     # NOTE: This will put a valid bearer token in the bash history until the history is cleared
