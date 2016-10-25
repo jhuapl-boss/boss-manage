@@ -503,7 +503,8 @@ if __name__ == "__main__":
     if args.command in ("ssh",):
         ssh(args.ssh_key, private, bastion)
     elif args.command in ("ssh-cmd",):
-        ssh_cmd(args.ssh_key, private, bastion, *args.arguments)
+        ret = ssh_cmd(args.ssh_key, private, bastion, *args.arguments)
+        sys.exit(ret)
     elif args.command in ("ssh-tunnel",):
         ssh_tunnel(args.ssh_key, private, bastion, *args.arguments)
     elif args.command in ("ssh-all",):
