@@ -87,6 +87,9 @@ def set_hostname():
     logging.info("Regenerating resolv.conf")
     bossutils.utils.execute("resolvconf -u")
 
+def django_collectstatic():
+    bossutils.utils.execute("sudo python3 /srv/www/django/manage.py collectstatic --noinput")
+
 if __name__ == '__main__':
     logging.info("CONFIG_FILE = \"{}\"".format(bossutils.configuration.CONFIG_FILE))
     logging.info("Creating /etc/boss (if it does not exist)")
@@ -96,6 +99,8 @@ if __name__ == '__main__':
     bossutils.configuration.download_and_save()
     #read_vault_token() # Not currently supported when generating access tokens
     set_hostname()
+    django_collectstatic()
+
 
     # Since the service is to be run once, disable it
     bossutils.utils.stop_firstboot()
