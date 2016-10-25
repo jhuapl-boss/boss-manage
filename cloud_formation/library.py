@@ -476,6 +476,11 @@ class KeyCloakClient:
         auth_header = "Authorization: Bearer {}".format(self.token["access_token"])
         return {"url": installation_endpoint, "headers": auth_header}
 
+def gen_timeout(total, step):
+    times, remainder = divmod(total, step)
+    rtn = [step for i in range(times)]
+    rtn.insert(0, remainder) # Sleep for the partial time first
+    return rtn
 
 class ExternalCalls:
     """Class that helps with forming connections from the local machine to machines
@@ -501,17 +506,16 @@ class ExternalCalls:
         self.domain = domain
         self.ssh_target = None
 
-    def vault_check(self, timeout=None):
+    def vault_check(self, timeout):
         """Vault status check to see if Vault is accessible
         """
         def delegate():
-            sleep = 15
-            for i in range(timeout):
+            for sleep in gen_timeout(timeout, 15): # 15 second sleep
                 if vault.vault_status_check(machine=self.vault_hostname, ip=self.vault_ip):
                     return True
                 time.sleep(sleep)
 
-            #raise Exception("Cannot connect to Vault after {} seconds".format(sleep * timeout))
+            #raise Exception("Cannot connect to Vault after {} seconds".format(timeout))
             return False
 
         return bastion.connect_vault(self.keypair_file, self.vault_ip, self.bastion_ip, delegate)
@@ -656,25 +660,34 @@ class ExternalCalls:
                                   local_port,
                                   cmd)
 
-    def keycloak_check(self, timeout=None):
+    def keycloak_check(self, timeout):
         """Keycloak status check to see if Keycloak is accessible
         """
         def delegate(port):
             # Could move to connecting through the ELB, but then KC will have to be healthy
             URL = "http://localhost:{}/auth/".format(port)
 
-            sleep = 15
-            for i in range(timeout):
+            for sleep in gen_timeout(timeout, 15): # 15 second sleep
                 res = urlopen(URL)
                 if res.getcode() == 200:
                     return True
                 time.sleep(sleep)
 
-            #raise Exception("Cannot connect to Keycloak after {} seconds".format(sleep * timeout))
+            #raise Exception("Cannot connect to Keycloak after {} seconds".format(timeout))
             return False
 
         self.set_ssh_target("auth")
         return self.ssh_tunnel(delegate, 8080)
+
+    def http_check(self, url, timeout):
+        for sleep in gen_timeout(timeout, 15): # 15 second sleep
+            res = urlopen(url)
+            if res.getcode() == 200:
+                return True
+            time.sleep(sleep)
+
+        #raise Exception("Cannot connect to URL after {} seconds".format(timeout))
+        return False
 
 def asg_restart(session, hostname, timeout):
     """Terminate all of the instances for an ASG, with the given timeout between

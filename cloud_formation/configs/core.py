@@ -58,6 +58,10 @@ VAULT_CLUSTER_SIZE = { # Vault Cluster is a fixed size
     "production": 3 # should be an odd number
 }
 
+TIMEOUT_START = 75
+TIMEOUT_VAULT = 90
+TIMEOUT_KEYCLOAK = 90
+
 
 def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, public=True, depends_on=None):
     security_groups = ["InternalSecurityGroup"]
@@ -288,85 +292,6 @@ runcmd:
 
     return config
 
-def upload_realm_config(port, username, password, realm_username, realm_password):
-    URL = "http://localhost:{}".format(port) # TODO move out of tunnel and use public address
-
-    kc = lib.KeyCloakClient(URL)
-    kc.login(username, password)
-    if kc.token is None:
-        print("Could not upload BOSS.realm configuration, exiting...")
-        return
-
-    cur_dir = os.path.dirname(os.path.realpath(__file__))
-    realm_file = os.path.normpath(os.path.join(cur_dir, "..", "..", "salt_stack", "salt", "keycloak", "files", "BOSS.realm"))
-    print("Opening realm file at '{}'".format(realm_file))
-    with open(realm_file, "r") as fh:
-        realm = json.load(fh)
-
-    try:
-        realm["users"][0]["username"] = realm_username
-        realm["users"][0]["credentials"][0]["value"] = realm_password
-    except:
-        print("Could not set realm admin's username or password, not creating user")
-        if "users" in realm:
-            del realm["users"]
-
-    kc.create_realm(realm)
-    kc.logout()
-
-def configure_keycloak(session, domain):
-    # NOTE DP: if there is an ELB in front of the auth server, this needs to be
-    #          the public DNS address of the ELB.
-    auth_elb = lib.elb_public_lookup(session, "auth." + domain)
-
-    if domain in hosts.BASE_DOMAIN_CERTS.keys():
-        auth_domain = 'auth.' + hosts.BASE_DOMAIN_CERTS[domain]
-    else:
-        auth_domain = 'auth-{}.{}'.format(domain.split(".")[0], hosts.DEV_DOMAIN)
-    auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_domain)
-    lib.set_domain_to_dns_name(session, auth_domain, auth_elb, lib.get_hosted_zone(session))
-
-    username = "admin"
-    password = lib.generate_password()
-    realm_username = "bossadmin"
-    realm_password = lib.generate_password()
-
-    call = lib.ExternalCalls(session, keypair, domain)
-    print("about to write secret/auth")
-    call.vault_write("secret/auth", password = password, username = username, client_id = "admin-cli")
-    print("about to write secret/auth/realm")
-    call.vault_write("secret/auth/realm", username = realm_username, password = realm_password, client_id = "endpoint")
-    print("about to write secret/keycloak")
-    call.vault_update("secret/keycloak", password = password, username = username, client_id = "admin-cli", realm = "master")
-    print("about to write secret/endpoint/auth")
-    call.vault_update("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
-    print("about to write secret/proofreader/auth")
-    call.vault_update("secret/proofreader/auth", url = auth_discovery_url, client_id = "endpoint")
-
-
-    print("Creating initial Keycloak admin user")
-    call.set_ssh_target("auth")
-    call.ssh("/srv/keycloak/bin/add-user.sh -r master -u {} -p {}".format(username, password))
-
-    print("Restarting Keycloak")
-    call.ssh("sudo service keycloak stop")
-    time.sleep(2)
-    call.ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
-                                  # make sure the process is actually killed
-    time.sleep(3)
-    call.ssh("sudo service keycloak start")
-
-
-    print("Waiting for Keycloak to restart")
-    if not call.keycloak_check(7): # 7*15s = 105s
-        print("Keycloak not restarted after 105 seconds, exiting...")
-        print("Check the server and run the following command")
-        print(lib.get_command("post-init"))
-        return
-
-    upload = lambda p: upload_realm_config(p, username, password, realm_username, realm_password)
-    call.ssh_tunnel(upload, 8080)
-
 def generate(folder, domain):
     """Create the configuration and save it to disk"""
     name = lib.domain_to_stackname("core." + domain)
@@ -383,25 +308,50 @@ def create(session, domain):
         vpc_id = lib.vpc_id_lookup(session, domain)
         lib.rt_name_default(session, vpc_id, "internal." + domain)
 
-        print("Waiting 75 seconds for VMs to start...")
-        time.sleep(75)
-        post_init(session, domain)
+        post_init(session, domain, True)
 
-def post_init(session, domain):
+def post_init(session, domain, startup_wait=False):
+    # Keypair is needed by ExternalCalls
     global keypair
     if keypair is None:
         keypair = lib.keypair_lookup(session)
-
     call = lib.ExternalCalls(session, keypair, domain)
 
-    print("Waiting for Vault...")
-    if not call.vault_check(6): # 6*15s = 90s
-        print("Could not contact Vault, check networking and run the following command")
-        print(lib.get_command("post-init"))
-        return
+    # Figure out the external domain name of the auth server(s), matching the SSL cert
+    if domain in hosts.BASE_DOMAIN_CERTS.keys():
+        auth_domain = 'auth.' + hosts.BASE_DOMAIN_CERTS[domain]
+    else:
+        auth_domain = 'auth-{}.{}'.format(domain.split(".")[0], hosts.DEV_DOMAIN)
 
-    print("Initializing Vault...")
+    # OIDC Discovery URL
+    auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_domain)
+
+    # Configure external DNS
+    auth_elb = lib.elb_public_lookup(session, "auth." + domain)
+    lib.set_domain_to_dns_name(session, auth_domain, auth_elb, lib.get_hosted_zone(session))
+
+    # Generate initial user accounts
+    username = "admin"
+    password = lib.generate_password()
+    realm_username = "bossadmin"
+    realm_password = lib.generate_password()
+
+    # Wait for infrastructure to finish starting up
+    # DP TODO: move to a polling setup
+    if startup_wait:
+        print("Waiting {} seconds for VMs to start...".format(TIMEOUT_START))
+        time.sleep(TIMEOUT_START)
+
+    # Initialize Vault
     try:
+        print("Waiting for Vault...")
+        if not call.vault_check(TIMEOUT_VAULT):
+            print("Could not contact Vault after {} seconds, exiting...".format(TIMEOUT_VAULT))
+            print("Check networking/the server and run the following command")
+            print(lib.get_command("post-init"))
+            return
+
+        print("Initializing Vault...")
         call.vault_init()
     except Exception as ex:
         print(ex)
@@ -410,15 +360,75 @@ def post_init(session, domain):
         print("Before launching other stacks")
         return
 
+    # Write data into Vault
+    print("Writing secret/auth")
+    call.vault_write("secret/auth", password = password, username = username, client_id = "admin-cli")
+    print("Writing secret/auth/realm")
+    call.vault_write("secret/auth/realm", username = realm_username, password = realm_password, client_id = "endpoint")
+    print("Updating secret/keycloak")
+    call.vault_update("secret/keycloak", password = password, username = username, client_id = "admin-cli", realm = "master")
+    print("Updating secret/endpoint/auth")
+    call.vault_update("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
+    print("Updating secret/proofreader/auth")
+    call.vault_update("secret/proofreader/auth", url = auth_discovery_url, client_id = "endpoint")
+
+    # Configure Keycloak
     print("Waiting for Keycloak to bootstrap")
-    if not call.keycloak_check(6): # 6*15s = 90s
-        print("Keycloak not started after 115 seconds, exiting...")
+    if not call.keycloak_check(TIMEOUT_KEYCLOAK):
+        print("Keycloak not started after {} seconds, exiting...".format(TIMEOUT_KEYCLOAK))
+        print("Check networking/the server and run the following command")
+        print(lib.get_command("post-init"))
+        return
+
+    print("Creating initial Keycloak admin user")
+    call.set_ssh_target("auth")
+    call.ssh("/srv/keycloak/bin/add-user.sh -r master -u {} -p {}".format(username, password))
+
+    print("Restarting Keycloak")
+    call.ssh("sudo service keycloak stop")
+    time.sleep(2)
+    call.ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
+                                  # make sure the process is actually killed
+    time.sleep(3)
+    call.ssh("sudo service keycloak start")
+
+    print("Waiting for Keycloak to restart")
+    if not call.keycloak_check(TIMEOUT_KEYCLOAK):
+        print("Keycloak not restarted after {} seconds, exiting...".format(TIMEOUT_KEYCLOAK))
         print("Check the server and run the following command")
         print(lib.get_command("post-init"))
         return
 
-    print("Configuring Keycloak...")
-    configure_keycloak(session, domain)
+    def upload_realm_config(port):
+        URL = "http://localhost:{}".format(port) # TODO move out of tunnel and use public address
+
+        kc = lib.KeyCloakClient(URL)
+        kc.login(username, password)
+        if kc.token is None:
+            print("Could not log into Keycloak, exiting...")
+            print("Check the server and run the following command")
+            print(lib.get_command("post-init"))
+            return
+
+        cur_dir = os.path.dirname(os.path.realpath(__file__))
+        realm_file = os.path.normpath(os.path.join(cur_dir, "..", "..", "salt_stack", "salt", "keycloak", "files", "BOSS.realm"))
+        print("Opening realm file at '{}'".format(realm_file))
+        with open(realm_file, "r") as fh:
+            realm = json.load(fh)
+
+        try:
+            realm["users"][0]["username"] = realm_username
+            realm["users"][0]["credentials"][0]["value"] = realm_password
+        except:
+            print("Could not set realm admin's username or password, not creating user")
+            if "users" in realm:
+                del realm["users"]
+
+        print("Uploading BOSS.realm configuration")
+        kc.create_realm(realm)
+        kc.logout()
+    call.ssh_tunnel(upload_realm_config, 8080)
+
 
     # Tell Scalyr to get CloudWatch metrics for these instances.
     instances = [ "vault." + domain ]

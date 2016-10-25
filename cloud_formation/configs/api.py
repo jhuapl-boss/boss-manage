@@ -69,6 +69,8 @@ REDIS_CLUSTER_SIZE = {
     "production": 2,
 }
 
+TIMEOUT_KEYCLOAK = 90
+
 # Prefixes uses to generate names of SQS queues.
 S3FLUSH_QUEUE_PREFIX = 'S3flush.'
 DEADLETTER_QUEUE_PREFIX = 'Deadletter.'
@@ -269,63 +271,80 @@ def create(session, domain):
     call.vault_write(VAULT_DJANGO, secret_key = str(uuid.uuid4()))
     call.vault_write(VAULT_DJANGO_DB, **db)
 
-    try:
-        name = lib.domain_to_stackname("api." + domain)
-        config = create_config(session, domain, keypair, user_data, db)
+    name = lib.domain_to_stackname("api." + domain)
+    config = create_config(session, domain, keypair, user_data, db)
 
+    try:
         success = config.create(session, name)
-        if not success:
-            raise Exception("Create Failed")
-        else:
-            post_init(session, domain)
     except:
         print("Error detected, revoking secrets") # Do we want to revoke if an exception from post_init?
         try:
             call.vault_delete(VAULT_DJANGO)
             call.vault_delete(VAULT_DJANGO_DB)
-            #call.vault_delete(VAULT_DJANGO_AUTH)
+            #call.vault_delete(VAULT_DJANGO_AUTH) # Deleting this will bork the whole stack
         except:
             print("Error revoking Django credentials")
 
         raise
 
+    if not success:
+        raise Exception("Create Failed")
+    else:
+        # Outside the try/except so it can be run again if there is an error
+        post_init(session, domain)
+
 
 def post_init(session, domain):
+    # Keypair is needed by ExternalCalls
     keypair = lib.keypair_lookup(session)
     call = lib.ExternalCalls(session, keypair, domain)
 
-    print("Configuring KeyCloak")  # Should abstract for production and proofreader
+    # Figure out the external domain name for the api server(s), matching the SSL cert
+    if domain in hosts.BASE_DOMAIN_CERTS.keys():
+        dns = "api." + hosts.BASE_DOMAIN_CERTS[domain]
+    else:
+        dns = "api-{}.{}".format(domain.split('.')[0],
+                                 hosts.DEV_DOMAIN)
 
+    # Configure external DNS
+    dns_elb = lib.elb_public_lookup(session, "elb." + domain)
+    lib.set_domain_to_dns_name(session, dns, dns_elb, lib.get_hosted_zone(session))
+
+    # Write data into Vault
+    uri = "https://{}".format(dns)
+    call.vault_update(VAULT_DJANGO_AUTH, public_uri = uri)
+
+    # Verify Keycloak is accessible
+    print("Checking for Keycloak availability")
+    if not call.keycloak_check(TIMEOUT_KEYCLOAK):
+        print("Cannot contact Keycloak after {} seconds, exiting...".format(TIMEOUT_KEYCLOAK))
+        print("Check the server and run the following command")
+        print(lib.get_command("post-init"))
+        return
+
+    # Add the API servers to the list of OIDC valid redirects
     def configure_auth(auth_port):
-        # NOTE DP: If an ELB is created the public_uri should be the Public DNS Name
-        #          of the ELB. Endpoint Django instances may have to be restarted if running.
-        dns_elb = lib.elb_public_lookup(session, "elb." + domain)
-        if domain in hosts.BASE_DOMAIN_CERTS.keys():
-            dns = "api." + hosts.BASE_DOMAIN_CERTS[domain]
-        else:
-            dns = "api-{}.{}".format(domain.split('.')[0],
-                                     hosts.DEV_DOMAIN)
-        lib.set_domain_to_dns_name(session, dns, dns_elb, lib.get_hosted_zone(session))
-
-        uri = "https://{}".format(dns)
-        call.vault_update(VAULT_DJANGO_AUTH, public_uri = uri)
-
         print("Update KeyCloak Client Info")
         creds = call.vault_read("secret/auth")
         kc = lib.KeyCloakClient("http://localhost:{}".format(auth_port))
         kc.login(creds["username"], creds["password"])
 
+        # DP TODO: make add_redirect_uri able to work multiple times without issue
         kc.add_redirect_uri("BOSS","endpoint", uri + "/*")
         kc.logout()
     call.set_ssh_target("auth")
     call.ssh_tunnel(configure_auth, 8080)
 
+    # DP TODO: Add polling check to make sure the endpoint server is ready
+
+    # Configure ndingest
     call.set_ssh_target("endpoint")
     print("Create settings.ini for ndingest")
     ret = call.ssh("sudo python3 /srv/salt/ndingest/build_settings.py")
     if ret != 0:
         print("Building ndingest setttings file failed")
 
+    # Bootstrap Django
     print("Initializing Django")  # Should create ssh call with array of commands
     call.set_ssh_target("endpoint")
     def django(cmd):
