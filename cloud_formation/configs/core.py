@@ -346,6 +346,7 @@ def post_init(session, domain, startup_wait=False):
     try:
         print("Waiting for Vault...")
         if not call.vault_check(TIMEOUT_VAULT):
+            print() # Space the error message so it stands out more
             print("Could not contact Vault after {} seconds, exiting...".format(TIMEOUT_VAULT))
             print("Check networking/the server and run the following command")
             print(lib.get_command("post-init"))
@@ -367,14 +368,17 @@ def post_init(session, domain, startup_wait=False):
     call.vault_write("secret/auth/realm", username = realm_username, password = realm_password, client_id = "endpoint")
     print("Updating secret/keycloak")
     call.vault_update("secret/keycloak", password = password, username = username, client_id = "admin-cli", realm = "master")
+    # DP TODO: Move this update call into the api config
     print("Updating secret/endpoint/auth")
     call.vault_update("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
+    # DP TODO: Move this update call into the proofreader config
     print("Updating secret/proofreader/auth")
     call.vault_update("secret/proofreader/auth", url = auth_discovery_url, client_id = "endpoint")
 
     # Configure Keycloak
     print("Waiting for Keycloak to bootstrap")
     if not call.keycloak_check(TIMEOUT_KEYCLOAK):
+        print() # Space the error message so it stands out more
         print("Keycloak not started after {} seconds, exiting...".format(TIMEOUT_KEYCLOAK))
         print("Check networking/the server and run the following command")
         print(lib.get_command("post-init"))
@@ -394,6 +398,7 @@ def post_init(session, domain, startup_wait=False):
 
     print("Waiting for Keycloak to restart")
     if not call.keycloak_check(TIMEOUT_KEYCLOAK):
+        print() # Space the error message so it stands out more
         print("Keycloak not restarted after {} seconds, exiting...".format(TIMEOUT_KEYCLOAK))
         print("Check the server and run the following command")
         print(lib.get_command("post-init"))
@@ -405,6 +410,7 @@ def post_init(session, domain, startup_wait=False):
         kc = lib.KeyCloakClient(URL)
         kc.login(username, password)
         if kc.token is None:
+            print() # Space the error message so it stands out more
             print("Could not log into Keycloak, exiting...")
             print("Check the server and run the following command")
             print(lib.get_command("post-init"))

@@ -238,6 +238,7 @@ def delete_stack(session, domain, config):
 
     return True
 
+# DP TODO: Add support for context manager for automatic logout
 class KeyCloakClient:
     """Client for connecting to Keycloak and using the REST API.
 
@@ -663,6 +664,9 @@ class ExternalCalls:
     def keycloak_check(self, timeout):
         """Keycloak status check to see if Keycloak is accessible
         """
+        # DP ???: use the actual login url so the actual API is checked..
+        #         (and parse response for 403 unauthorized vs any other error..)
+
         def delegate(port):
             # Could move to connecting through the ELB, but then KC will have to be healthy
             URL = "http://localhost:{}/auth/".format(port)
@@ -676,6 +680,7 @@ class ExternalCalls:
             #raise Exception("Cannot connect to Keycloak after {} seconds".format(timeout))
             return False
 
+        # DP TODO: save and restore previous ssh_target
         self.set_ssh_target("auth")
         return self.ssh_tunnel(delegate, 8080)
 
@@ -688,6 +693,13 @@ class ExternalCalls:
 
         #raise Exception("Cannot connect to URL after {} seconds".format(timeout))
         return False
+
+    def django_check(self, machine, manage_py):
+        self.set_ssh_target(machine)
+        cmd = "sudo python3 {} check 2> /dev/null > /dev/null".format(manage_py) # suppress all output
+
+        ret = self.ssh(cmd)
+        return ret == 0 # 0 - no issues, 1 - problems
 
 def asg_restart(session, hostname, timeout):
     """Terminate all of the instances for an ASG, with the given timeout between
