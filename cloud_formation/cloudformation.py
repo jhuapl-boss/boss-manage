@@ -29,11 +29,11 @@ import library as lib
 
 import hosts
 
-"""
-create vpc.boss vpc
-create subnet.vpc.boss subnet
-create subnet.vpc.boss instance
-"""
+# Add a reference to boss-manage/lib/ so that we can import those files
+cur_dir = os.path.dirname(os.path.realpath(__file__))
+lib_dir = os.path.normpath(os.path.join(cur_dir, "..", "lib"))
+sys.path.append(lib_dir)
+import exceptions
 
 def create_session(credentials):
     """Read the AWS from the credentials dictionary and then create a boto3
@@ -131,7 +131,24 @@ if __name__ == '__main__':
 
     session = create_session(credentials)
 
-    func = args.action.replace('-','_')
-    ret = call_config(session, args.domain_name, args.config_name, func)
-    if ret == False:
-        sys.exit(1)
+    try:
+        func = args.action.replace('-','_')
+        ret = call_config(session, args.domain_name, args.config_name, func)
+        if ret == False:
+            sys.exit(1)
+    except exceptions.StatusCheckError as ex:
+        target = 'the server'
+        if hasattr(ex, 'target') and ex.target is not None:
+            target = ex.target
+
+        print()
+        print(ex)
+        print("Check networking and {}".format(target))
+        print("Then run the following command:")
+        print("\t" + lib.get_command("post-init"))
+    except exceptions.KeyCloakLoginError as ex:
+        print()
+        print(ex)
+        print("Check Vault and Keycloak")
+        print("Then run the following command:")
+        print("\t" + lib.get_command("post-init"))

@@ -58,7 +58,6 @@ VAULT_CLUSTER_SIZE = { # Vault Cluster is a fixed size
     "production": 3 # should be an odd number
 }
 
-TIMEOUT_START = 75
 TIMEOUT_VAULT = 120
 TIMEOUT_KEYCLOAK = 120
 
@@ -336,23 +335,12 @@ def post_init(session, domain, startup_wait=False):
     realm_username = "bossadmin"
     realm_password = lib.generate_password()
 
-    # Wait for infrastructure to finish starting up
-    # DP TODO: move to a polling setup
-    if startup_wait:
-        print("Waiting {} seconds for VMs to start...".format(TIMEOUT_START))
-        time.sleep(TIMEOUT_START)
-
     # Initialize Vault
-    try:
-        print("Waiting for Vault...")
-        if not call.vault_check(TIMEOUT_VAULT):
-            print() # Space the error message so it stands out more
-            print("Could not contact Vault after {} seconds, exiting...".format(TIMEOUT_VAULT))
-            print("Check networking/the server and run the following command")
-            print(lib.get_command("post-init"))
-            return
+    print("Waiting for Vault...")
+    call.vault_check(TIMEOUT_VAULT) # Expecting this to also check Consul
 
-        print("Initializing Vault...")
+    print("Initializing Vault...")
+    try:
         call.vault_init()
     except Exception as ex:
         print(ex)
@@ -377,12 +365,7 @@ def post_init(session, domain, startup_wait=False):
 
     # Configure Keycloak
     print("Waiting for Keycloak to bootstrap")
-    if not call.keycloak_check(TIMEOUT_KEYCLOAK):
-        print() # Space the error message so it stands out more
-        print("Keycloak not started after {} seconds, exiting...".format(TIMEOUT_KEYCLOAK))
-        print("Check networking/the server and run the following command")
-        print(lib.get_command("post-init"))
-        return
+    call.keycloak_check(TIMEOUT_KEYCLOAK)
 
     print("Creating initial Keycloak admin user")
     call.set_ssh_target("auth")
@@ -397,24 +380,13 @@ def post_init(session, domain, startup_wait=False):
     call.ssh("sudo service keycloak start")
 
     print("Waiting for Keycloak to restart")
-    if not call.keycloak_check(TIMEOUT_KEYCLOAK):
-        print() # Space the error message so it stands out more
-        print("Keycloak not restarted after {} seconds, exiting...".format(TIMEOUT_KEYCLOAK))
-        print("Check the server and run the following command")
-        print(lib.get_command("post-init"))
-        return
+    call.keycloak_check(TIMEOUT_KEYCLOAK)
 
     def upload_realm_config(port):
         URL = "http://localhost:{}".format(port) # TODO move out of tunnel and use public address
 
         kc = lib.KeyCloakClient(URL)
         kc.login(username, password)
-        if kc.token is None:
-            print() # Space the error message so it stands out more
-            print("Could not log into Keycloak, exiting...")
-            print("Check the server and run the following command")
-            print(lib.get_command("post-init"))
-            return
 
         cur_dir = os.path.dirname(os.path.realpath(__file__))
         realm_file = os.path.normpath(os.path.join(cur_dir, "..", "..", "salt_stack", "salt", "keycloak", "files", "BOSS.realm"))

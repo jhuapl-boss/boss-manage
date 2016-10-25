@@ -52,6 +52,11 @@ sys.path.append(vault_dir)
 import bastion
 import vault
 
+lib_dir = os.path.normpath(os.path.join(cur_dir, "..", "lib"))
+sys.path.append(lib_dir)
+import exceptions
+
+
 def get_command(action=None):
     argv = sys.argv[:]
     if action:
@@ -286,6 +291,7 @@ class KeyCloakClient:
             method=method
         )
 
+        # DP TODO: rewrite or merge using the boss-tools/bossutils KeycloakClient
         try:
             response = urlopen(request, context=self.ctx).read().decode("utf-8")
             if len(response) > 0:
@@ -294,9 +300,7 @@ class KeyCloakClient:
                 response = {}
             return response
         except HTTPError as e:
-            print("Error on '{}'".format(url))
-            print(e)
-            return None
+            raise exceptions.KeyCloakError(e.code, e.reason)
 
     def login(self, username, password):
         """Login to the Keycloak master realm and retrieve an access token.
@@ -328,7 +332,8 @@ class KeyCloakClient:
         )
 
         if self.token is None:
-            print("Could not authenticate to KeyCloak Server")
+            #print("Could not authenticate to KeyCloak Server")
+            raise exceptions.KeyCloakLoginError(self.url_base, username)
 
     def logout(self):
         """Logout from Keycloak.
@@ -516,7 +521,8 @@ class ExternalCalls:
                     return True
                 time.sleep(sleep)
 
-            #raise Exception("Cannot connect to Vault after {} seconds".format(timeout))
+            msg = "Cannot connect to Vault after {} seconds".format(timeout)
+            raise exceptions.StatusCheckError(msg, self.vault_hostname)
             return False
 
         return bastion.connect_vault(self.keypair_file, self.vault_ip, self.bastion_ip, delegate)
@@ -677,7 +683,8 @@ class ExternalCalls:
                     return True
                 time.sleep(sleep)
 
-            #raise Exception("Cannot connect to Keycloak after {} seconds".format(timeout))
+            msg = "Cannot connect to Keycloak after {} seconds".format(timeout)
+            raise exceptions.StatusCheckError(msg, self.ssh_target)
             return False
 
         # DP TODO: save and restore previous ssh_target
@@ -691,7 +698,8 @@ class ExternalCalls:
                 return True
             time.sleep(sleep)
 
-        #raise Exception("Cannot connect to URL after {} seconds".format(timeout))
+        msg = "Cannot connect to URL after {} seconds".format(timeout)
+        raise exceptions.StatusCheckError(msg, url)
         return False
 
     def django_check(self, machine, manage_py):
@@ -699,6 +707,10 @@ class ExternalCalls:
         cmd = "sudo python3 {} check 2> /dev/null > /dev/null".format(manage_py) # suppress all output
 
         ret = self.ssh(cmd)
+        if ret != 0:
+            msg = "Problem with the endpoint's Django configuration"
+            raise exceptions.StatusCheckError(msg, self.ssh_target)
+
         return ret == 0 # 0 - no issues, 1 - problems
 
 def asg_restart(session, hostname, timeout):

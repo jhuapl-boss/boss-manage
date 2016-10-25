@@ -31,6 +31,12 @@ class RemoteCommandError(BossManageError):
 
         super(RemoteCommandError, self).__init__(message)
 
+class StatusCheckError(BossManageError):
+    def __init__(self, message, target=None):
+        self.target = target
+
+        super(StatusCheckError, self).__init__(message)
+
 # DP ???: Subclass BossManageError
 # Taken from boss-tools.git/bossutils/keycloak.py
 class KeyCloakError(Exception):
@@ -38,6 +44,9 @@ class KeyCloakError(Exception):
         super(KeyCloakError, self).__init__(data)
         self.status = status
         self.data = data
+
+    def __str__(self):
+        return "HTTP Error {}: {}".format(self.status, self.data)
 
     @staticmethod
     def _get_message(res):
@@ -54,3 +63,8 @@ class KeyCloakError(Exception):
         if 400 <= res.status_code <= 600: # handle both Client and Server errors
             msg = cls._get_message(res)
             raise cls(res.status_code, msg)
+
+class KeyCloakLoginError(KeyCloakError):
+    def __init__(self, target, username):
+        message = "Could not login to Keycloak at {} with username {}".format(target, username)
+        super(KeyCloakLoginError, self).__init__(None, message)

@@ -182,12 +182,7 @@ def post_init(session, domain):
 
     # Verify Django install doesn't have any issues
     print("Checking Django status")
-    if not call.django_check("proofreader-web", "/srv/www/app/proofreader_apis/manage.py"):
-        print() # Space the error message so it stands out more
-        print("Problem with the proofreader's Django configuration, exiting...")
-        print("Check the Django install and run the following command")
-        print(lib.get_command("post-init"))
-        return
+    call.django_check("proofreader-web", "/srv/www/app/proofreader_apis/manage.py")
 
     print("Initializing Django")
     call.set_ssh_target("proofreader-web")
@@ -208,21 +203,10 @@ def post_init(session, domain):
     # Verify Keycloak is accessible
     TIMEOUT_KEYCLOAK = 90
     print("Checking for Keycloak availability")
-    if not call.http_check(auth_url + "auth/", TIMEOUT_KEYCLOAK):
-        print() # Space the error message so it stands out more
-        print("Cannot contact Keycloak after {} seconds, exiting...".format(TIMEOUT_KEYCLOAK))
-        print("Check the server and run the following command")
-        print(lib.get_command("post-init"))
-        return
+    call.http_check(auth_url + "auth/", TIMEOUT_KEYCLOAK)
 
     kc = lib.KeyCloakClient(auth_url)
     kc.login(creds["username"], creds["password"])
-    if kc.token is None:
-        print() # Space the error message so it stands out more
-        print("Could not log into Keycloak, exiting...")
-        print("Check the server and run the following command")
-        print(lib.get_command("post-init"))
-        return
 
     print("Configuring KeyCloak")
     kc.append_list_properties("BOSS", "endpoint", {"redirectUris": uri + "/*", "webOrigins": uri})

@@ -316,12 +316,7 @@ def post_init(session, domain):
 
     # Verify Keycloak is accessible
     print("Checking for Keycloak availability")
-    if not call.keycloak_check(TIMEOUT_KEYCLOAK):
-        print() # Space the error message so it stands out more
-        print("Cannot contact Keycloak after {} seconds, exiting...".format(TIMEOUT_KEYCLOAK))
-        print("Check the server and run the following command")
-        print(lib.get_command("post-init"))
-        return
+    call.keycloak_check(TIMEOUT_KEYCLOAK)
 
     # Add the API servers to the list of OIDC valid redirects
     def configure_auth(auth_port):
@@ -329,12 +324,6 @@ def post_init(session, domain):
         creds = call.vault_read("secret/auth")
         kc = lib.KeyCloakClient("http://localhost:{}".format(auth_port))
         kc.login(creds["username"], creds["password"])
-        if kc.token is None:
-            print() # Space the error message so it stands out more
-            print("Could not log into Keycloak, exiting...")
-            print("Check the server and run the following command")
-            print(lib.get_command("post-init"))
-            return
 
         # DP TODO: make add_redirect_uri able to work multiple times without issue
         kc.add_redirect_uri("BOSS","endpoint", uri + "/*")
@@ -353,12 +342,7 @@ def post_init(session, domain):
 
     # Verify Django install doesn't have any issues
     print("Checking Django status")
-    if not call.django_check("endpoint", "/srv/www/django/manage.py"):
-        print() # Space the error message so it stands out more
-        print("Problem with the endpoint's Django configuration, exiting...")
-        print("Check the Django install and run the following command")
-        print(lib.get_command("post-init"))
-        return
+    call.django_check("endpoint", "/srv/www/django/manage.py")
 
     # Bootstrap Django
     print("Initializing Django")  # Should create ssh call with array of commands
