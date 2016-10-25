@@ -59,8 +59,8 @@ VAULT_CLUSTER_SIZE = { # Vault Cluster is a fixed size
 }
 
 TIMEOUT_START = 75
-TIMEOUT_VAULT = 90
-TIMEOUT_KEYCLOAK = 90
+TIMEOUT_VAULT = 120
+TIMEOUT_KEYCLOAK = 120
 
 
 def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, public=True, depends_on=None):
@@ -308,7 +308,7 @@ def create(session, domain):
         vpc_id = lib.vpc_id_lookup(session, domain)
         lib.rt_name_default(session, vpc_id, "internal." + domain)
 
-        post_init(session, domain, True)
+        post_init(session, domain)
 
 def post_init(session, domain, startup_wait=False):
     # Keypair is needed by ExternalCalls
