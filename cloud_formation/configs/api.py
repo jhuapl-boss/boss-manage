@@ -358,27 +358,11 @@ def post_init(session, domain):
     if ret != 0:
         print("Building ndingest setttings file failed")
 
-    # Verify Django install doesn't have any issues
+    # Django makemigrations, migrate and collectstatic moved to firstboot.py in salt
     print("Checking Django status")
     call.django_check("endpoint", "/srv/www/django/manage.py")
 
     # Bootstrap Django
-    print("Initializing Django")  # Should create ssh call with array of commands
-    call.set_ssh_target("endpoint")
-    def django(cmd):
-        ret = call.ssh("sudo python3 /srv/www/django/manage.py " + cmd)
-        if ret != 0:
-            print("Django command '{}' did not sucessfully execute".format(cmd))
-
-    django("makemigrations")  # will hang if it cannot contact the auth server
-    django("makemigrations bosscore")
-    django("makemigrations bossoidc")
-    django("makemigrations bossingest")
-    django("migrate")
-    django("collectstatic --no-input")
-
-    call.ssh("sudo service uwsgi-emperor reload")
-    call.ssh("sudo service nginx restart")
 
     # Tell Scalyr to get CloudWatch metrics for these instances.
     instances = ["endpoint." + domain]
