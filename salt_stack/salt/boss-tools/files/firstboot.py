@@ -87,8 +87,21 @@ def set_hostname():
     logging.info("Regenerating resolv.conf")
     bossutils.utils.execute("resolvconf -u")
 
-def django_collectstatic():
-    bossutils.utils.execute("sudo python3 /srv/www/django/manage.py collectstatic --noinput")
+def django_initialize():
+    logging.info("Initializing Django")
+    migrate_cmd = "sudo python3 /srv/www/django/manage.py "
+    bossutils.utils.execute(migrate_cmd + "makemigrations")
+    bossutils.utils.execute(migrate_cmd + "makemigrations bosscore")  # will hang if it cannot contact the auth server
+    bossutils.utils.execute(migrate_cmd + "makemigrations bossoidc")
+    bossutils.utils.execute(migrate_cmd + "makemigrations bossingest")
+    bossutils.utils.execute(migrate_cmd + "migrate")
+    bossutils.utils.execute(migrate_cmd + "collectstatic --no-input")
+    # http://stackoverflow.com/questions/6244382/how-to-automate-createsuperuser-on-django
+    # For how it is possible to script createsuperuser command
+    bossutils.utils.execute("sudo service uwsgi-emperor reload")
+    bossutils.utils.execute("sudo service nginx restart")
+    logging.info("Finished Initializing Django")
+
 
 if __name__ == '__main__':
     logging.info("CONFIG_FILE = \"{}\"".format(bossutils.configuration.CONFIG_FILE))
@@ -99,7 +112,7 @@ if __name__ == '__main__':
     bossutils.configuration.download_and_save()
     #read_vault_token() # Not currently supported when generating access tokens
     set_hostname()
-    django_collectstatic()
+    django_initialize()
 
 
     # Since the service is to be run once, disable it

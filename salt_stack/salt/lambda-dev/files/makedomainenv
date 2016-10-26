@@ -3,8 +3,8 @@
 # 
 # creates the default base virutalenv and installs yum libraries needed.
 
-if [ "$#" -ne 1 ]; then
-    echo "ERROR.  Illegal number of arguments.  Script takes a single argument: domain_name"
+if [ "$#" -ne 2 ]; then
+    echo "ERROR.  Illegal number of arguments.  Script takes a two arguments: domain_name bucket_name"
 else
    STARTTIME=`date +"%Y%m%d-%H%M%S"`
    cd /home/ec2-user
@@ -110,7 +110,7 @@ else
        rm ~/lambdazips/multilambda.${1}.zip
        zip --symlinks -r -q  ~/lambdazips/multilambda.${1}.zip .
 
-       python ~/virtualenvs/${1}/lib/python3.4/site-packages/lambdautils/deploy_lambdas.py /home/ec2-user/virtualenvs/$1 ~/lambdazips/multilambda.${1}.zip --upload-only
+       python ~/virtualenvs/${1}/lib/python3.4/site-packages/lambdautils/deploy_lambdas.py /home/ec2-user/virtualenvs/$1 ~/lambdazips/multilambda.${1}.zip $2 --upload-only
    else
        echo Virtualenv not working correctly.  Not creating lambda zip.
        env > ~/debug/env-after-failing-${STARTTIME}.txt
