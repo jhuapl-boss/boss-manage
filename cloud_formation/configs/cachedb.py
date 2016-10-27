@@ -240,6 +240,7 @@ def pre_init(session, domain):
     """
     load_lambdas_on_s3(session, domain)
 
+
 def post_init(session, domain):
     print("post_init")
 
@@ -247,7 +248,6 @@ def post_init(session, domain):
     instances = [names.get_cache_manager(domain)]
     scalyr.add_instances_to_scalyr(
         session, PRODUCTION_REGION, instances)
-
 
 
 def delete(session, domain):

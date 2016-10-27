@@ -165,13 +165,11 @@ def load_lambdas_on_s3(session, domain):
         proc.wait()
     os.remove(zipname)
 
-
-    # This section will run makedomainenv on lambda-build-server however
-    # running it this way seems to cause the virtualenv to get messed up.
-    # Running this script manually on the build server does not have the problem.
+    # This section will run makedomainenv on lambda-build-server
     print("calling makedomainenv on lambda-build-server")
     #cmd = "\"shopt login_shell\""
-    cmd = "\"source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {}\"".format(domain)
+    bucket = lib.get_lambda_s3_bucket(session)
+    cmd = "\"source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {} {}\"".format(domain, bucket)
     lambda_build_server = lib.get_lambda_server(session)
 
     ssh(apl_bastion_key, lambda_build_server, "ec2-user", cmd)
