@@ -26,6 +26,13 @@ $ git commit -m "Updated submodule references"
 $ git push
 ```
 
+## AWS Credentials File
+If you are rebuilding integration in the production account, make sure 
+your **boss-manage/config/aws_credentials** file contains the production 
+account keys 
+your **boss-manage/config/set_var.sh** should have 
+SSH_KEY=integration-prod-20161009.pem
+
 ## Rebuilding AMIs
 
 Once the boss-manage.git repository submodules are pointed at the latest
@@ -39,7 +46,7 @@ Place `microns-bastion20151117.pem` in the `bin` folder.
 
 ```shell
 $ cd bin
-$ ./packer.py auth vault endpoint proofreader-web consul cachemanager
+$ cd 
 ```
 
 *Note: because the packer.py script is running builds in parallel it is redirecting
@@ -181,7 +188,7 @@ will deploy the stack with the minimum set of resources.*
 cd vault
 ./bastion.py bastion.integration.boss vault.integration.boss vault-read secret/auth/realm
 ```
-Login to https://api.integration.theboss.io/v0.5/resource/collections/
+Login to https://api.integration.theboss.io/v0.7/collection/
 Uses bossadmin and the password you now have to sync bossadmin to django
 
 ## Run unit tests on Endpoint 
@@ -354,7 +361,6 @@ To be filled out
 
 ### Manual Checks
 * https://api.integration.theboss.io/ping/
-* https://api.integration.theboss.io/v0.4/resource/collections
-* https://api.integration.theboss.io/v0.5/resource/collections
+* https://api.integration.theboss.io/v0.7/collection/
 * Login into Scalyr and verify that the new instances appear on the overview page.
 * Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint and proofreader.
