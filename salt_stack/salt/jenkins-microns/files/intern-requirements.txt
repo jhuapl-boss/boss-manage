@@ -1,0 +1,5 @@
+numpy
+requests
+blosc==1.4.1
+six
+mock

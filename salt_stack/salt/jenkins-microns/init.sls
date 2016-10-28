@@ -14,8 +14,8 @@ include:
     - vault.client
     - aws.boto3
 
-ndio-sdk:
+## TODO: make pip installation part of the Jenkins job, instead.
+intern-sdk:
     pip.installed:
         - bin_env: /usr/local/bin/pip3
-        - requirements: salt://jenkins-microns/files/ndio-requirements.txt
-
+        - requirements: salt://jenkins-microns/files/intern-requirements.txt
