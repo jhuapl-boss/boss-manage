@@ -325,10 +325,13 @@ def post_init(session, domain):
                                  hosts.DEV_DOMAIN)
 
     # Configure external DNS
+    # DP ???: Can this be moved into the CloudFormation template?
     dns_elb = lib.elb_public_lookup(session, "elb." + domain)
     lib.set_domain_to_dns_name(session, dns, dns_elb, lib.get_hosted_zone(session))
 
     # Write data into Vault
+    # DP TODO: Move into the pre-launch Vault writes, so it is available when the
+    #          machines initially start
     uri = "https://{}".format(dns)
     call.vault_update(VAULT_DJANGO_AUTH, public_uri = uri)
 
@@ -349,8 +352,6 @@ def post_init(session, domain):
     call.set_ssh_target("auth")
     call.ssh_tunnel(configure_auth, 8080)
 
-    # DP TODO: Add polling check to make sure the endpoint server is ready
-
     # Configure ndingest
     call.set_ssh_target("endpoint")
     print("Create settings.ini for ndingest")
@@ -358,13 +359,15 @@ def post_init(session, domain):
     if ret != 0:
         print("Building ndingest setttings file failed")
 
-    # Django makemigrations, migrate and collectstatic moved to firstboot.py in salt
-    print("Checking Django status")
-    call.django_check("endpoint", "/srv/www/django/manage.py")
-
-    # Bootstrap Django
-
     # Tell Scalyr to get CloudWatch metrics for these instances.
     instances = ["endpoint." + domain]
     scalyr.add_instances_to_scalyr(
         session, PRODUCTION_REGION, instances)
+
+def update(session, domain):
+    name = lib.domain_to_stackname("api." + domain)
+    config = create_config(session, domain)
+
+    success = config.update(session, name)
+
+    return success

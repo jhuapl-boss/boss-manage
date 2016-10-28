@@ -167,6 +167,7 @@ runcmd:
                                max = CONSUL_CLUSTER_SIZE,
                                notifications = "DNSSNS",
                                role = consul_role,
+                               support_update = False,
                                depends_on = ["DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
     user_data = configuration.UserData()
@@ -430,8 +431,6 @@ def update(session, domain):
         # Need time for the ASG to detect the terminated instance,
         # launch the new instance, and have the instance cluster
         tpe.submit(lib.asg_restart, session, "consul." + domain, 15*60)
-        tpe.submit(lib.asg_restart, session, "vault." + domain, 60)
-        tpe.submit(lib.asg_restart, session, "auth." + domain, 60)
 
     if success:
         keypair = lib.keypair_lookup(session)

@@ -1292,7 +1292,7 @@ class CloudFormationConfiguration:
 
     def add_autoscale_group(self, key, hostname, ami, keypair, subnets=["Subnet"], type_="t2.micro", public_ip=False,
                             security_groups=[], user_data=None, min=1, max=1, elb=None, notifications=None,
-                            notifications_arn=False, role=None, health_check_grace_period=30, depends_on=None):
+                            notifications_arn=False, role=None, health_check_grace_period=30, support_update=True, depends_on=None):
         """Add an AutoScalingGroup to the configuration
 
         Args:
@@ -1329,19 +1329,21 @@ class CloudFormationConfiguration:
                     {"Key" : "Name", "Value" : { "Ref": key + "Hostname" }, "PropagateAtLaunch": "true" }
                 ],
                 "VPCZoneIdentifier" : [{ "Ref" : subnet } for subnet in subnets]
-            #},
-            #"UpdatePolicy" : {
-            #    "AutoScalingRollingUpdate" : {
-            #        "MinInstancesInService" : str(get_scenario(min, 1) - 1),
-            #        "MaxBatchSize": "1",
-            #        #"WaitOnResourceSignals": "true", # need to have instances signal ready...
-            #        "PauseTime": "PT5M" # 5 minutes
-            #    },
-            #    "AutoScalingScheduledAction" : {
-            #        "IgnoreUnmodifiedGroupSizeProperties" : "true"
-            #    }
             }
         }
+
+        if support_update:
+            self.resources[key]["UpdatePolicy"] = {
+                "AutoScalingRollingUpdate" : {
+                    "MinInstancesInService" : str(get_scenario(min, 1) - 1),
+                    "MaxBatchSize": "1",
+                    #"WaitOnResourceSignals": "true", # need to have instances signal ready...
+                    #"PauseTime": "PT5M" # 5 minutes
+                },
+                "AutoScalingScheduledAction" : {
+                    "IgnoreUnmodifiedGroupSizeProperties" : "true"
+                }
+            }
 
         if notifications is not None:
             if type(notifications) != list:
