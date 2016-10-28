@@ -15,7 +15,7 @@ python-lib:
         - require:
             - sls: python.python35
 
-firstboot:
+bossutils-firstboot:
     file.managed:
         - name: /etc/init.d/bossutils-firstboot
         - source: salt://boss-tools/files/firstboot.py

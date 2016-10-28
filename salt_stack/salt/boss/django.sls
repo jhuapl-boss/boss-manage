@@ -47,7 +47,7 @@ uwsgi-enable-config:
         - name: /etc/uwsgi/apps-enabled/boss.ini
         - target: /etc/uwsgi/apps-available/boss.ini
 
-firstboot:
+boss-firstboot:
     file.managed:
         - name: /etc/init.d/boss-firstboot
         - source: salt://boss/files/firstboot.py
@@ -55,5 +55,5 @@ firstboot:
         - group: root
         - mode: 555
     cmd.run:
-        - name: update-rc.d boss-firstboot start 10 2 3 4 5 .
+        - name: update-rc.d boss-firstboot start 99 2 3 4 5 .
         - user: root
