@@ -33,6 +33,10 @@ bossutils.utils.set_excepthook()
 logging = bossutils.logger.BossLogger().logger
 
 def django_initialize():
+    logging.info("Create settings.ini for ndingest")
+    bossutils.utils.execute("sudo python3 /srv/salt/ndingest/build_settings.py")
+    logging.info("Finished creating settings.ini")
+
     logging.info("Initializing Django")
     migrate_cmd = "sudo python3 /srv/www/django/manage.py "
     bossutils.utils.execute(migrate_cmd + "makemigrations")

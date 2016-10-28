@@ -352,13 +352,6 @@ def post_init(session, domain):
     call.set_ssh_target("auth")
     call.ssh_tunnel(configure_auth, 8080)
 
-    # Configure ndingest
-    call.set_ssh_target("endpoint")
-    print("Create settings.ini for ndingest")
-    ret = call.ssh("sudo python3 /srv/salt/ndingest/build_settings.py")
-    if ret != 0:
-        print("Building ndingest setttings file failed")
-
     # Tell Scalyr to get CloudWatch metrics for these instances.
     instances = ["endpoint." + domain]
     scalyr.add_instances_to_scalyr(
