@@ -27,10 +27,10 @@ $ git push
 ```
 
 ## AWS Credentials File
-If you are rebuilding integration in the production account, make sure 
-your **boss-manage/config/aws_credentials** file contains the production 
-account keys 
-your **boss-manage/config/set_var.sh** should have 
+If you are rebuilding integration in the production account, make sure
+your **boss-manage/config/aws_credentials** file contains the production
+account keys
+your **boss-manage/config/set_var.sh** should have
 SSH_KEY=integration-prod-20161009.pem
 
 ## Rebuilding AMIs
@@ -46,7 +46,7 @@ Place `microns-bastion20151117.pem` in the `bin` folder.
 
 ```shell
 $ cd bin
-$ cd 
+$  ./packer.py auth vault consul endpoint proofreader-web cachemanager
 ```
 
 *Note: because the packer.py script is running builds in parallel it is redirecting
@@ -69,8 +69,8 @@ Success looks like this:
 Failure like this
 ==> Builds finished but no artifacts were created.
 
-It can beneficial to check the logs before all the AMIs are completed, when 
-issues do occur, they frequently fail early.  Discovering this allows you to 
+It can beneficial to check the logs before all the AMIs are completed, when
+issues do occur, they frequently fail early.  Discovering this allows you to
 relauch packer.py in another terminal for the failed AMIs, saving time overall.
 
 ## Relaunching Integration Stack
@@ -139,8 +139,8 @@ Once you have the needed API keys:
 2. Open `vault_aws_credentials` in a text editor
 3. Copy the access key and secret key that you received into the text editor
 4. Save `vault_aws_credentials` and close the text editor
-5. If you are building Integration you'll need to have vault_aws_credentials 
-for the production account.  It should have aws_account and domain filling in like this:  
+5. If you are building Integration you'll need to have vault_aws_credentials
+for the production account.  It should have aws_account and domain filling in like this:
 ```
 {
     "aws_access_key": "",
@@ -191,9 +191,9 @@ cd vault
 Login to https://api.integration.theboss.io/v0.7/collection/
 Uses bossadmin and the password you now have to sync bossadmin to django
 
-## Run unit tests on Endpoint 
+## Run unit tests on Endpoint
 
-If you are following these instructions for your personal development environment, skip the 
+If you are following these instructions for your personal development environment, skip the
 export RUN_HIGH_MEM_TESTS line.  That line runs 2 tests that need >2.5GB of memory
 to run and will fail in your environment
 
@@ -227,8 +227,8 @@ results recorded, and developers notified of any problems.
 
 #### Test While Logged Onto the Endpoint VM
 
-Again, Skip the RUN_HIGH_MEM_TESTS line below if you are following these instructions for 
-your personal development environment.  That line runs 2 tests that need >2.5GB 
+Again, Skip the RUN_HIGH_MEM_TESTS line below if you are following these instructions for
+your personal development environment.  That line runs 2 tests that need >2.5GB
 of memory to run and will fail in your environment
 
 ```shell
