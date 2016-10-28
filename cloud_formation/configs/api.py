@@ -247,6 +247,7 @@ def create(session, domain):
 
     call = lib.ExternalCalls(session, keypair, domain)
 
+    # DP TODO: Move creating user_data into create_config
     db = {
         "name":"boss",
         "user":"testuser",
@@ -358,8 +359,52 @@ def post_init(session, domain):
         session, PRODUCTION_REGION, instances)
 
 def update(session, domain):
+    keypair = lib.keypair_lookup(session)
+
+    call = lib.ExternalCalls(session, keypair, domain)
+
+    # DP TODO: Move creating user_data into create_config
+    db = {
+        "name":"boss",
+        "user":"testuser",
+        "password": call.vault_read(VAULT_DJANGO_DB)['password'],
+        "port": "3306"
+    }
+
+    s3flushqname = lib.domain_to_stackname(S3FLUSH_QUEUE_PREFIX + domain)
+    deadqname = lib.domain_to_stackname(DEADLETTER_QUEUE_PREFIX + domain)
+
+    # Configure Vault and create the user data config that the endpoint will
+    # use for connecting to Vault and the DB instance
+    user_data = configuration.UserData()
+    user_data["system"]["fqdn"] = "endpoint." + domain
+    user_data["system"]["type"] = "endpoint"
+    user_data["aws"]["db"] = "endpoint-db." + domain
+    user_data["aws"]["cache"] = "cache." + domain
+    user_data["aws"]["cache-state"] = "cache-state." + domain
+
+    ## cache-db and cache-stat-db need to be in user_data for lambda to access them.
+    user_data["aws"]["cache-db"] = "0"
+    user_data["aws"]["cache-state-db"] = "0"
+    user_data["aws"]["meta-db"] = "bossmeta." + domain
+    # Use CloudFormation's Ref function so that queues' URLs are placed into
+    # the Boss config file.
+    user_data["aws"]["s3-flush-queue"] = '{{"Ref": "{}" }}'.format(s3flushqname)
+    user_data["aws"]["s3-flush-deadletter-queue"] = '{{"Ref": "{}" }}'.format(deadqname)
+    user_data["aws"]["cuboid_bucket"] = names.get_cuboid_bucket(domain)
+    user_data["aws"]["tile_bucket"] = names.get_tile_bucket(domain)
+    user_data["aws"]["s3-index-table"] = names.get_s3_index(domain)
+    user_data["aws"]["tile-index-table"] = names.get_tile_index(domain)
+
+    user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
+
+    # Lambda names can't have periods.
+    multilambda = names.get_multi_lambda(domain).replace('.', '-')
+    user_data["lambda"]["flush_function"] = multilambda
+    user_data["lambda"]["page_in_function"] = multilambda
+
     name = lib.domain_to_stackname("api." + domain)
-    config = create_config(session, domain)
+    config = create_config(session, domain, keypair, user_data, db)
 
     success = config.update(session, name)
 
