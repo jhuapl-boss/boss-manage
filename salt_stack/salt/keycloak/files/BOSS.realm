@@ -62,6 +62,11 @@
             "temporary": false
         }],
         "enabled": true,
-        "realmRoles": ["superuser"]
+        "realmRoles": [
+            "superuser",
+            "admin",
+            "user-manager",
+            "resource-manager"
+        ]
     }]
 }
