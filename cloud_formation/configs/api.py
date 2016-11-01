@@ -75,6 +75,13 @@ REDIS_CLUSTER_SIZE = {
     "production": 2,
 }
 
+ENDPOINT_DB_CONFIG = {
+    "name":"boss",
+    "user":"testuser", # DP ???: Why is the name testuser? should we generate the username too?
+    "password": "",
+    "port": "3306"
+}
+
 TIMEOUT_KEYCLOAK = 90
 
 # Prefixes uses to generate names of SQS queues.
@@ -82,7 +89,7 @@ S3FLUSH_QUEUE_PREFIX = 'S3flush.'
 DEADLETTER_QUEUE_PREFIX = 'Deadletter.'
 
 
-def create_config(session, domain, keypair=None, user_data=None, db_config={}):
+def create_config(session, domain, keypair=None, db_config={}):
     """
     Create the CloudFormationConfiguration object.
     Args:
@@ -95,6 +102,45 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     Returns: the config for the Cloud Formation stack
 
     """
+
+
+    s3flushqname = lib.domain_to_stackname(S3FLUSH_QUEUE_PREFIX + domain)
+    deadqname = lib.domain_to_stackname(DEADLETTER_QUEUE_PREFIX + domain)
+    multilambda = names.get_multi_lambda(domain).replace('.', '-') # Lambda names can't have periods.
+
+    # Lookup IAM Role and SNS Topic ARNs for used later in the config
+    endpoint_role_arn = lib.role_arn_lookup(session, "endpoint")
+    cachemanager_role_arn = lib.role_arn_lookup(session, 'cachemanager')
+    dns_arn = lib.sns_topic_lookup(session, 'dns-' + domain.replace(".", "-"))
+    if dns_arn is None:
+        raise Exception("SNS topic named dns." + domain + " does not exist.")
+
+    # Configure Vault and create the user data config that the endpoint will
+    # use for connecting to Vault and the DB instance
+    user_data = configuration.UserData()
+    user_data["system"]["fqdn"] = "endpoint." + domain
+    user_data["system"]["type"] = "endpoint"
+    user_data["aws"]["db"] = "endpoint-db." + domain
+    user_data["aws"]["cache"] = "cache." + domain
+    user_data["aws"]["cache-state"] = "cache-state." + domain
+
+    ## cache-db and cache-stat-db need to be in user_data for lambda to access them.
+    user_data["aws"]["cache-db"] = "0"
+    user_data["aws"]["cache-state-db"] = "0"
+    user_data["aws"]["meta-db"] = "bossmeta." + domain
+
+    # Use CloudFormation's Ref function so that queues' URLs are placed into
+    # the Boss config file.
+    user_data["aws"]["s3-flush-queue"] = '{{"Ref": "{}" }}'.format(s3flushqname)
+    user_data["aws"]["s3-flush-deadletter-queue"] = '{{"Ref": "{}" }}'.format(deadqname)
+    user_data["aws"]["cuboid_bucket"] = names.get_cuboid_bucket(domain)
+    user_data["aws"]["tile_bucket"] = names.get_tile_bucket(domain)
+    user_data["aws"]["s3-index-table"] = names.get_s3_index(domain)
+    user_data["aws"]["tile-index-table"] = names.get_tile_index(domain)
+
+    user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
+    user_data["lambda"]["flush_function"] = multilambda
+    user_data["lambda"]["page_in_function"] = multilambda
 
     # Prepare user data for parsing by CloudFormation.
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
@@ -114,22 +160,12 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     config.add_arg(configuration.Arg.VPC("VPC", vpc_id,
                                          "ID of VPC to create resources in"))
 
-    external_subnet_id = lib.subnet_id_lookup(session, "external." + domain)
-    config.add_arg(configuration.Arg.Subnet("ExternalSubnet",
-                                            external_subnet_id,
-                                            "ID of External Subnet to create resources in"))
-
-    internal_subnet_id = lib.subnet_id_lookup(session, "internal." + domain)
-    config.add_arg(configuration.Arg.Subnet("InternalSubnet",
-                                            internal_subnet_id,
-                                            "ID of Internal Subnet to create resources in"))
+    az_subnets, external_subnets = config.find_all_availability_zones(session)
 
     internal_sg_id = lib.sg_lookup(session, vpc_id, "internal." + domain)
     config.add_arg(configuration.Arg.SecurityGroup("InternalSecurityGroup",
                                                    internal_sg_id,
                                                    "ID of internal Security Group"))
-
-    az_subnets, external_subnets = config.find_all_availability_zones(session)
 
     if domain in hosts.BASE_DOMAIN_CERTS.keys():
         cert = lib.cert_arn_lookup(session, "api." + hosts.BASE_DOMAIN_CERTS[domain])
@@ -138,32 +174,25 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                                                                hosts.DEV_DOMAIN))
 
     # Create SQS queues and apply access control policies.
-    deadqname = lib.domain_to_stackname(DEADLETTER_QUEUE_PREFIX + domain)
     config.add_sqs_queue(deadqname, deadqname, 30, 20160)
 
-    s3flushqname = lib.domain_to_stackname(S3FLUSH_QUEUE_PREFIX + domain)
     max_receives = 3
     deadq_arn = { 'Fn::GetAtt': [deadqname, 'Arn'] }
     config.add_sqs_queue(
         s3flushqname, s3flushqname, 30, dead=(deadq_arn, max_receives))
 
-    endpoint_role_arn = lib.role_arn_lookup(session, "endpoint")
     config.add_sqs_policy(
         'sqsEndpointPolicy', 'sqsEndpointPolicy',
         [{'Ref': deadqname}, {'Ref': s3flushqname}],
         endpoint_role_arn)
 
-    cachemanager_role_arn = lib.role_arn_lookup(session, 'cachemanager')
     config.add_sqs_policy(
         'sqsCachemgrPolicy', 'sqsCachemgrPolicy',
         [{'Ref': deadqname}, {'Ref': s3flushqname}],
         cachemanager_role_arn)
 
-    dns_arn = lib.sns_topic_lookup(session, 'dns-' + domain.replace(".", "-"))
-    if dns_arn is None:
-        raise Exception("SNS topic named dns." + domain + " does not exist.")
 
-    security_groups = ["InternalSecurityGroup"]
+    # Create the endpoint ASG, ELB, and RDS instance
     endpoint_role = lib.instance_profile_arn_lookup(session, 'endpoint')
     config.add_autoscale_group("Endpoint",
                                "endpoint." + domain,
@@ -171,7 +200,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                                keypair,
                                subnets=az_subnets,
                                type_=ENDPOINT_TYPE,
-                               security_groups=security_groups,
+                               security_groups=["InternalSecurityGroup"],
                                user_data=parsed_user_data,
                                min=ENDPOINT_CLUSTER_SIZE,
                                max=ENDPOINT_CLUSTER_SIZE,
@@ -182,14 +211,18 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                                health_check_grace_period=90,
                                depends_on=["EndpointLoadBalancer", "EndpointDB"])
 
-    security_groups.extend(["AllHTTPSSecurityGroup"])
     config.add_loadbalancer("EndpointLoadBalancer",
                             "elb." + domain,
                             [("443", "80", "HTTPS", cert)],
                             subnets=external_subnets,
-                            security_groups=security_groups,
+                            security_groups=["InternalSecurityGroup", "AllHTTPSSecurityGroup"],
                             public=True,
                             depends_on=["AllHTTPSSecurityGroup"])
+
+    # Allow HTTPS access to endpoint loadbalancer from anywhere
+    config.add_security_group("AllHTTPSSecurityGroup",
+                              "https",
+                              [("tcp", "443", "443", "0.0.0.0/0")])
 
     config.add_rds_db("EndpointDB",
                       "endpoint-db." + domain,
@@ -201,6 +234,7 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
                       type_ = RDS_TYPE,
                       security_groups=["InternalSecurityGroup"])
 
+    # Create the Meta, s3Index, tileIndex Dynamo tables
     with open(DYNAMO_SCHEMA, 'r') as fh:
         dynamo_cfg = json.load(fh)
     config.add_dynamo_table_from_json("EndpointMetaDB",'bossmeta.' + domain, **dynamo_cfg)
@@ -213,23 +247,20 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
         dynamo_tile_cfg = json.load(tilefh)
     config.add_dynamo_table_from_json('tileIndex', names.get_tile_index(domain), **dynamo_tile_cfg)
 
+    # Create the Cache and CacheState Redis Clusters
     config.add_redis_replication("Cache",
                                  "cache." + domain,
                                  az_subnets,
                                  ["InternalSecurityGroup"],
                                  type_=REDIS_TYPE,
                                  clusters=REDIS_CLUSTER_SIZE)
+
     config.add_redis_replication("CacheState",
                                  "cache-state." + domain,
                                  az_subnets,
                                  ["InternalSecurityGroup"],
                                  type_=REDIS_TYPE,
                                  clusters=REDIS_CLUSTER_SIZE)
-
-    # Allow HTTPS access to endpoint loadbalancer from anywhere
-    config.add_security_group("AllHTTPSSecurityGroup",
-                              "https",
-                              [("tcp", "443", "443", "0.0.0.0/0")])
 
     return config
 
@@ -247,51 +278,13 @@ def create(session, domain):
 
     call = lib.ExternalCalls(session, keypair, domain)
 
-    # DP TODO: Move creating user_data into create_config
-    db = {
-        "name":"boss",
-        "user":"testuser",
-        "password": lib.generate_password(),
-        "port": "3306"
-    }
-
-    s3flushqname = lib.domain_to_stackname(S3FLUSH_QUEUE_PREFIX + domain)
-    deadqname = lib.domain_to_stackname(DEADLETTER_QUEUE_PREFIX + domain)
-
-    # Configure Vault and create the user data config that the endpoint will
-    # use for connecting to Vault and the DB instance
-    user_data = configuration.UserData()
-    user_data["system"]["fqdn"] = "endpoint." + domain
-    user_data["system"]["type"] = "endpoint"
-    user_data["aws"]["db"] = "endpoint-db." + domain
-    user_data["aws"]["cache"] = "cache." + domain
-    user_data["aws"]["cache-state"] = "cache-state." + domain
-
-    ## cache-db and cache-stat-db need to be in user_data for lambda to access them.
-    user_data["aws"]["cache-db"] = "0"
-    user_data["aws"]["cache-state-db"] = "0"
-    user_data["aws"]["meta-db"] = "bossmeta." + domain
-    # Use CloudFormation's Ref function so that queues' URLs are placed into
-    # the Boss config file.
-    user_data["aws"]["s3-flush-queue"] = '{{"Ref": "{}" }}'.format(s3flushqname)
-    user_data["aws"]["s3-flush-deadletter-queue"] = '{{"Ref": "{}" }}'.format(deadqname)
-    user_data["aws"]["cuboid_bucket"] = names.get_cuboid_bucket(domain)
-    user_data["aws"]["tile_bucket"] = names.get_tile_bucket(domain)
-    user_data["aws"]["s3-index-table"] = names.get_s3_index(domain)
-    user_data["aws"]["tile-index-table"] = names.get_tile_index(domain)
-
-    user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
-
-    # Lambda names can't have periods.
-    multilambda = names.get_multi_lambda(domain).replace('.', '-')
-    user_data["lambda"]["flush_function"] = multilambda
-    user_data["lambda"]["page_in_function"] = multilambda
+    ENDPOINT_DB_CONFIG["password"] = lib.generate_password()
 
     call.vault_write(VAULT_DJANGO, secret_key = str(uuid.uuid4()))
-    call.vault_write(VAULT_DJANGO_DB, **db)
+    call.vault_write(VAULT_DJANGO_DB, **ENDPOINT_DB_CONFIG)
 
     name = lib.domain_to_stackname("api." + domain)
-    config = create_config(session, domain, keypair, user_data, db)
+    config = create_config(session, domain, keypair, ENDPOINT_DB_CONFIG)
 
     try:
         success = config.create(session, name)
@@ -363,48 +356,10 @@ def update(session, domain):
 
     call = lib.ExternalCalls(session, keypair, domain)
 
-    # DP TODO: Move creating user_data into create_config
-    db = {
-        "name":"boss",
-        "user":"testuser",
-        "password": call.vault_read(VAULT_DJANGO_DB)['password'],
-        "port": "3306"
-    }
-
-    s3flushqname = lib.domain_to_stackname(S3FLUSH_QUEUE_PREFIX + domain)
-    deadqname = lib.domain_to_stackname(DEADLETTER_QUEUE_PREFIX + domain)
-
-    # Configure Vault and create the user data config that the endpoint will
-    # use for connecting to Vault and the DB instance
-    user_data = configuration.UserData()
-    user_data["system"]["fqdn"] = "endpoint." + domain
-    user_data["system"]["type"] = "endpoint"
-    user_data["aws"]["db"] = "endpoint-db." + domain
-    user_data["aws"]["cache"] = "cache." + domain
-    user_data["aws"]["cache-state"] = "cache-state." + domain
-
-    ## cache-db and cache-stat-db need to be in user_data for lambda to access them.
-    user_data["aws"]["cache-db"] = "0"
-    user_data["aws"]["cache-state-db"] = "0"
-    user_data["aws"]["meta-db"] = "bossmeta." + domain
-    # Use CloudFormation's Ref function so that queues' URLs are placed into
-    # the Boss config file.
-    user_data["aws"]["s3-flush-queue"] = '{{"Ref": "{}" }}'.format(s3flushqname)
-    user_data["aws"]["s3-flush-deadletter-queue"] = '{{"Ref": "{}" }}'.format(deadqname)
-    user_data["aws"]["cuboid_bucket"] = names.get_cuboid_bucket(domain)
-    user_data["aws"]["tile_bucket"] = names.get_tile_bucket(domain)
-    user_data["aws"]["s3-index-table"] = names.get_s3_index(domain)
-    user_data["aws"]["tile-index-table"] = names.get_tile_index(domain)
-
-    user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
-
-    # Lambda names can't have periods.
-    multilambda = names.get_multi_lambda(domain).replace('.', '-')
-    user_data["lambda"]["flush_function"] = multilambda
-    user_data["lambda"]["page_in_function"] = multilambda
+    ENDPOINT_DB_CONFIG["password"] = call.vault_read(VAULT_DJANGO_DB)['password']
 
     name = lib.domain_to_stackname("api." + domain)
-    config = create_config(session, domain, keypair, user_data, db)
+    config = create_config(session, domain, keypair, ENDPOINT_DB_CONFIG)
 
     success = config.update(session, name)
 
