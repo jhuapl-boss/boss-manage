@@ -512,7 +512,7 @@ class ExternalCalls:
         self.domain = domain
         self.ssh_target = None
 
-    def vault_check(self, timeout):
+    def vault_check(self, timeout, exception=True):
         """Vault status check to see if Vault is accessible
         """
         def delegate():
@@ -521,9 +521,11 @@ class ExternalCalls:
                     return True
                 time.sleep(sleep)
 
-            msg = "Cannot connect to Vault after {} seconds".format(timeout)
-            raise exceptions.StatusCheckError(msg, self.vault_hostname)
-            return False
+            if exception:
+                msg = "Cannot connect to Vault after {} seconds".format(timeout)
+                raise exceptions.StatusCheckError(msg, self.vault_hostname)
+            else:
+                return False
 
         return bastion.connect_vault(self.keypair_file, self.vault_ip, self.bastion_ip, delegate)
 
@@ -667,7 +669,16 @@ class ExternalCalls:
                                   local_port,
                                   cmd)
 
-    def keycloak_check(self, timeout):
+    def ssh_all(self, hostname, cmd):
+        machines = bastion.machine_lookup_all(self.session, hostname, public_ip=False)
+
+        for ip in machines:
+            bastion.ssh_cmd(self.keypair_file,
+                            ip,
+                            self.bastion_ip,
+                            cmd)
+
+    def keycloak_check(self, timeout, exception=True):
         """Keycloak status check to see if Keycloak is accessible
         """
         # DP ???: use the actual login url so the actual API is checked..
@@ -683,31 +694,35 @@ class ExternalCalls:
                     return True
                 time.sleep(sleep)
 
-            msg = "Cannot connect to Keycloak after {} seconds".format(timeout)
-            raise exceptions.StatusCheckError(msg, self.ssh_target)
-            return False
+            if exception:
+                msg = "Cannot connect to Keycloak after {} seconds".format(timeout)
+                raise exceptions.StatusCheckError(msg, self.ssh_target)
+            else:
+                return False
 
         # DP TODO: save and restore previous ssh_target
         self.set_ssh_target("auth")
         return self.ssh_tunnel(delegate, 8080)
 
-    def http_check(self, url, timeout):
+    def http_check(self, url, timeout, exception=True):
         for sleep in gen_timeout(timeout, 15): # 15 second sleep
             res = urlopen(url)
             if res.getcode() == 200:
                 return True
             time.sleep(sleep)
 
-        msg = "Cannot connect to URL after {} seconds".format(timeout)
-        raise exceptions.StatusCheckError(msg, url)
-        return False
+        if exception:
+            msg = "Cannot connect to URL after {} seconds".format(timeout)
+            raise exceptions.StatusCheckError(msg, url)
+        else:
+            return False
 
-    def django_check(self, machine, manage_py):
+    def django_check(self, machine, manage_py, exception=True):
         self.set_ssh_target(machine)
         cmd = "sudo python3 {} check 2> /dev/null > /dev/null".format(manage_py) # suppress all output
 
         ret = self.ssh(cmd)
-        if ret != 0:
+        if exception and ret != 0:
             msg = "Problem with the endpoint's Django configuration"
             raise exceptions.StatusCheckError(msg, self.ssh_target)
 
