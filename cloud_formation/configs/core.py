@@ -368,6 +368,11 @@ def post_init(session, domain, startup_wait=False):
     print("Waiting for Keycloak to bootstrap")
     call.keycloak_check(TIMEOUT_KEYCLOAK)
 
+    #######
+    ## DP TODO: Need to find a check so that the master user is only added once to keycloak
+    ##          Also need to guard the writes to vault with the admin password
+    #######
+
     print("Creating initial Keycloak admin user")
     call.set_ssh_target("auth")
     call.ssh("/srv/keycloak/bin/add-user.sh -r master -u {} -p {}".format(username, password))
@@ -419,30 +424,49 @@ def update(session, domain):
         print("Can only update the production scenario")
         return None
 
-    print("Update disabled for core")
-    return None
+    consul_update_timeout = 5 # minutes
+    consul_size = int(configuration.get_scenario(CONSUL_CLUSTER_SIZE))
+    min_time = consul_update_timeout * consul_size
+    max_time = min_time + 5 # add some time to allow the CF update to happen
+
+    print("Update command will take {} - {} minutes to finish".format(min_time, max_time))
+    print("Stack will be available during that time")
+    resp = input("Update? [N/y] ")
+    if len(resp) == 0 or resp[0] not in ('y', 'Y'):
+        print("Canceled")
+        return
 
     name = lib.domain_to_stackname("core." + domain)
     config = create_config(session, domain)
 
     success = config.update(session, name)
 
-    with ThreadPoolExecutor(max_workers=3) as tpe:
-        # Need time for the ASG to detect the terminated instance,
-        # launch the new instance, and have the instance cluster
-        tpe.submit(lib.asg_restart, session, "consul." + domain, 15*60)
-
     if success:
         keypair = lib.keypair_lookup(session)
         call = lib.ExternalCalls(session, keypair, domain)
 
+        # Unseal Vault first, so the rest of the system can continue working
         print("Waiting for Vault...")
-        if not call.vault_check(6): # 6*15s = 90s
+        if not call.vault_check(90, exception=False):
             print("Could not contact Vault, check networking and run the following command")
             print("python3 bastion.py bastion.521.boss vault.521.boss vault-unseal")
             return
 
         call.vault_unseal()
+
+        print("Stack should be ready for use")
+        print("Starting to cycle consul cluster instances")
+
+        with ThreadPoolExecutor(max_workers=3) as tpe:
+            # Need time for the ASG to detect the terminated instance,
+            # launch the new instance, and have the instance cluster
+            tpe.submit(lib.asg_restart, session, "consul." + domain, consul_update_timeout * 60)
+
+        print("Cleaning up consul cluster")
+        cmd = 'sudo consul members | grep failed | cut -f1 -d" " | xargs -t -r -n1 sudo consul force-leave'
+        call.ssh_all('consul.' + domain, cmd) # Remove references to old cluster nodes
+
+
 
     return success
 
