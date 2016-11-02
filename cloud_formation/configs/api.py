@@ -364,3 +364,8 @@ def update(session, domain):
     success = config.update(session, name)
 
     return success
+
+def delete(session, domain):
+    lib.sqs_delete_all(session, domain)
+    lib.policy_delete_all(session, domain, '/ingest/')
+    lib.delete_stack(session, domain, "api")

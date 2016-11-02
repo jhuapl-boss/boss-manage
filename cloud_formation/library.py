@@ -1233,6 +1233,22 @@ def sns_topic_lookup(session, topic_name):
     return None
 
 
+def sqs_delete_all(session, domain):
+    """Delete all of the SQS Queues that start with the given domain name
+
+    Args:
+        session (Session) : Boto3 session used to lookup information in AWS
+        domain (string) : Domain name prefix of queues to delete
+
+    Raises:
+        (boto3.ClientError): If queue not found.
+    """
+    client = session.client('sqs')
+    resp = client.list_queues(QueueNamePrefix=domain.replace('.','-'))
+
+    for url in resp['QueueUrls']:
+        client.delete_queue(QueueUrl=url)
+
 def sqs_lookup_url(session, queue_name):
     """Lookup up SQS url given a name.
 
@@ -1464,6 +1480,25 @@ def sns_create_topic(session, topic):
     else:
         return response['TopicArn']
 
+def policy_delete_all(session, domain, path=""):
+    """Delete all of the IAM policies that start with the given domain name
+
+    Args:
+        session (Session) : Boto3 session used to lookup information in AWS
+        domain (string) : Domain name prefix of policies to delete
+        path (string) : IAM path of the policy, if one was used
+
+    Raises:
+        (boto3.ClientError): If queue not found.
+    """
+    # DP TODO: check for '/' at the beginning and end of path
+    prefix = path + domain.replace('.', '-')
+
+    client = session.client('iam')
+    resp = client.list_policies(Scope='Local', PathPrefix=prefix)
+
+    for policy in resp['Policies']:
+        client.delete_policy(PolicyArn=policy['Arn'])
 
 def role_arn_lookup(session, role_name):
     """
