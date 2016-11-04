@@ -689,9 +689,12 @@ class ExternalCalls:
             URL = "http://localhost:{}/auth/".format(port)
 
             for sleep in gen_timeout(timeout, 15): # 15 second sleep
-                res = urlopen(URL)
-                if res.getcode() == 200:
-                    return True
+                try:
+                    res = urlopen(URL)
+                    if res.getcode() == 200:
+                        return True
+                except HTTPError:
+                    pass
                 time.sleep(sleep)
 
             if exception:
@@ -1497,7 +1500,17 @@ def policy_delete_all(session, domain, path="/"):
     prefix = domain.replace('.', '-')
     for policy in resp.get('Policies', []):
         if policy['PolicyName'].startswith(prefix):
-            client.delete_policy(PolicyArn=policy['Arn'])
+            ARN = policy['Arn']
+            if policy['AttachmentCount'] > 0:
+                # cannot delete a policy if it is still in use
+                attached = client.list_entities_for_policy(PolicyArn=ARN)
+                for group in attached.get('PolicyGroups', []):
+                    client.detach_group_policy(GroupName=group['GroupName'], PolicyArn=ARN)
+                for user in attached.get('PolicyUsers', []):
+                    client.detach_user_policy(UserName=user['UserName'], PolicyArn=ARN)
+                for role in attached.get('PolicyRoles', []):
+                    client.detach_role_policy(RoleName=role['RoleName'], PolicyArn=ARN)
+            client.delete_policy(PolicyArn=ARN)
 
 def role_arn_lookup(session, role_name):
     """
