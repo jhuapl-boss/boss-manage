@@ -29,11 +29,11 @@ import library as lib
 
 import hosts
 
-"""
-create vpc.boss vpc
-create subnet.vpc.boss subnet
-create subnet.vpc.boss instance
-"""
+# Add a reference to boss-manage/lib/ so that we can import those files
+cur_dir = os.path.dirname(os.path.realpath(__file__))
+lib_dir = os.path.normpath(os.path.join(cur_dir, "..", "lib"))
+sys.path.append(lib_dir)
+import exceptions
 
 def create_session(credentials):
     """Read the AWS from the credentials dictionary and then create a boto3
@@ -44,46 +44,34 @@ def create_session(credentials):
                       region_name = 'us-east-1')
     return session
 
-def create_config(session, domain, config):
-    """Import 'configs.<config>' and then call the create() function with
+def build_dispatch(module, config):
+    """Build a dispatch dictionary of the different supported methods. Fill in the
+    default implementation if none is given (if supported).
+
+    could use module.__dict__.get(method)
+    """
+    dispatch = {}
+    dispatch['create'] = module.create if hasattr(module, 'create') else None
+    dispatch['update'] = module.update if hasattr(module, 'update') else None
+    dispatch['delete'] = module.delete if hasattr(module, 'delete') else lambda s,d: lib.delete_stack(s, d, config)
+    dispatch['post_init'] = module.post_init if hasattr(module, 'post_init') else None
+    dispatch['pre_init'] = module.pre_init if hasattr(module, 'pre_init') else None
+
+    dispatch['generate'] = lambda s,d: module.generate("templates", d) if hasattr(module, 'generate') else None
+
+    return dispatch
+
+def call_config(session, domain, config, func_name):
+    """Import 'configs.<config>' and then call the requested function with
     <session> and <domain>.
     """
     module = importlib.import_module("configs." + config)
-    module.create(session, domain)
 
-def delete_config(session, domain, config):
-    """Import 'configs.<config>' and then call the delete() function with
-    <session> and <domain> or call lib.delete_stack() directly if no delete function.
-    """
-    module = importlib.import_module("configs." + config)
-    if "delete" in dir(module):
-        module.delete(session, domain)
+    func = build_dispatch(module, config).get(func_name)
+    if func is None:
+        print("Configuration '{}' doesn't implement function '{}'".format(config, func_name))
     else:
-        lib.delete_stack(session, domain, config)
-
-def generate_config(domain, config):
-    """Import 'configs.<config>' and then call the generate() function with
-    'templates' directory and <domain>.
-    """
-    module = importlib.import_module("configs." + config)
-    module.generate("templates", domain)
-
-def post_init(session, domain, config):
-    """Import 'configs.<config>' and then call the post_init() function with
-    <session> and <domain> if the method exists.
-    """
-    module = importlib.import_module("configs." + config)
-    if "post_init" in dir(module):
-        module.post_init(session, domain)
-
-def pre_init(session, domain, config):
-    """Import 'configs.<config>' and then call the pre_init() function with
-    <session> and <domain> if the method exists.
-    """
-    module = importlib.import_module("configs." + config)
-    if "pre_init" in dir(module):
-        module.pre_init(session, domain)
-
+        func(session, domain)
 
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
@@ -96,7 +84,7 @@ if __name__ == '__main__':
     config_names = [x.split('/')[1].split('.')[0] for x in glob.glob("configs/*.py") if "__init__" not in x]
     config_help = create_help("config_name supports the following:", config_names)
 
-    actions = ["create", "generate", "delete", "post-init", "pre-init"]
+    actions = ["create", "update", "delete", "post-init", "pre-init", "generate"]
     actions_help = create_help("action supports the following:", actions)
 
     scenarios = ["development", "production"]
@@ -143,14 +131,24 @@ if __name__ == '__main__':
 
     session = create_session(credentials)
 
-    if args.action in ("create", ):
-        create_config(session, args.domain_name, args.config_name)
-    elif args.action in ("post-init", ):
-        post_init(session, args.domain_name, args.config_name)
-    elif args.action in ("pre-init",):
-        pre_init(session, args.domain_name, args.config_name)
-    elif args.action in ("generate", "gen"):
-        generate_config(args.domain_name, args.config_name)
-    elif args.action in ("delete", "del"):
-        if not delete_config(session, args.domain_name, args.config_name):
+    try:
+        func = args.action.replace('-','_')
+        ret = call_config(session, args.domain_name, args.config_name, func)
+        if ret == False:
             sys.exit(1)
+    except exceptions.StatusCheckError as ex:
+        target = 'the server'
+        if hasattr(ex, 'target') and ex.target is not None:
+            target = ex.target
+
+        print()
+        print(ex)
+        print("Check networking and {}".format(target))
+        print("Then run the following command:")
+        print("\t" + lib.get_command("post-init"))
+    except exceptions.KeyCloakLoginError as ex:
+        print()
+        print(ex)
+        print("Check Vault and Keycloak")
+        print("Then run the following command:")
+        print("\t" + lib.get_command("post-init"))

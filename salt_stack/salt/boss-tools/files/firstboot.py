@@ -97,5 +97,6 @@ if __name__ == '__main__':
     #read_vault_token() # Not currently supported when generating access tokens
     set_hostname()
 
+
     # Since the service is to be run once, disable it
     bossutils.utils.stop_firstboot()

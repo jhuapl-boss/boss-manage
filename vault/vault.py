@@ -318,6 +318,14 @@ def vault_seal(machine = None, ip = None):
     client.seal()
     print("Vault is sealed")
 
+def vault_status_check(machine = None, ip = None):
+    try:
+        client = get_client(machine = machine, ip = ip)
+        client.is_initialized()
+        return True
+    except:
+        return False
+
 def vault_status(machine = None, ip = None):
     """Print the status of a Vault. Connect using get_client(True) and print
     the status of the following items (if available):

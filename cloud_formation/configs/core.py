@@ -30,6 +30,7 @@ import time
 import requests
 import scalyr
 import hvac
+from concurrent.futures import ThreadPoolExecutor
 
 import os
 import json
@@ -56,6 +57,9 @@ VAULT_CLUSTER_SIZE = { # Vault Cluster is a fixed size
     "development" : 1,
     "production": 3 # should be an odd number
 }
+
+TIMEOUT_VAULT = 120
+TIMEOUT_KEYCLOAK = 120
 
 
 def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, public=True, depends_on=None):
@@ -91,9 +95,6 @@ def create_config(session, domain):
     # do a couple of verification checks
     if config.subnet_domain is not None:
         raise Exception("Invalid VPC domain name")
-
-    if session is not None and lib.vpc_id_lookup(session, domain) is not None:
-        raise Exception("VPC already exists, exiting...")
 
     global keypair
     keypair = lib.keypair_lookup(session)
@@ -166,6 +167,7 @@ runcmd:
                                max = CONSUL_CLUSTER_SIZE,
                                notifications = "DNSSNS",
                                role = consul_role,
+                               support_update = False,
                                depends_on = ["DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
     user_data = configuration.UserData()
@@ -203,7 +205,7 @@ runcmd:
     if domain in hosts.BASE_DOMAIN_CERTS.keys():
         cert = lib.cert_arn_lookup(session, "auth." + hosts.BASE_DOMAIN_CERTS[domain])
     else:
-        cert = lib.cert_arn_lookup(session, "auth.{}.{}".format(domain.split(".")[0],
+        cert = lib.cert_arn_lookup(session, "auth-{}.{}".format(domain.split(".")[0],
                                                                 hosts.DEV_DOMAIN))
     create_asg_elb(config,
                    "Auth",
@@ -290,77 +292,6 @@ runcmd:
 
     return config
 
-def upload_realm_config(port, username, password, realm_username, realm_password):
-    URL = "http://localhost:{}".format(port) # TODO move out of tunnel and use public address
-
-    kc = lib.KeyCloakClient(URL)
-    kc.login(username, password)
-    if kc.token is None:
-        print("Could not upload BOSS.realm configuration, exiting...")
-        return
-
-    cur_dir = os.path.dirname(os.path.realpath(__file__))
-    realm_file = os.path.normpath(os.path.join(cur_dir, "..", "..", "salt_stack", "salt", "keycloak", "files", "BOSS.realm"))
-    print("Opening realm file at '{}'".format(realm_file))
-    with open(realm_file, "r") as fh:
-        realm = json.load(fh)
-
-    try:
-        realm["users"][0]["username"] = realm_username
-        realm["users"][0]["credentials"][0]["value"] = realm_password
-    except:
-        print("Could not set realm admin's username or password, not creating user")
-        if "users" in realm:
-            del realm["users"]
-
-    kc.create_realm(realm)
-    kc.logout()
-
-def configure_keycloak(session, domain):
-    # NOTE DP: if there is an ELB in front of the auth server, this needs to be
-    #          the public DNS address of the ELB.
-    auth_elb = lib.elb_public_lookup(session, "auth." + domain)
-
-    if domain in hosts.BASE_DOMAIN_CERTS.keys():
-        auth_domain = 'auth.' + hosts.BASE_DOMAIN_CERTS[domain]
-    else:
-        auth_domain = 'auth.{}.{}'.format(domain.split(".")[0], hosts.DEV_DOMAIN)
-    auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_domain)
-    lib.set_domain_to_dns_name(session, auth_domain, auth_elb, lib.get_hosted_zone(session))
-
-    username = "admin"
-    password = lib.generate_password()
-    realm_username = "bossadmin"
-    realm_password = lib.generate_password()
-
-    call = lib.ExternalCalls(session, keypair, domain)
-    print("about to write secret/auth")
-    call.vault_write("secret/auth", password = password, username = username, client_id = "admin-cli")
-    print("about to write secret/auth/realm")
-    call.vault_write("secret/auth/realm", username = realm_username, password = realm_password, client_id = "endpoint")
-    print("about to write secret/keycloak")
-    call.vault_update("secret/keycloak", password = password, username = username, client_id = "admin-cli", realm = "master")
-    print("about to write secret/endpoint/auth")
-    call.vault_update("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
-    print("about to write secret/proofreader/auth")
-    call.vault_update("secret/proofreader/auth", url = auth_discovery_url, client_id = "endpoint")
-
-    print("about to add bossadmin user to keycloak")
-    call.set_ssh_target("auth")
-    call.ssh("/srv/keycloak/bin/add-user.sh -r master -u {} -p {}".format(username, password))
-    print("about to restarting keycloak")
-    call.ssh("sudo service keycloak stop")
-    time.sleep(2)
-    call.ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
-                                  # make sure the process is actually killed
-    time.sleep(3)
-    call.ssh("sudo service keycloak start")
-    print("Waiting for Keycloak to restart")
-    time.sleep(100)
-
-    upload = lambda p: upload_realm_config(p, username, password, realm_username, realm_password)
-    call.ssh_tunnel(upload, 8080)
-
 def generate(folder, domain):
     """Create the configuration and save it to disk"""
     name = lib.domain_to_stackname("core." + domain)
@@ -377,40 +308,167 @@ def create(session, domain):
         vpc_id = lib.vpc_id_lookup(session, domain)
         lib.rt_name_default(session, vpc_id, "internal." + domain)
 
-        print("Waiting 75 seconds for VMs to start...")
-        time.sleep(75)
         post_init(session, domain)
 
-def post_init(session, domain):
+def post_init(session, domain, startup_wait=False):
+    # Keypair is needed by ExternalCalls
     global keypair
     if keypair is None:
         keypair = lib.keypair_lookup(session)
+    call = lib.ExternalCalls(session, keypair, domain)
+
+    # Figure out the external domain name of the auth server(s), matching the SSL cert
+    if domain in hosts.BASE_DOMAIN_CERTS.keys():
+        auth_domain = 'auth.' + hosts.BASE_DOMAIN_CERTS[domain]
+    else:
+        auth_domain = 'auth-{}.{}'.format(domain.split(".")[0], hosts.DEV_DOMAIN)
+
+    # OIDC Discovery URL
+    auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_domain)
+
+    # Configure external DNS
+    auth_elb = lib.elb_public_lookup(session, "auth." + domain)
+    lib.set_domain_to_dns_name(session, auth_domain, auth_elb, lib.get_hosted_zone(session))
+
+    # Generate initial user accounts
+    username = "admin"
+    password = lib.generate_password()
+    realm_username = "bossadmin"
+    realm_password = lib.generate_password()
+
+    # Initialize Vault
+    print("Waiting for Vault...")
+    call.vault_check(TIMEOUT_VAULT) # Expecting this to also check Consul
 
     print("Initializing Vault...")
-    initialized = False
-    for i in range(6):
-        try:
-            call = lib.ExternalCalls(session, keypair, domain)
-            call.vault_init()
-            initialized = True
-            break
-        except requests.exceptions.ConnectionError:
-            time.sleep(30)
-        except hvac.exceptions.VaultDown:
-            time.sleep(30)
-    if not initialized:
-        print("Could not initialize Vault, manually call post-init before launching other machines")
+    try:
+        call.vault_init()
+    except Exception as ex:
+        print(ex)
+        print("Could not initialize Vault")
+        print("Call: {}".format(lib.get_command("post-init")))
+        print("Before launching other stacks")
         return
 
-    print("Waiting for Keycloak to bootstrap")
-    time.sleep(90)
+    # Write data into Vault
+    print("Writing secret/auth")
+    call.vault_write("secret/auth", password = password, username = username, client_id = "admin-cli")
+    print("Writing secret/auth/realm")
+    call.vault_write("secret/auth/realm", username = realm_username, password = realm_password, client_id = "endpoint")
+    print("Updating secret/keycloak")
+    call.vault_update("secret/keycloak", password = password, username = username, client_id = "admin-cli", realm = "master")
+    # DP TODO: Move this update call into the api config
+    print("Updating secret/endpoint/auth")
+    call.vault_update("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
+    # DP TODO: Move this update call into the proofreader config
+    print("Updating secret/proofreader/auth")
+    call.vault_update("secret/proofreader/auth", url = auth_discovery_url, client_id = "endpoint")
 
-    print("Configuring Keycloak...")
-    configure_keycloak(session, domain)
+    # Configure Keycloak
+    print("Waiting for Keycloak to bootstrap")
+    call.keycloak_check(TIMEOUT_KEYCLOAK)
+
+    #######
+    ## DP TODO: Need to find a check so that the master user is only added once to keycloak
+    ##          Also need to guard the writes to vault with the admin password
+    #######
+
+    print("Creating initial Keycloak admin user")
+    call.set_ssh_target("auth")
+    call.ssh("/srv/keycloak/bin/add-user.sh -r master -u {} -p {}".format(username, password))
+
+    print("Restarting Keycloak")
+    call.ssh("sudo service keycloak stop")
+    time.sleep(2)
+    call.ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
+                                  # make sure the process is actually killed
+    time.sleep(3)
+    call.ssh("sudo service keycloak start")
+
+    print("Waiting for Keycloak to restart")
+    call.keycloak_check(TIMEOUT_KEYCLOAK)
+
+    def upload_realm_config(port):
+        URL = "http://localhost:{}".format(port) # TODO move out of tunnel and use public address
+
+        kc = lib.KeyCloakClient(URL)
+        kc.login(username, password)
+
+        cur_dir = os.path.dirname(os.path.realpath(__file__))
+        realm_file = os.path.normpath(os.path.join(cur_dir, "..", "..", "salt_stack", "salt", "keycloak", "files", "BOSS.realm"))
+        print("Opening realm file at '{}'".format(realm_file))
+        with open(realm_file, "r") as fh:
+            realm = json.load(fh)
+
+        try:
+            realm["users"][0]["username"] = realm_username
+            realm["users"][0]["credentials"][0]["value"] = realm_password
+        except:
+            print("Could not set realm admin's username or password, not creating user")
+            if "users" in realm:
+                del realm["users"]
+
+        print("Uploading BOSS.realm configuration")
+        kc.create_realm(realm)
+        kc.logout()
+    call.ssh_tunnel(upload_realm_config, 8080)
+
 
     # Tell Scalyr to get CloudWatch metrics for these instances.
     instances = [ "vault." + domain ]
     scalyr.add_instances_to_scalyr(session, CORE_REGION, instances)
+
+def update(session, domain):
+    # Only in the production scenario will data be preserved over the update
+    if os.environ["SCENARIO"] not in ("production",):
+        print("Can only update the production scenario")
+        return None
+
+    consul_update_timeout = 5 # minutes
+    consul_size = int(configuration.get_scenario(CONSUL_CLUSTER_SIZE))
+    min_time = consul_update_timeout * consul_size
+    max_time = min_time + 5 # add some time to allow the CF update to happen
+
+    print("Update command will take {} - {} minutes to finish".format(min_time, max_time))
+    print("Stack will be available during that time")
+    resp = input("Update? [N/y] ")
+    if len(resp) == 0 or resp[0] not in ('y', 'Y'):
+        print("Canceled")
+        return
+
+    name = lib.domain_to_stackname("core." + domain)
+    config = create_config(session, domain)
+
+    success = config.update(session, name)
+
+    if success:
+        keypair = lib.keypair_lookup(session)
+        call = lib.ExternalCalls(session, keypair, domain)
+
+        # Unseal Vault first, so the rest of the system can continue working
+        print("Waiting for Vault...")
+        if not call.vault_check(90, exception=False):
+            print("Could not contact Vault, check networking and run the following command")
+            print("python3 bastion.py bastion.521.boss vault.521.boss vault-unseal")
+            return
+
+        call.vault_unseal()
+
+        print("Stack should be ready for use")
+        print("Starting to cycle consul cluster instances")
+
+        with ThreadPoolExecutor(max_workers=3) as tpe:
+            # Need time for the ASG to detect the terminated instance,
+            # launch the new instance, and have the instance cluster
+            tpe.submit(lib.asg_restart, session, "consul." + domain, consul_update_timeout * 60)
+
+        print("Cleaning up consul cluster")
+        cmd = 'sudo consul members | grep failed | cut -f1 -d" " | xargs -t -r -n1 sudo consul force-leave'
+        call.ssh_all('consul.' + domain, cmd) # Remove references to old cluster nodes
+
+
+
+    return success
 
 def delete(session, domain):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted

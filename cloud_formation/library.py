@@ -52,7 +52,19 @@ sys.path.append(vault_dir)
 import bastion
 import vault
 
+lib_dir = os.path.normpath(os.path.join(cur_dir, "..", "lib"))
+sys.path.append(lib_dir)
+import exceptions
 
+
+def get_command(action=None):
+    argv = sys.argv[:]
+    if action:
+        # DP HACK: hardcoded list of supported actions, should figure out something else
+        actions = ["create", "update", "delete", "post-init", "pre-init", "generate"]
+        argv = [action if a in actions else a for a in argv]
+
+    return " ".join(argv)
 
 def zip_directory(directory, name = "lambda"):
     target = os.path.join(tempfile.mkdtemp(), name)
@@ -231,6 +243,7 @@ def delete_stack(session, domain, config):
 
     return True
 
+# DP TODO: Add support for context manager for automatic logout
 class KeyCloakClient:
     """Client for connecting to Keycloak and using the REST API.
 
@@ -278,6 +291,7 @@ class KeyCloakClient:
             method=method
         )
 
+        # DP TODO: rewrite or merge using the boss-tools/bossutils KeycloakClient
         try:
             response = urlopen(request, context=self.ctx).read().decode("utf-8")
             if len(response) > 0:
@@ -286,9 +300,7 @@ class KeyCloakClient:
                 response = {}
             return response
         except HTTPError as e:
-            print("Error on '{}'".format(url))
-            print(e)
-            return None
+            raise exceptions.KeyCloakError(e.code, e.reason)
 
     def login(self, username, password):
         """Login to the Keycloak master realm and retrieve an access token.
@@ -320,7 +332,8 @@ class KeyCloakClient:
         )
 
         if self.token is None:
-            print("Could not authenticate to KeyCloak Server")
+            #print("Could not authenticate to KeyCloak Server")
+            raise exceptions.KeyCloakLoginError(self.url_base, username)
 
     def logout(self):
         """Logout from Keycloak.
@@ -469,6 +482,11 @@ class KeyCloakClient:
         auth_header = "Authorization: Bearer {}".format(self.token["access_token"])
         return {"url": installation_endpoint, "headers": auth_header}
 
+def gen_timeout(total, step):
+    times, remainder = divmod(total, step)
+    rtn = [step for i in range(times)]
+    rtn.insert(0, remainder) # Sleep for the partial time first
+    return rtn
 
 class ExternalCalls:
     """Class that helps with forming connections from the local machine to machines
@@ -494,6 +512,23 @@ class ExternalCalls:
         self.domain = domain
         self.ssh_target = None
 
+    def vault_check(self, timeout, exception=True):
+        """Vault status check to see if Vault is accessible
+        """
+        def delegate():
+            for sleep in gen_timeout(timeout, 15): # 15 second sleep
+                if vault.vault_status_check(machine=self.vault_hostname, ip=self.vault_ip):
+                    return True
+                time.sleep(sleep)
+
+            if exception:
+                msg = "Cannot connect to Vault after {} seconds".format(timeout)
+                raise exceptions.StatusCheckError(msg, self.vault_hostname)
+            else:
+                return False
+
+        return bastion.connect_vault(self.keypair_file, self.vault_ip, self.bastion_ip, delegate)
+
     def vault_init(self):
         """Initialize and configure all of the vault servers.
 
@@ -509,6 +544,18 @@ class ExternalCalls:
         for ip in vaults[1:]:
             connect(ip, lambda: vault.vault_unseal(machine=self.vault_hostname, ip=ip))
 
+    def vault_unseal(self):
+        """Unseal all of the vault servers.
+
+        Lookup all vault IPs for the VPC and unseal each server.
+        """
+        vaults = bastion.machine_lookup_all(self.session, self.vault_hostname, public_ip=False)
+
+        def connect(ip, func):
+            bastion.connect_vault(self.keypair_file, ip, self.bastion_ip, func)
+
+        for ip in vaults:
+            connect(ip, lambda: vault.vault_unseal(machine=self.vault_hostname, ip=ip))
 
     def vault(self, cmd, *args, **kwargs):
         """Call the specified vault command (from vault.py) with the given arguments
@@ -622,6 +669,84 @@ class ExternalCalls:
                                   local_port,
                                   cmd)
 
+    def ssh_all(self, hostname, cmd):
+        machines = bastion.machine_lookup_all(self.session, hostname, public_ip=False)
+
+        for ip in machines:
+            bastion.ssh_cmd(self.keypair_file,
+                            ip,
+                            self.bastion_ip,
+                            cmd)
+
+    def keycloak_check(self, timeout, exception=True):
+        """Keycloak status check to see if Keycloak is accessible
+        """
+        # DP ???: use the actual login url so the actual API is checked..
+        #         (and parse response for 403 unauthorized vs any other error..)
+
+        def delegate(port):
+            # Could move to connecting through the ELB, but then KC will have to be healthy
+            URL = "http://localhost:{}/auth/".format(port)
+
+            for sleep in gen_timeout(timeout, 15): # 15 second sleep
+                try:
+                    res = urlopen(URL)
+                    if res.getcode() == 200:
+                        return True
+                except HTTPError:
+                    pass
+                time.sleep(sleep)
+
+            if exception:
+                msg = "Cannot connect to Keycloak after {} seconds".format(timeout)
+                raise exceptions.StatusCheckError(msg, self.ssh_target)
+            else:
+                return False
+
+        # DP TODO: save and restore previous ssh_target
+        self.set_ssh_target("auth")
+        return self.ssh_tunnel(delegate, 8080)
+
+    def http_check(self, url, timeout, exception=True):
+        for sleep in gen_timeout(timeout, 15): # 15 second sleep
+            res = urlopen(url)
+            if res.getcode() == 200:
+                return True
+            time.sleep(sleep)
+
+        if exception:
+            msg = "Cannot connect to URL after {} seconds".format(timeout)
+            raise exceptions.StatusCheckError(msg, url)
+        else:
+            return False
+
+    def django_check(self, machine, manage_py, exception=True):
+        self.set_ssh_target(machine)
+        cmd = "sudo python3 {} check 2> /dev/null > /dev/null".format(manage_py) # suppress all output
+
+        ret = self.ssh(cmd)
+        if exception and ret != 0:
+            msg = "Problem with the endpoint's Django configuration"
+            raise exceptions.StatusCheckError(msg, self.ssh_target)
+
+        return ret == 0 # 0 - no issues, 1 - problems
+
+def asg_restart(session, hostname, timeout):
+    """Terminate all of the instances for an ASG, with the given timeout between
+    each termination.
+    """
+    client = session.client('ec2')
+    resource = session.resource('ec2')
+    response = client.describe_instances(Filters=[{"Name":"tag:Name", "Values":[hostname]},
+                                                  {"Name":"instance-state-name", "Values":["running"]}])
+
+    for reservation in response['Reservations']:
+        for instance in reservation['Instances']:
+            id = instance['InstanceId']
+            print("Terminating {} instance {}".format(hostname, id))
+            resource.Instance(id).terminate()
+            print("Sleeping for {} minutes".format(timeout/60.0))
+            time.sleep(timeout)
 
 def vpc_id_lookup(session, vpc_domain):
     """Lookup the Id for the VPC with the given domain name.
@@ -1111,6 +1236,22 @@ def sns_topic_lookup(session, topic_name):
     return None
 
 
+def sqs_delete_all(session, domain):
+    """Delete all of the SQS Queues that start with the given domain name
+
+    Args:
+        session (Session) : Boto3 session used to lookup information in AWS
+        domain (string) : Domain name prefix of queues to delete
+
+    Raises:
+        (boto3.ClientError): If queue not found.
+    """
+    client = session.client('sqs')
+    resp = client.list_queues(QueueNamePrefix=domain.replace('.','-'))
+
+    for url in resp.get('QueueUrls', []):
+        client.delete_queue(QueueUrl=url)
+
 def sqs_lookup_url(session, queue_name):
     """Lookup up SQS url given a name.
 
@@ -1342,6 +1483,34 @@ def sns_create_topic(session, topic):
     else:
         return response['TopicArn']
 
+def policy_delete_all(session, domain, path="/"):
+    """Delete all of the IAM policies that start with the given domain name
+
+    Args:
+        session (Session) : Boto3 session used to lookup information in AWS
+        domain (string) : Domain name prefix of policies to delete
+        path (string) : IAM path of the policy, if one was used
+
+    Raises:
+        (boto3.ClientError): If queue not found.
+    """
+    client = session.client('iam')
+    resp = client.list_policies(Scope='Local', PathPrefix=path)
+
+    prefix = domain.replace('.', '-')
+    for policy in resp.get('Policies', []):
+        if policy['PolicyName'].startswith(prefix):
+            ARN = policy['Arn']
+            if policy['AttachmentCount'] > 0:
+                # cannot delete a policy if it is still in use
+                attached = client.list_entities_for_policy(PolicyArn=ARN)
+                for group in attached.get('PolicyGroups', []):
+                    client.detach_group_policy(GroupName=group['GroupName'], PolicyArn=ARN)
+                for user in attached.get('PolicyUsers', []):
+                    client.detach_user_policy(UserName=user['UserName'], PolicyArn=ARN)
+                for role in attached.get('PolicyRoles', []):
+                    client.detach_role_policy(RoleName=role['RoleName'], PolicyArn=ARN)
+            client.delete_policy(PolicyArn=ARN)
 
 def role_arn_lookup(session, role_name):
     """

@@ -431,6 +431,21 @@ class CloudFormationConfiguration:
         with open(os.path.join(folder, name + ".arguments"), "w") as fh:
             json.dump(self.arguments, fh, indent=4)
 
+    def _poll(self, client, name, action, process):
+        get_status = lambda r: r['Stacks'][0]['StackStatus']
+        response = client.describe_stacks(StackName=name)
+        if len(response['Stacks']) == 0:
+            return None
+        else:
+            print("Waiting for {} ".format(action), end="", flush=True)
+            while get_status(response) == process:
+                time.sleep(5)
+                print(".", end="", flush=True)
+                response = client.describe_stacks(StackName=name)
+            print(" done")
+
+            return get_status(response)
+
     def create(self, session, name, wait = True):
         """Launch the template this object represents in CloudFormation.
 
@@ -460,24 +475,61 @@ class CloudFormationConfiguration:
 
         rtn = None
         if wait:
-            get_status = lambda r: r['Stacks'][0]['StackStatus']
-            response = client.describe_stacks(StackName=name)
-            if len(response['Stacks']) == 0:
-                print("Problem launching stack")
-            else:
-                print("Waiting for create ", end="", flush=True)
-                while get_status(response) == 'CREATE_IN_PROGRESS':
-                    time.sleep(5)
-                    print(".", end="", flush=True)
-                    response = client.describe_stacks(StackName=name)
-                print(" done")
+            status = self._poll(client, name, 'create', 'CREATE_IN_PROGRESS')
 
-                if get_status(response) == 'CREATE_COMPLETE':
-                    print("Created stack '{}'".format(name))
-                    rtn = True
-                else:
-                    print("Status of stack '{}' is '{}'".format(name, get_status(response)))
-                    rtn = False
+            if status is None:
+                print("Problem launching stack")
+            elif status == 'CREATE_COMPLETE':
+                print("Created stack '{}'".format(name))
+                rtn = True
+            else:
+                print("Status of stack '{}' is '{}'".format(name, status))
+                rtn = False
+        return rtn
+
+    def update(self, session, name, wait = True):
+        """Update the template this object represents in CloudFormation.
+
+        Args:
+            session (Session) : Boto3 session used to launch the configuration
+            name (string) : Name of the CloudFormation Stack
+            wait (bool) : If True, wait for the stack to be updated, printing
+                          status information
+
+        Returns:
+            (bool|None) : If wait is True, the result of launching the stack,
+                          else None
+        """
+        for argument in self.arguments:
+            if argument["ParameterValue"] is None:
+                raise Exception("Could not determine argument '{}'".format(argument["ParameterKey"]))
+
+        client = session.client('cloudformation')
+        response = client.update_stack(
+            StackName = name,
+            TemplateBody = self._create_template(),
+            Parameters = self.arguments,
+            Tags = [
+                {"Key": "Commit", "Value": lib.get_commit()}
+            ]
+        )
+
+        rtn = None
+        if wait:
+            status = self._poll(client, name, 'update', 'UPDATE_IN_PROGRESS')
+
+            if status is None:
+                print("Problem launching stack")
+            elif status == 'UPDATE_COMPLETE':
+                print("Updated stack '{}'".format(name))
+                rtn = True
+            elif status == 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS':
+                status = self._poll(client, name, 'update cleanup', 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS')
+                print("Updated stack '{}'".format(name))
+                rtn = True
+            else:
+                print("Status of stack '{}' is '{}'".format(name, status))
+                rtn = False
         return rtn
 
     def add_arg(self, arg):
@@ -1238,7 +1290,9 @@ class CloudFormationConfiguration:
         if internal_dns:
             self._add_record_cname(key, name, elb = True)
 
-    def add_autoscale_group(self, key, hostname, ami, keypair, subnets=["Subnet"], type_="t2.micro", public_ip=False, security_groups=[], user_data=None, min=1, max=1, elb=None, notifications=None, role=None, depends_on=None):
+    def add_autoscale_group(self, key, hostname, ami, keypair, subnets=["Subnet"], type_="t2.micro", public_ip=False,
+                            security_groups=[], user_data=None, min=1, max=1, elb=None, notifications=None,
+                            notifications_arn=False, role=None, health_check_grace_period=30, support_update=True, depends_on=None):
         """Add an AutoScalingGroup to the configuration
 
         Args:
@@ -1253,6 +1307,10 @@ class CloudFormationConfiguration:
             min (int|string) : The minimimum number of instances in the AutoScalingGroup
             max (int|string) : The maximum number of instances in the AutoScalingGroup
             elb (None|string) : The unique name of a LoadBalancer within the configuration to attach the AutoScalingGroup to
+            notifications (None|List|string) : list of topic references or a single topic reference, or a Arn of a topic already created.
+            notifications_arn (bool) : False then the notifications contains topic reference, True notifications contains Arn of already created topic
+            role (None|string) : Role name to use when creating instances
+            health_check_grace_period (int) : grace period in seconds to wait before checking newly created instances.
             depends_on (None|string|list): A unique name or list of unique names of resources within the
                                            configuration and is used to determine the launch order of resources
         """
@@ -1261,7 +1319,7 @@ class CloudFormationConfiguration:
             "Properties" : {
                 #"DesiredCapacity" : get_scenario(min, 1), Initial capacity, will min size also ensure the size on startup?
                 "HealthCheckType" : "EC2" if elb is None else "ELB",
-                "HealthCheckGracePeriod" : 30, # seconds
+                "HealthCheckGracePeriod" : health_check_grace_period, # seconds
                 "LaunchConfigurationName" : { "Ref": key + "Configuration" },
                 "LoadBalancerNames" : [] if elb is None else [{ "Ref": elb }],
                 "MaxSize" : str(get_scenario(max, 1)),
@@ -1273,6 +1331,19 @@ class CloudFormationConfiguration:
                 "VPCZoneIdentifier" : [{ "Ref" : subnet } for subnet in subnets]
             }
         }
+
+        if support_update:
+            self.resources[key]["UpdatePolicy"] = {
+                "AutoScalingRollingUpdate" : {
+                    "MinInstancesInService" : str(get_scenario(min, 1) - 1),
+                    "MaxBatchSize": "1",
+                    #"WaitOnResourceSignals": "true", # need to have instances signal ready...
+                    #"PauseTime": "PT5M" # 5 minutes
+                },
+                "AutoScalingScheduledAction" : {
+                    "IgnoreUnmodifiedGroupSizeProperties" : "true"
+                }
+            }
 
         if notifications is not None:
             if type(notifications) != list:
@@ -1286,7 +1357,7 @@ class CloudFormationConfiguration:
                         "autoscaling:EC2_INSTANCE_TERMINATE_ERROR",
                         "autoscaling:TEST_NOTIFICATION"
                     ],
-                    "TopicARN" : {"Ref": topic}
+                    "TopicARN" : {"Ref": topic} if not notifications_arn else topic
                 } for topic in notifications
             ]
 
@@ -1694,112 +1765,6 @@ class CloudFormationConfiguration:
             }
         }
 
-    # XXX DP: Does this work, it looks like the keys topicMicronList and snspolicyMicronList should be self.resources keys, not subkeys
-    # TODO clean up function and make generic, right now topic_name is not used and there are hardcoded email addresses
-    def _add_sns_topic(self, key, topic_name, depends_on=None ):
-        """ Add alarms for Loadbalancer
-        :arg key is the unique name (within the configuration) for this resource
-        :arg name is the name to give the
-        :arg depends_on is a list of resources this loadbalancer depends on
-        """
-        self.resources[key] = {
-            "topicMicronList": {
-                  "Type": "AWS::SNS::Topic",
-                  "Properties": {
-                    "DisplayName": "MicronList",
-                    "Subscription": [
-                      {
-                        "Endpoint": "13012544552",
-                        "Protocol": "sms"
-                      },
-                      {
-                        "Endpoint": "sandy.hider@jhuapl.edu",
-                        "Protocol": "email"
-                      }
-                    ]
-                  }
-                },
-                "snspolicyMicronList": {
-                  "Type": "AWS::SNS::TopicPolicy",
-                  "Properties": {
-                    "Topics": [
-                      {
-                        "Ref": "topicMicronList"
-                      }
-                    ],
-                    "PolicyDocument": {
-                      "Version": "2008-10-17",
-                      "Id": "__default_policy_ID",
-                      "Statement": [
-                        {
-                          "Sid": "__default_statement_ID",
-                          "Effect": "Allow",
-                          "Principal": {
-                            "AWS": "*"
-                          },
-                          "Action": [
-                            "SNS:ListSubscriptionsByTopic",
-                            "SNS:Subscribe",
-                            "SNS:DeleteTopic",
-                            "SNS:GetTopicAttributes",
-                            "SNS:Publish",
-                            "SNS:RemovePermission",
-                            "SNS:AddPermission",
-                            "SNS:Receive",
-                            "SNS:SetTopicAttributes"
-                          ],
-                          "Resource": {
-                            "Ref": "topicMicronList"
-                          },
-                          "Condition": {
-                            "StringEquals": {
-                              "AWS:SourceOwner": "256215146792"
-                            }
-                          }
-                        },
-                        {
-                          "Sid": "__console_pub_0",
-                          "Effect": "Allow",
-                          "Principal": {
-                            "AWS": "*"
-                          },
-                          "Action": "SNS:Publish",
-                          "Resource": {
-                            "Ref": "topicMicronList"
-                          }
-                        },
-                        {
-                          "Sid": "__console_sub_0",
-                          "Effect": "Allow",
-                          "Principal": {
-                            "AWS": "*"
-                          },
-                          "Action": [
-                            "SNS:Subscribe",
-                            "SNS:Receive"
-                          ],
-                          "Resource": {
-                            "Ref": "topicMicronList"
-                          },
-                          "Condition": {
-                            "StringEquals": {
-                              "SNS:Protocol": [
-                                "application",
-                                "sms",
-                                "email"
-                              ]
-                            }
-                          }
-                        }
-                      ]
-                    }
-                  }
-                }
-
-
-        }
-        if depends_on is not None:
-            self.resources[key]["DependsOn"] = depends_on
 
     def add_sqs_queue(self, key, name, hide=30, retention=5760, dead=None):
         """Create a SQS Queue

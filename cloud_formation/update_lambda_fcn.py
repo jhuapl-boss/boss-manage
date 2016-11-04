@@ -64,9 +64,6 @@ AWS_REGION = 'us-east-1'
 # Name that is prepended to the domain name (periods are replaced with dashes).
 LAMBDA_PREFIX = 'multiLambda-'
 
-# Bucket that stores all of our lambda functions.
-S3_BUCKET = None
-
 # Location of settings files for ndingest.
 NDINGEST_SETTINGS_FOLDER = '../salt_stack/salt/ndingest/files/ndingest.git/settings'
 
@@ -98,11 +95,11 @@ def get_lambda_zip_name(domain):
     """
     return 'multilambda.{}.zip'.format(domain)
 
-def update_lambda_code(session, domain):
+def update_lambda_code(session, domain, bucket):
     client = session.client('lambda')
     resp = client.update_function_code(
         FunctionName=get_lambda_name(domain),
-        S3Bucket=S3_BUCKET,
+        S3Bucket=bucket,
         S3Key=get_lambda_zip_name(domain),
         Publish=True)
     print(resp)
@@ -168,13 +165,11 @@ def load_lambdas_on_s3(session, domain):
         proc.wait()
     os.remove(zipname)
 
-
-    # This section will run makedomainenv on lambda-build-server however
-    # running it this way seems to cause the virtualenv to get messed up.
-    # Running this script manually on the build server does not have the problem.
+    # This section will run makedomainenv on lambda-build-server
     print("calling makedomainenv on lambda-build-server")
     #cmd = "\"shopt login_shell\""
-    cmd = "\"source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {}\"".format(domain)
+    bucket = lib.get_lambda_s3_bucket(session)
+    cmd = "\"source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {} {}\"".format(domain, bucket)
     lambda_build_server = lib.get_lambda_server(session)
 
     ssh(apl_bastion_key, lambda_build_server, "ec2-user", cmd)
@@ -239,9 +234,7 @@ def setup_parser():
         'domain',
         help = 'Domain that lambda functions live in, such as integration.boss.')
     # parser.add_argument(
-    # parser.add_argument(
     #     '--bucket', '-b',
-    #     default = S3_BUCKET,
     #     help = 'Name of S3 bucket containing lambda function.')
     #     '--key',
     #     default = None,
@@ -259,7 +252,7 @@ if __name__ == '__main__':
         credentials = json.load(args.aws_credentials)
 
     session = create_session(credentials)
-    S3_BUCKET = lib.get_lambda_s3_bucket(session)
+    bucket = lib.get_lambda_s3_bucket(session)
 
     load_lambdas_on_s3(session, args.domain)
-    update_lambda_code(session, args.domain)
+    update_lambda_code(session, args.domain, bucket)
