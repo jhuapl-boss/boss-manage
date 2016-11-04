@@ -537,11 +537,11 @@ if __name__ == '__main__':
     session = create_session(credentials)
 
     iam = IamUtils(session)
-    iam.get_iam_details_from_aws()
+    #iam.get_iam_details_from_aws()
 
     print("Exporting..")
     iam.export_to_files()
-    iam.load_from_files()
-    print("Importing..")
-    iam.import_to_aws(use_assume_role=True)
+    #iam.load_from_files()
+    #print("Importing..")
+    #iam.import_to_aws(use_assume_role=True)
 
