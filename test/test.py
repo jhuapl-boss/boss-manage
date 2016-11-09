@@ -31,6 +31,13 @@ from boto3.session import Session
 import json
 import os
 import random
+import time
+
+cur_dir = os.path.dirname(os.path.realpath(__file__))
+vault_dir = os.path.normpath(os.path.join(cur_dir, "..", "vault"))
+sys.path.append(vault_dir)
+import bastion
+import vault
 
 TARGET_MACHINES = [
     "consul.",
@@ -96,35 +103,7 @@ def machine_terminate(session, instances):
     for instance in instances:
         ec2.Instance(instance).terminate()
 
-if __name__ == "__main__":
-    os.chdir(os.path.abspath(os.path.dirname(__file__)))
-
-    parser = argparse.ArgumentParser(description = "Script to test killing all of the target EC2 instances in an availability zone")
-
-
-    parser.add_argument("--aws-credentials", "-a",
-                        metavar = "<file>",
-                        default = os.environ.get("AWS_CREDENTIALS"),
-                        type = argparse.FileType('r'),
-                        help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
-    parser.add_argument("--dryrun",
-                        action = "store_true",
-                        help = "Dry run and print the instances that would be terminated")
-    parser.add_argument("domain",
-                        metavar = "domain",
-                        help = "Domain to target")
-
-    args = parser.parse_args()
-
-    if args.aws_credentials is None:
-        parser.print_usage()
-        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
-        sys.exit(1)
-
-    session = create_session(args.aws_credentials)
-
-    # TODO: add sub command argument and move current functionality into a function
-    # TODO: add sub command to log into each target machine and shutdown the service (leave the machine running)
+def kill_az(session, args):
     azs = azs_lookup(session)
     az = random.choice(azs)
     print("Selecting Availability Zone ", az)
@@ -134,3 +113,99 @@ if __name__ == "__main__":
             print("Would terminate instance ", id)
     else:
         machine_terminate(session, ids)
+
+ITERATIONS = 5 # DP TODO: make optional argument
+def test_consul(session, args):
+    if args.ssh_key is None:
+        print("Error: SSH key not provided and SSH_KEY is not defined")
+        return 1
+    if not os.path.exists(args.ssh_key):
+        print("Error: SSH key '{}' does not exist".format(args.ssh_key))
+        return 1
+
+    global TARGET_MACHINES
+    TARGET_MACHINES = [TARGET_MACHINES[0]] # Limit to only consul
+    bastion_ip = bastion.machine_lookup(session, "bastion." + args.domain)
+    vault_ip = bastion.machine_lookup(session, "vault." + args.domain, public_ip=False)
+    vault_read = lambda: vault.vault_read("secret/auth/realm", "vault." + args.domain, vault_ip)
+
+    azs = azs_lookup(session)
+    for i in range(ITERATIONS):
+        az = random.choice(azs)
+        print("Selecting Availability Zone ", az)
+
+        ids = machine_lookup(session, args.domain, az)
+        for id in ids:
+            print("Terminating instance ", id)
+        machine_terminate(session, ids)
+
+        print("Sleeping for 5 minutes")
+        time.sleep(5 * 60)
+
+        try:
+            result = bastion.connect_vault(args.ssh_key, vault_ip, bastion_ip, vault_read)
+            username = result['data']['username']
+            print("Read username '{}' from Vault".format(username))
+        except Exception as e:
+            print("Problem connecting to Vault on iteration ", i)
+            print(e)
+            return 1
+
+        print()
+
+    print("Complete")
+    return 0
+
+if __name__ == "__main__":
+    os.chdir(os.path.abspath(os.path.dirname(__file__)))
+
+    tests = {
+        'kill-az': kill_az,
+        'test-consul': test_consul,
+    }
+
+    def create_help(header, options):
+        """Create formated help."""
+        return "\n" + header + "\n" + \
+               "\n".join(map(lambda x: "  " + x, options)) + "\n"
+
+    parser = argparse.ArgumentParser(description = "Script to test killing all of the target EC2 instances in an availability zone",
+                                     formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     epilog=create_help("test supports the following:", tests.keys()))
+
+    parser.add_argument("--aws-credentials", "-a",
+                        metavar = "<file>",
+                        default = os.environ.get("AWS_CREDENTIALS"),
+                        type = argparse.FileType('r'),
+                        help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
+    parser.add_argument("--ssh-key", "-s",
+                        metavar = "<file>",
+                        default = os.environ.get("SSH_KEY"),
+                        help = "SSH private key to use when connecting to AWS instances (default: SSH_KEY)")
+    parser.add_argument("--dryrun",
+                        action = "store_true",
+                        help = "Dry run and print the instances that would be terminated")
+    parser.add_argument("domain",
+                        metavar = "domain",
+                        help = "Domain to target")
+    parser.add_argument("test",
+                        choices = tests.keys(),
+                        metavar = "test",
+                        help = "Which type of test to run")
+
+    args = parser.parse_args()
+
+    if args.aws_credentials is None:
+        parser.print_usage()
+        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
+        sys.exit(1)
+
+    session = create_session(args.aws_credentials)
+    # TODO: add sub command to log into each target machine and shutdown the service (leave the machine running)
+
+    ret = tests[args.test](session, args)
+    if type(ret) == int:
+        sys.exit(ret)
+    elif type(ret) == bool:
+        sys.exit(0 if ret else 1)
+
