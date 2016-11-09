@@ -731,7 +731,7 @@ class ExternalCalls:
 
         return ret == 0 # 0 - no issues, 1 - problems
 
-def asg_restart(session, hostname, timeout):
+def asg_restart(session, hostname, timeout, callback=None):
     """Terminate all of the instances for an ASG, with the given timeout between
     each termination.
     """
@@ -747,6 +747,9 @@ def asg_restart(session, hostname, timeout):
             resource.Instance(id).terminate()
             print("Sleeping for {} minutes".format(timeout/60.0))
             time.sleep(timeout)
+
+            if callback is not None:
+                callback()
 
 def vpc_id_lookup(session, vpc_domain):
     """Lookup the Id for the VPC with the given domain name.
