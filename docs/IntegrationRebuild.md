@@ -204,7 +204,7 @@ export RUN_HIGH_MEM_TESTS=true
 cd /srv/www/django
 sudo python3 manage.py test
 ```
-	output should say 230 Tests OK with 11 skipped tests.
+	output should say Ran 257 tests.
 
 
 ## Proofreader Tests
@@ -252,22 +252,22 @@ sudo nose2 -c inttest.cfg
 	or the tests hang.
 
 
-#### Test Using ndio From a Client
+#### Test Using Intern From a Client
 
-ndio integration tests should be run from your local workstation or a VM
+intern integration tests should be run from your local workstation or a VM
 **not** running within the integration VPC.
 
-First ensure ndio is current:
+First ensure intern is current:
 
 ```shell
 # Clone the repository if you do not already have it.
-git clone https://github.com/jhuapl-boss/ndio.git
+git clone https://github.com/jhuapl-boss/intern.git
 
 # Otherwise update with `pull`.
 # git pull
 
 # Make the repository the current working directory.
-cd ndio
+cd intern
 
 # Check out the integration branch.
 # If there is no current integration branch, use master.
@@ -285,11 +285,11 @@ Create a new account and return to the token page.
 
 Generate a token.
 
-This token will be copied-pasted into the ndio config file.
+This token will be copied-pasted into the intern config file.
 
 ```shell
-mkdir ~/.ndio
-EDITOR ~/.ndio/ndio.cfg
+mkdir ~/.intern
+EDITOR ~/.intern/intern.cfg
 ```
 
 In your text editor, copy and paste the text config values below. Replace all
@@ -315,7 +315,7 @@ host = api.integration.theboss.io
 token = c23b48ceb35cae212b470a23d99d4185bac1c226
 ```
 
-Additionally, create a copy of `~/.ndio/ndio.cfg` as `test.cfg` in the ndio
+Additionally, create a copy of `~/.intern/intern.cfg` as `test.cfg` in the intern
 repository directory.
 
 ##### Setup via the Django Admin Page
@@ -325,12 +325,6 @@ In your browser, go to https://api.integration.theboss.io/admin
 Login using the bossadmin account created previously (this was created during
 the endpoint initialization and unit test step).
 
-Click on `Users` and determine the user name based on the email address you
-used during account creation (this step should soon be unnecessary, but at the
-time of writing, GUIDs are used for the user name).
-
-Now go back to the root admin page.
-
 Click on `Boss roles`.
 
 Click on `ADD BOSS ROLE`.
@@ -338,13 +332,13 @@ Click on `ADD BOSS ROLE`.
 Find the user you created and add the `ADMIN` role to that user and save.
 
 
-##### Run ndio Integration Tests
+##### Run Intern Integration Tests
 
 Finally, open a shell and run the integration tests:
 
 ```shell
-# Go to the location of your cloned ndio repository.
-cd ndio.git
+# Go to the location of your cloned intern repository.
+cd intern.git
 python3 -m unittest discover -p int_test*
 ```
 
