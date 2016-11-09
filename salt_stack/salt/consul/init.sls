@@ -40,3 +40,14 @@ consul-config:
         - user: root
         - group: root
         - dir_mode: 755
+
+/usr/sbin/consul_cleanup:
+    file.managed:
+        - source: salt://consul/files/consul_cleanup.py
+        - user: root
+        - group: root
+        - mode: 500
+    cron.present:
+        - identifier: CLEANUP
+        - user: root
+        - minute: '*/1'
