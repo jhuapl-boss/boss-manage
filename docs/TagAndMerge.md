@@ -17,7 +17,8 @@ For each of the following repositories
 * https://github.com/aplmicrons/spdb.git
 * https://github.com/jhuapl-boss/ingest-client
 * https://github.com/jhuapl-boss/ndingest
-* https://github.com/jhuapl-boss/ndio.git (ndio is not a sub-module, but also needs tagging)
+* https://github.com/jhuapl-boss/intern.git (intern is not a sub-module, but also needs tagging)
+* https://github.com/jhuapl-boss/ingest_test.git (not a sub-module, but also needs tagging)
 
 
 If you don't have the repository already cloned
@@ -71,7 +72,8 @@ For each of the following repositories
 * https://github.com/aplmicrons/spdb.git
 * https://github.com/jhuapl-boss/ingest-client
 * https://github.com/jhuapl-boss/ndingest
-* https://github.com/jhuapl-boss/ndio.git (ndio is not a sub-module, but also needs tagging)
+* https://github.com/jhuapl-boss/intern.git (intern is not a sub-module, but also needs tagging)
+* https://github.com/jhuapl-boss/ingest_test.git (not a sub-module, but also needs tagging)
 
 
 If you don't have the repository already cloned
@@ -127,5 +129,7 @@ in parallel. To check status view the logs at `boss-manage/packer/logs/<ami>.log
 
 ```shell
 $ cd boss-manage
-$ bin/packer.py all --name <sprint#|release#>
+$ bin/packer.py auth vault consul endpoint proofreader-web cachemanager --name <sprint#|release#>
+$ cd ../packer
+$ packer build -var-file=../config/aws-credentials -var-file=variables/lambda -var-file=../config/aws-bastion -var 'name_suffix=<sprint#|release#>' -var 'force_deregister=true' lambda.packer
 ```
