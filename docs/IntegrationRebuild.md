@@ -200,7 +200,7 @@ to run and will fail in your environment
 ```shell
 cd vault
 ./bastion.py bastion.integration.boss endpoint.integration.boss ssh
-export RUN_HIGH_MEM_TESTS=true
+export RUN_HIGH_MEM_TESTS=True
 cd /srv/www/django
 sudo python3 manage.py test
 ```
@@ -232,7 +232,7 @@ your personal development environment.  That line runs 2 tests that need >2.5GB
 of memory to run and will fail in your environment
 
 ```shell
-export RUN_HIGH_MEM_TESTS=true
+export RUN_HIGH_MEM_TESTS=True
 cd /srv/www/django
 sudo python3 manage.py test --pattern="int_test_*.py"
 ```
