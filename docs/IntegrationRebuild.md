@@ -191,6 +191,16 @@ cd vault
 Login to https://api.integration.theboss.io/v0.7/collection/
 Uses bossadmin and the password you now have to sync bossadmin to django
 
+## Add Trigger to multilambda.integration.boss
+Go to Lambda in the AWS console, 
+Select multilambda.integration.boss
+Select trigger tab
+click in the empty box Lambda is pointing to in the diagram.  Now select the S3 in the drop down box.
+A new dialog will come up
+Bucket:  tiles.integration.boss
+Event Type:  Object Created (All)
+You may need to scroll down to click submit
+
 ## Run unit tests on Endpoint
 
 If you are following these instructions for your personal development environment, skip the
