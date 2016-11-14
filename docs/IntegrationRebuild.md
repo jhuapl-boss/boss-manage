@@ -248,6 +248,17 @@ sudo python3 manage.py test --pattern="int_test_*.py"
 ```
 	output should say 55 Tests OK with 7 skipped tests
 
+##### Test the ndingest library.
+
+```shell
+# Manual install for now.  Will likely remove use of pytest in the future.
+sudo pip3 install pytest
+cd /usr/local/lib/python3/site-packages/ndingest
+# Use randomized queue names.
+export NDINGEST_TEST=1
+pytest -c test_apl.cfg
+```
+
 
 ### Cachemanager Integration Tests
 
