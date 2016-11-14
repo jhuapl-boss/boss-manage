@@ -191,6 +191,16 @@ cd vault
 Login to https://api.integration.theboss.io/v0.7/collection/
 Uses bossadmin and the password you now have to sync bossadmin to django
 
+## Add Trigger to multilambda.integration.boss
+Go to Lambda in the AWS console, 
+Select multilambda.integration.boss
+Select trigger tab
+click in the empty box Lambda is pointing to in the diagram.  Now select the S3 in the drop down box.
+A new dialog will come up
+Bucket:  tiles.integration.boss
+Event Type:  Object Created (All)
+You may need to scroll down to click submit
+
 ## Run unit tests on Endpoint
 
 If you are following these instructions for your personal development environment, skip the
@@ -200,7 +210,7 @@ to run and will fail in your environment
 ```shell
 cd vault
 ./bastion.py bastion.integration.boss endpoint.integration.boss ssh
-export RUN_HIGH_MEM_TESTS=true
+export RUN_HIGH_MEM_TESTS=True
 cd /srv/www/django
 sudo python3 manage.py test
 ```
@@ -232,11 +242,22 @@ your personal development environment.  That line runs 2 tests that need >2.5GB
 of memory to run and will fail in your environment
 
 ```shell
-export RUN_HIGH_MEM_TESTS=true
+export RUN_HIGH_MEM_TESTS=True
 cd /srv/www/django
 sudo python3 manage.py test --pattern="int_test_*.py"
 ```
 	output should say 55 Tests OK with 7 skipped tests
+
+##### Test the ndingest library.
+
+```shell
+# Manual install for now.  Will likely remove use of pytest in the future.
+sudo pip3 install pytest
+cd /usr/local/lib/python3/site-packages/ndingest
+# Use randomized queue names.
+export NDINGEST_TEST=1
+pytest -c test_apl.cfg
+```
 
 
 ### Cachemanager Integration Tests
