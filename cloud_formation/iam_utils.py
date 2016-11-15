@@ -31,18 +31,20 @@ from boto3 import Session
 from botocore.exceptions import ClientError
 import hosts
 import pprint
+import library as lib
+import datetime
 
 IAM_CONFIG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config", "iam"))
 DEFAULT_POLICY_FILE = os.path.join(IAM_CONFIG_DIR, "policies.json")
 DEFAULT_GROUP_FILE = os.path.join(IAM_CONFIG_DIR, "groups.json")
 DEFAULT_ROLES_FILE = os.path.join(IAM_CONFIG_DIR, "roles.json")
-DEFAULT_INSTANCE_POLICIES_FILE = os.path.join(IAM_CONFIG_DIR, "instance_policies.json")
-DEFAULT_INSTANCE_POLICIES_ROLES_FILE = os.path.join(IAM_CONFIG_DIR, "instance_policies_roles.json")
+DEFAULT_INSTANCE_PROFILES_FILE = os.path.join(IAM_CONFIG_DIR, "instance_profiles.json")
+DEFAULT_INSTANCE_PROFILE_ROLES_FILE = os.path.join(IAM_CONFIG_DIR, "instance_profile_roles.json")
 DEFAULT_ROLE_MANAGED_POLICIES_FILE = os.path.join(IAM_CONFIG_DIR, "role_managed_policies.json")
 DEFAULT_ROLE_INLINE_POLICIES_FILE = os.path.join(IAM_CONFIG_DIR, "role_inline_policies.json")
 DEFAULT_GROUP_MANAGED_POLICIES_FILE = os.path.join(IAM_CONFIG_DIR, "group_managed_policies.json")
 DEFAULT_GROUP_INLINE_POLICIES_FILE = os.path.join(IAM_CONFIG_DIR, "group_inline_policies.json")
-
+DEFAULT_CF_TEMPLATE = os.path.join(IAM_CONFIG_DIR, "cf_template.json")
 
 class IamUtils:
 
@@ -60,19 +62,32 @@ class IamUtils:
         self.policies = []
         self.groups = []
         self.roles = []
-        self.instance_policies = []
-        self.instance_policies_roles = []
+        self.instance_profiles = []
+        self.instance_profile_roles = []
         self.role_managed_polices = []
         self.role_inline_policies = []
         self.group_managed_polices = []
         self.group_inline_policies = []
         os.makedirs(IAM_CONFIG_DIR, exist_ok=True)
 
-    def swap_accounts(self, list):
-        list_string = json.dumps(list, indent=4)
-        account_switched = list_string.replace(hosts.DEV_ACCOUNT, hosts.PROD_ACCOUNT)
-        return json.loads(account_switched)
+    def to_prod_account(self, list):
+        current_account = lib.get_account_id_from_session(self.session)
+        if current_account != hosts.PROD_ACCOUNT:
+            return self.swap_accounts(list, current_account, hosts.PROD_ACCOUNT)
+        else:
+            return list
 
+    def to_sessions_account(self, list):
+        current_account = lib.get_account_id_from_session()
+        if current_account != hosts.PROD_ACCOUNT:
+            return self.swap_accounts(list, hosts.PROD_ACCOUNT, current_account)
+        else:
+            return list
+
+    def swap_accounts(self, list, from_acc, to_acc):
+        list_string = json.dumps(list, indent=4)
+        account_switched = list_string.replace(from_acc, to_acc)
+        return json.loads(account_switched)
 
     def get_iam_details_from_aws(self):
         client = self.session.client('iam')
@@ -100,7 +115,15 @@ class IamUtils:
             return True
         return False
 
-    def extract_policies_from_iam_details(self):
+    def extract_policies_from_iam_details(self, for_cf=False):
+        """
+        extracts policies from the iam details.
+        Args:
+            for_cf: True if extracting for cloud formation template
+
+        Returns:
+
+        """
         policy_temp_list = []
         for policy in self.iam_details["Policies"]:
             if self.filter("PolicyName", self.policy_keyword_filters, self.policy_whole_filters, policy):
@@ -111,15 +134,16 @@ class IamUtils:
                 if versions['IsDefaultVersion']:
                     # Description is not currently in the response even though it is in the docs.
                     # so we do this test if it doesn't exist.
+                    policy_doc = versions['Document'] if for_cf else json.dumps(versions['Document'], indent=2)
                     new_policy = {'PolicyName': policy['PolicyName'],
                                   'Path': policy['Path'],
-                                  'PolicyDocument': json.dumps(versions['Document'], indent=2)}
+                                  'PolicyDocument': policy_doc}
                     if 'Description' in policy:
                         new_policy["Description"] = policy["Description"]
                     policy_temp_list.append(new_policy)
                     break
 
-        self.policies = self.swap_accounts(policy_temp_list)
+        self.policies = self.to_prod_account(policy_temp_list)
 
     def save_policies(self, filename):
         with open(filename, 'w') as f:
@@ -145,7 +169,7 @@ class IamUtils:
         with open(filename, 'r') as f:
             self.policies = json.load(f)
 
-    def extract_roles_from_iam_details(self):
+    def extract_roles_from_iam_details(self, for_cf=False):
         role_temp_list = []
         managed_pol_role_list = []
         inst_pol_role_list = []
@@ -153,10 +177,11 @@ class IamUtils:
             if self.filter("RoleName", self.role_keyword_filters, self.role_whole_filters, role):
                 print("filtering: " + role["RoleName"])
                 continue
-
+            policy_doc = role['AssumeRolePolicyDocument'] if for_cf else json.dumps(role['AssumeRolePolicyDocument'],
+                                                                                    indent=2)
             new_role = {'RoleName': role['RoleName'],
                         'Path': role['Path'],
-                        'AssumeRolePolicyDocument': json.dumps(role['AssumeRolePolicyDocument'], indent=2)}
+                        'AssumeRolePolicyDocument': policy_doc}
             role_temp_list.append(new_role)
             client = self.session.client("iam")
 
@@ -169,12 +194,12 @@ class IamUtils:
             for inst_pol in role["RolePolicyList"]:
                 inst_pol["RoleName"] = role["RoleName"]
                 doc = inst_pol['PolicyDocument']
-                inst_pol['PolicyDocument'] = json.dumps(doc, indent=2)
+                inst_pol['PolicyDocument'] = doc if for_cf else json.dumps(doc, indent=2)
                 inst_pol_role_list.append(inst_pol)
 
-        self.roles = self.swap_accounts(role_temp_list)
-        self.role_managed_polices = self.swap_accounts(managed_pol_role_list)
-        self.role_inline_policies = self.swap_accounts(inst_pol_role_list)
+        self.roles = self.to_prod_account(role_temp_list)
+        self.role_managed_polices = self.to_prod_account(managed_pol_role_list)
+        self.role_inline_policies = self.to_prod_account(inst_pol_role_list)
 
     def save_roles(self, filename):
         with open(filename, 'w') as f:
@@ -250,7 +275,7 @@ class IamUtils:
                     print("error occur creating role inline policy: {} - {}".format(ip["RoleName"], ip["PolicyName"]))
                     print("   Details: {}".format(str(e)))
 
-    def get_instance_policies_from_aws(self):
+    def get_instance_profiles_from_aws(self):
         client = self.session.client('iam')
         response = client.list_instance_profiles(MaxItems=1000)
         ip_list = response["InstanceProfiles"]
@@ -269,31 +294,31 @@ class IamUtils:
                 new_ip_role = {"InstanceProfileName": ip["InstanceProfileName"],
                                "RoleName": role["RoleName"]}
                 ip_roles_list.append(new_ip_role)
-        self.instance_policies = temp_ip_list
-        self.instance_policies_roles = ip_roles_list
+        self.instance_profiles = temp_ip_list
+        self.instance_profile_roles = ip_roles_list
 
-    def save_instance_policies(self, filename):
+    def save_instance_profiles(self, filename):
         with open(filename, 'w') as f:
-            json.dump(self.instance_policies, f, indent=4)
+            json.dump(self.instance_profiles, f, indent=4)
 
-    def load_instance_policies_from_file(self, filename):
+    def load_instance_profile_from_file(self, filename):
         with open(filename, 'r') as f:
-            self.instance_policies = json.load(f)
+            self.instance_profiles = json.load(f)
 
-    def save_instance_policies_roles(self, filename):
+    def save_instance_profile_roles(self, filename):
         with open(filename, 'w') as f:
-            json.dump(self.instance_policies_roles, f, indent=4)
+            json.dump(self.instance_profile_roles, f, indent=4)
 
-    def load_instance_policies_roles_from_file(self, filename):
+    def load_instance_profile_roles_from_file(self, filename):
         with open(filename, 'r') as f:
-            self.instance_policies_roles = json.load(f)
+            self.instance_profile_roles = json.load(f)
 
     def import_instance_profiles_to_aws(self, use_assume_role=False):
         if use_assume_role:
             import_session = assume_production_role(self.session)
         else:
             import_session = self.session
-        for ip in self.instance_policies:
+        for ip in self.instance_profiles:
             client = import_session.client('iam')
             try:
                 client.create_instance_profile(**ip)
@@ -309,7 +334,7 @@ class IamUtils:
             import_session = assume_production_role(self.session)
         else:
             import_session = self.session
-        for ip_role in self.instance_policies_roles:
+        for ip_role in self.instance_profile_roles:
             client = import_session.client('iam')
             try:
                 client.add_role_to_instance_profile(**ip_role)
@@ -322,7 +347,7 @@ class IamUtils:
                                                                                        ip_role["RoleName"]))
                     print("   Details: {}".format(str(e)))
 
-    def extract_groups_from_iam_details(self):
+    def extract_groups_from_iam_details(self, for_cf=False):
         group_temp_list = []
         managed_pol_group_list = []
         inst_pol_group_list = []
@@ -345,12 +370,12 @@ class IamUtils:
             for inst_pol in group["GroupPolicyList"]:
                 inst_pol["GroupName"] = group["GroupName"]
                 doc = inst_pol['PolicyDocument']
-                inst_pol['PolicyDocument'] = json.dumps(doc, indent=2)
+                inst_pol['PolicyDocument'] = doc if for_cf else json.dumps(doc, indent=2)
                 inst_pol_group_list.append(inst_pol)
 
-        self.groups = self.swap_accounts(group_temp_list)
-        self.group_managed_polices = self.swap_accounts(managed_pol_group_list)
-        self.group_inline_policies = self.swap_accounts(inst_pol_group_list)
+        self.groups = self.to_prod_account(group_temp_list)
+        self.group_managed_polices = self.to_prod_account(managed_pol_group_list)
+        self.group_inline_policies = self.to_prod_account(inst_pol_group_list)
 
     def save_groups(self, filename):
         with open(filename, 'w') as f:
@@ -376,8 +401,8 @@ class IamUtils:
         with open(filename, 'r') as f:
             self.group_inline_policies = json.load(f)
 
-    def import_groups_to_aws(self, use_assume_group=True):
-        if use_assume_group:
+    def import_groups_to_aws(self, use_assume_role=True):
+        if use_assume_role:
             import_session = assume_production_role(self.session)
         else:
             import_session = self.session
@@ -392,8 +417,8 @@ class IamUtils:
                     print("error occur creating group: {}".format(group["GroupName"]))
                     print("   Details: {}".format(str(e)))
 
-    def import_group_managed_policies_to_aws(self, use_assume_group=True):
-        if use_assume_group:
+    def import_group_managed_policies_to_aws(self, use_assume_role=True):
+        if use_assume_role:
             import_session = assume_production_role(self.session)
         else:
             import_session = self.session
@@ -411,8 +436,8 @@ class IamUtils:
                                                                                      mp["PolicyArn"]))
                     print("   Details: {}".format(str(e)))
 
-    def import_group_inline_policies_to_aws(self, use_assume_group=True):
-        if use_assume_group:
+    def import_group_inline_policies_to_aws(self, use_assume_role=True):
+        if use_assume_role:
             import_session = assume_production_role(self.session)
         else:
             import_session = self.session
@@ -448,9 +473,9 @@ class IamUtils:
         self.save_role_managed_policies(DEFAULT_ROLE_MANAGED_POLICIES_FILE)
         self.save_role_inline_policies(DEFAULT_ROLE_INLINE_POLICIES_FILE)
 
-        self.get_instance_policies_from_aws()
-        self.save_instance_policies(DEFAULT_INSTANCE_POLICIES_FILE)
-        self.save_instance_policies_roles(DEFAULT_INSTANCE_POLICIES_ROLES_FILE)
+        self.get_instance_profiles_from_aws()
+        self.save_instance_profiles(DEFAULT_INSTANCE_PROFILES_FILE)
+        self.save_instance_profile_roles(DEFAULT_INSTANCE_PROFILE_ROLES_FILE)
 
         self.extract_groups_from_iam_details()
         self.save_groups(DEFAULT_GROUP_FILE)
@@ -460,8 +485,8 @@ class IamUtils:
     def load_from_files(self):
         self.load_policies_from_file(DEFAULT_POLICY_FILE)
         self.load_roles_from_file(DEFAULT_ROLES_FILE)
-        self.load_instance_policies_from_file(DEFAULT_INSTANCE_POLICIES_FILE)
-        self.load_instance_policies_roles_from_file(DEFAULT_INSTANCE_POLICIES_ROLES_FILE)
+        self.load_instance_profile_from_file(DEFAULT_INSTANCE_PROFILES_FILE)
+        self.load_instance_profile_roles_from_file(DEFAULT_INSTANCE_PROFILE_ROLES_FILE)
         self.load_role_managed_policies_from_file(DEFAULT_ROLE_MANAGED_POLICIES_FILE)
         self.load_role_inline_policies_from_file(DEFAULT_ROLE_INLINE_POLICIES_FILE)
         self.load_groups_from_file(DEFAULT_GROUP_FILE)
@@ -478,6 +503,21 @@ class IamUtils:
         self.import_groups_to_aws(use_assume_role)
         self.import_group_managed_policies_to_aws(use_assume_role)
         self.import_group_inline_policies_to_aws(use_assume_role)
+
+    def delete_policies(self,  use_assume_role=False):
+        if use_assume_role:
+            import_session = assume_production_role(self.session)
+        else:
+            import_session = self.session
+        acc = lib.get_account_id_from_session(import_session)
+        while input("Your about to delete all policies from account {}.  type yes to continue: ".format(acc)) != 'yes':
+            pass
+        client = import_session.client('iam')
+        policies = client.list_policies(Scope='Local')
+        for policy in policies["Policies"]:
+            print("deleting " + policy["PolicyName"])
+            client.delete_policy(PolicyArn=policy["Arn"])
+
 
 
 def assume_production_role(session):
@@ -517,9 +557,9 @@ def create_session(credentials):
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
-    parser = argparse.ArgumentParser(description="Request SSL domain certificates for theboss.io subdomains",
+    parser = argparse.ArgumentParser(description="Exports Iam information from Dev Account to Production Account.  Assume role must be active.",
                                      formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     epilog='create domain cert')
+                                     epilog='Exports and Imports Iam Information')
     parser.add_argument("--aws-credentials", "-a",
                         metavar="<file>",
                         default=os.environ.get("AWS_CREDENTIALS"),
@@ -537,11 +577,17 @@ if __name__ == '__main__':
     session = create_session(credentials)
 
     iam = IamUtils(session)
+    #iam.export_to_cf_template()
+
+
     #iam.get_iam_details_from_aws()
 
     print("Exporting..")
     iam.export_to_files()
+
     #iam.load_from_files()
     #print("Importing..")
-    #iam.import_to_aws(use_assume_role=True)
+    #iam.import_to_aws(use_assume_role=False)
+
+    #iam.delete_policies()  # be careful with this one.
 
