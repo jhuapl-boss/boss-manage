@@ -44,10 +44,10 @@ DYNAMO_S3_INDEX_SCHEMA = '../salt_stack/salt/spdb/files/spdb.git/spatialdb/dynam
 DYNAMO_TILE_INDEX_SCHEMA  = '../salt_stack/salt/ndingest/files/ndingest.git/nddynamo/schemas/boss_tile_index.json'
 
 # Annotation id to supercuboid table.
-DYNAMO_ID_INDEX_SCHEMA = '../salt_stack/salt/boss/files/boss.git/django/bosscore/dynamo_id_index_schema.json'
+DYNAMO_ID_INDEX_SCHEMA = '../salt_stack/salt/spdb/files/spdb.git/spatialdb/dynamo/id_index_schema.json'
 
 # Annotation id count table (allows for reserving the next id in a channel).
-DYNAMO_ID_COUNT_SCHEMA = '../salt_stack/salt/boss/files/boss.git/django/bosscore/dynamo_id_count_schema.json'
+DYNAMO_ID_COUNT_SCHEMA = '../salt_stack/salt/spdb/files/spdb.git/spatialdb/dynamo/id_count_schema.json'
 
 INCOMING_SUBNET = "52.3.13.189/32"  # microns-bastion elastic IP
 
