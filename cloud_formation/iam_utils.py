@@ -19,6 +19,13 @@ from Developer account into Production Account
 
 Currently setup to assume DeveloperAccess role in Production Account.
 Could also be used with Production Credentials to import from text files.
+Several methods have use_assume_role option for the developerAccess to assume
+production account access.  The preferable way is to use production credentials
+directly.
+
+The following variables have to be converted from JSON to a String before using in Boto3
+Policy.PolicyDocument
+
 
 """
 
@@ -115,11 +122,9 @@ class IamUtils:
             return True
         return False
 
-    def extract_policies_from_iam_details(self, for_cf=False):
+    def extract_policies_from_iam_details(self):
         """
         extracts policies from the iam details.
-        Args:
-            for_cf: True if extracting for cloud formation template
 
         Returns:
 
@@ -134,7 +139,7 @@ class IamUtils:
                 if versions['IsDefaultVersion']:
                     # Description is not currently in the response even though it is in the docs.
                     # so we do this test if it doesn't exist.
-                    policy_doc = versions['Document'] if for_cf else json.dumps(versions['Document'], indent=2)
+                    policy_doc = versions['Document']
                     new_policy = {'PolicyName': policy['PolicyName'],
                                   'Path': policy['Path'],
                                   'PolicyDocument': policy_doc}
@@ -150,20 +155,70 @@ class IamUtils:
             json.dump(self.policies, f, indent=4)
 
     def import_policies_to_aws(self, use_assume_role=False):
+        '''
+        imports the currently loaded policies into AWS.
+        Args:
+            use_assume_role: set to True if using developer account credentials and plan to assume production credentials
+
+        Returns:
+
+        '''
         if use_assume_role:
             import_session = assume_production_role(self.session)
         else:
             import_session = self.session
         for policy in self.policies:
             client = import_session.client('iam')
+            boto3_policy = policy.copy()
+            boto3_policy["PolicyDocument"] = json.dumps(boto3_policy["PolicyDocument"], indent=2)
             try:
-                client.create_policy(**policy)
+                client.create_policy(**boto3_policy)
             except ClientError as e:
                 if e.response['Error']['Code'] == 'EntityAlreadyExists':
-                    print("Policy {} already exists cannot load again.".format(policy["PolicyName"]))
+                    print("Policy {} already exists cannot load again.".format(boto3_policy["PolicyName"]))
                 else:
-                    print("error occur creating policy: {}".format(policy["PolicyName"]))
+                    print("error occur creating policy: {}".format(boto3_policy["PolicyName"]))
                     print("   Details: {}".format(str(e)))
+
+    def adjust_policies_in_aws(self, use_assume_role=False):
+        '''
+        Adjusts the AWS policies to match the current in memory policies. It creates the polices if
+        they do not exist in AWS and updates the policy version active policy version to match the
+        loaded policy version.  It will not delete any policies. It cannot not adjust the policy path but
+        will inform if the policy path is different.
+        Args:
+            use_assume_role: set to True if using developer account credentials and plan to assume production credentials
+
+        Returns:
+
+        '''
+        if use_assume_role:
+            import_session = assume_production_role(self.session)
+        else:
+            import_session = self.session
+        if self.iam_details == None:
+            print("iam_details must be imported first.")
+            return
+        for policy in self.policies:
+            client = import_session.client('iam')
+            boto3_policy = policy.copy()
+
+            aws_policy = find_dict_with(self.iam_details["Policies"], "PolicyName",  boto3_policy["PolicyName"])
+            if aws_policy is None:
+                try:
+                    boto3_policy["PolicyDocument"] = json.dumps(boto3_policy["PolicyDocument"], indent=2, sort_keys=True)
+                    client.create_policy(**boto3_policy)
+                except ClientError as e:
+                    if e.response['Error']['Code'] == 'EntityAlreadyExists':
+                        print("Policy {} already exists cannot load again.".format(boto3_policy["PolicyName"]))
+                    else:
+                        print("error occur creating policy: {}".format(boto3_policy["PolicyName"]))
+                        print("   Details: {}".format(str(e)))
+            else:
+                validate_policy(client, boto3_policy, aws_policy)
+
+
+
 
     def load_policies_from_file(self, filename):
         with open(filename, 'r') as f:
@@ -462,7 +517,7 @@ class IamUtils:
         )
         pprint.pprint(response)
 
-    def export_to_files(self):
+    def export_from_aws_to_files(self):
         self.get_iam_details_from_aws()
 
         self.extract_policies_from_iam_details()
@@ -554,6 +609,56 @@ def create_session(credentials):
     return session
 
 
+def find_dict_with(list_of_dicts, key, value):
+    """
+    finds the first dictionary containing the key, value pair.
+    Args:
+        list_of_dicts: a list of dictionaries
+        key:  key to search for in the dictionaries
+        value:  the value that should be assigned to the key
+
+    Returns:
+        returns the first dictionary containing the key,value pair.
+    """
+    for d in list_of_dicts:
+        if key in d:
+            if d[key] == value:
+                return d;
+    return None
+
+
+def validate_policy(client, mem_pol, aws_pol):
+    if mem_pol["PolicyName"] != aws_pol["PolicyName"]:
+        print("Cannot validate different Policys: {} and {}".format(mem_pol["PolicyName"], aws_pol["PolicyName"]))
+        return
+    if mem_pol["Path"] != aws_pol["Path"]:
+        print("WARNING Paths differ for policy {}: Path_In_File={} Path_In_AWS={}".format(mem_pol["PolicyName"],
+                                                                                     mem_pol["Path"], aws_pol["Path"]))
+        print("You will need to manually delete the old policy for the Path to be changed.")
+    aws_ver = get_default_policy_version(aws_pol)
+    mem_pol["PolicyDocument"] = json.dumps(mem_pol["PolicyDocument"], indent=2, sort_keys=True)
+    aws_ver["Document"] = json.dumps(aws_ver["Document"], indent=2, sort_keys=True)
+    if mem_pol["PolicyDocument"] != aws_ver["Document"]:
+        print("Default Policy version differs")
+        if len(aws_pol["PolicyVersionList"]) == 5:
+            response = client.delete_policy_version(PolicyArn=aws_pol["Arn"],
+                                                    VersionId=get_oldest_policy_version(aws_pol))
+        client.create_policy_version(PolicyArn=aws_pol['Arn'],
+                                     PolicyDocument=mem_pol["PolicyDocument"],
+                                     SetAsDefault=True)
+
+
+def get_oldest_policy_version(policy):
+    versions = []
+    for ver in policy["PolicyVersionList"]:
+        versions.append(int(ver["VersionId"][1:]))
+    versions.sort()
+    print(str(versions))
+    return "v" + str(versions[0])
+
+def get_default_policy_version(policy):
+    return find_dict_with(policy["PolicyVersionList"], "VersionId", policy["DefaultVersionId"])
+
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
@@ -577,17 +682,26 @@ if __name__ == '__main__':
     session = create_session(credentials)
 
     iam = IamUtils(session)
-    #iam.export_to_cf_template()
 
+    # Testing
+    # iam.get_iam_details_from_aws()
+    # iam.extract_policies_from_iam_details()
+    # iam.save_policies(DEFAULT_POLICY_FILE)
 
-    #iam.get_iam_details_from_aws()
+    # print("Adjusting...")
+    iam.get_iam_details_from_aws()
+    iam.load_policies_from_file(DEFAULT_POLICY_FILE)
+    iam.adjust_policies_in_aws()
 
-    print("Exporting..")
-    iam.export_to_files()
+    # iam.get_iam_details_from_aws()
+    # iam.save_iam_details()
 
-    #iam.load_from_files()
-    #print("Importing..")
-    #iam.import_to_aws(use_assume_role=False)
+    # print("Exporting..")
+    # iam.export_to_files()
 
-    #iam.delete_policies()  # be careful with this one.
+    # print("Importing..")
+    # iam.load_from_files()
+    # iam.import_to_aws(use_assume_role=False)
+
+    # iam.delete_policies()  # be careful with this one.
 
