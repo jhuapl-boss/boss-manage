@@ -1677,3 +1677,22 @@ def get_lambda_server(session):
         return hosts.DEV_LAMBDA_SERVER
     else:
         raise NameError("Unknown session account used, {}, lambda_build_server for this session is unknown.".format(account))
+
+def find_dict_with(list_of_dicts, key, value):
+    """
+    finds the first dictionary containing the key, value pair.
+    Args:
+        list_of_dicts: a list of dictionaries
+        key:  key to search for in the dictionaries
+        value:  the value that should be assigned to the key
+
+    Returns:
+        returns the first dictionary containing the key,value pair.
+    """
+    for d in list_of_dicts:
+        if key in d:
+            if d[key] == value:
+                return d;
+    return None
+
+
