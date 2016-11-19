@@ -203,7 +203,7 @@ class IamUtils:
             client = import_session.client('iam')
             boto3_policy = policy.copy()
 
-            aws_policy = find_dict_with(self.iam_details["Policies"], "PolicyName",  boto3_policy["PolicyName"])
+            aws_policy = lib.find_dict_with(self.iam_details["Policies"], "PolicyName",  boto3_policy["PolicyName"])
             if aws_policy is None:
                 try:
                     boto3_policy["PolicyDocument"] = json.dumps(boto3_policy["PolicyDocument"], indent=2, sort_keys=True)
@@ -609,24 +609,6 @@ def create_session(credentials):
     return session
 
 
-def find_dict_with(list_of_dicts, key, value):
-    """
-    finds the first dictionary containing the key, value pair.
-    Args:
-        list_of_dicts: a list of dictionaries
-        key:  key to search for in the dictionaries
-        value:  the value that should be assigned to the key
-
-    Returns:
-        returns the first dictionary containing the key,value pair.
-    """
-    for d in list_of_dicts:
-        if key in d:
-            if d[key] == value:
-                return d;
-    return None
-
-
 def validate_policy(client, mem_pol, aws_pol):
     if mem_pol["PolicyName"] != aws_pol["PolicyName"]:
         print("Cannot validate different Policys: {} and {}".format(mem_pol["PolicyName"], aws_pol["PolicyName"]))
@@ -657,7 +639,7 @@ def get_oldest_policy_version(policy):
     return "v" + str(versions[0])
 
 def get_default_policy_version(policy):
-    return find_dict_with(policy["PolicyVersionList"], "VersionId", policy["DefaultVersionId"])
+    return lib.find_dict_with(policy["PolicyVersionList"], "VersionId", policy["DefaultVersionId"])
 
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
@@ -689,12 +671,12 @@ if __name__ == '__main__':
     # iam.save_policies(DEFAULT_POLICY_FILE)
 
     # print("Adjusting...")
-    iam.get_iam_details_from_aws()
-    iam.load_policies_from_file(DEFAULT_POLICY_FILE)
-    iam.adjust_policies_in_aws()
-
     # iam.get_iam_details_from_aws()
-    # iam.save_iam_details()
+    # iam.load_policies_from_file(DEFAULT_POLICY_FILE)
+    # iam.adjust_policies_in_aws()
+
+    iam.get_iam_details_from_aws()
+    iam.save_iam_details()
 
     # print("Exporting..")
     # iam.export_to_files()
