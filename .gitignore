@@ -89,5 +89,3 @@ salt_stack/salt/keycloak/files/keycloak-*Final.tar.gz
 # Boss Set Vars
 config/set_vars_*.sh
 
-# iam config files
-config/iam/
