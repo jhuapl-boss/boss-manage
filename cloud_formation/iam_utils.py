@@ -40,6 +40,7 @@ import hosts
 import pprint
 import library as lib
 import datetime
+from boto_wrapper import IamWrapper as iw
 
 IAM_CONFIG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config", "iam"))
 DEFAULT_POLICY_FILE = os.path.join(IAM_CONFIG_DIR, "policies.json")
@@ -58,6 +59,7 @@ class IamUtils:
     def __init__(self, session):
         self.session = session
         self.iam_details = None
+        self.iw = iw(session.client("iam"))
         self.policy_keyword_filters = ["-client-policy-"]  # Any keywords in the policy name should be skipped.
         self.policy_whole_filters = ["gion-test-policy", "aplAllowAssumeRoleInProduction",
                                      "aplDenyAssumeRoleInProduction"]
@@ -85,7 +87,7 @@ class IamUtils:
             return list
 
     def to_sessions_account(self, list):
-        current_account = lib.get_account_id_from_session()
+        current_account = lib.get_account_id_from_session(self.session)  # TODO SH this only works after we remove possible assume account
         if current_account != hosts.PROD_ACCOUNT:
             return self.swap_accounts(list, hosts.PROD_ACCOUNT, current_account)
         else:
@@ -402,10 +404,8 @@ class IamUtils:
                                                                                        ip_role["RoleName"]))
                     print("   Details: {}".format(str(e)))
 
-    def extract_groups_from_iam_details(self, for_cf=False):
+    def extract_groups_from_iam_details(self):
         group_temp_list = []
-        managed_pol_group_list = []
-        inst_pol_group_list = []
         for group in self.iam_details["GroupDetailList"]:
             if self.filter("GroupName", self.group_keyword_filters, self.group_whole_filters, group):
                 print("filtering: " + group["GroupName"])
@@ -413,28 +413,92 @@ class IamUtils:
 
             new_group = {'GroupName': group['GroupName'],
                         'Path': group['Path']}
-            group_temp_list.append(new_group)
-            client = self.session.client("iam")
 
+            managed_pol_list = []
             for mp_pol in group["AttachedManagedPolicies"]:
-                mp_pol["GroupName"] = group["GroupName"]
-                if "PolicyName" in mp_pol:
-                    del mp_pol["PolicyName"]
-                managed_pol_group_list.append(mp_pol)
+                managed_pol_list.append(mp_pol["PolicyArn"])
+            new_group["AttachedManagedPolicies"] = managed_pol_list
 
+            inst_pol_group_list = []
             for inst_pol in group["GroupPolicyList"]:
-                inst_pol["GroupName"] = group["GroupName"]
-                doc = inst_pol['PolicyDocument']
-                inst_pol['PolicyDocument'] = doc if for_cf else json.dumps(doc, indent=2)
+                doc = {}
+                doc["PolicyDocument"] = inst_pol["PolicyDocument"]
+                doc["PolicyName"] = inst_pol["PolicyName"]
                 inst_pol_group_list.append(inst_pol)
+            new_group["GroupPolicyList"] = inst_pol_group_list
 
+            group_temp_list.append(new_group)
         self.groups = self.to_prod_account(group_temp_list)
-        self.group_managed_polices = self.to_prod_account(managed_pol_group_list)
-        self.group_inline_policies = self.to_prod_account(inst_pol_group_list)
+
+    def create_full_group(self, group):
+        self.iw.create_group(group["GroupName"], group["Path"])
+        for inline_pol in group["GroupPolicyList"]:
+            document = json.dumps(inline_pol["PolicyDocument"], indent=2, sort_keys=True)
+            self.iw.put_group_policy(group["GroupName"], inline_pol["PolicyName"], inline_pol["PolicyDocument"])
+        for mngd_pol_arn in group["AttachedManagedPolicies"]:
+            self.iw.attach_group_policy(group["GroupName"], mngd_pol_arn)
+
+    def adjust_groups_in_aws(self, use_assume_role=False):
+        '''
+        Adjusts the AWS groups to match the current in memory groups. It creates the groups if
+        they do not exist in AWS.  Also adjusts attached managed policies and inline policies associated with the group
+         It will not delete any groups.
+        Args:
+            use_assume_role: set to True if using developer account credentials and plan to assume production credentials
+
+        Returns:
+
+        '''
+        if use_assume_role:
+            import_session = assume_production_role(self.session)
+        else:
+            import_session = self.session
+        if self.iam_details == None:
+            print("iam_details must be imported first.")
+            return
+        for group in self.groups:
+            client = import_session.client('iam')
+            aws_group = lib.find_dict_with(self.iam_details["GroupDetailList"], "GroupName",  group["GroupName"])
+            if aws_group is None:
+                self.create_full_group(group)
+            else:
+                self.validate_group(client, group, aws_group)
+
+    def validate_group(self, client, mem_group, aws_group):
+        if mem_group["GroupName"] != aws_group["GroupName"]:
+            print("Cannot validate different Groups: {} and {}".format(mem_group["GroupName"], aws_group["GroupName"]))
+            return
+        if mem_group["Path"] != aws_group["Path"]:
+            print("WARNING Paths differ for group {}: Path_In_File={} Path_In_AWS={}".format(mem_group["GroupName"],
+                                                                                             mem_group["Path"],
+                                                                                             aws_group["Path"]))
+            print("You will need to manually delete the old group for the Path to be changed.")
+
+        for inline_pol in mem_group["GroupPolicyList"]:
+            aws_inline_pol = lib.find_dict_with(aws_group["GroupPolicyList"], "PolicyName", inline_pol["PolicyName"])
+            if aws_inline_pol is None:
+                self.iw.put_group_policy(mem_group["GroupName"], inline_pol["PolicyName"], inline_pol["PolicyDocument"])
+                continue
+            aws_doc_str = json.dumps(aws_inline_pol["PolicyDocument"], indent=2, sort_keys=True)
+            mem_doc_str = json.dumps(inline_pol["PolicyDocument"], indent=2, sort_keys=True)
+            if mem_doc_str != aws_doc_str:
+                self.iw.put_group_policy(mem_group["GroupName"], inline_pol["PolicyName"], inline_pol["PolicyDocument"])
+        for aws_inline_pol in aws_group["GroupPolicyList"]:
+            matching_mem_pol = lib.find_dict_with(mem_group["GroupPolicyList"], "PolicyName", aws_inline_pol["PolicyName"])
+            if matching_mem_pol is None:
+                # AWS has a policy that is not in memory version, it should be deleted.
+                self.iw.delete_group_policy(mem_group["GroupName"], aws_inline_pol["PolicyName"])
+
+        for mngd_pol_arn in mem_group["AttachedManagedPolicies"]:
+            self.iw.attach_group_policy(mem_group["GroupName"], mngd_pol_arn)
+        for aws_mngd_pol in aws_group["AttachedManagedPolicies"]:
+            if aws_mngd_pol["PolicyArn"] not in mem_group["AttachedManagedPolicies"]:
+                # AWS has a mngd policy that is not in memory version, it should be deleted.
+                self.iw.detach_group_policy(mem_group["GroupName"], aws_mngd_pol["PolicyArn"])
 
     def save_groups(self, filename):
         with open(filename, 'w') as f:
-            json.dump(self.groups, f, indent=4)
+            json.dump(self.groups, f, indent=4, sort_keys=True)
 
     def load_groups_from_file(self, filename):
         with open(filename, 'r') as f:
@@ -593,6 +657,7 @@ def assume_production_role(session):
     return production_session
 
 
+
 def create_session(credentials):
     """
     Read the AWS from the credentials dictionary and then create a boto3
@@ -667,16 +732,22 @@ if __name__ == '__main__':
 
     # Testing
     # iam.get_iam_details_from_aws()
-    # iam.extract_policies_from_iam_details()
-    # iam.save_policies(DEFAULT_POLICY_FILE)
+    # iam.extract_groups_from_iam_details()
+    # iam.save_groups(DEFAULT_GROUP_FILE)
+    # iam.load_groups_from_file(DEFAULT_GROUP_FILE)
+    # iam.save_groups(DEFAULT_GROUP_FILE+"2")
 
     # print("Adjusting...")
     # iam.get_iam_details_from_aws()
     # iam.load_policies_from_file(DEFAULT_POLICY_FILE)
+    # iam.policies = iam.to_sessions_account(iam.policies)
     # iam.adjust_policies_in_aws()
+    # iam.load_groups_from_file(DEFAULT_GROUP_FILE)
+    # iam.groups = iam.to_sessions_account(iam.groups)
+    # iam.adjust_groups_in_aws()
 
-    iam.get_iam_details_from_aws()
-    iam.save_iam_details()
+    # iam.get_iam_details_from_aws()
+    # iam.save_iam_details()
 
     # print("Exporting..")
     # iam.export_to_files()
