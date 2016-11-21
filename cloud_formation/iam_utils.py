@@ -46,13 +46,6 @@ IAM_CONFIG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "
 DEFAULT_POLICY_FILE = os.path.join(IAM_CONFIG_DIR, "policies.json")
 DEFAULT_GROUP_FILE = os.path.join(IAM_CONFIG_DIR, "groups.json")
 DEFAULT_ROLES_FILE = os.path.join(IAM_CONFIG_DIR, "roles.json")
-DEFAULT_INSTANCE_PROFILES_FILE = os.path.join(IAM_CONFIG_DIR, "instance_profiles.json")
-DEFAULT_INSTANCE_PROFILE_ROLES_FILE = os.path.join(IAM_CONFIG_DIR, "instance_profile_roles.json")
-DEFAULT_ROLE_MANAGED_POLICIES_FILE = os.path.join(IAM_CONFIG_DIR, "role_managed_policies.json")
-DEFAULT_ROLE_INLINE_POLICIES_FILE = os.path.join(IAM_CONFIG_DIR, "role_inline_policies.json")
-DEFAULT_GROUP_MANAGED_POLICIES_FILE = os.path.join(IAM_CONFIG_DIR, "group_managed_policies.json")
-DEFAULT_GROUP_INLINE_POLICIES_FILE = os.path.join(IAM_CONFIG_DIR, "group_inline_policies.json")
-DEFAULT_CF_TEMPLATE = os.path.join(IAM_CONFIG_DIR, "cf_template.json")
 COMMANDS=["import", "export"]
 
 class IamUtils:
@@ -72,12 +65,6 @@ class IamUtils:
         self.policies = []
         self.groups = []
         self.roles = []
-        self.instance_profiles = []
-        self.instance_profile_roles = []
-        self.role_managed_polices = []
-        self.role_inline_policies = []
-        self.group_managed_polices = []
-        self.group_inline_policies = []
         os.makedirs(IAM_CONFIG_DIR, exist_ok=True)
 
     def to_prod_account(self, list):
@@ -156,32 +143,6 @@ class IamUtils:
     def save_policies(self, filename):
         with open(filename, 'w') as f:
             json.dump(self.policies, f, indent=2, sort_keys=True)
-
-    def import_policies_to_aws(self, use_assume_role=False):
-        '''
-        imports the currently loaded policies into AWS.
-        Args:
-            use_assume_role: set to True if using developer account credentials and plan to assume production credentials
-
-        Returns:
-
-        '''
-        if use_assume_role:
-            import_session = assume_production_role(self.session)
-        else:
-            import_session = self.session
-        for policy in self.policies:
-            client = import_session.client('iam')
-            boto3_policy = policy.copy()
-            boto3_policy["PolicyDocument"] = json.dumps(boto3_policy["PolicyDocument"], indent=2)
-            try:
-                client.create_policy(**boto3_policy)
-            except ClientError as e:
-                if e.response['Error']['Code'] == 'EntityAlreadyExists':
-                    print("Policy {} already exists cannot load again.".format(boto3_policy["PolicyName"]))
-                else:
-                    print("error occur creating policy: {}".format(boto3_policy["PolicyName"]))
-                    print("   Details: {}".format(str(e)))
 
     def adjust_policies_in_aws(self, use_assume_role=False):
         '''
@@ -375,144 +336,6 @@ class IamUtils:
         with open(filename, 'r') as f:
             self.roles = json.load(f)
 
-    def save_role_managed_policies(self, filename):
-        with open(filename, 'w') as f:
-            json.dump(self.role_managed_polices, f, indent=2)
-
-    def load_role_managed_policies_from_file(self, filename):
-        with open(filename, 'r') as f:
-            self.role_managed_polices = json.load(f)
-
-    def save_role_inline_policies(self, filename):
-        with open(filename, 'w') as f:
-            json.dump(self.role_inline_policies, f, indent=2)
-
-    def load_role_inline_policies_from_file(self, filename):
-        with open(filename, 'r') as f:
-            self.role_inline_policies = json.load(f)
-
-    def import_roles_to_aws(self, use_assume_role=False):
-        if use_assume_role:
-            import_session = assume_production_role(self.session)
-        else:
-            import_session = self.session
-        for role in self.roles:
-            client = import_session.client('iam')
-            try:
-                client.create_role(**role)
-            except ClientError as e:
-                if e.response['Error']['Code'] == 'EntityAlreadyExists':
-                    print("Role {} already exists cannot load again.".format(role["RoleName"]))
-                else:
-                    print("error occur creating role: {}".format(role["RoleName"]))
-                    print("   Details: {}".format(str(e)))
-
-    def import_role_managed_policies_to_aws(self, use_assume_role=False):
-        if use_assume_role:
-            import_session = assume_production_role(self.session)
-        else:
-            import_session = self.session
-        for mp in self.role_managed_polices:
-            client = import_session.client('iam')
-            try:
-                client.attach_role_policy(**mp)
-            except ClientError as e:
-                if e.response['Error']['Code'] == 'EntityAlreadyExists':
-                    print("Role Managed Policy {} - {} already exists cannot load again.".format(mp["RoleName"],
-                                                                                                 mp["PolicyArn"]))
-                else:
-                    print("error occur creating role managed policy: {} - {}".format(mp["RoleName"], mp["PolicyArn"]))
-                    print("   Details: {}".format(str(e)))
-
-    def import_role_inline_policies_to_aws(self, use_assume_role=False):
-        if use_assume_role:
-            import_session = assume_production_role(self.session)
-        else:
-            import_session = self.session
-        for ip in self.role_inline_policies:
-            client = import_session.client('iam')
-            try:
-                client.put_role_policy(**ip)
-            except ClientError as e:
-                if e.response['Error']['Code'] == 'EntityAlreadyExists':
-                    print("Role Inline Policy {} - {} already exists cannot load again.".format(ip["RoleName"],
-                                                                                                 ip["PolicyName"]))
-                else:
-                    print("error occur creating role inline policy: {} - {}".format(ip["RoleName"], ip["PolicyName"]))
-                    print("   Details: {}".format(str(e)))
-
-    def get_instance_profiles_from_aws(self):
-        client = self.session.client('iam')
-        response = client.list_instance_profiles(MaxItems=1000)
-        ip_list = response["InstanceProfiles"]
-        batch = response
-        while batch["IsTruncated"]:
-            batch = client.list_instance_profiles(MaxItems=1000)
-            ip_list.append(batch["InstanceProfiles"])
-
-        temp_ip_list = []
-        ip_roles_list = []
-        for ip in ip_list:
-            new_ip = {"InstanceProfileName": ip["InstanceProfileName"],
-                      "Path":  ip["Path"]}
-            temp_ip_list.append(new_ip)
-            for role in ip["Roles"]:
-                new_ip_role = {"InstanceProfileName": ip["InstanceProfileName"],
-                               "RoleName": role["RoleName"]}
-                ip_roles_list.append(new_ip_role)
-        self.instance_profiles = temp_ip_list
-        self.instance_profile_roles = ip_roles_list
-
-    def save_instance_profiles(self, filename):
-        with open(filename, 'w') as f:
-            json.dump(self.instance_profiles, f, indent=2)
-
-    def load_instance_profile_from_file(self, filename):
-        with open(filename, 'r') as f:
-            self.instance_profiles = json.load(f)
-
-    def save_instance_profile_roles(self, filename):
-        with open(filename, 'w') as f:
-            json.dump(self.instance_profile_roles, f, indent=2)
-
-    def load_instance_profile_roles_from_file(self, filename):
-        with open(filename, 'r') as f:
-            self.instance_profile_roles = json.load(f)
-
-    def import_instance_profiles_to_aws(self, use_assume_role=False):
-        if use_assume_role:
-            import_session = assume_production_role(self.session)
-        else:
-            import_session = self.session
-        for ip in self.instance_profiles:
-            client = import_session.client('iam')
-            try:
-                client.create_instance_profile(**ip)
-            except ClientError as e:
-                if e.response['Error']['Code'] == 'EntityAlreadyExists':
-                    print("Instance_Profile {} already exists cannot load again.".format(ip["InstanceProfileName"]))
-                else:
-                    print("error occur creating instance profile: {}".format(ip["InstanceProfileName"]))
-                    print("   Details: {}".format(str(e)))
-
-    def import_instance_profiles_roles_to_aws(self, use_assume_role=False):
-        if use_assume_role:
-            import_session = assume_production_role(self.session)
-        else:
-            import_session = self.session
-        for ip_role in self.instance_profile_roles:
-            client = import_session.client('iam')
-            try:
-                client.add_role_to_instance_profile(**ip_role)
-            except ClientError as e:
-                if e.response['Error']['Code'] == 'EntityAlreadyExists':
-                    print("Instance_Profile_Role {} - {} already exists cannot load again."
-                          .format(ip_role["InstanceProfileName"], ip_role["RoleName"]))
-                else:
-                    print("error occur creating instance profile role: {} - {}".format(ip_role["InstanceProfileName"],
-                                                                                       ip_role["RoleName"]))
-                    print("   Details: {}".format(str(e)))
-
     def extract_groups_from_iam_details(self):
         group_temp_list = []
         for group in self.iam_details["GroupDetailList"]:
@@ -611,76 +434,6 @@ class IamUtils:
     def load_groups_from_file(self, filename):
         with open(filename, 'r') as f:
             self.groups = json.load(f)
-
-    def save_group_managed_policies(self, filename):
-        with open(filename, 'w') as f:
-            json.dump(self.group_managed_polices, f, indent=2)
-
-    def load_group_managed_policies_from_file(self, filename):
-        with open(filename, 'r') as f:
-            self.group_managed_polices = json.load(f)
-
-    def save_group_inline_policies(self, filename):
-        with open(filename, 'w') as f:
-            json.dump(self.group_inline_policies, f, indent=2)
-
-    def load_group_inline_policies_from_file(self, filename):
-        with open(filename, 'r') as f:
-            self.group_inline_policies = json.load(f)
-
-    def import_groups_to_aws(self, use_assume_role=True):
-        if use_assume_role:
-            import_session = assume_production_role(self.session)
-        else:
-            import_session = self.session
-        for group in self.groups:
-            client = import_session.client('iam')
-            try:
-                client.create_group(**group)
-            except ClientError as e:
-                if e.response['Error']['Code'] == 'EntityAlreadyExists':
-                    print("Group {} already exists cannot load again.".format(group["GroupName"]))
-                else:
-                    print("error occur creating group: {}".format(group["GroupName"]))
-                    print("   Details: {}".format(str(e)))
-
-    def import_group_managed_policies_to_aws(self, use_assume_role=True):
-        if use_assume_role:
-            import_session = assume_production_role(self.session)
-        else:
-            import_session = self.session
-        for mp in self.group_managed_polices:
-            client = import_session.client('iam')
-            try:
-                client.attach_group_policy(**mp)
-            except ClientError as e:
-                if e.response['Error']['Code'] == 'EntityAlreadyExists':
-                    print("Group Managed Policy {} - {} already exists cannot load again.".format(
-                        mp["GroupName"],
-                        mp["PolicyArn"]))
-                else:
-                    print("error occur creating group managed policy: {} - {}".format(mp["GroupName"],
-                                                                                     mp["PolicyArn"]))
-                    print("   Details: {}".format(str(e)))
-
-    def import_group_inline_policies_to_aws(self, use_assume_role=True):
-        if use_assume_role:
-            import_session = assume_production_role(self.session)
-        else:
-            import_session = self.session
-        for ip in self.group_inline_policies:
-            client = import_session.client('iam')
-            try:
-                client.put_group_policy(**ip)
-            except ClientError as e:
-                if e.response['Error']['Code'] == 'EntityAlreadyExists':
-                    print("Group Inline Policy {} - {} already exists cannot load again.".format(
-                        ip["GroupName"],
-                        ip["PolicyName"]))
-                else:
-                    print("error occur creating group inline policy: {} - {}".format(ip["GroupName"],
-                                                                                    ip["PolicyName"]))
-                    print("   Details: {}".format(str(e)))
 
     def print_alarms(self, filename=None):
         client = self.session.client("cloudwatch")
