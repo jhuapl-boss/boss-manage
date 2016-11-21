@@ -155,7 +155,7 @@ if __name__ == '__main__':
                         metavar="<asg>",
                         default=ENDPOINT,
                         choices=ASGS,
-                        help="The deployment configuration to use when creating the stack (instance size, autoscale group size, etc) (default: development)")
+                        help="short name for one of the auto-scale-groups, ex: endpoint")
     parser.add_argument("domain_name",
                         help="Domain in which to execute the configuration (example: hiderrt1.boss)")
 

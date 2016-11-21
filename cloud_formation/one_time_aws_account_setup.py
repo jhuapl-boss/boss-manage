@@ -81,6 +81,7 @@ def create_initial_sns_accounts(session):
     if topic_arn == None:
         print("Failed to create {} topic".format(PRODUCTION_BILLING_TOPIC))
 
+
 def import_iam_details_from_files(session):
     iam = iam_utils.IamUtils(session)
     iam.get_iam_details_from_aws()

@@ -82,3 +82,94 @@ class IamWrapper:
         except ClientError as e:
             print("ERROR occured detaching policy, {}, from group {}".format(policy_arn, group_name))
             print("   Details: {}".format(str(e)))
+
+    def add_role_to_instance_profile(self, role_name, instance_profile_name):
+        try:
+            self.client.add_role_to_instance_profile(RoleName=role_name, InstanceProfileName=instance_profile_name)
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'EntityAlreadyExists':
+                print("WARNING Instance Profile {} already contains Role: {}".format(instance_profile_name, role_name))
+            else:
+                print("ERROR occured adding role, {}, to instance profile: {}".format(role_name, instance_profile_name))
+                print("   Details: {}".format(str(e)))
+
+    def create_instance_profile(self, instance_profile_name, path):
+        try:
+            self.client.create_instance_profile(InstanceProfileName=instance_profile_name, Path=path)
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'EntityAlreadyExists':
+                print("WARNING Instance Profile {} already exists: {}".format(instance_profile_name))
+            else:
+                print("ERROR occured creating instance profile: {}".format(instance_profile_name))
+                print("   Details: {}".format(str(e)))
+
+    def remove_role_from_instance_profile(self, role_name, instance_profile_name):
+            try:
+                self.client.remove_role_from_instance_profile(RoleName=role_name, InstanceProfileName=instance_profile_name)
+            except ClientError as e:
+                print("ERROR occured adding role, {}, to instance profile: {}".format(role_name,
+                                                                                      instance_profile_name))
+                print("   Details: {}".format(str(e)))
+
+    def delete_instance_profile(self, instance_profile_name):
+            try:
+                self.client.delete_instance_profile(InstanceProfileName=instance_profile_name)
+            except ClientError as e:
+                print("ERROR occured deleting instance profile: {}".format(instance_profile_name))
+                print("   Details: {}".format(str(e)))
+
+    def create_role(self, role_name, path, assume_role_policy_document):
+        try:
+            self.client.create_role(RoleName=role_name, Path=path, AssumeRolePolicyDocument=assume_role_policy_document)
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'EntityAlreadyExists':
+                print("WARNING Role {} already exists, it cannot be loaded again.".format(role_name))
+            else:
+                print("ERROR occured creating role: {}".format(role_name))
+                print("   Details: {}".format(str(e)))
+
+    def update_assume_role_policy(self, role_name, policy_document):
+        pol_doc_str = json.dumps(policy_document, indent=2, sort_keys=True)
+        try:
+            self.client.update_assume_role_policy(RoleName=role_name, PolicyDocument=pol_doc_str)
+        except ClientError as e:
+            print("ERROR occured updating role {}'s assume role policy document: ".format(role_name))
+            pprint.pprint(policy_document)
+            print("   Details: {}".format(str(e)))
+
+
+    def put_role_policy(self, role_name, policy_name, policy_document):
+        pol_doc_str = json.dumps(policy_document, indent=2, sort_keys=True)
+        try:
+            self.client.put_role_policy(RoleName=role_name, PolicyName=policy_name, PolicyDocument=pol_doc_str)
+        except ClientError as e:
+            print("ERROR occured creating role {}'s inline policy: {}".format(role_name, policy_name))
+            print("   Details: {}".format(str(e)))
+
+
+    def attach_role_policy(self, role_name, policy_arn):
+        try:
+            self.client.attach_role_policy(RoleName=role_name, PolicyArn=policy_arn)
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'EntityAlreadyExists':
+                print("WARNING Role {} already contains managed policy: {}".format(role_name, policy_arn))
+            else:
+                print("ERROR occured creating role: {}".format(role_name))
+                print("   Details: {}".format(str(e)))
+
+
+    def delete_role_policy(self, role_name, policy_name):
+        try:
+            self.client.delete_role_policy(RoleName=role_name, PolicyName=policy_name)
+        except ClientError as e:
+            print("ERROR occured deleting role {}'s inline policy: {}".format(role_name, policy_name))
+            print("   Details: {}".format(str(e)))
+
+
+    def detach_role_policy(self, role_name, policy_arn):
+        try:
+            self.client.detach_role_policy(RoleName=role_name, PolicyArn=policy_arn)
+        except ClientError as e:
+            print("ERROR occured detaching policy, {}, from role {}".format(policy_arn, role_name))
+            print("   Details: {}".format(str(e)))
+
