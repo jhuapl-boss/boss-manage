@@ -95,7 +95,7 @@ class IamUtils:
             return list
 
     def swap_accounts(self, list, from_acc, to_acc):
-        list_string = json.dumps(list, indent=4)
+        list_string = json.dumps(list, indent=2)
         account_switched = list_string.replace(from_acc, to_acc)
         return json.loads(account_switched)
 
@@ -155,7 +155,7 @@ class IamUtils:
 
     def save_policies(self, filename):
         with open(filename, 'w') as f:
-            json.dump(self.policies, f, indent=4, sort_keys=True)
+            json.dump(self.policies, f, indent=2, sort_keys=True)
 
     def import_policies_to_aws(self, use_assume_role=False):
         '''
@@ -369,7 +369,7 @@ class IamUtils:
 
     def save_roles(self, filename):
         with open(filename, 'w') as f:
-            json.dump(self.roles, f, indent=4, sort_keys=True)
+            json.dump(self.roles, f, indent=2, sort_keys=True)
 
     def load_roles_from_file(self, filename):
         with open(filename, 'r') as f:
@@ -377,7 +377,7 @@ class IamUtils:
 
     def save_role_managed_policies(self, filename):
         with open(filename, 'w') as f:
-            json.dump(self.role_managed_polices, f, indent=4)
+            json.dump(self.role_managed_polices, f, indent=2)
 
     def load_role_managed_policies_from_file(self, filename):
         with open(filename, 'r') as f:
@@ -385,7 +385,7 @@ class IamUtils:
 
     def save_role_inline_policies(self, filename):
         with open(filename, 'w') as f:
-            json.dump(self.role_inline_policies, f, indent=4)
+            json.dump(self.role_inline_policies, f, indent=2)
 
     def load_role_inline_policies_from_file(self, filename):
         with open(filename, 'r') as f:
@@ -465,7 +465,7 @@ class IamUtils:
 
     def save_instance_profiles(self, filename):
         with open(filename, 'w') as f:
-            json.dump(self.instance_profiles, f, indent=4)
+            json.dump(self.instance_profiles, f, indent=2)
 
     def load_instance_profile_from_file(self, filename):
         with open(filename, 'r') as f:
@@ -473,7 +473,7 @@ class IamUtils:
 
     def save_instance_profile_roles(self, filename):
         with open(filename, 'w') as f:
-            json.dump(self.instance_profile_roles, f, indent=4)
+            json.dump(self.instance_profile_roles, f, indent=2)
 
     def load_instance_profile_roles_from_file(self, filename):
         with open(filename, 'r') as f:
@@ -606,7 +606,7 @@ class IamUtils:
 
     def save_groups(self, filename):
         with open(filename, 'w') as f:
-            json.dump(self.groups, f, indent=4, sort_keys=True)
+            json.dump(self.groups, f, indent=2, sort_keys=True)
 
     def load_groups_from_file(self, filename):
         with open(filename, 'r') as f:
@@ -614,7 +614,7 @@ class IamUtils:
 
     def save_group_managed_policies(self, filename):
         with open(filename, 'w') as f:
-            json.dump(self.group_managed_polices, f, indent=4)
+            json.dump(self.group_managed_polices, f, indent=2)
 
     def load_group_managed_policies_from_file(self, filename):
         with open(filename, 'r') as f:
@@ -622,7 +622,7 @@ class IamUtils:
 
     def save_group_inline_policies(self, filename):
         with open(filename, 'w') as f:
-            json.dump(self.group_inline_policies, f, indent=4)
+            json.dump(self.group_inline_policies, f, indent=2)
 
     def load_group_inline_policies_from_file(self, filename):
         with open(filename, 'r') as f:
@@ -795,7 +795,6 @@ if __name__ == '__main__':
                         help="File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
 
     parser.add_argument("command",
-                        metavar="<asg>",
                         choices=COMMANDS,
                         help="import from files to AWS, export from AWS to files. Files will be manaually edited so export should not be used after initial file creation.")
 
@@ -820,7 +819,7 @@ if __name__ == '__main__':
         iam.import_to_aws()
     else:
         print("Uknown Command.")
-        
+
 
 
 
