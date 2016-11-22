@@ -7,7 +7,7 @@ to update an existing production stack with the latest code.
 successfully launch CloudFormation configurations.*
 
 ## Rebuild Integration
-This is not a manditory step but it is a good idea to [IntegrationRebuild.md](IntegrationRebuild.md) 
+This is not a mandatory step but it is a good idea to [IntegrationRebuild.md](IntegrationRebuild.md)
 before Tag and merge to verify that everything is working.
 
 ## Tag and Merge
@@ -43,6 +43,14 @@ Create this script and save it (config/set_scalyr_vars.sh) for the next time you
 ```shell
 source ../config/set_scalyr_vars.sh
 ```
+### Updating IAM
+Verify IAM Policy, Groups and Roles are the latest.  Master IAM scripts are located boss-manage/config/iam.
+Make sure your AWS_CREDENTIALS is set for the production account
+
+```shell
+$ cd boss-manage/cloud_formation
+$ ./iam_utils import
+```
 
 
 ### Updating configs
@@ -68,18 +76,21 @@ This will show the status of all the consul nodes:
 $ ./cloudformation.py update integration.boss --scenario production api
 ```
 
-API failed to update.  Here is the error message encountered. 
-UPDATE_FAILED    AWS::DynamoDB::Table    tileIndex    CloudFormation cannot update a stack when a 
-custom-named resource requires replacing. Rename tileindex.production.boss and update the stack again.
+For *cachedb* and *cloudwatch* delete and create the cloud formation stacks again.
 
+```shell
+$ ./cloudformation.py delete production.boss --scenario production cachedb
+$ ./cloudformation.py create production.boss --scenario production cachedb
+$ ./cloudformation.py delete production.boss --scenario production cloudwatch
+$ ./cloudformation.py create production.boss --scenario production cloudwatch
+```
 
-======================================================================
 ## Get bossadmin password
 ```shell
 cd vault
 ./bastion.py bastion.integration.boss vault.integration.boss vault-read secret/auth/realm
 ```
-Login to https://api.integration.theboss.io/v0.7/collection/
+Login to https://api.theboss.io/v0.7/collection/
 Uses bossadmin and the password you now have to sync bossadmin to django
 
 ## Run unit tests on Endpoint

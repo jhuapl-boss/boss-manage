@@ -61,7 +61,7 @@ have to be pushed yet) so that the correct commit hash is used.*
 **Note: Because the Packer output is redirected, check the logs and/or the AWS
 console to verify the creation of the AMIs.**
 ```shell
-$ grep "artifact" ../packer/logs/*.logs
+$ grep "artifact" ../packer/log/*.logs
 ```
 
 Success looks like this:
