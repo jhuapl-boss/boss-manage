@@ -2,8 +2,9 @@
 
 include:
   - git
+  - ndingest
+  - ingest-client.ingest
   - boss-tools.bossutils
-  - boss-tools.credentials
   - boss.django
   - boss-oidc
   - mysql
