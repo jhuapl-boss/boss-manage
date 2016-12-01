@@ -60,7 +60,7 @@ run the following command. You have to wait for each command to finish before
 launching the next configuration as they build upon each other.  
 
 ```shell
-$ ./cloudformation.py update integration.boss --scenario production core
+$ ./cloudformation.py update production.boss --scenario production core
 ```
 
 *Note: The cloudformation.py script will automatically use the latest created AMIs
@@ -73,7 +73,7 @@ This will show the status of all the consul nodes:
 ./bastion.py bastion.production.boss consul.production.boss ssh-all 'sudo consul operator raft -list-peers; sudo consul members'
 
 ```shell
-$ ./cloudformation.py update integration.boss --scenario production api
+$ ./cloudformation.py update production.boss --scenario production api
 ```
 
 For *cachedb* and *cloudwatch* delete and create the cloud formation stacks again.
