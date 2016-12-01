@@ -71,24 +71,36 @@ def bool_str(val):
     """
     return "true" if val else "false"
 
+def Ref(key):
+    """Turn a template key name into a template reference.
+
+    This allows methods to handle both reference and non reference
+    values without any work.
+    """
+    return { "Ref": key }
+
 class Arg:
     """Class of static methods to create the CloudFormation template argument
     snippits.
     """
 
-    def __init__(self, key, parameter, argument):
+    def __init__(self, key, parameter, value, use_previous=False):
         """Generic constructor used by all of the specific static methods.
 
         Args:
             key (string) : Unique name associated with the argument
             parameter (dict) : Dictionary of parameter information, as defined
                                by CloudFormation / AWS.
-            argument (dict) : Dictionary of the argument to supply for the
-                              parameter when launching the template
+            value (string) : Value of the argument
+            use_previous (bool) : Stored under the UsePreviousValue key
         """
         self.key = key
         self.parameter = parameter
-        self.argument = argument
+        self.argument = {
+            "ParameterKey": key,
+            "ParameterValue": value,
+            "UsePreviousValue": use_previous
+        }
 
     @staticmethod
     def String(key, value, description=""):
@@ -104,8 +116,7 @@ class Arg:
             "Description" : description,
             "Type": "String"
         }
-        argument = lib.template_argument(key, value)
-        return Arg(key, parameter, argument)
+        return Arg(key, parameter, value)
 
     @staticmethod
     def Password(key, value, description=""):
@@ -122,8 +133,7 @@ class Arg:
             "Type": "String",
             "NoEcho": "true"
         }
-        argument = lib.template_argument(key, value)
-        return Arg(key, parameter, argument)
+        return Arg(key, parameter, value)
 
     @staticmethod
     def IP(key, value, description=""):
@@ -148,8 +158,7 @@ class Arg:
             "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})",
             "ConstraintDescription": "must be a valid IP of the form x.x.x.x."
         }
-        argument = lib.template_argument(key, value)
-        return Arg(key, parameter, argument)
+        return Arg(key, parameter, value)
 
     @staticmethod
     def Port(key, value, description=""):
@@ -168,8 +177,7 @@ class Arg:
             "MinValue": "1",
             "MaxValue": "65535"
         }
-        argument = lib.template_argument(key, value)
-        return Arg(key, parameter, argument)
+        return Arg(key, parameter, value)
 
     @staticmethod
     def CIDR(key, value, description=""):
@@ -196,8 +204,7 @@ class Arg:
             "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
             "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
         }
-        argument = lib.template_argument(key, value)
-        return Arg(key, parameter, argument)
+        return Arg(key, parameter, value)
 
     @staticmethod
     def VPC(key, value, description=""):
@@ -213,8 +220,7 @@ class Arg:
             "Description" : description,
             "Type": "AWS::EC2::VPC::Id"
         }
-        argument = lib.template_argument(key, value)
-        return Arg(key, parameter, argument)
+        return Arg(key, parameter, value)
 
     @staticmethod
     def Subnet(key, value, description=""):
@@ -231,8 +237,7 @@ class Arg:
             "Description" : description,
             "Type": "AWS::EC2::Subnet::Id"
         }
-        argument = lib.template_argument(key, value)
-        return Arg(key, parameter, argument)
+        return Arg(key, parameter, value)
 
     @staticmethod
     def AMI(key, value, description=""):
@@ -248,8 +253,7 @@ class Arg:
             "Description" : description,
             "Type": "AWS::EC2::Image::Id"
         }
-        argument = lib.template_argument(key, value)
-        return Arg(key, parameter, argument)
+        return Arg(key, parameter, value)
 
     @staticmethod
     def Instance(key, value, description=""):
@@ -265,8 +269,7 @@ class Arg:
             "Description" : description,
             "Type": "AWS::EC2::Instance::Id"
         }
-        argument = lib.template_argument(key, value)
-        return Arg(key, parameter, argument)
+        return Arg(key, parameter, value)
 
     @staticmethod
     def KeyPair(key, value, hostname):
@@ -284,8 +287,7 @@ class Arg:
             "Type": "AWS::EC2::KeyPair::KeyName",
             "ConstraintDescription" : "must be the name of an existing EC2 KeyPair."
         }
-        argument = lib.template_argument(key, value)
-        return Arg(key, parameter, argument)
+        return Arg(key, parameter, value)
 
     @staticmethod
     def SecurityGroup(key, value, description=""):
@@ -302,8 +304,7 @@ class Arg:
             "Description" : description,
             "Type": "AWS::EC2::SecurityGroup::Id"
         }
-        argument = lib.template_argument(key, value)
-        return Arg(key, parameter, argument)
+        return Arg(key, parameter, value)
 
     @staticmethod
     def RouteTable(key, value, description=""):
@@ -325,8 +326,7 @@ class Arg:
             "Type" : "AWS::EC2::RouteTable::Id",
             "Type" : "String"
         }
-        argument = lib.template_argument(key, value)
-        return Arg(key, parameter, argument)
+        return Arg(key, parameter, value)
 
     @staticmethod
     def Certificate(key, value, description=""):
@@ -343,8 +343,7 @@ class Arg:
             "Description" : description,
             "Type": "AWS::ACM::Certificate::Id"
         }
-        argument = lib.template_argument(key, value)
-        return Arg(key, parameter, argument)
+        return Arg(key, parameter, value)
 
 # Developer Note
 #
@@ -388,6 +387,7 @@ class CloudFormationConfiguration:
         self.arguments = []
         self.region = region
         self.keypairs = {}
+        self.stack_name = "".join(map(lambda x: x.capitalize(), domain.split(".")))
 
         dots = len(domain.split("."))
         if dots == 2: # vpc.tld
@@ -446,12 +446,11 @@ class CloudFormationConfiguration:
 
             return get_status(response)
 
-    def create(self, session, name, wait = True):
+    def create(self, session, wait = True):
         """Launch the template this object represents in CloudFormation.
 
         Args:
             session (Session) : Boto3 session used to launch the configuration
-            name (string) : Name of the CloudFormation Stack
             wait (bool) : If True, wait for the stack to be created, printing
                           status information
 
@@ -465,7 +464,7 @@ class CloudFormationConfiguration:
 
         client = session.client('cloudformation')
         response = client.create_stack(
-            StackName = name,
+            StackName = self.stack_name,
             TemplateBody = self._create_template(),
             Parameters = self.arguments,
             Tags = [
@@ -475,24 +474,23 @@ class CloudFormationConfiguration:
 
         rtn = None
         if wait:
-            status = self._poll(client, name, 'create', 'CREATE_IN_PROGRESS')
+            status = self._poll(client, self.stack_name, 'create', 'CREATE_IN_PROGRESS')
 
             if status is None:
                 print("Problem launching stack")
             elif status == 'CREATE_COMPLETE':
-                print("Created stack '{}'".format(name))
+                print("Created stack '{}'".format(self.stack_name))
                 rtn = True
             else:
-                print("Status of stack '{}' is '{}'".format(name, status))
+                print("Status of stack '{}' is '{}'".format(self.stack_name, status))
                 rtn = False
         return rtn
 
-    def update(self, session, name, wait = True):
+    def update(self, session, wait = True):
         """Update the template this object represents in CloudFormation.
 
         Args:
             session (Session) : Boto3 session used to launch the configuration
-            name (string) : Name of the CloudFormation Stack
             wait (bool) : If True, wait for the stack to be updated, printing
                           status information
 
@@ -506,7 +504,7 @@ class CloudFormationConfiguration:
 
         client = session.client('cloudformation')
         response = client.update_stack(
-            StackName = name,
+            StackName = self.stack_name,
             TemplateBody = self._create_template(),
             Parameters = self.arguments,
             Tags = [
@@ -516,19 +514,53 @@ class CloudFormationConfiguration:
 
         rtn = None
         if wait:
-            status = self._poll(client, name, 'update', 'UPDATE_IN_PROGRESS')
+            status = self._poll(client, self.stack_name, 'update', 'UPDATE_IN_PROGRESS')
 
             if status is None:
                 print("Problem launching stack")
             elif status == 'UPDATE_COMPLETE':
-                print("Updated stack '{}'".format(name))
+                print("Updated stack '{}'".format(self.stack_name))
                 rtn = True
             elif status == 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS':
-                status = self._poll(client, name, 'update cleanup', 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS')
-                print("Updated stack '{}'".format(name))
+                status = self._poll(client, self.stack_name, 'update cleanup', 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS')
+                print("Updated stack '{}'".format(self.stack_name))
                 rtn = True
             else:
-                print("Status of stack '{}' is '{}'".format(name, status))
+                print("Status of stack '{}' is '{}'".format(self.stack_name, status))
+                rtn = False
+        return rtn
+
+    def delete_stack(self, session, wait = True):
+        """Deletes the given stack from CloudFormation.
+
+        Initiates the stack delete and waits for it to finish.  config and domain
+        are combined to identify the stack.
+
+        Args:
+            session (boto3.Session): An active session.
+            domain (string): Name of domain.
+            wait (bool) : If True, wait for the stack to be deleted, printing
+                          status information
+
+        Returns:
+            (bool|None) : If wait is True, the result of launching the stack,
+                          else None
+        """
+
+        client = session.client("cloudformation")
+        client.delete_stack(StackName = self.stack_name)
+
+        rtn = None
+        if wait:
+            status = self._poll(client, self.stack_name, 'delete', 'DELETE_IN_PROGRESS')
+
+            if status is None:
+                print("Problem deleting stack")
+            elif status == 'DELETE_COMPLETE':
+                print("Deleted stack '{}'".format(self.stack_name))
+                rtn = True
+            else:
+                print("Status of stack '{}' is '{}'".format(self.stack_name, status))
                 rtn = False
         return rtn
 
@@ -553,12 +585,12 @@ class CloudFormationConfiguration:
         self.resources[key] = {
             "Type" : "AWS::EC2::VPC",
             "Properties" : {
-                "CidrBlock" : { "Ref" : key + "Subnet" },
+                "CidrBlock" : Ref(key + "Subnet"),
                 "EnableDnsSupport" : "true",
                 "EnableDnsHostnames" : "true",
                 "Tags" : [
-                    {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
-                    {"Key" : "Name", "Value" : { "Ref" : key + "Domain"} }
+                    {"Key" : "Stack", "Value" : Ref("AWS::StackName") },
+                    {"Key" : "Name", "Value" : Ref(key + "Domain") }
                 ]
             }
         }
@@ -569,10 +601,10 @@ class CloudFormationConfiguration:
                 "HostedZoneConfig" : {
                     "Comment": "Internal DNS Zone for the VPC of {}".format(self.vpc_domain)
                 },
-                "Name" : { "Ref" : key + "Domain" },
+                "Name" : Ref(key + "Domain"),
                 "VPCs" : [ {
-                    "VPCId": { "Ref" : key },
-                    "VPCRegion": { "Ref" : key + "Region" }
+                    "VPCId": Ref(key),
+                    "VPCRegion": Ref(key + "Region")
                 }]
             }
         }
@@ -603,11 +635,11 @@ class CloudFormationConfiguration:
         self.resources[key] = {
             "Type" : "AWS::EC2::Subnet",
             "Properties" : {
-                "VpcId" : { "Ref" : vpc },
-                "CidrBlock" : { "Ref" : key + "Subnet" },
+                "VpcId" : Ref(vpc),
+                "CidrBlock" : Ref(key + "Subnet"),
                 "Tags" : [
-                    {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
-                    {"Key" : "Name", "Value" : { "Ref" : key + "Domain" } }
+                    {"Key" : "Stack", "Value" : Ref("AWS::StackName") },
+                    {"Key" : "Name", "Value" : Ref(key + "Domain") }
                 ]
             }
         }
@@ -643,13 +675,13 @@ class CloudFormationConfiguration:
             self.subnet_domain = sub + "-internal." + self.vpc_domain
             self.subnet_subnet = hosts.lookup(self.subnet_domain)
             self.add_subnet(name, az = az)
-            internal.append(name)
+            internal.append(Ref(name))
 
             name = sub.capitalize() + "ExternalSubnet"
             self.subnet_domain = sub + "-external." + self.vpc_domain
             self.subnet_subnet = hosts.lookup(self.subnet_domain)
             self.add_subnet(name, az = az)
-            external.append(name)
+            external.append(Ref(name))
 
         return (internal, external)
 
@@ -675,13 +707,13 @@ class CloudFormationConfiguration:
             domain = sub + "-internal." + self.vpc_domain
             id = lib.subnet_id_lookup(session, domain)
             self.add_arg(Arg.Subnet(name, id))
-            internal.append(name)
+            internal.append(Ref(name))
 
             name = sub.capitalize() + "ExternalSubnet"
             domain = sub + "-external." + self.vpc_domain
             id = lib.subnet_id_lookup(session, domain)
             self.add_arg(Arg.Subnet(name, id))
-            external.append(name)
+            external.append(Ref(name))
 
         return (internal, external)
 
@@ -707,19 +739,19 @@ class CloudFormationConfiguration:
         self.resources[key] = {
             "Type" : "AWS::EC2::Instance",
             "Properties" : {
-                "ImageId" : { "Ref" : key + "AMI" },
+                "ImageId" : Ref(key + "AMI"),
                 "InstanceType" : get_scenario(type_, "t2.micro"),
-                "KeyName" : { "Ref" : key + "Key" },
+                "KeyName" : Ref(key + "Key"),
                 "SourceDestCheck": bool_str(iface_check),
                 "Tags" : [
-                    {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
-                    {"Key" : "Name", "Value" : { "Ref": key + "Hostname" } }
+                    {"Key" : "Stack", "Value" : Ref("AWS::StackName") },
+                    {"Key" : "Name", "Value" : Ref(key + "Hostname") }
                 ],
                 "NetworkInterfaces" : [{
                     "AssociatePublicIpAddress" : bool_str(public_ip),
                     "DeviceIndex"              : "0",
                     "DeleteOnTermination"      : "true",
-                    "SubnetId"                 : { "Ref" : subnet },
+                    "SubnetId"                 : subnet,
                 }]
             }
         }
@@ -736,10 +768,7 @@ class CloudFormationConfiguration:
             self.resources[key]["DependsOn"] = depends_on
 
         if security_groups is not None:
-            sgs = []
-            for sg in security_groups:
-                sgs.append({ "Ref" : sg })
-            self.resources[key]["Properties"]["NetworkInterfaces"][0]["GroupSet"] = sgs
+            self.resources[key]["Properties"]["NetworkInterfaces"][0]["GroupSet"] = security_groups
 
         if meta_data is not None:
             self.resources[key]["Metadata"] = meta_data
@@ -798,13 +827,13 @@ class CloudFormationConfiguration:
                 "MultiAZ" : multi_az,
                 "StorageType" : "standard",
                 "AllocatedStorage" : str(storage),
-                "DBInstanceIdentifier" : { "Ref" : key + "Hostname" },
-                "MasterUsername" : { "Ref" : key + "Username" },
-                "MasterUserPassword" : { "Ref" : key + "Password" },
-                "DBSubnetGroupName" : { "Ref" : key + "SubnetGroup" },
+                "DBInstanceIdentifier" : Ref(key + "Hostname"),
+                "MasterUsername" : Ref(key + "Username"),
+                "MasterUserPassword" : Ref(key + "Password"),
+                "DBSubnetGroupName" : Ref(key + "SubnetGroup"),
                 "PubliclyAccessible" : "false",
-                "DBName" : { "Ref" : key + "DBName" },
-                "Port" : { "Ref" : key + "Port" },
+                "DBName" : Ref(key + "DBName"),
+                "Port" : Ref(key + "Port"),
                 "StorageEncrypted" : "false"
             }
         }
@@ -812,16 +841,13 @@ class CloudFormationConfiguration:
         self.resources[key + "SubnetGroup"] = {
             "Type" : "AWS::RDS::DBSubnetGroup",
             "Properties" : {
-                "DBSubnetGroupDescription" : { "Ref" : key + "Hostname" },
-                "SubnetIds" : [{ "Ref" : subnet } for subnet in subnets]
+                "DBSubnetGroupDescription" : Ref(key + "Hostname"),
+                "SubnetIds" : subnets
             }
         }
 
         if security_groups is not None:
-            sgs = []
-            for sg in security_groups:
-                sgs.append({ "Ref" : sg })
-            self.resources[key]["Properties"]["VPCSecurityGroups"] = sgs
+            self.resources[key]["Properties"]["VPCSecurityGroups"] = security_groups
 
         hostname_ = Arg.String(key + "Hostname", hostname.replace('.','-'),
                                "Hostname of the RDS DB Instance '{}'".format(key))
@@ -870,7 +896,7 @@ class CloudFormationConfiguration:
         """
 
         props = {
-            "TableName" : { "Ref" : key + "TableName" },
+            "TableName" : Ref(key + "TableName"),
             "KeySchema" : KeySchema,
             "AttributeDefinitions" : AttributeDefinitions,
             "ProvisionedThroughput" : ProvisionedThroughput
@@ -915,7 +941,7 @@ class CloudFormationConfiguration:
         self.resources[key] = {
             "Type" : "AWS::DynamoDB::Table",
             "Properties" : {
-                "TableName" : { "Ref" : key + "TableName" },
+                "TableName" : Ref(key + "TableName"),
                 "AttributeDefinitions" : attr_defs,
                 "KeySchema" : key_schema_,
                 "ProvisionedThroughput" : {
@@ -950,17 +976,17 @@ class CloudFormationConfiguration:
             "Properties" : {
                 #"AutoMinorVersionUpgrade" : "false", # defaults to true - Indicates that minor engine upgrades will be applied automatically to the cache cluster during the maintenance window.
                 "CacheNodeType" : get_scenario(type_, "cache.t2.micro"),
-                "CacheSubnetGroupName" : { "Ref" : key + "SubnetGroup" },
+                "CacheSubnetGroupName" : Ref(key + "SubnetGroup"),
                 "Engine" : "redis",
                 "EngineVersion" : version,
                 "NumCacheNodes" : "1",
                 "Port" : port,
                 #"PreferredMaintenanceWindow" : String, # don't know the default - site says minimum 60 minutes, infrequent and announced on AWS forum 2w prior
                 "Tags" : [
-                    {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
-                    {"Key" : "Name", "Value" : { "Ref": key + "Hostname" } }
+                    {"Key" : "Stack", "Value" : Ref("AWS::StackName") },
+                    {"Key" : "Name", "Value" : Ref(key + "Hostname") }
                 ],
-                "VpcSecurityGroupIds" :  [{ "Ref" : sg } for sg in security_groups]
+                "VpcSecurityGroupIds" :  security_groups
             },
             "DependsOn" : key + "SubnetGroup"
         }
@@ -968,8 +994,8 @@ class CloudFormationConfiguration:
         self.resources[key + "SubnetGroup"] = {
             "Type" : "AWS::ElastiCache::SubnetGroup",
             "Properties" : {
-                "Description" : { "Ref" : key + "Hostname" },
-                "SubnetIds" : [{ "Ref" : subnet } for subnet in subnets]
+                "Description" : Ref(key + "Hostname" },
+                "SubnetIds" : subnets
             }
         }
 
@@ -1000,15 +1026,15 @@ class CloudFormationConfiguration:
                 "AutomaticFailoverEnabled" : bool_str(clusters > 1),
                 #"AutoMinorVersionUpgrade" : "false", # defaults to true - Indicates that minor engine upgrades will be applied automatically to the cache cluster during the maintenance window.
                 "CacheNodeType" : get_scenario(type_, "cache.m3.medium"),
-                "CacheSubnetGroupName" : { "Ref" : key + "SubnetGroup" },
+                "CacheSubnetGroupName" : Ref(key + "SubnetGroup"),
                 "Engine" : "redis",
                 "EngineVersion" : version,
                 "NumCacheClusters" : clusters,
                 "Port" : int(port),
                 #"PreferredCacheClusterAZs" : [ String, ... ],
                 #"PreferredMaintenanceWindow" : String, # don't know the default - site says minimum 60 minutes, infrequent and announced on AWS forum 2w prior
-                "ReplicationGroupDescription" : { "Ref" : key + "Hostname" },
-                "SecurityGroupIds" : [{ "Ref" : sg } for sg in security_groups]
+                "ReplicationGroupDescription" : Ref(key + "Hostname"),
+                "SecurityGroupIds" : security_groups
             },
             "DependsOn" : key + "SubnetGroup"
         }
@@ -1016,8 +1042,8 @@ class CloudFormationConfiguration:
         self.resources[key + "SubnetGroup"] = {
             "Type" : "AWS::ElastiCache::SubnetGroup",
             "Properties" : {
-                "Description" : { "Ref" : key + "Hostname" },
-                "SubnetIds" : [{ "Ref" : subnet } for subnet in subnets]
+                "Description" : Ref(key + "Hostname"),
+                "SubnetIds" : subnets
             }
         }
 
