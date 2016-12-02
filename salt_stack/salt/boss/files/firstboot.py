@@ -48,13 +48,13 @@ def django_initialize():
         logging.info("Finished getting migration settings")
 
         logging.info("Initializing Django")
-        migrate_cmd = "sudo python3 /srv/www/django/manage.py "
-        bossutils.utils.execute(migrate_cmd + "makemigrations")
-        bossutils.utils.execute(migrate_cmd + "makemigrations bosscore")  # will hang if it cannot contact the auth server
-        bossutils.utils.execute(migrate_cmd + "makemigrations bossoidc")
-        bossutils.utils.execute(migrate_cmd + "makemigrations bossingest")
-        bossutils.utils.execute(migrate_cmd + "migrate")
-        bossutils.utils.execute(migrate_cmd + "collectstatic --no-input")
+        migrate_cmd = "yes | sudo python3 /srv/www/django/manage.py "
+        bossutils.utils.execute(migrate_cmd + "makemigrations", whole=True, shell=True)
+        bossutils.utils.execute(migrate_cmd + "makemigrations bosscore", whole=True, shell=True)  # will hang if it cannot contact the auth server
+        bossutils.utils.execute(migrate_cmd + "makemigrations bossoidc", whole=True, shell=True)
+        bossutils.utils.execute(migrate_cmd + "makemigrations bossingest", whole=True, shell=True)
+        bossutils.utils.execute(migrate_cmd + "migrate", whole=True, shell=True)
+        bossutils.utils.execute(migrate_cmd + "collectstatic --no-input", whole=True, shell=True)
 
         bossutils.utils.execute("sudo service uwsgi-emperor reload")
         bossutils.utils.execute("sudo service nginx restart")
