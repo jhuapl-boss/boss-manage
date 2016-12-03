@@ -72,9 +72,11 @@ For each of the following repositories
 * https://github.com/aplmicrons/spdb.git
 * https://github.com/jhuapl-boss/ingest-client
 * https://github.com/jhuapl-boss/ndingest
-* https://github.com/jhuapl-boss/intern.git (intern is not a sub-module, but also needs tagging)
+* https://github.com/jhuapl-boss/intern.git (not a sub-module, but also needs tagging)
 * https://github.com/jhuapl-boss/ingest_test.git (not a sub-module, but also needs tagging)
-
+* https://github.com/jhuapl-boss/boss-oidc.git (not a sub-module, but also needs tagging)
+* https://github.com/jhuapl-boss/django-oidc.git (not a sub-module, but also needs tagging)
+* https://github.com/jhuapl-boss/drf-oidc-auth.git (not a sub-module, but also needs tagging)
 
 If you don't have the repository already cloned
 ```shell
