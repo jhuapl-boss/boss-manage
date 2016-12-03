@@ -64,7 +64,7 @@ $ git push
 
 ## Tagging a stable release
 
-### Submodule Repositorie
+### Submodule Repositories
 For each of the following repositories
 * https://github.com/aplmicrons/boss.git
 * https://github.com/aplmicrons/proofread.git
