@@ -1311,6 +1311,7 @@ class CloudFormationConfiguration:
             notifications_arn (bool) : False then the notifications contains topic reference, True notifications contains Arn of already created topic
             role (None|string) : Role name to use when creating instances
             health_check_grace_period (int) : grace period in seconds to wait before checking newly created instances.
+            support_update (bool) : If the ASG should include RollingUpdate UpdatePolicy
             depends_on (None|string|list): A unique name or list of unique names of resources within the
                                            configuration and is used to determine the launch order of resources
         """

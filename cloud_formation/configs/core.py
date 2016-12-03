@@ -167,7 +167,7 @@ runcmd:
                                max = CONSUL_CLUSTER_SIZE,
                                notifications = "DNSSNS",
                                role = consul_role,
-                               support_update = False,
+                               support_update = False, # Update will restart the instances manually
                                depends_on = ["DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
     user_data = configuration.UserData()
@@ -457,16 +457,16 @@ def update(session, domain):
         print("Stack should be ready for use")
         print("Starting to cycle consul cluster instances")
 
+        # DP NOTE: Cycling the instances is done manually (outside of CF)
+        #          so that Vault can be unsealed first, else the whole stacks
+        #          would not be usable until all consul instance were restarted
         with ThreadPoolExecutor(max_workers=3) as tpe:
             # Need time for the ASG to detect the terminated instance,
             # launch the new instance, and have the instance cluster
-            tpe.submit(lib.asg_restart, session, "consul." + domain, consul_update_timeout * 60)
-
-        print("Cleaning up consul cluster")
-        cmd = 'sudo consul members | grep failed | cut -f1 -d" " | xargs -t -r -n1 sudo consul force-leave'
-        call.ssh_all('consul.' + domain, cmd) # Remove references to old cluster nodes
-
-
+            tpe.submit(lib.asg_restart,
+                            session,
+                            "consul." + domain,
+                            consul_update_timeout * 60)
 
     return success
 

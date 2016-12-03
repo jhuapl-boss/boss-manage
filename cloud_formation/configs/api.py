@@ -37,11 +37,17 @@ import names
 # extract this from the session variable.  Hard coding for now.
 PRODUCTION_REGION = 'us-east-1'
 
-DYNAMO_SCHEMA = '../salt_stack/salt/boss/files/boss.git/django/bosscore/dynamo_schema.json'
+DYNAMO_METADATA_SCHEMA = '../salt_stack/salt/boss/files/boss.git/django/bosscore/dynamo_schema.json'
 
 DYNAMO_S3_INDEX_SCHEMA = '../salt_stack/salt/spdb/files/spdb.git/spatialdb/dynamo/s3_index_table.json'
 
 DYNAMO_TILE_INDEX_SCHEMA  = '../salt_stack/salt/ndingest/files/ndingest.git/nddynamo/schemas/boss_tile_index.json'
+
+# Annotation id to supercuboid table.
+DYNAMO_ID_INDEX_SCHEMA = '../salt_stack/salt/spdb/files/spdb.git/spatialdb/dynamo/id_index_schema.json'
+
+# Annotation id count table (allows for reserving the next id in a channel).
+DYNAMO_ID_COUNT_SCHEMA = '../salt_stack/salt/spdb/files/spdb.git/spatialdb/dynamo/id_count_schema.json'
 
 INCOMING_SUBNET = "52.3.13.189/32"  # microns-bastion elastic IP
 
@@ -137,6 +143,8 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["aws"]["tile_bucket"] = names.get_tile_bucket(domain)
     user_data["aws"]["s3-index-table"] = names.get_s3_index(domain)
     user_data["aws"]["tile-index-table"] = names.get_tile_index(domain)
+    user_data["aws"]["id-index-table"] = names.get_id_index(domain)
+    user_data["aws"]["id-count-table"] = names.get_id_count_index(domain)
 
     user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
     user_data["lambda"]["flush_function"] = multilambda
@@ -234,8 +242,8 @@ def create_config(session, domain, keypair=None, db_config={}):
                       type_ = RDS_TYPE,
                       security_groups=["InternalSecurityGroup"])
 
-    # Create the Meta, s3Index, tileIndex Dynamo tables
-    with open(DYNAMO_SCHEMA, 'r') as fh:
+    # Create the Meta, s3Index, tileIndex, annotation Dynamo tables
+    with open(DYNAMO_METADATA_SCHEMA, 'r') as fh:
         dynamo_cfg = json.load(fh)
     config.add_dynamo_table_from_json("EndpointMetaDB",'bossmeta.' + domain, **dynamo_cfg)
 
@@ -246,6 +254,14 @@ def create_config(session, domain, keypair=None, db_config={}):
     with open(DYNAMO_TILE_INDEX_SCHEMA , 'r') as tilefh:
         dynamo_tile_cfg = json.load(tilefh)
     config.add_dynamo_table_from_json('tileIndex', names.get_tile_index(domain), **dynamo_tile_cfg)
+
+    with open(DYNAMO_ID_INDEX_SCHEMA , 'r') as id_ind_fh:
+        dynamo_id_ind__cfg = json.load(id_ind_fh)
+    config.add_dynamo_table_from_json('idIndIndex', names.get_id_index(domain), **dynamo_id_ind__cfg)
+
+    with open(DYNAMO_ID_COUNT_SCHEMA , 'r') as id_count_fh:
+        dynamo_id_count_cfg = json.load(id_count_fh)
+    config.add_dynamo_table_from_json('idCountIndex', names.get_id_count_index(domain), **dynamo_id_count_cfg)
 
     # Create the Cache and CacheState Redis Clusters
     config.add_redis_replication("Cache",

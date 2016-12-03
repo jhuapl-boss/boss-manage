@@ -1,0 +1,64 @@
+[
+  {
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/AdministratorAccess"
+    ],
+    "GroupName": "aplAdminGroup",
+    "GroupPolicyList": [],
+    "Path": "/"
+  },
+  {
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/IAMFullAccess"
+    ],
+    "GroupName": "aplIAMAdminGroup",
+    "GroupPolicyList": [],
+    "Path": "/"
+  },
+  {
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::451493790433:policy/aplInstanceOwnerPolicy"
+    ],
+    "GroupName": "aplInstanceOwnerGroup",
+    "GroupPolicyList": [],
+    "Path": "/"
+  },
+  {
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/IAMFullAccess",
+      "arn:aws:iam::451493790433:policy/aplCloudFormationFullAccess",
+      "arn:aws:iam::aws:policy/CloudFrontFullAccess",
+      "arn:aws:iam::aws:policy/AWSCloudTrailFullAccess",
+      "arn:aws:iam::aws:policy/AmazonVPCFullAccess"
+    ],
+    "GroupName": "aplNetworkGroup",
+    "GroupPolicyList": [],
+    "Path": "/"
+  },
+  {
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::451493790433:policy/aplBillingGroupPolicy"
+    ],
+    "GroupName": "aplProjectManagerGroup",
+    "GroupPolicyList": [],
+    "Path": "/"
+  },
+  {
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess",
+      "arn:aws:iam::aws:policy/AmazonDynamoDBReadOnlyAccess",
+      "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+    ],
+    "GroupName": "aplProofReader",
+    "GroupPolicyList": [],
+    "Path": "/"
+  },
+  {
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::451493790433:policy/aplCloudFormationFullAccess"
+    ],
+    "GroupName": "aplSWDevGroup",
+    "GroupPolicyList": [],
+    "Path": "/"
+  }
+]

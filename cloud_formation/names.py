@@ -24,6 +24,8 @@ MULTI_LAMBDA = 'multiLambda'
 S3_INDEX = 's3index'
 TILE_BUCKET = 'tiles'
 TILE_INDEX = 'tileindex'
+ID_INDEX = 'idIndex'
+ID_COUNT_INDEX = 'idCount'
 
 def get_cache_manager(domain):
     """Get the domain name of the cache manager.
@@ -80,3 +82,19 @@ def get_tile_index(domain):
         (string)
     """
     return TILE_INDEX + '.' + domain
+
+def get_id_index(domain):
+    """Get the domain name of the annotation id index table in DynamoDB.
+
+    Returns:
+        (string)
+    """
+    return ID_INDEX + '.' + domain
+
+def get_id_count_index(domain):
+    """Get the domain name of the annotation id count index table in DynamoDB.
+
+    Returns:
+        (string)
+    """
+    return ID_COUNT_INDEX + '.' + domain

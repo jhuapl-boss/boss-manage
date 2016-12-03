@@ -12,6 +12,7 @@ django-prerequirements:
         - pkgs:
             - libmysqlclient-dev
             - libffi-dev
+            - awscli
 
 django-requirements:
     pip.installed:

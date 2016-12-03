@@ -37,19 +37,36 @@ def django_initialize():
     bossutils.utils.execute("sudo python3 /srv/salt/ndingest/build_settings.py")
     logging.info("Finished creating settings.ini")
 
-    logging.info("Initializing Django")
-    migrate_cmd = "sudo python3 /srv/www/django/manage.py "
-    bossutils.utils.execute(migrate_cmd + "makemigrations")
-    bossutils.utils.execute(migrate_cmd + "makemigrations bosscore")  # will hang if it cannot contact the auth server
-    bossutils.utils.execute(migrate_cmd + "makemigrations bossoidc")
-    bossutils.utils.execute(migrate_cmd + "makemigrations bossingest")
-    bossutils.utils.execute(migrate_cmd + "migrate")
-    bossutils.utils.execute(migrate_cmd + "collectstatic --no-input")
+    logging.info("Get migration settings from S3")
+    mm = bossutils.migration_manager.MigrationManager()
+    migration_success = mm.get_migrations()
+    if not migration_success:
+        logging.info("getting migrations from s3 failed.  Skipping makemigrations, migrate")  # and stopping nginx, uwsgi-emeror"
+        #bossutils.utils.execute("sudo service uwsgi-emperor stop")
+        #bossutils.utils.execute("sudo service nginx stop")
+    else:
+        logging.info("Finished getting migration settings")
 
-    bossutils.utils.execute("sudo service uwsgi-emperor reload")
-    bossutils.utils.execute("sudo service nginx restart")
-    logging.info("Finished Initializing Django")
+        logging.info("Initializing Django")
+        migrate_cmd = "yes | sudo python3 /srv/www/django/manage.py "
+        bossutils.utils.execute(migrate_cmd + "makemigrations", whole=True, shell=True)
+        bossutils.utils.execute(migrate_cmd + "makemigrations bosscore", whole=True, shell=True)  # will hang if it cannot contact the auth server
+        bossutils.utils.execute(migrate_cmd + "makemigrations bossoidc", whole=True, shell=True)
+        bossutils.utils.execute(migrate_cmd + "makemigrations bossingest", whole=True, shell=True)
+        bossutils.utils.execute(migrate_cmd + "migrate", whole=True, shell=True)
+        bossutils.utils.execute(migrate_cmd + "collectstatic --no-input", whole=True, shell=True)
 
+        bossutils.utils.execute("sudo service uwsgi-emperor reload")
+        bossutils.utils.execute("sudo service nginx restart")
+        logging.info("Finished Initializing Django")
+
+        logging.info("Put migration settings in S3")
+        migration_put_success = mm.put_migrations()
+        if not migration_put_success:
+            logging.error(
+                "At least one migration failed when putting them in s3.")
+        else:
+            logging.info("Migrations")
 
 if __name__ == '__main__':
     django_initialize()
