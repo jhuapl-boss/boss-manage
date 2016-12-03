@@ -24,8 +24,10 @@ import time
 import json
 import io
 import configparser
+
 import hosts
-import library as lib
+import aws
+import utils
 
 def get_scenario(var, default = None):
     """Handle getting the appropriate value froma variable using the SCENARIO
@@ -389,19 +391,8 @@ class CloudFormationConfiguration:
         self.keypairs = {}
         self.stack_name = "".join(map(lambda x: x.capitalize(), domain.split(".")))
 
-        dots = len(domain.split("."))
-        if dots == 2: # vpc.tld
-            self.vpc_domain = domain
-            self.vpc_subnet = hosts.lookup(domain)
-            self.subnet_domain = None
-            self.subnet_subnet = None
-        elif dots == 3: # subnet.vpc.tld
-            self.vpc_domain = domain.split(".", 1)[1]
-            self.vpc_subnet = hosts.lookup(self.vpc_domain)
-            self.subnet_domain = domain
-            self.subnet_subnet = hosts.lookup(domain)
-        else:
-            raise Exception("Not a valiid VPC or Subnet domain name")
+        self.vpc_domain = domain
+        self.vpc_subnet = hosts.lookup(domain)
 
     def _create_template(self, description=""):
         """Create the JSON CloudFormation template from the resources that have
@@ -468,7 +459,7 @@ class CloudFormationConfiguration:
             TemplateBody = self._create_template(),
             Parameters = self.arguments,
             Tags = [
-                {"Key": "Commit", "Value": lib.get_commit()}
+                {"Key": "Commit", "Value": utils.get_commit()}
             ]
         )
 
@@ -508,7 +499,7 @@ class CloudFormationConfiguration:
             TemplateBody = self._create_template(),
             Parameters = self.arguments,
             Tags = [
-                {"Key": "Commit", "Value": lib.get_commit()}
+                {"Key": "Commit", "Value": utils.get_commit()}
             ]
         )
 
@@ -585,12 +576,12 @@ class CloudFormationConfiguration:
         self.resources[key] = {
             "Type" : "AWS::EC2::VPC",
             "Properties" : {
-                "CidrBlock" : Ref(key + "Subnet"),
+                "CidrBlock" : self.vpc_subnet,
                 "EnableDnsSupport" : "true",
                 "EnableDnsHostnames" : "true",
                 "Tags" : [
                     {"Key" : "Stack", "Value" : Ref("AWS::StackName") },
-                    {"Key" : "Name", "Value" : Ref(key + "Domain") }
+                    {"Key" : "Name", "Value" : self.vpc_domain }
                 ]
             }
         }
@@ -601,58 +592,55 @@ class CloudFormationConfiguration:
                 "HostedZoneConfig" : {
                     "Comment": "Internal DNS Zone for the VPC of {}".format(self.vpc_domain)
                 },
-                "Name" : Ref(key + "Domain"),
+                "Name" : self.vpc_domain,
                 "VPCs" : [ {
                     "VPCId": Ref(key),
-                    "VPCRegion": Ref(key + "Region")
+                    "VPCRegion": self.region
                 }]
             }
         }
 
-        subnet = Arg.CIDR(key + "Subnet", self.vpc_subnet,
-                          "Subnet of the VPC '{}'".format(key))
-        self.add_arg(subnet)
+    def find_vpc(self, session, key="VPC"):
+        """Lookup a VPC's ID and add it to the configuration as an argument
 
-        domain = Arg.String(key + "Domain", self.vpc_domain,
-                            "Domain of the VPC '{}'".format(key))
-        self.add_arg(domain)
+        VPC name is derived fromt he domain given to the constructor
 
-        region_ = Arg.String(key + "Region", self.region,
-                            "Region of the VPC '{}'".format(key))
-        self.add_arg(region_)
+        Args:
+            session (Session) : Boto3 session used to lookup the VPC's ID
+            key (string) : Unique name for the resource in the template
+        """
+            
+        vpc_id = aws.vpc_id_lookup(session, self.vpc_domain)
+        vpc = Arg.VPC(key, vpc_id, "ID of the VPC"))
+        self.add_arg(vpc)
 
-    def add_subnet(self, key="Subnet", vpc="VPC", az=None):
+    def add_subnet(self, key, name, vpc=Ref("VPC"), az=None):
         """Add a Subnet to the configuration.
 
         Subnet name is derived from the domain given to the constructor.
 
         Args:
             key (string) : Unique name for the resource in the template
-            vpc (string) : Unique argument key for the VPC the subnet will be created in
+            name (string) : Name of the subnet being added
+            vpc (string) : VPC ID or Ref for the VPC the subnet will be created in
             az (string|None) : Availability Zone to launch the subnet in or None
                                to allow AWS to decide
         """
+
         self.resources[key] = {
             "Type" : "AWS::EC2::Subnet",
             "Properties" : {
-                "VpcId" : Ref(vpc),
-                "CidrBlock" : Ref(key + "Subnet"),
+                "VpcId" : vpc,
+                "CidrBlock" : hosts.lookup(name),
                 "Tags" : [
                     {"Key" : "Stack", "Value" : Ref("AWS::StackName") },
-                    {"Key" : "Name", "Value" : Ref(key + "Domain") }
+                    {"Key" : "Name", "Value" : name }
                 ]
             }
         }
 
         if az is not None:
             self.resources[key]["Properties"]["AvailabilityZone"] = az
-
-        subnet = Arg.CIDR(key + "Subnet", self.subnet_subnet,
-                          "Subnet of the Subnet '{}'".format(key))
-        self.add_arg(subnet)
-        domain = Arg.String(key + "Domain", self.subnet_domain,
-                            "Domain of the Subnet '{}'".format(key))
-        self.add_arg(domain)
 
     def add_all_azs(self, session):
         """Add Internal and External subnets for each availability zone.
@@ -670,17 +658,13 @@ class CloudFormationConfiguration:
         """
         internal = []
         external = []
-        for az, sub in lib.azs_lookup(session):
+        for az, sub in aws.azs_lookup(session):
             name = sub.capitalize() + "InternalSubnet"
-            self.subnet_domain = sub + "-internal." + self.vpc_domain
-            self.subnet_subnet = hosts.lookup(self.subnet_domain)
-            self.add_subnet(name, az = az)
+            self.add_subnet(name, sub + "-internal." + self.vpc_domain, az = az)
             internal.append(Ref(name))
 
             name = sub.capitalize() + "ExternalSubnet"
-            self.subnet_domain = sub + "-external." + self.vpc_domain
-            self.subnet_subnet = hosts.lookup(self.subnet_domain)
-            self.add_subnet(name, az = az)
+            self.add_subnet(name, sub + "-external." + self.vpc_domain, az = az)
             external.append(Ref(name))
 
         return (internal, external)
@@ -702,50 +686,56 @@ class CloudFormationConfiguration:
         internal = []
         external = []
 
-        for az, sub in lib.azs_lookup(session):
+        for az, sub in aws.azs_lookup(session):
             name = sub.capitalize() + "InternalSubnet"
             domain = sub + "-internal." + self.vpc_domain
-            id = lib.subnet_id_lookup(session, domain)
+            id = aws.subnet_id_lookup(session, domain)
             self.add_arg(Arg.Subnet(name, id))
             internal.append(Ref(name))
 
             name = sub.capitalize() + "ExternalSubnet"
             domain = sub + "-external." + self.vpc_domain
-            id = lib.subnet_id_lookup(session, domain)
+            id = aws.subnet_id_lookup(session, domain)
             self.add_arg(Arg.Subnet(name, id))
             external.append(Ref(name))
 
         return (internal, external)
 
-    def add_ec2_instance(self, key, hostname, ami, keypair, subnet="Subnet", type_="t2.micro", iface_check=True, public_ip=False, security_groups=None, user_data=None, meta_data=None, role=None, depends_on=None):
+    def add_ec2_instance(self, key, hostname, ami, keypair, subnet=Ref("Subnet"), type_="t2.micro", iface_check=True, public_ip=False, security_groups=None, user_data=None, meta_data=None, role=None, depends_on=None):
         """Add an EC2 instance to the configuration
 
         Args:
             key (string) : Unique name for the resource in the template
             hostname (string) : The hostname / instance name of the instance
             ami (string) : The AMI ID of the image to base the instance on
-            subnet (string) : The Subnet unique name within the configuration to launch this machine in
+            subnet (string) : The Subnet ID or Ref of the Subnet to launch this machine in
             type_ (string) : The instance type to create
             iface_check (bool) : Should the network check if the traffic is destined for itself
                                  (usedful for NAT instances)
             public_ip (bool) : Should the instance gets a public IP address
-            security_groups (None|list) : A list of SecurityGroup unique names within the configuration
+            security_groups (None|list) : A list of SecurityGroup IDs or Refs
             user_data (None|string) : A string of user-data to give to the instance when launching
             meta_data (None|dict) : A dictionary of meta-data to include with the configuration
             role (None|string) : The role name of that the ec2 instance can assume.
             depends_on (None|string|list): A unique name or list of unique names of resources within the
                                            configuration and is used to determine the launch order of resources
         """
+
+        commit = None
+        if type(ami) == tuple:
+            commit = ami[1]
+            ami = ami[0]
+
         self.resources[key] = {
             "Type" : "AWS::EC2::Instance",
             "Properties" : {
-                "ImageId" : Ref(key + "AMI"),
+                "ImageId" : ami,
                 "InstanceType" : get_scenario(type_, "t2.micro"),
-                "KeyName" : Ref(key + "Key"),
+                "KeyName" : keypair,
                 "SourceDestCheck": bool_str(iface_check),
                 "Tags" : [
                     {"Key" : "Stack", "Value" : Ref("AWS::StackName") },
-                    {"Key" : "Name", "Value" : Ref(key + "Hostname") }
+                    {"Key" : "Name", "Value" : hostname }
                 ],
                 "NetworkInterfaces" : [{
                     "AssociatePublicIpAddress" : bool_str(public_ip),
@@ -756,13 +746,9 @@ class CloudFormationConfiguration:
             }
         }
 
-        if type(ami) == tuple:
-            commit = ami[1]
-            ami = ami[0]
-
-            if commit is not None:
-                kv = {"Key": "AMI Commit", "Value": commit}
-                self.resources[key]["Properties"]["Tags"].append(kv)
+        if commit is not None:
+            kv = {"Key": "AMI Commit", "Value": commit}
+            self.resources[key]["Properties"]["Tags"].append(kv)
 
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
@@ -780,18 +766,7 @@ class CloudFormationConfiguration:
             self.resources[key]["Properties"]["IamInstanceProfile"] = role
 
 
-        _ami = Arg.AMI(key + "AMI", ami,
-                       "AMI for the EC2 Instance '{}'".format(key))
-        self.add_arg(_ami)
-
-        _key = Arg.KeyPair(key + "Key", keypair, hostname)
-        self.add_arg(_key)
         self.keypairs[hostname] = keypair
-
-        _hostname = Arg.String(key + "Hostname", hostname,
-                               "Hostname of the EC2 Instance '{}'".format(key))
-        self.add_arg(_hostname)
-
         self._add_record_cname(key, hostname, ec2 = True)
 
     def add_rds_db(self, key, hostname, port, db_name, username, password, subnets, type_="db.t2.micro", storage="5", security_groups=None):
@@ -804,17 +779,19 @@ class CloudFormationConfiguration:
             db_name (string) : The name of the database to create on the DB instance
             username (string) : The master username for the database
             password (string) : The (plaintext) password for the master username
-            subnets (list) : A list of Subnet unique names within the configuration across which
+            subnets (list) : A list of Subnet IDs or Refs across which
                              to create a DB SubnetGroup for the DB Instance to launch into
             type_ (string) : The RDS instance type to create
             storage (int|string) : The storage size of the database (in GB)
-            security_groups (None|list) : A list of SecurityGroup unique names within the configuration
+            security_groups (None|list) : A list of SecurityGroup IDs or Refs
         """
         scenario = os.environ["SCENARIO"]
         multi_az = {
             "development": "false",
             "production": "true",
         }.get(scenario, "false")
+
+        hostname_ = hostname.replace('.','-')
 
         self.resources[key] = {
             "Type" : "AWS::RDS::DBInstance",
@@ -827,13 +804,13 @@ class CloudFormationConfiguration:
                 "MultiAZ" : multi_az,
                 "StorageType" : "standard",
                 "AllocatedStorage" : str(storage),
-                "DBInstanceIdentifier" : Ref(key + "Hostname"),
-                "MasterUsername" : Ref(key + "Username"),
-                "MasterUserPassword" : Ref(key + "Password"),
+                "DBInstanceIdentifier" : hostname_,
+                "MasterUsername" : username,
+                "MasterUserPassword" : password,
                 "DBSubnetGroupName" : Ref(key + "SubnetGroup"),
                 "PubliclyAccessible" : "false",
-                "DBName" : Ref(key + "DBName"),
-                "Port" : Ref(key + "Port"),
+                "DBName" : db_name,
+                "Port" : port,
                 "StorageEncrypted" : "false"
             }
         }
@@ -841,33 +818,13 @@ class CloudFormationConfiguration:
         self.resources[key + "SubnetGroup"] = {
             "Type" : "AWS::RDS::DBSubnetGroup",
             "Properties" : {
-                "DBSubnetGroupDescription" : Ref(key + "Hostname"),
+                "DBSubnetGroupDescription" : hostname_,
                 "SubnetIds" : subnets
             }
         }
 
         if security_groups is not None:
             self.resources[key]["Properties"]["VPCSecurityGroups"] = security_groups
-
-        hostname_ = Arg.String(key + "Hostname", hostname.replace('.','-'),
-                               "Hostname of the RDS DB Instance '{}'".format(key))
-        self.add_arg(hostname_)
-
-        port_ = Arg.Port(key + "Port", port,
-                         "DB Server Port for the RDS DB Instance '{}'".format(key))
-        self.add_arg(port_)
-
-        name_ = Arg.String(key + "DBName", db_name,
-                           "Name of the intial database on the RDS DB Instance '{}'".format(key))
-        self.add_arg(name_)
-
-        username_ = Arg.String(key + "Username", username,
-                               "Master Username for RDS DB Instance '{}'".format(key))
-        self.add_arg(username_)
-
-        password_ = Arg.Password(key + "Password", password,
-                                 "Master User Password for RDS DB Instance '{}'".format(key))
-        self.add_arg(password_)
 
         self._add_record_cname(key, hostname, rds = True)
 
@@ -895,26 +852,18 @@ class CloudFormationConfiguration:
             GlobalSecondaryIndexes (optional[list]): List of dicts representing global secondary indexes.  Defaults to None.
         """
 
-        props = {
-            "TableName" : Ref(key + "TableName"),
-            "KeySchema" : KeySchema,
-            "AttributeDefinitions" : AttributeDefinitions,
-            "ProvisionedThroughput" : ProvisionedThroughput
+        self.resources[key] = {
+            "Type" : "AWS::DynamoDB::Table",
+            "Properties" : {
+                "TableName" : name,
+                "KeySchema" : KeySchema,
+                "AttributeDefinitions" : AttributeDefinitions,
+                "ProvisionedThroughput" : ProvisionedThroughput
+            }
         }
 
         if GlobalSecondaryIndexes is not None:
-            props["GlobalSecondaryIndexes"] = GlobalSecondaryIndexes
-
-        self.resources[key] = {
-            "Type" : "AWS::DynamoDB::Table",
-            "Properties" : props
-        }
-
-        table_name = Arg.String(
-            key + "TableName", name,
-            "Name of the DynamoDB table created by instance '{}'".format(key))
-
-        self.add_arg(table_name)
+            self.resources[key]["Properties"]["GlobalSecondaryIndexes"] = GlobalSecondaryIndexes
 
     def add_dynamo_table(self, key, name, attributes, key_schema, throughput):
         """Add an DynamoDB Table to the configuration
@@ -941,7 +890,7 @@ class CloudFormationConfiguration:
         self.resources[key] = {
             "Type" : "AWS::DynamoDB::Table",
             "Properties" : {
-                "TableName" : Ref(key + "TableName"),
+                "TableName" : name,
                 "AttributeDefinitions" : attr_defs,
                 "KeySchema" : key_schema_,
                 "ProvisionedThroughput" : {
@@ -950,10 +899,6 @@ class CloudFormationConfiguration:
                 }
             }
         }
-
-        table_name = Arg.String(key + "TableName", name,
-                                "Name of the DynamoDB table created by instance '{}'".format(key))
-        self.add_arg(table_name)
 
     def add_redis_cluster(self, key, hostname, subnets, security_groups, type_="cache.t2.micro", port=6379, version="2.8.24"):
         """Add a Redis ElastiCache cluster to the configuration
@@ -964,9 +909,9 @@ class CloudFormationConfiguration:
         Args:
             key (string) : Unique name for the resource in the template
             hostname (string) : The hostname / instance name of the Redis Cache
-            subnets (list) : A list of Subnet unique names within the configuration across which
-                             to create a DB SubnetGroup for the DB Instance to launch into
-            security_groups (list) : A list of SecurityGroup unique names within the configuration
+            subnets (list) : A list of Subnet IDs or Refs across which to create a ElastiCache 
+                             SubnetGroup for the ElastiCache Instance to launch into
+            security_groups (list) : A list of SecurityGroup IDs or Refs
             type_ (string) : The ElastiCache instance type to create
             port (int) : The port for the Redis instance to listen on
             version (string) : Redis version to run on the instance
@@ -984,7 +929,7 @@ class CloudFormationConfiguration:
                 #"PreferredMaintenanceWindow" : String, # don't know the default - site says minimum 60 minutes, infrequent and announced on AWS forum 2w prior
                 "Tags" : [
                     {"Key" : "Stack", "Value" : Ref("AWS::StackName") },
-                    {"Key" : "Name", "Value" : Ref(key + "Hostname") }
+                    {"Key" : "Name", "Value" : hostname }
                 ],
                 "VpcSecurityGroupIds" :  security_groups
             },
@@ -994,14 +939,10 @@ class CloudFormationConfiguration:
         self.resources[key + "SubnetGroup"] = {
             "Type" : "AWS::ElastiCache::SubnetGroup",
             "Properties" : {
-                "Description" : Ref(key + "Hostname" },
+                "Description" : hostname,
                 "SubnetIds" : subnets
             }
         }
-
-        hostname_ = Arg.String(key + "Hostname", hostname.replace('.','-'),
-                               "Hostname of the Redis Cluster '{}'".format(key))
-        self.add_arg(hostname_)
 
         self._add_record_cname(key, hostname, cluster = True)
 
@@ -1011,9 +952,9 @@ class CloudFormationConfiguration:
         Args:
             key (string) : Unique name for the resource in the template
             hostname (string) : The hostname / instance name of the Redis Cache
-            subnets (list) : A list of Subnet unique names within the configuration across which
-                             to create a DB SubnetGroup for the DB Instance to launch into
-            security_groups (list) : A list of SecurityGroup unique names within the configuration
+            subnets (list) : A list of Subnet IDs or Refs across which to create a ElastiCache 
+                             SubnetGroup for the ElastiCache Instance to launch into
+            security_groups (list) : A list of SecurityGroup IDs or Refs
             type_ (string) : The ElastiCache instance type to create
             port (int|string) : The port for the Redis instance to listen on
             version (string) : Redis version to run on the instance
@@ -1033,7 +974,7 @@ class CloudFormationConfiguration:
                 "Port" : int(port),
                 #"PreferredCacheClusterAZs" : [ String, ... ],
                 #"PreferredMaintenanceWindow" : String, # don't know the default - site says minimum 60 minutes, infrequent and announced on AWS forum 2w prior
-                "ReplicationGroupDescription" : Ref(key + "Hostname"),
+                "ReplicationGroupDescription" : hostname,
                 "SecurityGroupIds" : security_groups
             },
             "DependsOn" : key + "SubnetGroup"
@@ -1042,27 +983,22 @@ class CloudFormationConfiguration:
         self.resources[key + "SubnetGroup"] = {
             "Type" : "AWS::ElastiCache::SubnetGroup",
             "Properties" : {
-                "Description" : Ref(key + "Hostname"),
+                "Description" : hostname,
                 "SubnetIds" : subnets
             }
         }
 
-        hostname_ = Arg.String(key + "Hostname", hostname.replace('.','-'),
-                               "Hostname of the Redis Cluster '{}'".format(key))
-        self.add_arg(hostname_)
-
         self._add_record_cname(key, hostname, replication = True)
 
-    def add_security_group(self, key, name, rules, vpc="VPC"):
+    def add_security_group(self, key, name, rules, vpc=Ref("VPC")):
         """Add SecurityGroup to the configuration
 
         Args:
             key (string) : Unique name for the resource in the template
             name (string) : The name to give the SecurityGroup
-                            The name is appended with the configuration's VPC domain name
             rules (list) : A list of tuples (protocol, from port, to port, cidr)
                            Where protocol/from/to can be -1 if open access is desired
-            vpc (string) : The VPC unique name within the configuration to add the Security Group to
+            vpc (string) : The VPC ID or Ref to add the Security Group to
         """
         ports = "/".join(map(lambda x: x[1] + "-" + x[2], rules))
         ingress = []
@@ -1072,50 +1008,41 @@ class CloudFormationConfiguration:
         self.resources[key] = {
           "Type" : "AWS::EC2::SecurityGroup",
           "Properties" : {
-            "VpcId" : { "Ref" : vpc },
+            "VpcId" : vpc,
             "GroupDescription" : "Enable access to ports {}".format(ports),
             "SecurityGroupIngress" : ingress,
              "Tags" : [
-                {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
-                {"Key" : "Name", "Value" : { "Fn::Join" : [ ".", [name, { "Ref" : vpc + "Domain" }]]}}
+                {"Key" : "Stack", "Value" : Ref("AWS::StackName") },
+                {"Key" : "Name", "Value" : name }
             ]
           }
         }
 
-        domain = Arg.String(vpc + "Domain", self.vpc_domain,
-                            "Domain of the VPC '{}'".format(vpc))
-        self.add_arg(domain)
-
-    def add_route_table(self, key, name, vpc="VPC", subnets=["Subnet"]):
+    def add_route_table(self, key, name, vpc=Ref("VPC"), subnets=[Ref("Subnet")]):
         """Add RouteTable to the configuration
 
         Args:
             key (string) : Unique name for the resource in the template
             name (string) : The name to give the RouteTable
-                            The name is appended with the configuration's VPC domain name
-            vpc (string) : The VPC unique name within the configuration to add the RouteTable to
-            subnets (list) : A list of Subnet unique names within the configuration to attach the RouteTable to
+            vpc (string) : The VPC ID or Ref to add the RouteTable to
+            subnets (list) : A list of Subnet IDs or Refs to attach the RouteTable to
         """
         self.resources[key] = {
           "Type" : "AWS::EC2::RouteTable",
           "Properties" : {
-            "VpcId" : {"Ref" : vpc},
+            "VpcId" : vpc,
             "Tags" : [
-                {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
-                {"Key" : "Name", "Value" : { "Fn::Join" : [ ".", [name, { "Ref" : vpc + "Domain" }]]}}
+                {"Key" : "Stack", "Value" : Ref("AWS::StackName") },
+                {"Key" : "Name", "Value" : name }
             ]
           }
         }
 
-        domain = Arg.String(vpc + "Domain", self.vpc_domain,
-                            "Domain of the VPC '{}'".format(vpc))
-        self.add_arg(domain)
-
         for subnet in subnets:
             key_ = key + "SubnetAssociation" + str(subnets.index(subnet))
-            self.add_route_table_association(key_, key, subnet)
+            self.add_route_table_association(key_, Ref(key), subnet)
 
-    def add_route_table_association(self, key, route_table, subnet="Subnet"):
+    def add_route_table_association(self, key, route_table, subnet=Ref("Subnet")):
         """Add SubnetRouteTableAssociation to the configuration
 
         Args:
@@ -1126,8 +1053,8 @@ class CloudFormationConfiguration:
         self.resources[key] = {
           "Type" : "AWS::EC2::SubnetRouteTableAssociation",
           "Properties" : {
-            "SubnetId" : { "Ref" : subnet },
-            "RouteTableId" : { "Ref" : route_table }
+            "SubnetId" : subnet,
+            "RouteTableId" : route_table
           }
         }
 
@@ -1138,19 +1065,19 @@ class CloudFormationConfiguration:
 
         Args:
             key (string) : Unique name for the resource in the template
-            route_table (string) : The unique name of the RouteTable to add the Route to
+            route_table (string) : The RouteTable ID or Ref to add the Route to
             cidr (string) : A CIDR formatted (x.x.x.x/y) subnet of the route
-            gateway (None|string) The unique name of the target InternetGateway
-            peer (None|string) : The unique name of the target VPCPeerConnection
-            instance (None|string) : The unique name of the target EC2 Instance
+            gateway (None|string) The the target InternetGateway ID or Ref
+            peer (None|string) : The the target VPCPeerConnection ID or Ref
+            instance (None|string) : The the target EC2 Instance ID or Ref
             depends_on (None|string|list): A unique name or list of unique names of resources within the
                                            configuration and is used to determine the launch order of resources
         """
         self.resources[key] = {
           "Type" : "AWS::EC2::Route",
           "Properties" : {
-            "RouteTableId" : { "Ref" : route_table },
-            "DestinationCidrBlock" : { "Ref" : key + "Cidr" },
+            "RouteTableId" : route_table,
+            "DestinationCidrBlock" : cidr
           }
         }
 
@@ -1161,78 +1088,63 @@ class CloudFormationConfiguration:
 
 
         if gateway is not None:
-            self.resources[key]["Properties"]["GatewayId"] = { "Ref" : gateway }
+            self.resources[key]["Properties"]["GatewayId"] = gateway
         if peer is not None:
-            self.resources[key]["Properties"]["VpcPeeringConnectionId"] = { "Ref" : peer }
+            self.resources[key]["Properties"]["VpcPeeringConnectionId"] = peer
         if instance is not None:
-            self.resources[key]["Properties"]["InstanceId"] = { "Ref" : instance }
+            self.resources[key]["Properties"]["InstanceId"] = instance
 
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
 
-        cidr = Arg.CIDR(key + "Cidr", cidr,
-                        "Destination CIDR Block for Route '{}'".format(key))
-        self.add_arg(cidr)
-
-    def add_internet_gateway(self, key, name="internet", vpc="VPC"):
+    def add_internet_gateway(self, key, name, vpc=Ref("VPC")):
         """Add an InternetGateway to the configuration
 
         Args:
             key (string) : Unique name for the resource in the template
             name (string) : The name to give the InternetGateway
-                            The name is appended with the configuration's VPC domain name
-            vpc (string) : The VPC unique name within the configuration to add the InternetGateway to
+            vpc (string) : The VPC ID or Ref to add the InternetGateway to
         """
         self.resources[key] = {
           "Type" : "AWS::EC2::InternetGateway",
           "Properties" : {
             "Tags" : [
-                {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} },
-                {"Key" : "Name", "Value" : { "Fn::Join" : [ ".", [name, { "Ref" : vpc + "Domain" }]]}}
+                {"Key" : "Stack", "Value" : Ref("AWS::StackName") },
+                {"Key" : "Name", "Value" : name }
             ]
-          },
-          "DependsOn" : vpc
+          }
         }
+
+        if type(vpc) == dict:
+            self.resources[key]['DependsOn'] = vpc['Ref']
 
         self.resources["Attach" + key] = {
            "Type" : "AWS::EC2::VPCGatewayAttachment",
            "Properties" : {
-             "VpcId" : { "Ref" : vpc },
-             "InternetGatewayId" : { "Ref" : key }
+             "VpcId" : vpc,
+             "InternetGatewayId" : Ref(key)
            },
            "DependsOn" : key
         }
-
-        domain = Arg.String(vpc + "Domain", self.vpc_domain,
-                            "Domain of the VPC '{}'".format(vpc))
-        self.add_arg(domain)
 
     def add_vpc_peering(self, key, vpc, peer_vpc):
         """Add a VPCPeeringConnection to the configuration
 
         Args:
             key (string) : Unique name for the resource in the template
-            vpc (string) : The VPC unique name within the configuration to create the peering connection from
-            peer_vpc (string) : The VPC unique name within the configuration to create the peering connection to
+            vpc (string) : The VPC ID or Ref to create the peering connection from
+            peer_vpc (string) : The VPC ID or Ref to create the peering connection to
         """
         self.resources[key] = {
             "Type" : "AWS::EC2::VPCPeeringConnection",
             "Properties" : {
-                "VpcId" : { "Ref" : key + "VPC" },
-                "PeerVpcId" : { "Ref" : key + "PeerVPC" },
+                "VpcId" : vpc,
+                "PeerVpcId" : peer_vpc
                 "Tags" : [
                     {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} }
                 ]
             }
         }
-
-        vpc_ = Arg.VPC(key + "VPC", vpc,
-                       "Originating VPC for the peering connection")
-        self.add_arg(vpc_)
-
-        peer_vpc_ = Arg.VPC(key + "PeerVPC", peer_vpc,
-                            "Destination VPC for the peering connection")
-        self.add_arg(peer_vpc_)
 
     def add_loadbalancer(self, key, name, listeners, instances=None, subnets=None, security_groups=None,
                          healthcheck_target="HTTP:80/ping/", public=True, internal_dns=False, depends_on=None ):
@@ -1248,9 +1160,9 @@ class CloudFormationConfiguration:
                                    instance_port (string) : The port on the instance that the elb sends traffic to
                                    protocol (string) : The protocol used, ex: HTTP, HTTPS
                                    ssl_cert_id (Optional string) : The AWS ID of the SSL cert to use
-            instances (None|list) : A list of Instance unique names within the configuration to attach to the LoadBalancer
-            subnets (None|list) : A list of Subnet unique names within the configuration to attach the LoadBalancer to
-            security_groups (None|list) : A list of SecurityGroup unique names within the configuration to apply to the LoadBalancer
+            instances (None|list) : A list of Instance IDs or Refs to attach to the LoadBalancer
+            subnets (None|list) : A list of Subnet IDs or Refsto attach the LoadBalancer to
+            security_groups (None|list) : A list of SecurityGroup IDs or Refs to apply to the LoadBalancer
             healthcheck_target (string) : The URL used for for health checks Ex: "HTTP:80/"
             public (bool) : If the ELB is public facing or internal
             internal_dns (bool) : If the ELB should have an internal Router53 entry
@@ -1288,20 +1200,17 @@ class CloudFormationConfiguration:
                 "Listeners": listener_defs,
                 "Scheme": "internet-facing" if public else "internal",
                 "Tags": [
-                    {"Key": "Stack", "Value": { "Ref": "AWS::StackName"}}
+                    {"Key": "Stack", "Value": Ref("AWS::StackName")}
                 ]
             }
         }
 
         if instances is not None:
-            instance_refs = [{ "Ref" : ref } for ref in instances]
-            self.resources[key]["Properties"]["Instances"] = instance_refs
+            self.resources[key]["Properties"]["Instances"] = instances
         if security_groups is not None:
-            sgs = [{"Ref": sg } for sg in security_groups]
-            self.resources[key]["Properties"]["SecurityGroups"] = sgs
+            self.resources[key]["Properties"]["SecurityGroups"] = security_groups
         if subnets is not None:
-            ref_subs = [{"Ref": sub } for sub in subnets]
-            self.resources[key]["Properties"]["Subnets"] = ref_subs
+            self.resources[key]["Properties"]["Subnets"] = subnets
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
 
@@ -1316,7 +1225,7 @@ class CloudFormationConfiguration:
         if internal_dns:
             self._add_record_cname(key, name, elb = True)
 
-    def add_autoscale_group(self, key, hostname, ami, keypair, subnets=["Subnet"], type_="t2.micro", public_ip=False,
+    def add_autoscale_group(self, key, hostname, ami, keypair, subnets=[Ref("Subnet")], type_="t2.micro", public_ip=False,
                             security_groups=[], user_data=None, min=1, max=1, elb=None, notifications=None,
                             notifications_arn=False, role=None, health_check_grace_period=30, support_update=True, depends_on=None):
         """Add an AutoScalingGroup to the configuration
@@ -1511,11 +1420,11 @@ class CloudFormationConfiguration:
         """
 
         if file is not None:
-            minified_file = lib.python_minifiy(file)
+            minified_file = utils.python_minifiy(file)
             with open(minified_file, "r") as fh:
                 # Warning, sanitizing process does not handle backslashes
                 # in strings properly!
-                code = lib.json_sanitize(fh.read())
+                code = utils.json_sanitize(fh.read())
                 if len(code) >= 4096:
                     raise Exception("Lambda code file is too large") # TODO need to figure out if / how to upload a manually created zip file
 
@@ -1563,8 +1472,8 @@ class CloudFormationConfiguration:
             #     "SubnetIds": [{"Ref": sub} for sub in subnets]
             # }
             self.resources[key]["Properties"]["VpcConfig"] = {
-                "SecurityGroupIds": [sg for sg in security_groups],
-                "SubnetIds": [sub for sub in subnets]
+                "SecurityGroupIds": security_groups,
+                "SubnetIds": subnets
             }
         elif security_groups is not None or subnets is not None:
             raise Exception("security_groups and subnets should both be specified")
