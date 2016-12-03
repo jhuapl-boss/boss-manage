@@ -121,6 +121,9 @@ $ git add salt_stack/salt/ndingest/files/ndingest.git
 $ git add salt_stack/salt/ingest-client/files/ingest-client.git
 # Review the SHA hash for each submodule to make sure it correctly points to the
 #   tagged version
+* $ git submodule foreach "git status"
+# Compare with the actual repos using this command, in actual repo
+* $ git log --pretty=format:'%h' -n 1
 $ git commit -m "Updated submodule references"
 $ git tag <release#>
 $ git push --tags
