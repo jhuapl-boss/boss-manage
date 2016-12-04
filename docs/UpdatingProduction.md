@@ -64,6 +64,11 @@ $ cd boss-manage/cloud_formation
 $ ./iam_utils import
 ```
 
+### Remove Subscriptions to ProductionMicronsMailingList in SNS 
+Delete all subscrioptions to Production mailing list before upgrading.  Leaving them in place
+will cause multiple emails and texts per minute to everyone on the list.
+*Make a note of the contents so you can add them back in later.*
+
 ### Updating configs
 
 For the *core*, *api* configurations
@@ -78,10 +83,14 @@ $ ./cloudformation.py update production.boss --scenario production core
 that are named with a commit hash.  If you want to use specific AMIs use the **--ami-version***
 
 After completion check that vault still works, look for password:
+```shell
 ./bastion.py bastion.production.boss vault.production.boss vault-read secret/auth/realm
+```
 
 This will show the status of all the consul nodes:
-./bastion.py bastion.production.boss consul.production.boss ssh-all 'sudo consul operator raft -list-peers; sudo consul members'
+```shell
+$ ./bastion.py bastion.production.boss consul.production.boss ssh-all 'sudo consul operator raft -list-peers; sudo consul members'
+```
 
 ```shell
 $ ./cloudformation.py update production.boss --scenario production api
@@ -119,6 +128,10 @@ Bucket:  tiles.production.boss
 Event Type:  Object Created (All)
 click submit (You may need to scroll down to see the submit button)
 
+### Add Subscriptions to ProductionMicronsMailingList in SNS
+Take the list of emails and phone numbers you created earlier and 
+add them back into the ProductionMicronsMailingList Topic in SNS.
+
 ## Run unit tests on Endpoint
 
 If you are following these instructions for your personal development environment, skip the
@@ -134,6 +147,19 @@ sudo python3 manage.py test
 ```
 	output should say Ran 257 tests.
 
+## Integration Tests
+After the integration instance is launched the following tests need to be run,
+results recorded, and developers notified of any problems.
+
+### Endpoint Integration Tests
+
+#### Test While Logged onto the Endpoint VM
+```shell
+export RUN_HIGH_MEM_TESTS=true
+cd /srv/www/django
+sudo python3 manage.py test --pattern="int_test_*.py"
+```
+	output should say 55 Tests OK with 7 skipped tests
 
 ## Proofreader Tests
 ````shell
@@ -146,22 +172,6 @@ sudo python3 manage.py migrate
 sudo python3 manage.py test
 ````
     output should say 350 Tests OK
-
-## Integration Tests
-After the integration instance is launched the following tests need to be run,
-results recorded, and developers notified of any problems.
-
-### Endpoint Integration Tests
-
-#### Test While Logged onto the Endpoint VM
-
-```shell
-export RUN_HIGH_MEM_TESTS=true
-cd /srv/www/django
-sudo python3 manage.py test --pattern="int_test_*.py"
-```
-	output should say 55 Tests OK with 7 skipped tests
-
 
 ### Cachemanager Integration Tests
 
@@ -244,7 +254,7 @@ repository directory.
 
 ##### Setup via the Django Admin Page
 
-In your browser, go to https://api.integration.theboss.io/admin
+In your browser, go to https://api.production.theboss.io/admin
 
 Login using the bossadmin account created previously (this was created during
 the endpoint initialization and unit test step).
@@ -282,3 +292,20 @@ To be filled out
 * https://api.integration.theboss.io/v0.7/collection/
 * Login into Scalyr and verify that the new instances appear on the overview page.
 * Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint and proofreader.
+
+# Finally 
+## Change AWS Credentials back to dev account
+Make sure your:
+**boss-manage/config/aws_credentials** file contains the developer account keys
+**boss-manage/vault/private/vault_aws_credentials** file contains the developer vault account keys
+**boss-manage/config/set_var.sh** should have SSH_KEY=<yourdefault key>
+
+## Create SprintXX AMIs in developer account 
+Its best to create new hash versions of the AMIs like this:
+```shell
+$ cd boss-manage/bin
+$  ./packer.py auth vault consul endpoint proofreader-web cachemanager
+```
+And then copy the latest AMIs from the console to become sprintXX 
+(this way developers can get the latest AMIs without explicitly specifying sprintXX)
+
