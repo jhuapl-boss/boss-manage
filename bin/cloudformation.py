@@ -25,41 +25,16 @@ import json
 import pprint
 import glob
 import time
-import library as lib
 
-import hosts
+import alter_path
+from lib import exceptions
+from lib import aws
+from lib.cloudformation import CloudFormationConfiguration
 
 # Add a reference to boss-manage/lib/ so that we can import those files
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-lib_dir = os.path.normpath(os.path.join(cur_dir, "..", "lib"))
-sys.path.append(lib_dir)
-import exceptions
-
-def create_session(credentials):
-    """Read the AWS from the credentials dictionary and then create a boto3
-    connection to AWS with those credentials.
-    """
-    session = Session(aws_access_key_id = credentials["aws_access_key"],
-                      aws_secret_access_key = credentials["aws_secret_key"],
-                      region_name = 'us-east-1')
-    return session
-
-def build_dispatch(module, config):
-    """Build a dispatch dictionary of the different supported methods. Fill in the
-    default implementation if none is given (if supported).
-
-    could use module.__dict__.get(method)
-    """
-    dispatch = {}
-    dispatch['create'] = module.create if hasattr(module, 'create') else None
-    dispatch['update'] = module.update if hasattr(module, 'update') else None
-    dispatch['delete'] = module.delete if hasattr(module, 'delete') else lambda s,d: lib.delete_stack(s, d, config)
-    dispatch['post_init'] = module.post_init if hasattr(module, 'post_init') else None
-    dispatch['pre_init'] = module.pre_init if hasattr(module, 'pre_init') else None
-
-    dispatch['generate'] = lambda s,d: module.generate("templates", d) if hasattr(module, 'generate') else None
-
-    return dispatch
+cf_dir = os.path.normpath(os.path.join(cur_dir, '..', 'cloud_formation'))
+sys.path.append(cf_dir) # Needed for importing CF configs
 
 def call_config(session, domain, config, func_name):
     """Import 'configs.<config>' and then call the requested function with
@@ -67,14 +42,15 @@ def call_config(session, domain, config, func_name):
     """
     module = importlib.import_module("configs." + config)
 
-    func = build_dispatch(module, config).get(func_name)
-    if func is None:
-        print("Configuration '{}' doesn't implement function '{}'".format(config, func_name))
+    if func_name in module.__dict__:
+        module.__dict__[func_name](session, domain)
+    elif func_name == 'delete':
+        CloudFormationConfiguration(domain).delete(session)
     else:
-        func(session, domain)
+        print("Configuration '{}' doesn't implement function '{}'".format(config, func_name))
 
 if __name__ == '__main__':
-    os.chdir(os.path.abspath(os.path.dirname(__file__)))
+    os.chdir(os.path.join(cur_dir, "..", "cloud_formation"))
 
     def create_help(header, options):
         """Create formated help."""
@@ -129,7 +105,7 @@ if __name__ == '__main__':
 
     credentials = json.load(args.aws_credentials)
 
-    session = create_session(credentials)
+    session = aws.create_session(credentials)
 
     try:
         func = args.action.replace('-','_')

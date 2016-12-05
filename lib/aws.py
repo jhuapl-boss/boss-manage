@@ -26,8 +26,99 @@ Author:
 
 import os
 import time
+from boto3.session import Session
 
-import hosts
+from . import hosts
+
+def create_session(credentials):
+    """Read the AWS from the credentials dictionary and then create a boto3
+    connection to AWS with those credentials.
+    """
+    session = Session(aws_access_key_id = credentials["aws_access_key"],
+                      aws_secret_access_key = credentials["aws_secret_key"],
+                      region_name = credentials.get('aws_region', 'us-east-1'))
+    return session
+
+def machine_lookup_all(session, hostname, public_ip = True):
+    """Lookup all of the IP addresses for a given AWS instance name.
+
+    Multiple instances with the same name is a result of instances belonging to
+    an auto scale group. Useful when an action needs to happen to all machines
+    in an auto scale group.
+
+    Args:
+        session (Session) : Active Boto3 session
+        hostname (string) : Hostname of the EC2 instances
+        public_ip (bool) : Whether or not to return public IPs or private IPs
+
+    Returns:
+        (list) : List of IP addresses
+    """
+    client = session.client('ec2')
+    response = client.describe_instances(Filters=[{"Name":"tag:Name", "Values":[hostname]},
+                                                  {"Name":"instance-state-name", "Values":["running"]}])
+
+    addresses = []
+    items = response['Reservations']
+    if len(items) > 0:
+        for i in items:
+            item = i['Instances'][0]
+            if 'PublicIpAddress' in item and public_ip:
+                addresses.append(item['PublicIpAddress'])
+            elif 'PrivateIpAddress' in item and not public_ip:
+                addresses.append(item['PrivateIpAddress'])
+    return addresses
+
+def machine_lookup(session, hostname, public_ip = True):
+    """Lookup the IP addresses for a given AWS instance name.
+
+        Note: If not address could be located an error message is printed
+
+    If there are multiple machines with the same hostname, to select a specific
+    one, prepend the hostname with "#." where '#' is the zero based index.
+        Example: 0.auth.integration.boss
+
+    Retrieved instances are sorted by InstanceId.
+
+    Args:
+        session (Session) : Active Boto3 session
+        hostname (string) : Hostname of the EC2 instance
+        public_ip (bool) : Whether or not to return the public IP or private IP
+
+    Returns:
+        (string|None) : IP address or None if one could not be located.
+    """
+
+    try:
+        idx, target = hostname.split('.', 1)
+        idx = int(idx) # if it is not a valid number, then it is a hostname
+        hostname = target
+    except:
+        idx = 0
+
+    client = session.client('ec2')
+    response = client.describe_instances(Filters=[{"Name":"tag:Name", "Values":[hostname]},
+                                                  {"Name":"instance-state-name", "Values":["running"]}])
+
+    item = response['Reservations']
+    if len(item) == 0:
+        print("Could not find IP address for '{}'".format(hostname))
+        return None
+    else:
+        item.sort(key = lambda i: i['Instances'][0]["InstanceId"])
+
+        if len(item) <= idx:
+            print("Could not find IP address for '{}' index '{}'".format(hostname, idx))
+            return None
+        else:
+            item = item[idx]['Instances'][0]
+            if 'PublicIpAddress' in item and public_ip:
+                return item['PublicIpAddress']
+            elif 'PrivateIpAddress' in item and not public_ip:
+                return item['PrivateIpAddress']
+            else:
+                print("Could not find IP address for '{}'".format(hostname))
+                return None
 
 def asg_restart(session, hostname, timeout, callback=None):
     """Terminate all of the instances for an ASG, with the given timeout between

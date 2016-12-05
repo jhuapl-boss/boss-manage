@@ -23,9 +23,9 @@ import os
 import time
 import json
 
-import hosts
-import aws
-import utils
+from . import hosts
+from . import aws
+from . import utils
 
 def get_scenario(var, default = None):
     """Handle getting the appropriate value froma variable using the SCENARIO
@@ -519,7 +519,7 @@ class CloudFormationConfiguration:
                 rtn = False
         return rtn
 
-    def delete_stack(self, session, wait = True):
+    def deletek(self, session, wait = True):
         """Deletes the given stack from CloudFormation.
 
         Initiates the stack delete and waits for it to finish.  config and domain
@@ -609,7 +609,7 @@ class CloudFormationConfiguration:
         """
             
         vpc_id = aws.vpc_id_lookup(session, self.vpc_domain)
-        vpc = Arg.VPC(key, vpc_id, "ID of the VPC"))
+        vpc = Arg.VPC(key, vpc_id, "ID of the VPC")
         self.add_arg(vpc)
 
     def add_subnet(self, key, name, vpc=Ref("VPC"), az=None):
@@ -1137,7 +1137,7 @@ class CloudFormationConfiguration:
             "Type" : "AWS::EC2::VPCPeeringConnection",
             "Properties" : {
                 "VpcId" : vpc,
-                "PeerVpcId" : peer_vpc
+                "PeerVpcId" : peer_vpc,
                 "Tags" : [
                     {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"} }
                 ]
