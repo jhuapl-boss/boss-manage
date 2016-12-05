@@ -216,19 +216,6 @@ sudo python3 manage.py test
 ```
 	output should say Ran 257 tests.
 
-
-## Proofreader Tests
-````shell
-cd vault
-./ssh.py proofreader-web.integration.boss
-cd /srv/www/app/proofreader_apis
-sudo python3 manage.py makemigrations --noinput
-sudo python3 manage.py makemigrations --noinput common
-sudo python3 manage.py migrate
-sudo python3 manage.py test
-````
-    output should say 350 Tests OK
-
 ## Integration Tests
 After the integration instance is launched the following tests need to be run,
 results recorded, and developers notified of any problems.
@@ -248,6 +235,18 @@ sudo python3 manage.py test --pattern="int_test_*.py"
 ```
 	output should say 55 Tests OK with 7 skipped tests
 
+## Proofreader Tests
+````shell
+cd vault
+./ssh.py proofreader-web.integration.boss
+cd /srv/www/app/proofreader_apis
+sudo python3 manage.py makemigrations --noinput
+sudo python3 manage.py makemigrations --noinput common
+sudo python3 manage.py migrate
+sudo python3 manage.py test
+````
+    output should say 350 Tests OK
+
 ##### Test the ndingest library.
 
 ```shell
@@ -258,7 +257,6 @@ cd /usr/local/lib/python3/site-packages/ndingest
 export NDINGEST_TEST=1
 pytest -c test_apl.cfg
 ```
-
 
 ### Cachemanager Integration Tests
 
@@ -271,7 +269,6 @@ sudo nose2 -c inttest.cfg
 ```
 	there is currently issues with some of the tests not getting setup correctly. cache-DB and cache-state-db need to be manutally set to 1.
 	or the tests hang.
-
 
 #### Test Using Intern From a Client
 
