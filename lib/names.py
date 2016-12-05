@@ -1,79 +1,89 @@
-"""
-??? right now with AWSNames there is a single representation for all uses of a given resource
+# Copyright 2014 The Johns Hopkins University Applied Physics Laboratory
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-What about creating 
-class AWSName:
-    def __init__(self, name (hostname?)):
-        self.name = name
+import hosts
 
-    def __str__(self):
-        return self.name
-
-    @property
-    def dns(self):
-        return self.name
-
-    @property
-    def ec2(self):
-        return self.name
-
-    @property
-    def rds(self):
-        return self.name.replace('.','-')
-
-    ..... repeat for each service that uses the name .....
-"""
 class AWSNames(object):
+    """
+    All names are returned as dotted names (containg '.' between each component).
+    Some AWS resources cannot have '.' in their name. In these cases the
+    CloudFormationConfiguration add_* methods will convert '.' to '-' as needed.
+    """
+
     def __init__(self, base):
         self.base = base
         self.base_dot = '.' + base
-        self.base_dash = '-' + base.replace('.', '-')
 
-    def _ec2(self, name):
+    ##################################
+    # Generic rules for different type of AWS resources
+    def subnet(self, name):
         return name + self.base_dot
 
-    def _rds(self, name):
-        # while RDS instance ids can't contain '.', the DNS
-        # names for those instances will contain '.'
-        return name + self.base_dot
+    def public_dns(self, name):
+        name = name.split('.')[0]
+        if self.base in hosts.BASE_DOMAIN_CERTS.keys():
+            dns = name + "." + hosts.BASE_DOMAIN_CERTS[self.base]
+        else:
+            stack = self.base.split('.')[0]
+            dns = "{}-{}.{}".format(name, stack, hosts.DEV_DOMAIN)
+        return dns
 
-    def _dynamodb(self, name):
-        return name
+    ##################################
+    # Properties for common / well known BOSS resources
+    RESOURCES = {
+        "bastion": "bastion",
+        "auth": "auth", # ec2 instance, security group
+        "auth_db": "auth-db",
+        "vault": "vault",
+        "consul": "consul",
+        "api": "api", # public name of endoint
+        "endpoint": "endpoint",
+        "endpoint_db": "endpoint-db",
+        "endpoint_elb": "elb",
+        "dns": "dns", # lambda, sns topic display name, sns topic name
+        "internal": "internal", # subnet, security group, route table
+        "ssh": "ssh",
+        "https": "https",
+        "internet": "internet",
+        "meta": "bossmeta",
+        "cache": "cache",
+        "cache_state": "cache-state",
+        "cache_manager": "cachemanager",
+        "cache_db": "cachedb",
+        "cuboid_bucket": "cuboids",
+        "multi_lambda": "multiLambda",
+        "s3_index": "s3index",
+        "tile_bucket": "tiles",
+        "tile_index": "tileindex",
+        "id_index": "idIndex",
+        "id_count_index": "idCount",
+        "s3flush_queue": "S3flush",
+        "deadletter_queue": "Deadletter",
+    }
 
-    def _redis(self, name):
-        return name
+    def __getattr__(self, name):
+        if name not in self.RESOURCES:
+            raise AttributeError("{} is not a valid BOSS AWS Resource name".format(name))
 
-    def _sg(self, name):
-        return name + self.base_dot
+        hostname = self.RESOURCES[name]
+        fq_hostname = hostname + self.base_dot
 
-    def _rt(self, name):
-        return name + self.base_dot
+        if name in ['multi_lambda']:
+            fq_hostname = fq_hostname.replace('.','-')
 
-    def _inet_gw(self, name):
-        return name + self.base_dot
+        if name in ['s3flush_queue', 'deadletter_queue']:
+            fq_hostname = "".join(map(lambda x: x.capitalize(), fq_hostname.split('.')))
 
-    def _elb(self, name):
-        return name + self.base_dot
+        return fq_hostname
 
-    def _asg(self, name):
-        return name
-
-    @property
-    def auth(self):
-        return self._ec2("auth")
-
-    @property
-    def vault(self):
-        return self._ec2("vault")
-
-    @property
-    def consul(self):
-        return self._ec2("consul")
-
-    @property
-    def endpoint(self):
-        return self._ec2("endpoint")
-
-    @property
-    def endpoint_db(self):
-        return self._rds("endpoint-db")
