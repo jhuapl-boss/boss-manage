@@ -207,6 +207,9 @@ def create(session, domain):
 
     user_data["aws"]["cuboid_bucket"] = names.get_cuboid_bucket(domain)
     user_data["aws"]["s3-index-table"] = names.get_s3_index(domain)
+    user_data["aws"]["id-index-table"] = names.get_id_index(domain)
+    user_data["aws"]["id-count-table"] = names.get_id_count_index(domain)
+
 
     # SNS and Lambda names can't have periods.
     multilambda = names.get_multi_lambda(domain).replace('.', '-')
