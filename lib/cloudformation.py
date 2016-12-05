@@ -22,8 +22,6 @@ Author:
 import os
 import time
 import json
-import io
-import configparser
 
 import hosts
 import aws
@@ -1227,51 +1225,56 @@ class CloudFormationConfiguration:
 
     def add_autoscale_group(self, key, hostname, ami, keypair, subnets=[Ref("Subnet")], type_="t2.micro", public_ip=False,
                             security_groups=[], user_data=None, min=1, max=1, elb=None, notifications=None,
-                            notifications_arn=False, role=None, health_check_grace_period=30, support_update=True, depends_on=None):
+                            role=None, health_check_grace_period=30, support_update=True, depends_on=None):
         """Add an AutoScalingGroup to the configuration
 
         Args:
             key (string) : Unique name for the resource in the template
             hostname (string) : The hostname / instance name of the instances
             ami (string) : The AMI ID of the image to base the instances on
-            subnets (list) : A list of Subnet unique names within the configuration to launch the instances in
+            subnets (list) : A list of Subnet IDs or Refs to launch the instances in
             type_ (string) : The instance type to create
             public_ip (bool) : Should the instances gets public IP addresses
-            security_groups (list) : A list of SecurityGroup unique names within the configuration to apply to the instances
+            security_groups (list) : A list of SecurityGroup IDs or Refs to apply to the instances
             user_data (None|string) : A string of user-data to give to the instance when launching
             min (int|string) : The minimimum number of instances in the AutoScalingGroup
             max (int|string) : The maximum number of instances in the AutoScalingGroup
-            elb (None|string) : The unique name of a LoadBalancer within the configuration to attach the AutoScalingGroup to
-            notifications (None|List|string) : list of topic references or a single topic reference, or a Arn of a topic already created.
-            notifications_arn (bool) : False then the notifications contains topic reference, True notifications contains Arn of already created topic
+            elb (None|string) : The LoadBalancer ID or Ref to attach the AutoScalingGroup to
+            notifications (None|List|string) : list or single topic ARN or Ref to send ASG notifications to
             role (None|string) : Role name to use when creating instances
             health_check_grace_period (int) : grace period in seconds to wait before checking newly created instances.
             support_update (bool) : If the ASG should include RollingUpdate UpdatePolicy
             depends_on (None|string|list): A unique name or list of unique names of resources within the
                                            configuration and is used to determine the launch order of resources
         """
+
+        commit = None
+        if type(ami) == tuple:
+            commit = ami[1]
+            ami = ami[0]
+
         self.resources[key] = {
             "Type" : "AWS::AutoScaling::AutoScalingGroup",
             "Properties" : {
                 #"DesiredCapacity" : get_scenario(min, 1), Initial capacity, will min size also ensure the size on startup?
                 "HealthCheckType" : "EC2" if elb is None else "ELB",
                 "HealthCheckGracePeriod" : health_check_grace_period, # seconds
-                "LaunchConfigurationName" : { "Ref": key + "Configuration" },
-                "LoadBalancerNames" : [] if elb is None else [{ "Ref": elb }],
+                "LaunchConfigurationName" : Ref(key + "Configuration"),
+                "LoadBalancerNames" : [] if elb is None else [elb],
                 "MaxSize" : str(get_scenario(max, 1)),
                 "MinSize" : str(get_scenario(min, 1)),
                 "Tags" : [
-                    {"Key" : "Stack", "Value" : { "Ref" : "AWS::StackName"}, "PropagateAtLaunch": "true" },
-                    {"Key" : "Name", "Value" : { "Ref": key + "Hostname" }, "PropagateAtLaunch": "true" }
+                    {"Key" : "Stack", "Value" : Ref("AWS::StackName"), "PropagateAtLaunch": "true" },
+                    {"Key" : "Name", "Value" : hostname, "PropagateAtLaunch": "true" }
                 ],
-                "VPCZoneIdentifier" : [{ "Ref" : subnet } for subnet in subnets]
+                "VPCZoneIdentifier" : subnets
             }
         }
 
         if support_update:
             self.resources[key]["UpdatePolicy"] = {
                 "AutoScalingRollingUpdate" : {
-                    "MinInstancesInService" : str(get_scenario(min, 1) - 1),
+                    "MinInstancesInService" : str(get_scenario(min, 1) - 1), # Restart one instance at a time
                     "MaxBatchSize": "1",
                     #"WaitOnResourceSignals": "true", # need to have instances signal ready...
                     #"PauseTime": "PT5M" # 5 minutes
@@ -1293,7 +1296,7 @@ class CloudFormationConfiguration:
                         "autoscaling:EC2_INSTANCE_TERMINATE_ERROR",
                         "autoscaling:TEST_NOTIFICATION"
                     ],
-                    "TopicARN" : {"Ref": topic} if not notifications_arn else topic
+                    "TopicARN" : topic
                 } for topic in notifications
             ]
 
@@ -1305,11 +1308,11 @@ class CloudFormationConfiguration:
             "Properties" : {
                 "AssociatePublicIpAddress" : public_ip,
                 #"EbsOptimized" : Boolean, EBS I/O optimized
-                "ImageId" : { "Ref" : key + "AMI" },
+                "ImageId" : ami,
                 "InstanceMonitoring" : False, # CloudWatch Monitoring...
                 "InstanceType" : get_scenario(type_, "t2.micro"),
-                "KeyName" : { "Ref" : key + "Key" },
-                "SecurityGroups" : [{ "Ref" : sg } for sg in security_groups],
+                "KeyName" : keypair,
+                "SecurityGroups" : security_groups,
                 "UserData" : "" if user_data is None else { "Fn::Base64" : user_data }
             }
         }
@@ -1317,25 +1320,11 @@ class CloudFormationConfiguration:
         if role is not None:
             self.resources[key + "Configuration"]["Properties"]["IamInstanceProfile"] = role
 
-        if type(ami) == tuple:
-            commit = ami[1]
-            ami = ami[0]
+        if commit is not None:
+            kv = {"Key": "AMI Commit", "Value": commit, "PropagateAtLaunch": "true"}
+            self.resources[key]["Properties"]["Tags"].append(kv)
 
-            if commit is not None:
-                kv = {"Key": "AMI Commit", "Value": commit, "PropagateAtLaunch": "true"}
-                self.resources[key]["Properties"]["Tags"].append(kv)
-
-        _ami = Arg.AMI(key + "AMI", ami,
-                       "AMI for the EC2 Instance '{}'".format(key))
-        self.add_arg(_ami)
-
-        _key = Arg.KeyPair(key + "Key", keypair, hostname)
-        self.add_arg(_key)
         self.keypairs[hostname] = keypair
-
-        _hostname = Arg.String(key + "Hostname", hostname,
-                               "Hostname of the EC2 Instance '{}'".format(key))
-        self.add_arg(_hostname)
 
     def add_s3_bucket(self, key, name, access_control=None, life_cycle_config=None, notification_config=None, tags=None):
         """Create or configure a S3 bucket.
@@ -1454,23 +1443,13 @@ class CloudFormationConfiguration:
                 "FunctionName": name.replace('.', '-'),
                 "Handler": handler,
                 "MemorySize": memory,
-                "Role": {"Ref": role},
+                "Role": role,
                 "Runtime": "python2.7",
                 "Timeout": int(timeout)
             }
         }
 
         if security_groups is not None and subnets is not None:
-            # It looks like it's more convenient to use the functions
-            # in library.py to get the ids, at least for the first use
-            # of creating a lambda outside of the default VPC.  May have
-            # to make more generic in the case that the security groups and
-            # subnets are created within the same template - TG.
-            #
-            # self.resources[key]["Properties"]["VpcConfig"] = {
-            #     "SecurityGroupIds": [{"Ref": sg} for sg in security_groups],
-            #     "SubnetIds": [{"Ref": sub} for sub in subnets]
-            # }
             self.resources[key]["Properties"]["VpcConfig"] = {
                 "SecurityGroupIds": security_groups,
                 "SubnetIds": subnets
@@ -1486,7 +1465,7 @@ class CloudFormationConfiguration:
 
         Args:
             key (string) : Unique name for the resource in the template
-            lambda_ (string) : Unique name of the lambda resource
+            lambda_ (string) : Lambda ID or Ref to add the permission to
             action (string) : Permission action to grant the lambda
             principal (string) : AWS principal to grant the action to
             source (string) : Source ARN to restrict the permission to
@@ -1495,7 +1474,7 @@ class CloudFormationConfiguration:
             "Type": "AWS::Lambda::Permission",
             "Properties": {
                 "Action": action,
-                "FunctionName": {"Ref": lambda_},
+                "FunctionName": lambda_,
                 "Principal": principal
             }
         }
@@ -1503,7 +1482,7 @@ class CloudFormationConfiguration:
         if source is not None:
             self.resources[key]["Properties"]["SourceArn"] = source
 
-    def _add_record_cname(self, key, hostname, vpc="VPC", ttl="300", rds=False, cluster=False, replication=False, ec2=False, elb=False):
+    def _add_record_cname(self, key, hostname, vpc=Ref("VPC"), ttl="300", rds=False, cluster=False, replication=False, ec2=False, elb=False):
         """Add a CNAME RecordSet to the configuration
 
         Note: Only one of rds/cluster/replication/ec2 should be specified for the call
@@ -1512,7 +1491,7 @@ class CloudFormationConfiguration:
         Args:
             key (string) : Unique name for the resource in the template to create the RecordSet for
             hostname (string) : The DNS hostname to map to the resource
-            vpc (string) : The VPC unique name within the configuration containing the target HostedZone
+            vpc (string) : The VPC ID or Ref containing the target HostedZone
             ttl (string) : The Time to live for the RecordSet
             rds (bool) : The key is a RDS instance
             cluster (bool) : The key is a ElastiCache Cluster instance
@@ -1536,17 +1515,13 @@ class CloudFormationConfiguration:
         if address_key is None:
             raise Exception("Unknown type of CNAME record to create")
 
-        zone = { "Fn::Join" : ["", [{ "Ref" : vpc + "Domain" }, "."] ]}
+        zone = self.vpc_domain + "."
         target = { "Fn::GetAtt" : [ key, address_key ] }
 
         self.add_route_53_record_set(key + "Record", hostname, target, zone, ttl)
 
         if "DNSZone" in self.resources:
             self.resources[key + "Record"]["DependsOn"] = "DNSZone"
-
-        domain = Arg.String(vpc + "Domain", self.vpc_domain,
-                            "Domain of the VPC '{}'".format(vpc))
-        self.add_arg(domain)
 
     def add_route_53_record_set(self, key, full_domain_name, cname_value, hosted_zone_name, ttl=300):
         """Add a CNAME RecordSet to the configuration
@@ -1723,7 +1698,7 @@ class CloudFormationConfiguration:
         self.resources[key] = {
             "Type": "AWS::SQS::Queue",
             "Properties": {
-                "MessageRetentionPeriod": retention * 60,
+                "MessageRetentionPeriod": int(retention) * 60,
                 "QueueName": name,
                 "VisibilityTimeout": int(hide)
             }
@@ -1742,8 +1717,8 @@ class CloudFormationConfiguration:
         Example call:
 
         self.add_sqs_policy(
-            'sqs_policy', 'sqs_policy',
-            [{'Ref': 'S3Flush'}, {'Ref': 'DeadLetter'}],
+            'SQS_POLICY', 'sqs_policy',
+            [Ref('S3Flush'), Ref('DeadLetter')],
             'endpoint')
 
         Note that the use of 'Ref' in the queue_list.  This lets you use the
@@ -1752,7 +1727,7 @@ class CloudFormationConfiguration:
         Args:
             key (string): Lookup key for this SQS policy.
             name (string): Id for this SQS policy.
-            queues_list (list): List of strings identifying queues to apply policy to.
+            queues_list (list): List of Queue IDs or Refs to apply policy to.
             role (string): Give this IAM role full access to these queues.
         """
 
@@ -1774,116 +1749,3 @@ class CloudFormationConfiguration:
             }
         }
 
-
-class UserData:
-    """A wrapper class around configparse.ConfigParser that automatically loads
-    the default boss.config file and provide the ability to return the
-    configuration file as a string. (ConfigParser can only write to a file
-    object)
-
-    When using CloudFormation template intrinsic functions such as Ref and
-    Fn::GetAtt, use double quotes, not single quotes.  The strings are
-    converted to dictionaries using the json library.  This library requires
-    double quotes for key names and values that are strings.
-
-    Ref and Fn:GetAtt let you use the logical name of the AWS resource.  When
-    it is parsed by CloudFormation, the logical name will be replaced by a
-    runtime value such as the resource's ARN, for example.
-    """
-    def __init__(self, config_file = "../salt_stack/salt/boss-tools/files/boss-tools.git/bossutils/boss.config.default", config_str = None):
-        """Constructor.
-
-        If config_file is None, tries to read user data from config_str,
-        instead.  Currently does not allow providing both a file and a string.
-
-        Args:
-            config_file (string): Path to config file.
-            config_str (string): User data as a string.
-        """
-        self.config = configparser.ConfigParser()
-        self.config.optionxform = str  # this line perserves the case of the keys.
-        if config_file is not None:
-            self.config.read(config_file)
-        elif config_str is not None:
-            self.config.read_string(config_str)
-
-    def __getitem__(self, key):
-        return self.config[key]
-
-    def __str__(self):
-        buffer = io.StringIO()
-        self.config.write(buffer)
-        data = buffer.getvalue()
-        buffer.close()
-        return data
-
-    def format_for_cloudformation(self):
-        """Returns user data as a list of strings suitable for the Fn::Join statement.
-
-        The returned list of strings is formatted so other intrinsic
-        CloudFormation functions will be executed when parsed by
-        CloudFormation.  This allows use of Ref and Fn::GetAtt which look up
-        resources by logical name.
-
-        Example return value:
-
-        [
-            '\n[aws]\n',
-            'db = ', 'endpoint-db.theboss.io\n',
-            'cache = ', 'cache.theboss.io\n',
-            's3-flush-queue = ', {"Ref": "S3FlushQueue"}, '\n'
-        ]
-
-        Returns:
-            (list): List of strings and dicts formatted for use with CloudFormation's Fn::Join function.
-        """
-        strs = []
-
-        # The default section is treated specially if it exists.
-        def_section = self.config.defaults()
-        if len(def_section) > 0:
-            strs.append('[' + self.config.default_section + ']\n')
-        for (key, val) in def_section.items():
-            strs.append(key + ' = ')
-            strs.append(self._convert_str_to_dict(val))
-            strs.append('\n')
-
-        # Output the non-default sections.
-        sections = self.config.sections()
-        for sect in sections:
-            strs.append('\n[' + sect + ']\n')
-            for (key, val) in self.config.items(sect):
-                strs.append(key + ' = ')
-                strs.append(self._convert_str_to_dict(val))
-                strs.append('\n')
-
-        return strs
-
-    def _convert_str_to_dict(self, str):
-        """If string is a dictionary encoded as a string, create a dict.
-
-        Uses json.loads() so keys and values must be enclosed with double
-        quotes intead of single quotes.
-
-        Args:
-            str (string): Candidate string to possibly convert.
-
-        Returns:
-            (dict|string): Returns original string if not a dict.  Otherwise returns string converted to dict.
-        """
-        if str is None:
-            return ''
-
-        stripped = str.strip()
-
-        length = len(stripped)
-        if length < 2:
-            return str
-
-        if stripped[0] != '{':
-            return str
-
-        if stripped[length-1] != '}':
-            return str
-
-        return json.loads(stripped)
