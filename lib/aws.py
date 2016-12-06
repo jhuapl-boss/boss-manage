@@ -26,6 +26,7 @@ Author:
 
 import os
 import time
+import json
 from boto3.session import Session
 
 from . import hosts
@@ -34,6 +35,13 @@ def create_session(credentials):
     """Read the AWS from the credentials dictionary and then create a boto3
     connection to AWS with those credentials.
     """
+    if type(credentials) == dict:
+        pass
+    elif type(credentials) == str:
+        credentials = json.loads(credentials)
+    else:
+        credentials = json.load(credentials)
+
     session = Session(aws_access_key_id = credentials["aws_access_key"],
                       aws_secret_access_key = credentials["aws_secret_key"],
                       region_name = credentials.get('aws_region', 'us-east-1'))
