@@ -51,35 +51,8 @@ import vault
 
 import alter_path
 from lib import aws
-from lib import ssh
+from lib.ssh import SSHConnection, vault_tunnel
 from lib.vault import Vault
-
-def connect_vault(key, remote_ip, bastion_ip, cmd):
-    """Create SSH tunnel(s) through bastion machine(s) and call a command from
-    vault.py.
-
-    Create an SSH tunnel from the local machine to bastion that gets
-    forwarded to remote. Call a command and then destroy the SSH tunnel.
-    The SSH Tunnel forwards port 8200, the Vault default port.
-
-    NOTE: Currently the commands that are passed to this function are
-          defined in vault.py.
-
-    Args:
-        key (string) : Path to a SSH private key, protected as required by SSH
-        remote_ip : IP of the machine the tunnel remote end should point at
-        bastion_ip : IP of the machine to form the SSH tunnel through
-        cmd (function): vault.py function expect to connect to Vault at localhost:8200
-    """
-
-    #proc = create_tunnel_aplnis(key, 8200, remote_ip, 8200, bastion_ip)
-    # connection to bastion's http proxy server
-    proc = ssh.create_tunnel_aplnis(key, 3128, "localhost", 3128, bastion_ip)
-    try:
-        return cmd()
-    finally:
-        proc.terminate()
-        proc.wait()
 
 if __name__ == "__main__":
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
@@ -144,21 +117,25 @@ if __name__ == "__main__":
     else:
         private = aws.machine_lookup(session, args.internal, public_ip=False)
 
+    ssh = SSHConnection(args.ssh_key, private, bastion)
+
     if args.command in ("ssh",):
-        ssh.ssh(args.ssh_key, private, bastion)
+        ssh.shell()
     elif args.command in ("ssh-cmd",):
-        ret = ssh.ssh_cmd(args.ssh_key, private, bastion, *args.arguments)
+        ret = ssh.cmd(*args.arguments)
         sys.exit(ret)
     elif args.command in ("ssh-tunnel",):
-        ssh.ssh_tunnel(args.ssh_key, private, bastion, *args.arguments)
+        ssh.external_tunnel(*args.arguments)
     elif args.command in ("ssh-all",):
         addrs = aws.machine_lookup_all(session, args.internal, public_ip=False)
         for addr in addrs:
             print("{} at {}".format(args.internal, addr))
-            ssh.ssh_cmd(args.ssh_key, addr, bastion, *args.arguments)
+            ssh = SSHConnection(args.ssh_key, addr, bastion)
+            ssh.cmd(args.ssh_key, addr, bastion, *args.arguments)
             print()
     elif args.command in vault.COMMANDS:
-        connect_vault(args.ssh_key, private, bastion, lambda: vault.COMMANDS[args.command](Vault(args.internal, private), *args.arguments))
+        with vault_tunnel(args.ssh_key, bastion):
+            vault.COMMANDS[args.command](Vault(args.internal, private), *args.arguments)
     else:
         parser.print_usage()
         sys.exit(1)

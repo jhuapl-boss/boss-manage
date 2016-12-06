@@ -20,11 +20,57 @@ import sys
 import time
 import random
 
+from contextlib import contextmanager
+
 from .exceptions import SSHError, SSHTunnelError
 
 # Needed to prevent ssh from asking about the fingerprint from new machines
 SSH_OPTIONS = "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -q"
 TUNNEL_SLEEP = 10 # seconds
+
+def locate_port():
+    """Locate a local port to attach a SSH tunnel to.
+
+    Instead of trying to figure out if a port is in use, assume that it will
+    not be in use.
+
+    Returns:
+        (int) : Local port to use
+    """
+    return random.randint(10000,60000)
+
+def become_tty_fg():
+    """Force a subprocess call to become the foreground process.
+
+    A helper function for subprocess.call(preexec_fn=) that makes the
+    called command to become the foreground process in the terminal,
+    allowing the user to interact with that process.
+
+    Control is returned to this script after the called process has
+    terminated.
+    """
+    #From: http://stackoverflow.com/questions/15200700/how-do-i-set-the-terminal-foreground-process-group-for-a-process-im-running-und
+
+    os.setpgrp()
+    hdlr = signal.signal(signal.SIGTTOU, signal.SIG_IGN)
+    tty = os.open('/dev/tty', os.O_RDWR)
+    os.tcsetpgrp(tty, os.getpgrp())
+    signal.signal(signal.SIGTTOU, hdlr)
+
+def check_ssh(ret):
+    if ret == 255:
+        raise SSHError("Error establishing a SSH connection")
+
+class ProcWrapper(list):
+    """Wrapper that holds multiple Popen objects and can call
+    terminate and wait on all contained objects.
+    """
+    def prepend(self, item):
+        self.insert(0, item)
+    def terminate(self):
+        [item.terminate() for item in self]
+    def wait(self):
+        [item.wait() for item in self]
 
 def create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user="ec2-user", bastion_port=22):
     """Create a SSH tunnel.
@@ -54,7 +100,6 @@ def create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_u
                                  bastion_ip)
 
     proc = subprocess.Popen(shlex.split(fwd_cmd))
-    #time.sleep(5) # wait for the tunnel to be setup
 
     try:
         r = proc.wait(TUNNEL_SLEEP)
@@ -126,150 +171,156 @@ def create_tunnel_aplnis(key, local_port, remote_ip, remote_port, bastion_ip, ba
             wrapper.wait()
             raise # raise initial exception
 
-class ProcWrapper(list):
-    """Wrapper that holds multiple Popen objects and can call
-    terminate and wait on all contained objects.
-    """
-    def prepend(self, item):
-        self.insert(0, item)
-    def terminate(self):
-        [item.terminate() for item in self]
-    def wait(self):
-        [item.wait() for item in self]
+def unpack(obj, *args):
+    if type(obj) == tuple:
+        args_ = list(args)[len(obj)-1:]
+        return (*obj, *args_)
+    else:
+        return (obj, *args)
 
-def locate_port():
-    """Locate a local port to attach a SSH tunnel to.
+class SSHConnection(object):
+    def __init__(self, key, target, bastion, local_port=None):
+        self.key = key
+        self.remote_ip, self.remote_port, self.remote_user = unpack(target, 22, "ubuntu")
+        self.bastion_ip, self.bastion_port, self.bastion_user = unpack(bastion, 22, "ec2-user")
+        self.local_port = local_port if local_port else random.randint(10000,60000)
 
-    Instead of trying to figure out if a port is in use, assume that it will
-    not be in use.
+    @contextmanager
+    def _connect(self):
+        proc = create_tunnel_aplnis(self.key,
+                                    self.local_port, 
+                                    self.remote_ip,
+                                    self.remote_port, 
+                                    self.bastion_ip, 
+                                    self.bastion_user)
+        try:
+            yield
+        finally:
+            proc.terminate()
+            proc.wait()
 
-    Returns:
-        (int) : Local port to use
-    """
-    return random.randint(10000,60000)
+    def shell(self):
+        """Create SSH tunnel(s) through bastion machine(s) and start a foreground
+        SSH process.
 
-def become_tty_fg():
-    """Force a subprocess call to become the foreground process.
+        Create an SSH tunnel from the local machine to bastion that gets
+        forwarded to remote. Launch a second SSH connection (using
+        become_tty_fg) through the SSH tunnel to the remote machine.
 
-    A helper function for subprocess.call(preexec_fn=) that makes the
-    called command to become the foreground process in the terminal,
-    allowing the user to interact with that process.
+        After the second SSH session is complete, the SSH tunnel is destroyed.
+        """
+        ssh_cmd = "ssh -i {} {} -p {} {}@localhost" \
+                        .format(self.key, SSH_OPTIONS, self.local_port, self.remote_user)
 
-    Control is returned to this script after the called process has
-    terminated.
-    """
-    #From: http://stackoverflow.com/questions/15200700/how-do-i-set-the-terminal-foreground-process-group-for-a-process-im-running-und
+        with self._connect():
+            ret = subprocess.call(shlex.split(ssh_cmd), close_fds=True, preexec_fn=become_tty_fg)
+            check_ssh(ret)
+            return ret
 
-    os.setpgrp()
-    hdlr = signal.signal(signal.SIGTTOU, signal.SIG_IGN)
-    tty = os.open('/dev/tty', os.O_RDWR)
-    os.tcsetpgrp(tty, os.getpgrp())
-    signal.signal(signal.SIGTTOU, hdlr)
+    @contextmanager
+    def cmds(self):
+        """Create SSH tunnel(s) through bastion machine(s) and return a function
+        that will execute commands over SSH.
 
-def check_ssh(ret):
-    if ret == 255:
-        raise SSHError("Error establishing a SSH connection")
+        Create an SSH tunnel from the local machine to bastion that gets
+        forwarded to remote. Launch a second SSH connection through the SSH tunnel
+        to the remote machine and execute a command. After the command is complete
+        the connections are closed.
 
-def ssh(key, remote_ip, bastion_ip):
-    """Create SSH tunnel(s) through bastion machine(s) and start a foreground
-    SSH process.
+        with SSHConnection().cmds as cmd:
+            cmd("command to execute")
+            cmd("command to execute")
+        """
+        def cmd(command):
+            ssh_cmd_str = "ssh -i {} {} -p {} {}@localhost '{}'" \
+                                .format(self.key, SSH_OPTIONS, self.local_port, self.remote_user, command)
 
-    Create an SSH tunnel from the local machine to bastion that gets
-    forwarded to remote. Launch a second SSH connection (using
-    become_tty_fg) through the SSH tunnel to the remote machine.
+            ret = subprocess.call(shlex.split(ssh_cmd_str))
+            check_ssh(ret)
+            return ret
 
-    After the second SSH session is complete, the SSH tunnel is destroyed.
+        with self._connect():
+            yield cmd
 
-    Args:
-        key (string) : Path to a SSH private key, protected as required by SSH
-        remote_ip : IP of the machine the tunnel remote end should point at
-        bastion_ip : IP of the machine to form the SSH tunnel through
-    """
-    ssh_port = locate_port()
-    ssh_cmd = "ssh -i {} {} -p {} ubuntu@localhost".format(key, SSH_OPTIONS, ssh_port)
+    def cmd(self, command = None):
+        """Create SSH tunnel(s) through bastion machine(s) and execute a command over
+        SSH.
 
-    proc = create_tunnel_aplnis(key, ssh_port, remote_ip, 22, bastion_ip)
-    try:
-        ret = subprocess.call(shlex.split(ssh_cmd), close_fds=True, preexec_fn=become_tty_fg)
-        check_ssh(ret)
-        return ret
-    finally:
-        proc.terminate()
-        proc.wait()
+        Create an SSH tunnel from the local machine to bastion that gets
+        forwarded to remote. Launch a second SSH connection through the SSH tunnel
+        to the remote machine and execute a command. After the command is complete
+        the connections are closed.
 
-def ssh_cmd(key, remote_ip, bastion_ip, command = None):
-    """Create SSH tunnel(s) through bastion machine(s) and execute a command over
-    SSH.
+        Args:
+            command (None|string) : Command to execute on remote_ip. If command is
+                                    None, then prompt the user for the command to
+                                    execute.
+        """
 
-    Create an SSH tunnel from the local machine to bastion that gets
-    forwarded to remote. Launch a second SSH connection through the SSH tunnel
-    to the remote machine and execute a command. After the command is complete
-    the connections are closed.
+        if command is None:
+            command = input("command: ")
 
-    Args:
-        key (string) : Path to a SSH private key, protected as required by SSH
-        remote_ip : IP of the machine the tunnel remote end should point at
-        bastion_ip : IP of the machine to form the SSH tunnel through
-        command (None|string) : Command to execute on remote_ip. If command is
-                                None, then prompt the user for the command to
-                                execute.
-    """
+        with self.cmds() as cmd:
+            cmd(command)
 
-    if command is None:
-        command = input("command: ")
+    @contextmanager
+    def tunnel(self):
+        """Create SSH tunnel(s) through bastion machine(s), setup a SSH tunnel,
+        and return the local port to connect to.
+        """
+        with self._connect():
+            yield self.local_port
 
-    ssh_port = locate_port()
-    ssh_cmd_str = "ssh -i {} {} -p {} ubuntu@localhost '{}'".format(key, SSH_OPTIONS, ssh_port, command)
+    def external_tunnel(self, port = None, local_port = None):
+        """Create SSH tunnel(s) through bastion machine(s) and setup a SSH tunnel.
 
-    proc = create_tunnel_aplnis(key, ssh_port, remote_ip, 22, bastion_ip)
-    try:
-        ret = subprocess.call(shlex.split(ssh_cmd_str))
-        check_ssh(ret)
-        return ret
-    finally:
-        proc.terminate()
-        proc.wait()
+            Note: This function will block until the user tells it to close the tunnel
+                  if cmd argument is None.
 
-def ssh_tunnel(key, remote_ip, bastion_ip, port = None, local_port = None, cmd = None):
-    """Create SSH tunnel(s) through bastion machine(s) and setup a SSH tunnel.
+        Create an SSH tunnel from the local machine to bastion that gets
+        forwarded to remote. Launch a second SSH tunnel through the SSH tunnel
+        to the remote machine and wait for user input to close the tunnels.
 
-        Note: This function will block until the user tells it to close the tunnel
-              if cmd argument is None.
+        Args:
+            port : Target port on remote_ip to form the SSH tunnel to
+                   If port is None then prompt the user for the port
+            local_port : Local port to connect the SSH tunnel to
+                         If local_port is None and cmd is None then the user is prompted
+                             for the local port to use
+                         If local_port is None and cmd is not None then a port is located
+                             and passed to cmd
+        """
+        if port is None:
+            port = int(input("Target Port: "))
+        self.remote_port = port
 
-    Create an SSH tunnel from the local machine to bastion that gets
-    forwarded to remote. Launch a second SSH tunnel through the SSH tunnel
-    to the remote machine and wait for user input (or cmd to return) to close
-    the tunnels.
+        if local_port is None:
+            local_port = int(input("Local Port: "))
+        self.local_port = local_port
 
-    Args:
-        key (string) : Path to a SSH private key, protected as required by SSH
-        remote_ip : IP of the machine the tunnel remote end should point at
-        bastion_ip : IP of the machine to form the SSH tunnel through
-        port : Target port on remote_ip to form the SSH tunnel to
-               If port is None then prompt the user for the port
-        local_port : Local port to connect the SSH tunnel to
-                     If local_port is None and cmd is None then the user is prompted
-                         for the local port to use
-                     If local_port is None and cmd is not None then a port is located
-                         and passed to cmd
-        cmd (None|function): If cmd is None, the tunnels are setup and the user
-                             is prompted for when to close the tunnels else cmd
-                             is called as a function, passing in local_port
-    """
-    if port is None:
-        port = int(input("Target Port: "))
-
-    if local_port is None:
-        local_port = int(input("Local Port: ")) if cmd is None else locate_port()
-
-    proc = create_tunnel_aplnis(key, local_port, remote_ip, port, bastion_ip)
-    try:
-        if cmd is None:
-            print("Connect to localhost:{} to be forwarded to {}:{}".format(local_port, remote_ip, port))
+        with self._connect():
+            print("Connect to localhost:{} to be forwarded to {}:{}"
+                        .format(self.local_port, self.remote_ip, self.remote_port))
             input("Waiting to close tunnel...")
-        else:
-            return cmd(local_port)
-    finally:
-        proc.terminate()
-        proc.wait()
+
+def vault_tunnel(key, bastion):
+    ssh = SSHConnection(key, ("localhost", 3128), bastion, local_port=3128)
+    return ssh.tunnel()
+
+class ConnectionManager(object):
+    def __init__(self, key, remote, bastion, local_port=None):
+        self.base = SSHConnection(key, remote, bastion, local_port)
+        self.connections = {}
+
+
+    def get(self, target):
+        if target not in self.connections:
+            target_ = unpack(target, self.base.remote_port, self.base.remote_user)
+            self.connections[target] = SSHConnection(self.base.key,
+                                                     target_,
+                                                     (self.base.bastion_ip, self.base.bastion_port, self.base.bastion_user),
+                                                     self.base.local_port)
+        return self.connections[target]
+
+
 

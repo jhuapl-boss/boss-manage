@@ -18,7 +18,7 @@ from urllib.request import urlopen
 import exceptions
 import bastion
 import vault
-from xxx import keypair_to_file
+from utils import keypair_to_file
 
 def gen_timeout(total, step):
     """Break the total timeout value into steps
