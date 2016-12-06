@@ -52,6 +52,7 @@ import vault
 import alter_path
 from lib import aws
 from lib import ssh
+from lib.vault import Vault
 
 def connect_vault(key, remote_ip, bastion_ip, cmd):
     """Create SSH tunnel(s) through bastion machine(s) and call a command from
@@ -110,7 +111,7 @@ if __name__ == "__main__":
                         metavar = "<file>",
                         default = os.environ.get("SSH_KEY"),
                         help = "SSH private key to use when connecting to AWS instances (default: SSH_KEY)")
-    parser.add_argument("bastion", help="Hostname of the EC2 bastion server to create SSH Tunnels on")
+    parser.add_argument("--bastion","-b",  help="Hostname of the EC2 bastion server to create SSH Tunnels on")
     parser.add_argument("internal", help="Hostname of the EC2 internal server to create the SSH Tunnels to")
     parser.add_argument("command",
                         choices = commands,
@@ -136,7 +137,8 @@ if __name__ == "__main__":
         sys.exit(1)
 
     session = aws.create_session(args.aws_credentials)
-    bastion = aws.machine_lookup(session, args.bastion)
+    bastion_host = args.bastion if args.bastion else "bastion." + args.internal.split(".", 1)[1]
+    bastion = aws.machine_lookup(session, bastion_host)
     if args.private_ip:
         private = args.internal
     else:
@@ -156,7 +158,7 @@ if __name__ == "__main__":
             ssh.ssh_cmd(args.ssh_key, addr, bastion, *args.arguments)
             print()
     elif args.command in vault.COMMANDS:
-        connect_vault(args.ssh_key, private, bastion, lambda: vault.COMMANDS[args.command](args.internal, private, *args.arguments))
+        connect_vault(args.ssh_key, private, bastion, lambda: vault.COMMANDS[args.command](Vault(args.internal, private), *args.arguments))
     else:
         parser.print_usage()
         sys.exit(1)
