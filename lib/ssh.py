@@ -307,20 +307,3 @@ def vault_tunnel(key, bastion):
     ssh = SSHConnection(key, ("localhost", 3128), bastion, local_port=3128)
     return ssh.tunnel()
 
-class ConnectionManager(object):
-    def __init__(self, key, remote, bastion, local_port=None):
-        self.base = SSHConnection(key, remote, bastion, local_port)
-        self.connections = {}
-
-
-    def get(self, target):
-        if target not in self.connections:
-            target_ = unpack(target, self.base.remote_port, self.base.remote_user)
-            self.connections[target] = SSHConnection(self.base.key,
-                                                     target_,
-                                                     (self.base.bastion_ip, self.base.bastion_port, self.base.bastion_user),
-                                                     self.base.local_port)
-        return self.connections[target]
-
-
-

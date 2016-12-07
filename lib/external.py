@@ -14,11 +14,13 @@
 
 import time
 from urllib.request import urlopen
+from contextlib import contextmanager
 
-import exceptions
-import bastion
-import vault
-from utils import keypair_to_file
+from . import exceptions
+from . import aws
+from .utils import keypair_to_file
+from .ssh import SSHConnection, vault_tunnel
+from .vault import Vault
 
 def gen_timeout(total, step):
     """Break the total timeout value into steps
@@ -55,19 +57,84 @@ class ExternalCalls:
         """
         self.session = session
         self.keypair_file = keypair_to_file(keypair)
-        self.bastion_hostname = "bastion." + domain
-        self.bastion_ip = bastion.machine_lookup(session, self.bastion_hostname)
-        self.vault_hostname = "vault." + domain
-        self.vault_ip = bastion.machine_lookup(session, self.vault_hostname, public_ip=False)
         self.domain = domain
-        self.ssh_target = None
 
-    def vault_check(self, timeout, exception=True):
+        self.bastion_hostname = "bastion." + domain
+        self.bastion_ip = aws.machine_lookup(session, self.bastion_hostname)
+
+        self.vault_hostname = "vault." + domain
+        ips = aws.machine_lookup_all(session, self.vault_hostname, public_ip=False)
+        self.vaults = [Vault(self.vault_hostname, ip) for ip in vaults]
+
+        # keep track of previous connections to limit the need for looking up IP addresses
+        self.connections = {}
+
+    @contextmanager
+    def vault(self):
+        class ContextVault(object):
+            @staticmethod
+            def initialize():
+                """Initialize and configure all of the vault servers.
+
+                Lookup all vault IPs for the VPC, initialize and configure the first server
+                and then unseal any other servers.
+                """
+                self.vaults[0].initialize()
+                for vault in self.vaults[1:]:
+                    vault.unseal()
+
+            @staticmethod
+            def unseal():
+                """Unseal all of the vault servers.
+
+                Lookup all vault IPs for the VPC and unseal each server.
+                """
+                for vault in self.vaults:
+                    vault.unseal()
+
+            # DP NOTE: Bind basic methods to the Vault object methods
+            write = self.vaults[0].write
+            update = self.vaults[0].update
+            read = self.vaults[0].read
+            delete = self.vaults[0].delete
+
+        with vault_tunnel(self.keypair_file, self.bastion_ip):
+            yield ContextVault()
+
+    def ssh(self, target):
+        """Open a SSH connection to the target machine (AWS instance name) and return a method
+        that can be used to execute commands on the remote machines.
+        """
+        if target not in self.connections:
+            hostname = target
+            if not hostname.endswith("." + self.domain):
+                hostname += "." + self.domain
+            target_ip = aws.machine_lookup(self.session, hostname, public_ip=False)
+            self.connections[target] = SSHConnection(self.keypair_file, target_ip, self.bastion_ip)
+
+        return self.connections[target].cmds()
+
+    def tunnel(self, target, port):
+        """Open a SSH connectio to the target machine (AWS instance name) / port and return the local
+        port of the tunnel to connect to.
+        """
+        key = (target, port)
+        if key not in self.connections:
+            hostname = target
+            if not hostname.endswith("." + self.domain):
+                hostname += "." + self.domain
+            target_ip = aws.machine_lookup(self.session, hostname, public_ip=False)
+            self.connections[key] = SSHConnection(self.keypair_file, (target_ip, port), self.bastion_ip)
+
+        return self.connections[key].tunnel()
+
+
+    def check_vault(self, timeout, exception=True):
         """Vault status check to see if Vault is accessible
         """
-        def delegate():
+        with vault_tunnel():
             for sleep in gen_timeout(timeout, 15): # 15 second sleep
-                if vault.vault_status_check(machine=self.vault_hostname, ip=self.vault_ip):
+                if self.vaults[0].status_check():
                     return True
                 time.sleep(sleep)
 
@@ -77,164 +144,13 @@ class ExternalCalls:
             else:
                 return False
 
-        return bastion.connect_vault(self.keypair_file, self.vault_ip, self.bastion_ip, delegate)
-
-    def vault_init(self):
-        """Initialize and configure all of the vault servers.
-
-        Lookup all vault IPs for the VPC, initialize and configure the first server
-        and then unseal any other servers.
-        """
-        vaults = bastion.machine_lookup_all(self.session, self.vault_hostname, public_ip=False)
-
-        def connect(ip, func):
-            bastion.connect_vault(self.keypair_file, ip, self.bastion_ip, func)
-
-        connect(vaults[0], lambda: vault.vault_init(machine=self.vault_hostname, ip=vaults[0]))
-        for ip in vaults[1:]:
-            connect(ip, lambda: vault.vault_unseal(machine=self.vault_hostname, ip=ip))
-
-    def vault_unseal(self):
-        """Unseal all of the vault servers.
-
-        Lookup all vault IPs for the VPC and unseal each server.
-        """
-        vaults = bastion.machine_lookup_all(self.session, self.vault_hostname, public_ip=False)
-
-        def connect(ip, func):
-            bastion.connect_vault(self.keypair_file, ip, self.bastion_ip, func)
-
-        for ip in vaults:
-            connect(ip, lambda: vault.vault_unseal(machine=self.vault_hostname, ip=ip))
-
-    def vault(self, cmd, *args, **kwargs):
-        """Call the specified vault command (from vault.py) with the given arguments
-
-        Args:
-            cmd (string) : Name of the vault command to execute (name of function
-                           defined in vault.py)
-            args (list) : Positional arguments to pass to the vault command
-            kwargs (dict) : Keyword arguments to pass to the vault command
-
-        Returns:
-            (object) : Value returned by the vault command
-        """
-        def delegate():
-            # Have to dynamically lookup the function because vault.COMMANDS
-            # references the command line version of the commands we want to execute
-            return vault.__dict__[cmd.replace('-', '_')](*args, machine=self.vault_hostname, ip=self.vault_ip, **kwargs)
-
-        return bastion.connect_vault(self.keypair_file, self.vault_ip, self.bastion_ip, delegate)
-
-    def vault_write(self, path, **kwargs):
-        """Vault vault-write with the given arguments
-
-        WARNING: vault-write will override any data at the given path
-
-        Args:
-            path (string) : Vault path to write data to
-            kwargs (dict) : Keyword key value pairs to store in Vault
-        """
-        self.vault("vault-write", path, **kwargs)
-
-    def vault_update(self, path, **kwargs):
-        """Vault vault-update with the given arguments
-
-        Args:
-            path (string) : Vault path to write data to
-            kwargs (dict) : Keyword key value pairs to store in Vault
-        """
-        self.vault("vault-update", path, **kwargs)
-
-    def vault_read(self, path):
-        """Vault vault-read for the given path
-
-        Args:
-            path (string) : Vault path to read data from
-
-        Returns:
-            (None|dict) : None if no data or dictionary of key value pairs stored
-                          at Vault path
-        """
-        res = self.vault("vault-read", path)
-        return None if res is None else res['data']
-
-    def vault_delete(self, path):
-        """Vault vault-delete for the givne path
-
-        Args:
-            path (string) : Vault path to delete data from
-        """
-        self.vault("vault-delete", path)
-
-    def set_ssh_target(self, target):
-        """Set the target machine for the SSH commands
-
-        Args:
-            target (string) : target machine name. If the name is not fully qualified
-                              it is qualified using the domain given in the constructor.
-        """
-        self.ssh_target = target
-        if not target.endswith("." + self.domain):
-            self.ssh_target += "." + self.domain
-        self.ssh_target_ip = bastion.machine_lookup(self.session, self.ssh_target, public_ip=False)
-
-    def ssh(self, cmd):
-        """Execute a command over SSH on the SSH target
-
-        Args:
-            cmd (string) : Command to execute on the SSH target
-
-        Returns:
-            (None)
-        """
-        if self.ssh_target is None:
-            raise Exception("No SSH Target Set")
-
-        return bastion.ssh_cmd(self.keypair_file,
-                               self.ssh_target_ip,
-                               self.bastion_ip,
-                               cmd)
-
-    def ssh_tunnel(self, cmd, port, local_port=None):
-        """Execute a function within a SSH tunnel.
-
-        Args:
-            cmd (string) : Function to execute after the tunnel is established
-                           Function is passed the local port of the tunnel to use
-            port (int|string) : Remote port to use for tunnel
-            local_port (None|int|string : Local port to use for tunnel or None if
-                                          the function should select a random port
-
-        Returns:
-            None
-        """
-        if self.ssh_target is None:
-            raise Exception("No SSH Target Set")
-
-        return bastion.ssh_tunnel(self.keypair_file,
-                                  self.ssh_target_ip,
-                                  self.bastion_ip,
-                                  port,
-                                  local_port,
-                                  cmd)
-
-    def ssh_all(self, hostname, cmd):
-        machines = bastion.machine_lookup_all(self.session, hostname, public_ip=False)
-
-        for ip in machines:
-            bastion.ssh_cmd(self.keypair_file,
-                            ip,
-                            self.bastion_ip,
-                            cmd)
-
-    def keycloak_check(self, timeout, exception=True):
+    def check_keycloak(self, timeout, exception=True):
         """Keycloak status check to see if Keycloak is accessible
         """
         # DP ???: use the actual login url so the actual API is checked..
         #         (and parse response for 403 unauthorized vs any other error..)
 
-        def delegate(port):
+        with self.tunnel("auth", 8080) as port:
             # Could move to connecting through the ELB, but then KC will have to be healthy
             URL = "http://localhost:{}/auth/".format(port)
 
@@ -249,15 +165,11 @@ class ExternalCalls:
 
             if exception:
                 msg = "Cannot connect to Keycloak after {} seconds".format(timeout)
-                raise exceptions.StatusCheckError(msg, self.ssh_target)
+                raise exceptions.StatusCheckError(msg, "auth." + self.domain)
             else:
                 return False
 
-        # DP TODO: save and restore previous ssh_target
-        self.set_ssh_target("auth")
-        return self.ssh_tunnel(delegate, 8080)
-
-    def http_check(self, url, timeout, exception=True):
+    def check_url(self, url, timeout, exception=True):
         for sleep in gen_timeout(timeout, 15): # 15 second sleep
             res = urlopen(url)
             if res.getcode() == 200:
@@ -270,14 +182,14 @@ class ExternalCalls:
         else:
             return False
 
-    def django_check(self, machine, manage_py, exception=True):
-        self.set_ssh_target(machine)
+    def check_djagngo(self, machine, manage_py, exception=True):
         cmd = "sudo python3 {} check 2> /dev/null > /dev/null".format(manage_py) # suppress all output
 
-        ret = self.ssh(cmd)
-        if exception and ret != 0:
-            msg = "Problem with the endpoint's Django configuration"
-            raise exceptions.StatusCheckError(msg, self.ssh_target)
+        with self.ssh(machine) as ssh:
+            ret = ssh(cmd)
+            if exception and ret != 0:
+                msg = "Problem with the {}'s Django configuration".format(machine)
+                raise exceptions.StatusCheckError(msg, machine + "." + self.domain)
 
-        return ret == 0 # 0 - no issues, 1 - problems
+            return ret == 0 # 0 - no issues, 1 - problems
 
