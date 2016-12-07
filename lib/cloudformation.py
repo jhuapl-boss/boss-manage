@@ -22,6 +22,7 @@ Author:
 import os
 import time
 import json
+from botocore.exceptions import ClientError
 
 from . import hosts
 from . import aws
@@ -370,7 +371,7 @@ class CloudFormationConfiguration:
 
     # TODO DP: figure out if we can extract the region from the session used to
     #          create the stack and use a template argument
-    def __init__(self, domain, region = "us-east-1"):
+    def __init__(self, config, domain, region = "us-east-1"):
         """CloudFormationConfiguration constructor
 
         A domain name is in either <vpc>.<tld> or <subnet>.<vpc>.<tld> format and
@@ -387,12 +388,12 @@ class CloudFormationConfiguration:
         self.arguments = []
         self.region = region
         self.keypairs = {}
-        self.stack_name = "".join(map(lambda x: x.capitalize(), domain.split(".")))
+        self.stack_name = "".join([x.capitalize() for x in [config, *domain.split('.')]])
 
         self.vpc_domain = domain
         self.vpc_subnet = hosts.lookup(domain)
 
-    def _create_template(self, description=""):
+    def _create_template(self, description="", indent=None):
         """Create the JSON CloudFormation template from the resources that have
         be added to the object.
 
@@ -405,19 +406,17 @@ class CloudFormationConfiguration:
         return json.dumps({"AWSTemplateFormatVersion" : "2010-09-09",
                            "Description" : description,
                            "Parameters": self.parameters,
-                           "Resources": self.resources})
+                           "Resources": self.resources}, indent=indent)
 
-    def generate(self, name, folder):
-        """Generate the CloudFormation template and arguments files
+    def generate(self):
+        """Generate the CloudFormation template and arguments files """
+        cur_dir = os.path.dirname(os.path.realpath(__file__))
+        folder = os.path.realpath(os.path.join(cur_dir, '..', 'cloud_formation', 'templates'))
 
-        Args:
-            name (string) : Name to give the .template and .arguments files
-            folder (string) : Folder to save the files under
-        """
-        with open(os.path.join(folder, name + ".template"), "w") as fh:
-            fh.write(self._create_template())
+        with open(os.path.join(folder, self.stack_name + ".template"), "w") as fh:
+            fh.write(self._create_template(indent=4))
 
-        with open(os.path.join(folder, name + ".arguments"), "w") as fh:
+        with open(os.path.join(folder, self.stack_name + ".arguments"), "w") as fh:
             json.dump(self.arguments, fh, indent=4)
 
     def _poll(self, client, name, action, process):
@@ -519,7 +518,7 @@ class CloudFormationConfiguration:
                 rtn = False
         return rtn
 
-    def deletek(self, session, wait = True):
+    def delete(self, session, wait = True):
         """Deletes the given stack from CloudFormation.
 
         Initiates the stack delete and waits for it to finish.  config and domain
@@ -541,16 +540,21 @@ class CloudFormationConfiguration:
 
         rtn = None
         if wait:
-            status = self._poll(client, self.stack_name, 'delete', 'DELETE_IN_PROGRESS')
+            try:
+                status = self._poll(client, self.stack_name, 'delete', 'DELETE_IN_PROGRESS')
 
-            if status is None:
-                print("Problem deleting stack")
-            elif status == 'DELETE_COMPLETE':
-                print("Deleted stack '{}'".format(self.stack_name))
+                if status is None:
+                    print("Problem deleting stack")
+                elif status == 'DELETE_COMPLETE':
+                    print("Deleted stack '{}'".format(self.stack_name))
+                    rtn = True
+                else:
+                    print("Status of stack '{}' is '{}'".format(self.stack_name, status))
+                    rtn = False
+            except ClientError:
+                # Stack doesn't exist anymore
+                print(" done")
                 rtn = True
-            else:
-                print("Status of stack '{}' is '{}'".format(self.stack_name, status))
-                rtn = False
         return rtn
 
     def add_arg(self, arg):
@@ -1717,7 +1721,7 @@ class CloudFormationConfiguration:
         Example call:
 
         self.add_sqs_policy(
-            'SQS_POLICY', 'sqs_policy',
+            'SqsPolicy', 'sqs_policy',
             [Ref('S3Flush'), Ref('DeadLetter')],
             'endpoint')
 

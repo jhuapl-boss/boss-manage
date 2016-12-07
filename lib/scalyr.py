@@ -29,7 +29,8 @@ from boto3.session import Session
 from copy import copy
 import json
 import subprocess
-import library as lib
+
+from . import aws
 
 """This file name used to store new config file before uploading to Scalyr."""
 OUTPUT_CFG_FILE = 'scalyr-cfg.json'
@@ -182,7 +183,7 @@ def convert_host_names_to_ids(session, instanceList):
     """Look up ID of each instance on Amazon.  Returns a list of IDs."""
     idList = []
     for i in instanceList:
-        instId = lib.instanceid_lookup(session, i)
+        instId = aws.instanceid_lookup(session, i)
         if instId is not None:
             idList.append(instId)
     return idList

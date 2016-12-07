@@ -132,7 +132,7 @@ class ExternalCalls:
     def check_vault(self, timeout, exception=True):
         """Vault status check to see if Vault is accessible
         """
-        with vault_tunnel():
+        with vault_tunnel(self.keypair_file, ssssslf.baestion_ip):
             for sleep in gen_timeout(timeout, 15): # 15 second sleep
                 if self.vaults[0].status_check():
                     return True

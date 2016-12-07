@@ -27,6 +27,7 @@ Author:
 import os
 import time
 import json
+import re
 from boto3.session import Session
 
 from . import hosts

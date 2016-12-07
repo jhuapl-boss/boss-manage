@@ -18,7 +18,7 @@ from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 from urllib.error import HTTPError
 
-import exceptions
+from . import exceptions
 
 # DP TODO: Add support for context manager for automatic logout
 class KeyCloakClient:

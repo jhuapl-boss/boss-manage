@@ -16,11 +16,17 @@ import os
 
 # Region api is created in.  Later versions of boto3 should allow us to
 # extract this from the session variable.  Hard coding for now.
-PRODUCTION_REGION = 'us-east-1'
+REGION = 'us-east-1'
 INCOMING_SUBNET = "52.3.13.189/32"  # microns-bastion elastic IP
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-REPO_ROOT = os.path.realpath('..')
+REPO_ROOT = os.path.realpath(os.path.join(cur_dir, '..'))
+
+
+########################
+# Lambda Files
+LAMBDA_DIR = os.path.join(REPO_ROOT, 'cloud_formation', 'lambda')
+DNS_LAMBDA = LAMBDA_DIR + '/updateRoute53/index.py'
 
 
 ########################
@@ -34,6 +40,11 @@ DYNAMO_TILE_INDEX_SCHEMA  = SALT_DIR + '/ndingest/files/ndingest.git/nddynamo/sc
 DYNAMO_ID_INDEX_SCHEMA = SALT_DIR + '/spdb/files/spdb.git/spatialdb/dynamo/id_index_schema.json'
 # Annotation id count table (allows for reserving the next id in a channel).
 DYNAMO_ID_COUNT_SCHEMA = SALT_DIR + '/spdb/files/spdb.git/spatialdb/dynamo/id_count_schema.json'
+
+
+########################
+# Other Salt Files
+KEYCLOAK_REALM = SALT_DIR + '/keycloak/files/BOSS.realm'
 
 
 ########################
@@ -107,6 +118,8 @@ ENDPOINT_DB_CONFIG = {
     "port": "3306"
 }
 
+BASTION_AMI = "amzn-ami-vpc-nat-hvm-2015.03.0.x86_64-ebs"
+# Configure Squid to allow clustered Vault access, restricted to connections from the Bastion
 BASTION_USER_DATA = """#cloud-config
 packages:
     - squid
