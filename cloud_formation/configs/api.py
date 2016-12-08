@@ -23,14 +23,15 @@ in a VPC created by the core configuration. It also expects for the user to
 select the same KeyPair used when creating the core configuration.
 """
 
-from lib.cloudformation import CloudFormationConfiguration, Ref, get_scenario
+from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, get_scenario
 from lib.userdata import UserData
-from lib import aws
-from lib import utils
-from lib import constants as const
 from lib.names import AWSNames
 from lib.keycloak import KeyCloakClient
+from lib.external import ExternalCalls
+from lib import aws
+from lib import utils
 from lib import scalyr
+from lib import constants as const
 
 import json
 import uuid
@@ -50,10 +51,6 @@ def create_config(session, domain, keypair=None, db_config={}):
     """
 
     names = AWSNames(domain)
-
-    s3flushqname = names.s3flush_queue
-    deadqname = names.deadletter_queue
-    multilambda = names.multi_lambda
 
     # Lookup IAM Role and SNS Topic ARNs for used later in the config
     endpoint_role_arn = aws.role_arn_lookup(session, "endpoint")
@@ -78,8 +75,8 @@ def create_config(session, domain, keypair=None, db_config={}):
 
     # Use CloudFormation's Ref function so that queues' URLs are placed into
     # the Boss config file.
-    user_data["aws"]["s3-flush-queue"] = Ref(s3flushqname)
-    user_data["aws"]["s3-flush-deadletter-queue"] = Ref(deadqname)
+    user_data["aws"]["s3-flush-queue"] = str(Ref("S3FlushQueue")) 
+    user_data["aws"]["s3-flush-deadletter-queue"] = str(Ref("DeadLetterQueue"))
     user_data["aws"]["cuboid_bucket"] = names.cuboid_bucket
     user_data["aws"]["tile_bucket"] = names.tile_bucket
     user_data["aws"]["s3-index-table"] = names.s3_index
@@ -88,15 +85,15 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["aws"]["id-count-table"] = names.id_count_index
 
     user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
-    user_data["lambda"]["flush_function"] = multilambda
-    user_data["lambda"]["page_in_function"] = multilambda
+    user_data["lambda"]["flush_function"] = names.multi_lambda
+    user_data["lambda"]["page_in_function"] = names.multi_lambda
 
     # Prepare user data for parsing by CloudFormation.
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
 
     config = CloudFormationConfiguration('api', domain, const.REGION)
 
-    config.find_vpc(session)
+    vpc_id = config.find_vpc(session)
     az_subnets, external_subnets = config.find_all_availability_zones(session)
 
     internal_sg_id = aws.sg_lookup(session, vpc_id, names.internal)
@@ -105,22 +102,21 @@ def create_config(session, domain, keypair=None, db_config={}):
                                      "ID of internal Security Group"))
 
     # Create SQS queues and apply access control policies.
-    config.add_sqs_queue("DeadLetterQueue", deadqname, 30, 20160)
+    config.add_sqs_queue("DeadLetterQueue", names.deadletter_queue, 30, 20160)
 
     max_receives = 3
     deadq_arn = { 'Fn::GetAtt': ["DeadLetterQueue", 'Arn'] }
     config.add_sqs_queue("S3FlushQueue",
-                         s3flushqname,
+                         names.s3flush_queue,
                          30,
                          dead=(deadq_arn, max_receives))
 
-    config.add_sqs_policy("EndpointPolicy" 'sqsEndpointPolicy',
-                          [Ref(deadqname), Ref(s3flushqname)],
+    config.add_sqs_policy("EndpointPolicy", 'sqsEndpointPolicy',
+                          [Ref("DeadLetterQueue"), Ref("S3FlushQueue")],
                           endpoint_role_arn)
 
-    config.add_sqs_policy("CachemgrPolicy",
-                          'sqsCachemgrPolicy',
-                          [Ref(deadqname), Ref(s3flushqname)],
+    config.add_sqs_policy("CachemgrPolicy", 'sqsCachemgrPolicy',
+                          [Ref("DeadLetterQueue"), Ref("S3FlushQueue")],
                           cachemanager_role_arn)
 
     # Create the endpoint ASG, ELB, and RDS instance
@@ -151,7 +147,7 @@ def create_config(session, domain, keypair=None, db_config={}):
 
     # Allow HTTPS access to endpoint loadbalancer from anywhere
     config.add_security_group("AllHTTPSSecurityGroup",
-                              names.https
+                              names.https,
                               [("tcp", "443", "443", "0.0.0.0/0")])
 
     config.add_rds_db("EndpointDB",
@@ -224,7 +220,7 @@ def create(session, domain):
     config = create_config(session, domain, keypair, db_config)
 
     try:
-        success = config.create(session, name)
+        success = config.create(session)
     except:
         print("Error detected, revoking secrets")
         try:
@@ -252,7 +248,7 @@ def post_init(session, domain):
 
     # Configure external DNS
     # DP ???: Can this be moved into the CloudFormation template?
-    dns = names.public_dns(session, "api")
+    dns = names.public_dns("api")
     dns_elb = aws.elb_public_lookup(session, names.endpoint_elb)
     aws.set_domain_to_dns_name(session, dns, dns_elb, aws.get_hosted_zone(session))
 

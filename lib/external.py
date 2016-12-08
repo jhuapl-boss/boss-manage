@@ -64,7 +64,7 @@ class ExternalCalls:
 
         self.vault_hostname = "vault." + domain
         ips = aws.machine_lookup_all(session, self.vault_hostname, public_ip=False)
-        self.vaults = [Vault(self.vault_hostname, ip) for ip in vaults]
+        self.vaults = [Vault(self.vault_hostname, ip) for ip in ips]
 
         # keep track of previous connections to limit the need for looking up IP addresses
         self.connections = {}
@@ -92,10 +92,15 @@ class ExternalCalls:
                 for vault in self.vaults:
                     vault.unseal()
 
+            @staticmethod
+            def read(path):
+                """Read data from vault and return just the dict of data"""
+                data = self.vaults[0].read(path)
+                return data['data'] if data else None
+
             # DP NOTE: Bind basic methods to the Vault object methods
             write = self.vaults[0].write
             update = self.vaults[0].update
-            read = self.vaults[0].read
             delete = self.vaults[0].delete
 
         with vault_tunnel(self.keypair_file, self.bastion_ip):
@@ -132,7 +137,7 @@ class ExternalCalls:
     def check_vault(self, timeout, exception=True):
         """Vault status check to see if Vault is accessible
         """
-        with vault_tunnel(self.keypair_file, ssssslf.baestion_ip):
+        with vault_tunnel(self.keypair_file, self.bastion_ip):
             for sleep in gen_timeout(timeout, 15): # 15 second sleep
                 if self.vaults[0].status_check():
                     return True

@@ -115,9 +115,6 @@ class UserData:
         if str is None:
             return ''
 
-        if type(str) == dict:
-            return str
-
         stripped = str.strip()
 
         length = len(stripped)

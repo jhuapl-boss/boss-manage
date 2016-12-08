@@ -25,12 +25,13 @@ other servers for services like Authentication.
 
 from lib.cloudformation import CloudFormationConfiguration, Ref, get_scenario
 from lib.userdata import UserData
-from lib import aws
-from lib import utils
-from lib import constants as const
 from lib.names import AWSNames
 from lib.keycloak import KeyCloakClient
+from lib.external import ExternalCalls
+from lib import aws
+from lib import utils
 from lib import scalyr
+from lib import constants as const
 
 import os
 import json
@@ -121,18 +122,18 @@ def create_config(session, domain):
                                user_data = str(user_data),
                                min = const.VAULT_CLUSTER_SIZE,
                                max = const.VAULT_CLUSTER_SIZE,
-                               notifications = "DNSSNS",
+                               notifications = Ref("DNSSNS"),
                                depends_on = ["Consul", "DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
 
     user_data = UserData()
     user_data["system"]["fqdn"] = names.auth
     user_data["system"]["type"] = "auth"
-    deps = [Ref("AuthSecurityGroup"),
-            Ref("AttachInternetGateway"),
-            Ref("DNSLambda"),
-            Ref("DNSSNS"),
-            Ref("DNSLambdaExecute")]
+    deps = ["AuthSecurityGroup",
+            "AttachInternetGateway",
+            "DNSLambda",
+            "DNSSNS",
+            "DNSLambdaExecute"]
 
     SCENARIO = os.environ["SCENARIO"]
     USE_DB = SCENARIO in ("production",)
@@ -142,7 +143,7 @@ def create_config(session, domain):
     #          was lost. Using an RDS for development fixes this at the cost of having
     #          the core config taking longer to launch.
     if USE_DB:
-        deps.append(Ref("AuthDB"))
+        deps.append("AuthDB")
         user_data["aws"]["db"] = "keycloak" # flag for init script for which config to use
 
     cert = aws.cert_arn_lookup(session, names.public_dns('auth'))
@@ -214,10 +215,11 @@ def create_config(session, domain):
                                  depends_on = "Bastion")
 
     # Create the internet gateway and internet router
-    external_subnets.append(Ref("ExternalSubnet"))
+    all_external_subnets = external_subnets.copy()
+    all_external_subnets.append(Ref("ExternalSubnet"))
     config.add_route_table("InternetRouteTable",
                            names.internet,
-                           subnets = external_subnets)
+                           subnets = all_external_subnets)
 
     config.add_route_table_route("InternetRoute",
                                  Ref("InternetRouteTable"),
@@ -319,7 +321,7 @@ def post_init(session, domain, startup_wait=False):
         ssh("sudo service keycloak start")
 
     print("Waiting for Keycloak to restart")
-    call.keycloak_check(const.TIMEOUT_KEYCLOAK)
+    call.check_keycloak(const.TIMEOUT_KEYCLOAK)
 
     with call.tunnel(names.auth, 8080) as port:
         URL = "http://localhost:{}".format(port) # TODO move out of tunnel and use public address
