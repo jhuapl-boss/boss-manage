@@ -72,13 +72,20 @@ def bool_str(val):
     """
     return "true" if val else "false"
 
-def Ref(key):
+class Ref(dict):
     """Turn a template key name into a template reference.
 
     This allows methods to handle both reference and non reference
     values without any work.
     """
-    return { "Ref": key }
+    def __init__(self, key):
+        super(Ref, self).__init__(self, Ref=key)
+
+    def __str__(self):
+        # DP NOTE: by default str / repr formatted python dictionaries
+        # are not JSON compatible due to using single quotes
+        # Force the format into a JSON compatible format
+        return json.dumps(self)
 
 class Arg:
     """Class of static methods to create the CloudFormation template argument
@@ -615,6 +622,7 @@ class CloudFormationConfiguration:
         vpc_id = aws.vpc_id_lookup(session, self.vpc_domain)
         vpc = Arg.VPC(key, vpc_id, "ID of the VPC")
         self.add_arg(vpc)
+        return vpc_id
 
     def add_subnet(self, key, name, vpc=Ref("VPC"), az=None):
         """Add a Subnet to the configuration.
