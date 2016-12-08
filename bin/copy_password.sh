@@ -28,7 +28,7 @@ fi
 
 which pbcopy > /dev/null
 if [ $? -eq 0 ] ; then
-    CB="bpcopy"
+    CB="pbcopy"
 fi
 
 
@@ -37,4 +37,4 @@ if [ -z "$CB" ] ; then
     exit 1
 fi
 
-python3 bastion.py bastion.$DOMAIN vault.$DOMAIN vault-read $SECRET | ./pq .data.$KEY | $CB
+python3 bastion.py vault.$DOMAIN vault-read $SECRET | ./pq .data.$KEY | $CB
