@@ -25,15 +25,18 @@ These environment variables MUST be set:
 
 """
 
-from boto3.session import Session
 from copy import copy
 import json
 import subprocess
+import os
 
 from . import aws
+from .constants import repo_path
+
+SCALYR_TOOL = repo_path('bin', 'scalyr-tool')
 
 """This file name used to store new config file before uploading to Scalyr."""
-OUTPUT_CFG_FILE = 'scalyr-cfg.json'
+OUTPUT_CFG_FILE = repo_path('config', 'scalyr-cfg.json')
 
 """Base monitor JSON object."""
 EMPTY_MONITOR = {
@@ -79,7 +82,7 @@ def print_error(msgStr):
     Print specific error as given by msgStr and tell user that Scalyr must be
     configured manually.
     """
-    print(msgStr)
+    #print(msgStr)
     print('\nFailed to set up Scalyr monitoring of new instance(s).\nInstance(s) must be configured manually on https://www.scalyr.com\n\n')
 
 
@@ -87,7 +90,7 @@ def download_config_file():
     """
     Download the monitor config file from Scalyr and return it as a string.
     """
-    cmd = ['./scalyr-tool', 'get-file', '/scalyr/monitors']
+    cmd = [SCALYR_TOOL, 'get-file', '/scalyr/monitors']
     complete = subprocess.run(cmd, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE, check=True)
 
@@ -98,7 +101,7 @@ def upload_config_file(filename):
     """
     Upload the monitor config file to Scalyr.
     """
-    cmd = ['./scalyr-tool', 'put-file', '/scalyr/monitors']
+    cmd = [SCALYR_TOOL, 'put-file', '/scalyr/monitors']
     with open(filename, 'r') as f:
         complete = subprocess.run(cmd, stdin=f, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, check=True)
@@ -188,19 +191,3 @@ def convert_host_names_to_ids(session, instanceList):
             idList.append(instId)
     return idList
 
-
-# if __name__ == '__main__':
-    # add_instances_to_scalyr(None, 'foo', [])
-    # try:
-    #     upload_config_file('foo')
-    # except Exception as e:
-    #     print_error(e)
-    # val = download_config_file()
-    # raw = load_config_file('cfg.json')
-    # jsonCfg = json.loads(raw)
-    # monEle = get_cloudwatch_obj(jsonCfg, 'us-east-1')
-    # metricsObj = get_metrics_obj(monEle)
-    # add_new_instances(metricsObj, ('blah', 'blah blah') )
-    # with open(OUTPUT_CFG_FILE , 'w') as f:
-    #     json.dump(jsonCfg, f, indent=4)
-    # upload_config_file(OUTPUT_CFG_FILE)

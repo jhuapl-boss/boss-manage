@@ -32,8 +32,10 @@ import subprocess
 from distutils.spawn import find_executable
 from boto3.session import Session
 
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-os.environ["PATH"] += ":" + os.path.join(REPO_ROOT, "bin") # allow executing Packer from the bin/ directory
+import alter_path
+from lib.constants import repo_path
+
+os.environ["PATH"] += ":" + repo_path("bin") # allow executing Packer from the bin/ directory
 
 def get_commit():
     """Figure out the commit hash of the current git revision.
@@ -105,7 +107,7 @@ if __name__ == '__main__':
         return "\n" + header + "\n" + \
                "\n".join(map(lambda x: "  " + x, options)) + "\n"
 
-    config_glob = os.path.join(REPO_ROOT, "packer", "variables", "*")
+    config_glob = repo_root("packer", "variables", "*")
     config_names = [x.split(os.path.sep)[-1] for x in glob.glob(config_glob)]
     config_help_names = list(config_names)
     config_help_names.append("all")
@@ -142,15 +144,15 @@ if __name__ == '__main__':
     if "all" in args.config:
         args.config = config_names
 
-    bastion_config = "-var-file=" + os.path.join(REPO_ROOT, "config", "aws-bastion")
-    credentials_config = os.path.join(REPO_ROOT, "config", "aws-credentials")
-    packer_file = os.path.join(REPO_ROOT, "packer", "vm.packer")
+    bastion_config = "-var-file=" + repo_path("config", "aws-bastion")
+    credentials_config = repo_path("config", "aws-credentials")
+    packer_file = repo_path("packer", "vm.packer")
 
     if not os.path.exists(credentials_config):
         print("Could not locate AWS credentials file at '{}', required...".format(credentials_config))
         sys.exit(1)
 
-    packer_logs = os.path.join(REPO_ROOT, "packer", "logs")
+    packer_logs = repo_path("packer", "logs")
     if not os.path.isdir(packer_logs):
         os.mkdir(packer_logs)
 
@@ -178,7 +180,7 @@ if __name__ == '__main__':
     for config in args.config:
         print("Launching {} configuration".format(config))
         log_file = os.path.join(packer_logs, config + ".log")
-        cmd_args["machine"] = os.path.join(REPO_ROOT, "packer", "variables", config)
+        cmd_args["machine"] = repo_path("packer", "variables", config)
         proc = execute(cmd.format(**cmd_args), log_file)
 
         if args.single_thread:

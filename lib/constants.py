@@ -19,19 +19,31 @@ import os
 REGION = 'us-east-1'
 INCOMING_SUBNET = "52.3.13.189/32"  # microns-bastion elastic IP
 
-cur_dir = os.path.dirname(os.path.realpath(__file__))
-REPO_ROOT = os.path.realpath(os.path.join(cur_dir, '..'))
+
+########################
+# Path functions
+def find_dir(dir_):
+    return os.path.dirname(os.path.realpath(dir_))
+
+def path(*args):
+    return os.path.realpath(os.path.join(*args))
+
+cur_dir = find_dir(__file__)
+REPO_ROOT = path(cur_dir, '..')
+
+def repo_path(*args):
+    return path(REPO_ROOT, *args)
 
 
 ########################
 # Lambda Files
-LAMBDA_DIR = os.path.join(REPO_ROOT, 'cloud_formation', 'lambda')
+LAMBDA_DIR = repo_path('cloud_formation', 'lambda')
 DNS_LAMBDA = LAMBDA_DIR + '/updateRoute53/index.py'
 
 
 ########################
 # DynamoDB Table Schemas
-SALT_DIR = os.path.join(REPO_ROOT, 'salt_stack', 'salt')
+SALT_DIR = repo_path('salt_stack', 'salt')
 
 DYNAMO_METADATA_SCHEMA = SALT_DIR + '/boss/files/boss.git/django/bosscore/dynamo_schema.json'
 DYNAMO_S3_INDEX_SCHEMA = SALT_DIR + '/spdb/files/spdb.git/spatialdb/dynamo/s3_index_table.json'
