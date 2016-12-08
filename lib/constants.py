@@ -18,6 +18,7 @@ import os
 # extract this from the session variable.  Hard coding for now.
 REGION = 'us-east-1'
 INCOMING_SUBNET = "52.3.13.189/32"  # microns-bastion elastic IP
+PRODUCTION_MAILING_LIST = "ProductionMicronsMailingList"
 
 
 ########################
@@ -39,6 +40,8 @@ def repo_path(*args):
 # Lambda Files
 LAMBDA_DIR = repo_path('cloud_formation', 'lambda')
 DNS_LAMBDA = LAMBDA_DIR + '/updateRoute53/index.py'
+VAULT_LAMBDA = LAMBDA_DIR + '/monitors/chk_vault.py'
+CONSUL_LAMBDA = LAMBDA_DIR + '/monitors/chk_consul.py'
 
 
 ########################
@@ -90,6 +93,11 @@ RDS_TYPE = {
 REDIS_TYPE = {
     "development": "cache.t2.small",
     "production": "cache.m3.xlarge",
+}
+
+CACHE_MANAGER_TYPE = {
+    "development": "t2.micro",
+    "production": "t2.medium",
 }
 
 

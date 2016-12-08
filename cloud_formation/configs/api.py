@@ -23,7 +23,7 @@ in a VPC created by the core configuration. It also expects for the user to
 select the same KeyPair used when creating the core configuration.
 """
 
-from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, get_scenario
+from lib.cloudformation import CloudFormationConfiguration, Arg, Ref
 from lib.userdata import UserData
 from lib.names import AWSNames
 from lib.keycloak import KeyCloakClient

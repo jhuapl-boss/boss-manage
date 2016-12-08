@@ -70,6 +70,11 @@ class AWSNames(object):
         "id_count_index": "idCount",
         "s3flush_queue": "S3flush",
         "deadletter_queue": "Deadletter",
+        'write_lock_topic': 'WriteLockAlert',
+        'write_lock': 'WriteLockAlert',
+        'vault_monitor': 'vaultMonitor',
+        'consul_monitor': 'consulMonitor',
+        'vault_consul_check': 'checkVaultConsul',
     }
 
     def __getattr__(self, name):
@@ -77,9 +82,12 @@ class AWSNames(object):
             raise AttributeError("{} is not a valid BOSS AWS Resource name".format(name))
 
         hostname = self.RESOURCES[name]
+        if name in ['write_lock_topic']:
+            return hostname
+
         fq_hostname = hostname + self.base_dot
 
-        if name in ['multi_lambda']:
+        if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'consul_monitor', 'vault_consul_check']:
             fq_hostname = fq_hostname.replace('.','-')
 
         if name in ['s3flush_queue', 'deadletter_queue']:

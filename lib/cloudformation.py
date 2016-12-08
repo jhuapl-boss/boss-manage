@@ -400,6 +400,9 @@ class CloudFormationConfiguration:
         self.vpc_domain = domain
         self.vpc_subnet = hosts.lookup(domain)
 
+        if self.vpc_subnet is None:
+            raise Exception("'{}' is not a valid stack domain".format(domain))
+
     def _create_template(self, description="", indent=None):
         """Create the JSON CloudFormation template from the resources that have
         be added to the object.

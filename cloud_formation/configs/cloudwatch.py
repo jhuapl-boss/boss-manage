@@ -18,11 +18,17 @@ Create the cloudwatch alarms for the load balancer on top of a loadbalancer stac
 
 """
 
+from lib.cloudformation import CloudFormationConfiguration, Arg, Ref
+from lib.userdata import UserData
+from lib.names import AWSNames
+from lib.keycloak import KeyCloakClient
+from lib.external import ExternalCalls
+from lib import aws
+from lib import utils
+from lib import scalyr
+from lib import constants as const
 
-import configuration
-import library as lib
-
-PRODUCTION_MAILING_LIST = "ProductionMicronsMailingList"
+import json
 
 def create_vault_consul_health_checks(session, domain, vpc_id, config):
     """Update CloudFormationConfiguration with resources for vault and consul health checks.
@@ -36,109 +42,77 @@ def create_vault_consul_health_checks(session, domain, vpc_id, config):
         vpc_id (string): Physical id of VPC.
         config (CloudFormationConfiguration): config to update.
     """
+    internal_subnets, _ = config.find_all_availability_zones(session)
+    internal_sg = lib.sg_lookup(session, vpc_id, names.internal)
+
     lambda_role = lib.role_arn_lookup(session, 'VaultConsulHealthChecker')
     config.add_arg(configuration.Arg.String(
         'VaultConsulHealthChecker', lambda_role,
         'IAM role for vault/consul health check.' + domain))
 
-    core_sec_group = lib.sg_lookup(session, vpc_id, 'internal.' + domain)
-    filter_by_host_name = ([{
-        'Name': 'tag:Name',
-        'Values': ['*internal.' + domain]
-    }])
-    subnets = lib.multi_subnet_id_lookup(session, filter_by_host_name)
+    config.add_lambda('VaultLambda',
+                      names.vault_monitor,
+                      description='Check health of vault instances.',
+                      timeout=30,
+                      role=Ref('VaultConsulHealthChecker'),
+                      security_groups=[internal_sg],
+                      subnets=internal_subnets,
+                      handler='index.lambda_handler',
+                      file=const.VAULT_LAMBDA)
 
-    chk_vault_lambda = 'vaultMonitor'
-    chk_vault_lambda_logical_name = (
-        chk_vault_lambda + '-' + domain.replace('.', '-'))
-    config.add_lambda(
-        key=chk_vault_lambda,
-        name=chk_vault_lambda_logical_name,
-        description='Check health of vault instances.',
-        timeout=30,
-        role='VaultConsulHealthChecker',
-        security_groups=[core_sec_group],
-        subnets=subnets,
-        handler='index.lambda_handler',
-        file='lambda/monitors/chk_vault.py',
-        )
+    config.add_lambda('ConsulLambda',
+                      names.consul_monitor,
+                      description='Check health of vault instances.',
+                      timeout=30,
+                      role=Ref('VaultConsulHealthChecker'),
+                      security_groups=[internal_sg],
+                      subnets=internal_subnets,
+                      handler='index.lambda_handler',
+                      file=const.CONSUL_LAMBDA)
 
-    chk_consul_lambda = 'consulMonitor'
-    chk_consul_lambda_logical_name = (
-        chk_consul_lambda + '-' + domain.replace('.', '-'))
-    config.add_lambda(
-        key=chk_consul_lambda,
-        name=chk_consul_lambda_logical_name,
-        description='Check health of vault instances.',
-        timeout=30,
-        role='VaultConsulHealthChecker',
-        security_groups=[core_sec_group],
-        subnets=subnets,
-        handler='index.lambda_handler',
-        file='lambda/monitors/chk_consul.py',
-        )
-
-    # Commented out - using PRODUCTION_MAILING_LIST topic, instead.
-    # vault_consul_topic = 'vaultConsulAlert'
-    # vault_consul_topic_logical_name = (
-    #     vault_consul_topic + '-' + domain.replace('.', '-'))
-    # vault_consul_subscribers = []
-    # config.add_sns_topic(
-    #     vault_consul_topic, vault_consul_topic,
-    #     vault_consul_topic_logical_name, vault_consul_subscribers)
-
-    # # json for rule's Input key.  Split into a list so it can be passed to
-    # # Fn::Join for execution of the Ref function.
-    # json_str_list = [
-    #     """{{
-    #         "vpc_id": "{}",
-    #         "vpc_name": "{}",
-    #         "topic_arn": \"""".format(vpc_id, domain),
-    #     { 'Ref': '{}'.format(vault_consul_topic) },
-    #     '"}']
-
-    mailing_list_arn = lib.sns_topic_lookup(session, PRODUCTION_MAILING_LIST)
+    mailing_list_arn = lib.sns_topic_lookup(session, const.PRODUCTION_MAILING_LIST)
     if mailing_list_arn is None:
-        raise Exception("MailingList " + PRODUCTION_MAILING_LIST
-     + "needs to be created before running cloudwatch")
+        msg = "Mailing List {} needs to be created before running configuration"
+        raise Exception(msg.format(const.PRODUCTION_MAILING_LIST))
 
-    json_str = '{{ "vpc_id": "{}", "vpc_name": "{}", "topic_arn": "{}" }}'.format(
-        vpc_id, domain, mailing_list_arn)
-    chk_vault_consul_rule_name = 'checkVaultConsul'
-    chk_vault_consul_rule_logical_name = (
-        chk_vault_consul_rule_name + '-' + domain.replace('.', '-'))
-    config.add_cloudwatch_rule(
-        key=chk_vault_consul_rule_name,
-        targets=[
-            {
-                'Arn': { 'Fn::GetAtt': [chk_vault_lambda, 'Arn']},
-                'Id': chk_vault_lambda_logical_name,
-                # 'Input': { 'Fn::Join': ['', json_str_list] }
-                'Input': json_str
-            },
-            {
-                'Arn': { 'Fn::GetAtt': [chk_consul_lambda, 'Arn']},
-                'Id': chk_consul_lambda_logical_name,
-                # 'Input': { 'Fn::Join': ['', json_str_list] }
-                'Input': json_str
-            },
-        ],
-        name=chk_vault_consul_rule_logical_name,
-        schedule='rate(1 minute)',
-        description='Check health of vault and consul instances.',
-        depends_on=[chk_vault_lambda, chk_consul_lambda]
-        # depends_on=[vault_consul_topic, chk_vault_lambda, chk_consul_lambda]
-        )
+    # DP XXX: Why is this a string and not a json object?
+    json_str = json.dumps({
+        'vpc_id': vpc_id,
+        'vpc_name': vpc_name,
+        'topic_arn': mailing_list_arn,
+    })
 
-    config.add_lambda_permission(
-        'chkVaultExecute', chk_vault_lambda,
-        principal='events.amazonaws.com',
-        source={'Fn::GetAtt': [chk_vault_consul_rule_name, 'Arn']})
+    config.add_cloudwatch_rule('VaultConsulCheck'
+                               names.vault_consul_check,
+                               description='Check health of vault and consul instances.',
+                               targets=[
+                                   {
+                                       'Arn': { 'Fn::GetAtt': [chk_vault_lambda, 'Arn']},
+                                       'Id': names.vault_monitor,
+                                       'Input': json_str
+                                   },
+                                   {
+                                       'Arn': { 'Fn::GetAtt': [chk_consul_lambda, 'Arn']},
+                                       'Id': names.consul_monitor,
+                                       'Input': json_str
+                                   },
+                               ],
+                               schedule='rate(1 minute)',
+                               depends_on=['VaultLambda', 'ConsulLambda'])
 
-    config.add_lambda_permission(
-        'chkConsulExecute', chk_consul_lambda,
-        principal='events.amazonaws.com',
-        source={'Fn::GetAtt': [chk_vault_consul_rule_name, 'Arn']})
+    config.add_lambda_permission('VaultPerms'
+                                 names.vault_monitor,
+                                 principal='events.amazonaws.com',
+                                 source={
+                                    'Fn::GetAtt': ['VaultConsulCheck', 'Arn']
+                                 })
+
+    config.add_lambda_permission('ConsulPerms',
+                                 names.consul_monitor,
+                                 principal='events.amazonaws.com',
+                                 source={
+                                    'Fn::GetAtt': ['VaultConsulCheck', 'Arn']
+                                 })
 
 
 def create_config(session, domain, keypair=None, user_data=None, db_config={}):
@@ -149,33 +123,25 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     :arg user_data custom data needed for config
     :arg db_config database config
     """
-    config = configuration.CloudFormationConfiguration(domain)
+    config = configuration.CloudFormationConfiguration('cloudwatch', domain)
+    names = AWSNames(domain)
 
-    # do a couple of verification checks
-    if config.subnet_domain is not None:
-        raise Exception("Invalid VPC domain name")
+    vpc_id = config.find_vpc(session)
 
-    vpc_id = lib.vpc_id_lookup(session, domain)
-    if session is not None and vpc_id is None:
-        raise Exception("VPC does not exists, exiting...")
 
-    # Lookup the VPC, External Subnet, that are needed by other resources
-    config.add_arg(configuration.Arg.VPC("VPC", vpc_id,
-                                         "ID of VPC to create resources in"))
-
-    loadbalancer_name = "elb-" + domain.replace(".", "-")  # elb names can't have periods in them.
-    is_lb = lib.lb_lookup(session, loadbalancer_name)
-    if not is_lb:
+    loadbalancer_name = names.endpoint_elb
+    if not aws.lb_lookup(session, loadbalancer_name):
         raise Exception("Invalid load balancer name: " + loadbalancer_name)
 
     # TODO Test that MailingListTopic is working.
-    production_mailing_list = PRODUCTION_MAILING_LIST
-    mailingListTopic = lib.sns_topic_lookup(session, production_mailing_list)
+    production_mailing_list = const.PRODUCTION_MAILING_LIST
+    mailingListTopic = aws.sns_topic_lookup(session, production_mailing_list)
     if mailingListTopic is None:
         #config.add_sns_topic("topicList", production_mailing_list)
-        raise Exception("MailingList " + production_mailing_list + "needs to be created before running cloudwatch")
+        msg = "MailingList {} needs to be created before running config"
+        raise Exception(msg.format(production_mailing_list))
 
-    config.add_cloudwatch( loadbalancer_name, mailingListTopic)
+    config.add_cloudwatch(loadbalancer_name, mailingListTopic)
 
     # Add lambda functions.
     create_vault_consul_health_checks(session, domain, vpc_id, config)
@@ -183,31 +149,23 @@ def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     return config
 
 
-def generate(folder, domain):
+def generate(session, domain):
     """Create the configuration and save it to disk
     :arg folder location to generate the cloudformation template stack
     :arg domain internal DNS name"""
-    name = lib.domain_to_stackname("loadbalancer." + domain)
-    config = create_config(None, domain)
-    config.generate(name, folder)
-
+    config = create_config(session, domain)
+    config.generate()
 
 def create(session, domain):
     """Create the configuration, launch it, and initialize Vault
     :arg session information for performing lookups
     :arg domain internal DNS name """
-    name = lib.domain_to_stackname("cloudwatch." + domain)
     config = create_config(session, domain)
 
-    success = config.create(session, name)
+    success = config.create(session)
 
     if success:
         print('success')
     else:
         print('failed')
 
-def delete(session, domain):
-    # Expect to add custom delete.
-
-    # Standard stack delete.
-    lib.delete_stack(session, domain, "cloudwatch")

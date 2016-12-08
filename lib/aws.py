@@ -192,24 +192,6 @@ def subnet_id_lookup(session, subnet_domain):
     else:
         return response['Subnets'][0]['SubnetId']
 
-def multi_subnet_id_lookup(session, filters):
-    """Lookup the Ids for the all Subnets that pass the filters.
-
-    Args:
-        session (Session|None) : Boto3 session used to lookup information in AWS.   If session is None no lookup is performed
-        filters (list) : List of dicts specifying how to filter all the available subnets.
-
-    Returns:
-        (list) : Subnet IDs as strings.
-    """
-    if session is None:
-        return []
-
-    client = session.client('ec2')
-    response = client.describe_subnets(Filters=filters)
-    return [subnet['SubnetId'] for subnet in response['Subnets']]
-
-
 def azs_lookup(session):
     """Lookup all of the Availablity Zones for the connected region.
 
@@ -603,6 +585,8 @@ def lb_lookup(session, lb_name):
     """
     if session is None:
         return None
+
+    lb_name = lb_name.replace('.', '-')
 
     client = session.client('elb')
     response = client.describe_load_balancers()
