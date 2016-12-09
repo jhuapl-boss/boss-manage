@@ -23,7 +23,7 @@ in a VPC created by the core configuration. It also expects for the user to
 select the same KeyPair used when creating the core configuration.
 """
 
-from lib.cloudformation import CloudFormationConfiguration, Arg, Ref
+from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, Arn
 from lib.userdata import UserData
 from lib.names import AWSNames
 from lib.keycloak import KeyCloakClient
@@ -105,11 +105,10 @@ def create_config(session, domain, keypair=None, db_config={}):
     config.add_sqs_queue("DeadLetterQueue", names.deadletter_queue, 30, 20160)
 
     max_receives = 3
-    deadq_arn = { 'Fn::GetAtt': ["DeadLetterQueue", 'Arn'] }
     config.add_sqs_queue("S3FlushQueue",
                          names.s3flush_queue,
                          30,
-                         dead=(deadq_arn, max_receives))
+                         dead=(Arn("DeadLetterQueue"), max_receives))
 
     config.add_sqs_policy("EndpointPolicy", 'sqsEndpointPolicy',
                           [Ref("DeadLetterQueue"), Ref("S3FlushQueue")],

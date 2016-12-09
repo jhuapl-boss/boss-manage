@@ -23,7 +23,7 @@ the other production resources to function. In the furture this may include
 other servers for services like Authentication.
 """
 
-from lib.cloudformation import CloudFormationConfiguration, Ref, get_scenario
+from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, get_scenario
 from lib.userdata import UserData
 from lib.names import AWSNames
 from lib.keycloak import KeyCloakClient
@@ -186,7 +186,7 @@ def create_config(session, domain):
     config.add_sns_topic("DNSSNS",
                          names.dns,
                          names.dns,
-                         [("lambda", {"Fn::GetAtt": ["DNSLambda", "Arn"]})])
+                         [("lambda", Arn("DNSLambda"))])
 
 
     config.add_security_group("InternalSecurityGroup",

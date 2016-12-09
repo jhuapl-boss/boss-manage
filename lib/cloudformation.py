@@ -72,6 +72,10 @@ def bool_str(val):
     """
     return "true" if val else "false"
 
+def Arn(key):
+    """Get the Arn attribute of the given template resource"""
+    return { 'Fn::GetAtt': [key, 'Arn']}
+
 class Ref(dict):
     """Turn a template key name into a template reference.
 
