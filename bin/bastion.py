@@ -62,7 +62,7 @@ if __name__ == "__main__":
         return "\n" + header + "\n" + \
                "\n".join(map(lambda x: "  " + x, options)) + "\n"
 
-    commands = ["ssh", "ssh-cmd", "ssh-tunnel", "ssh-all"]
+    commands = ["ssh", "scp", "ssh-cmd", "ssh-tunnel", "ssh-all"]
     commands.extend(vault.COMMANDS.keys())
     commands_help = create_help("command supports the following:", commands)
 
@@ -121,6 +121,9 @@ if __name__ == "__main__":
 
     if args.command in ("ssh",):
         ssh.shell()
+    elif args.command in ("scp",):
+        ret = ssh.scp(*args.arguments)
+        sys.exit(ret)
     elif args.command in ("ssh-cmd",):
         ret = ssh.cmd(*args.arguments)
         sys.exit(ret)

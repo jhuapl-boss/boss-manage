@@ -171,6 +171,31 @@ def create_tunnel_aplnis(key, local_port, remote_ip, remote_port, bastion_ip, ba
             wrapper.wait()
             raise # raise initial exception
 
+def create_tunnel_bastion(local_port, remote_ip, remote_port):
+    """Create a SSH tunnel through the bastion machine defined by environmental variables.
+
+    If not bastion machine is defined an exception is raised
+
+    Args:
+        local_port : Port on the local machine to attach the local end of the tunnel to
+        remote_ip : IP of the machine the tunnel remote end should point at
+        remote_port : Port of on the remote_ip that the tunnel should point at
+
+    Returns:
+        (Popen) : Popen process object of the SSH tunnel
+    """
+    apl_bastion_ip = os.environ.get("BASTION_IP")
+    apl_bastion_key = os.environ.get("BASTION_KEY")
+    apl_bastion_user = os.environ.get("BASTION_USER")
+
+    if apl_bastion_ip is None or apl_bastion_key is None or apl_bastion_user is None:
+        raise Exception("Bastion information not defined, check environmental variables")
+    else:
+        # traffic
+        # localhost -> apl_bastion -> remote
+        proc = create_tunnel(apl_bastion_key, local_port, remote_ip, remote_port, apl_bastion_ip, apl_bastion_user)
+        return proc
+
 def unpack(obj, *args):
     if type(obj) == tuple:
         args_ = list(args)[len(obj)-1:]
@@ -179,7 +204,7 @@ def unpack(obj, *args):
         return (obj, *args)
 
 class SSHConnection(object):
-    def __init__(self, key, target, bastion, local_port=None):
+    def __init__(self, key, target, bastion=None, local_port=None):
         self.key = key
         self.remote_ip, self.remote_port, self.remote_user = unpack(target, 22, "ubuntu")
         self.bastion_ip, self.bastion_port, self.bastion_user = unpack(bastion, 22, "ec2-user")
@@ -187,12 +212,18 @@ class SSHConnection(object):
 
     @contextmanager
     def _connect(self):
-        proc = create_tunnel_aplnis(self.key,
-                                    self.local_port, 
-                                    self.remote_ip,
-                                    self.remote_port, 
-                                    self.bastion_ip, 
-                                    self.bastion_user)
+        if self.bastion_ip:
+            proc = create_tunnel_aplnis(self.key,
+                                        self.local_port, 
+                                        self.remote_ip,
+                                        self.remote_port, 
+                                        self.bastion_ip, 
+                                        self.bastion_user)
+        else:
+            proc = create_tunnel_bastion(self.local_port,
+                                         self.remote_ip,
+                                         self.remote_port)
+
         try:
             yield
         finally:
@@ -217,6 +248,60 @@ class SSHConnection(object):
             check_ssh(ret)
             return ret
 
+    # DP TODO: combind scps and cmds together to a user can scp and ssh over the same tunnel
+    @contextmanager
+    def scps(self):
+        """Create SSH tunnel(s) through bastion machine(s) and return a function
+        that will copy files over SSH.
+
+        with SSHConnection().scps() as scp:
+            scp(local_file, remote_file, upload=False)
+            scp(local_file, remote_file, upload=True)
+        """
+        def scp(local_file, remote_file, upload=False):
+            first = local_file if upload else ""
+            second = "" if upload else local_file
+            scp_str = "scp -i {} {} -P {} {} {}@localhost:{} {}" \
+                            .format(self.key, SSH_OPTINS, self.local_port, first, self.remote_user, remote_file, second)
+            ret = subprocess.call(shlex.split(scp_str))
+            check_ssh(ret)
+            return ret
+
+        with self._connect():
+            yield scp
+
+    def scp(self, local_file=None, remote_file=None, upload=None):
+        """Create SSH tunnel(s) through bastion machine(s) and execute a file copy over
+        SSH.
+
+        Args:
+            local_file (None|String) : Local file path to upload from or download to.
+                                       If None, then prompt the user for the file path
+            remote_file (None|String) : Remote file path to upload from or download to.
+                                        If None, then prompt the user for the file path
+            upload (None:Bool): If the local file is being uploaded to the remote file
+                                or it is being downloaded.
+                                If None, then prompt the user for if this is an upload or download
+        """
+        if local_file is None:
+            local_file = input("local file: ")
+
+        if remote_file is None:
+            remote_file = input("remote file: ")
+
+        try:
+            upload = bool(upload)
+        except:
+            print("'{}' is not a valid boolean".format(upload))
+            upload = None
+
+        if upload is None:
+            upload = input("[u]pload / [D]ownload: ").strip()
+            upload = len(upload) > 0 and upload[0] in ('U', 'u')
+
+        with self.scps() as cmd:
+            cmd(local_file, remote_file, upload)
+
     @contextmanager
     def cmds(self):
         """Create SSH tunnel(s) through bastion machine(s) and return a function
@@ -227,7 +312,7 @@ class SSHConnection(object):
         to the remote machine and execute a command. After the command is complete
         the connections are closed.
 
-        with SSHConnection().cmds as cmd:
+        with SSHConnection().cmds() as cmd:
             cmd("command to execute")
             cmd("command to execute")
         """
