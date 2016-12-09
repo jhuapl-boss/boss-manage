@@ -71,6 +71,9 @@ def get_s3_index(domain):
 def get_ingest_bucket(domain):
     """Get the domain name of the S3 ingest bucket.
 
+    Messages stored in this bucket are enqueued in a job specific upload queue
+    by a lambda function.
+
     Returns:
         (string)
     """
