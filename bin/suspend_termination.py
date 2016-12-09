@@ -22,73 +22,11 @@ based off of http://docs.aws.amazon.com/autoscaling/latest/userguide/as-suspend-
 import argparse
 import sys
 import os
-import boto3
-import json
-from boto3 import Session
-from botocore.exceptions import ClientError
-import hosts
-import pprint
-import library as lib
-import datetime
 
-IAM_CONFIG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config", "iam"))
-ENDPOINT = "endpoint"
-VAULT = "vault"
-AUTH = "auth"
-CONSUL = "consul"
-ASGS = [ENDPOINT, VAULT, AUTH, CONSUL]
+import alter_path
+from lib import aws
 
-def create_help(header, options):
-    """Create formated help."""
-    return "\n" + header + "\n" + \
-           "\n".join(map(lambda x: "  " + x, options)) + "\n"
-
-asg_help = create_help("asg defaults to endpoint, options are", ASGS)
-
-def get_asg_subname(domain, asg_name):
-    """
-
-    Args:
-        domain: domain like hiderrt1.boss
-        asg_name: One of the asg names in ASGS
-
-    Returns:
-        subname of Actual asg.  Used to search for the full asg name.
-    """
-    components = domain.split(".")
-    title_domain = "".join(x.title() for x in components)
-    if asg_name == ENDPOINT:
-        return "Api" + title_domain + "-" + ENDPOINT.title()
-    else:
-        return "Core" + title_domain + "-" + asg_name.title()
-
-
-def get_asg_full_name(session, domain, asg_name):
-    """
-    gets the full name of the asg.
-    Args:
-        session:
-        domain: domain name (ex: hiderrt1.boss)
-        asg_name: asg name listed in ASGS
-
-    Returns:
-
-    """
-    asg_sub_name = get_asg_subname(domain, asg_name)
-    client = session.client("autoscaling")
-    paginator = client.get_paginator('describe_auto_scaling_groups')
-    response_iterator = paginator.paginate(
-        #AutoScalingGroupNames=[],
-        #PaginationConfig={'MaxItems': 100, 'PageSize': 100000}
-       )
-    for resp in response_iterator:
-        for asg in resp["AutoScalingGroups"]:
-            if asg["AutoScalingGroupName"].startswith(asg_sub_name):
-                return asg["AutoScalingGroupName"]
-    return None
-
-
-def suspend_termination(session, domain, asg_name, reverse=False):
+def suspend_termination(session, hostname, reverse=False):
     """
     Suspends the ASG Processes Termination and HealthCheck or puts them back online
     Args:
@@ -100,9 +38,9 @@ def suspend_termination(session, domain, asg_name, reverse=False):
     Returns:
     """
     client = session.client("autoscaling")
-    asg_name_full_name = get_asg_full_name(session, domain, asg_name)
+    asg_name_full_name = aws.asg_name_lookup(session, hostname)
     if asg_name_full_name is None:
-        print("Cannot find a asg for {} in {}".format(asg_name, domain))
+        print("Cannot find a asg for {}".format(hostname))
         return
     if reverse:
         response = client.resume_processes(AutoScalingGroupName=asg_name_full_name,
@@ -120,28 +58,10 @@ def suspend_termination(session, domain, asg_name, reverse=False):
         print("SUSPENDED: Termination and HealthCheck processes are suspended for asg: " + asg_name_full_name)
 
 
-def create_session(credentials):
-    """
-    Read the AWS from the credentials dictionary and then create a boto3
-    connection to AWS with those credentials.
-    Args:
-        credentials: AWS credentials in JSON format
-
-    Returns: results boto3 AWS session object
-
-    """
-    session = Session(aws_access_key_id=credentials["aws_access_key"],
-                      aws_secret_access_key=credentials["aws_secret_key"],
-                      region_name='us-east-1')
-    return session
-
-
 if __name__ == '__main__':
-    os.chdir(os.path.abspath(os.path.dirname(__file__)))
-
     parser = argparse.ArgumentParser(description="Suspend ASG healthchecks and termination processes or enable them again",
-                                     formatter_class=argparse.RawDescriptionHelpFormatter,
-                                      epilog=asg_help)
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+
     parser.add_argument("--aws-credentials", "-a",
                         metavar="<file>",
                         default=os.environ.get("AWS_CREDENTIALS"),
@@ -151,13 +71,8 @@ if __name__ == '__main__':
                         action="store_true",
                         default=False,
                         help="This flag reverses the suspension and puts Termination and HeatlhChecks back online")
-    parser.add_argument("--asg",
-                        metavar="<asg>",
-                        default=ENDPOINT,
-                        choices=ASGS,
-                        help="short name for one of the auto-scale-groups, ex: endpoint")
-    parser.add_argument("domain_name",
-                        help="Domain in which to execute the configuration (example: hiderrt1.boss)")
+    parser.add_argument("hostname",
+                        help="Hostname of EC2 instances that the target ASG maintains (example: endpoint.integration.boss)")
 
     args = parser.parse_args()
 
@@ -166,9 +81,8 @@ if __name__ == '__main__':
         print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
         sys.exit(1)
 
-    credentials = json.load(args.aws_credentials)
-    session = create_session(credentials)
-    suspend_termination(session, args.domain_name, args.asg, args.reverse)
+    session = aws.create_session(args.aws_credentials)
+    suspend_termination(session, args.hostname, args.reverse)
 
 
 

@@ -130,6 +130,23 @@ def machine_lookup(session, hostname, public_ip = True):
                 print("Could not find IP address for '{}'".format(hostname))
                 return None
 
+
+def _find(xs, predicate):
+    """Locate an item in a list based on a predicate function.
+
+    Args:
+        xs (list) : List of  data
+        predicate (function) : Function taking a data item and returning bool
+
+    Returns:
+        (object|None) : The first list item that predicate returns True for or None
+    """
+    for x in xs:
+        if predicate(x):
+            return x
+    return None
+
+
 def asg_restart(session, hostname, timeout, callback=None):
     """Terminate all of the instances for an ASG, with the given timeout between
     each termination.
@@ -149,6 +166,32 @@ def asg_restart(session, hostname, timeout, callback=None):
 
             if callback is not None:
                 callback()
+
+def asg_name_lookup(session, hostname):
+    """Lookup the Group name for the ASG creating the EC2 instances with the given hostname
+
+    Args:
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
+        hostname (string) : Hostname of the EC2 instances created by the ASG
+
+    Returns:
+        (string|None) : ASG Group name or None of the ASG could not be located
+    """
+    if session is None:
+        return None
+
+    client = session.client('autoscaling')
+    response = client.describe_auto_scaling_groups()
+    if len(response['AutoScalingGroups']) == 0:
+        return None
+    else:
+        # DP NOTE: Unfortunatly describe_auto_scaling_groups() doesn't allow filtering results
+        for g in response['AutoScalingGroups']:
+            t = _find(g['Tags'], lambda x: x['Key'] == 'Name')
+            if t and t['Value'] == hostname:
+                return g['AutoScalingGroupName']
+        return None
 
 def vpc_id_lookup(session, vpc_domain):
     """Lookup the Id for the VPC with the given domain name.
@@ -211,22 +254,6 @@ def azs_lookup(session):
     rtn = [(z["ZoneName"], z["ZoneName"][-1]) for z in response["AvailabilityZones"]]
 
     return rtn
-
-
-def _find(xs, predicate):
-    """Locate an item in a list based on a predicate function.
-
-    Args:
-        xs (list) : List of  data
-        predicate (function) : Function taking a data item and returning bool
-
-    Returns:
-        (object|None) : The first list item that predicate returns True for or None
-    """
-    for x in xs:
-        if predicate(x):
-            return x
-    return None
 
 
 def ami_lookup(session, ami_name, version = None):
