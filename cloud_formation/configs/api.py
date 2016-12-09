@@ -58,27 +58,32 @@ VAULT_DJANGO_AUTH = "secret/endpoint/auth"
 ENDPOINT_TYPE = {
     "development": "t2.small",
     "production": "m4.large",
+    "ha-development": "t2.small",
 }
 
 ENDPOINT_CLUSTER_SIZE = {
     "development": 1,
     "production": 1,
+    "ha-development": 1,
 }
 
 
 RDS_TYPE = {
     "development": "db.t2.micro",
     "production": "db.t2.medium",
+    "ha-development": "db.t2.micro",
 }
 
 REDIS_TYPE = {
     "development": "cache.t2.small",
     "production": "cache.m3.xlarge",
+    "ha-development": "cache.t2.small",
 }
 
 REDIS_CLUSTER_SIZE = {
     "development": 1,
     "production": 2,
+    "ha-development": 1,
 }
 
 ENDPOINT_DB_CONFIG = {

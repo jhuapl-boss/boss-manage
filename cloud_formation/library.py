@@ -1345,7 +1345,7 @@ def get_hosted_zone_id(session, hosted_zone):
         return None
 
 def set_domain_to_dns_name(session, domain_name, dns_resource, hosted_zone):
-    """Look up Hosted Zone ID by DNS Name
+    """Updates or Creates a domain name with FQDN resource.
 
     Args:
         session (Session|None) : Boto3 session used to lookup information in AWS
@@ -1391,6 +1391,56 @@ def set_domain_to_dns_name(session, domain_name, dns_resource, hosted_zone):
         }
     )
     return response
+
+
+def get_dns_resource_for_domain_name(session, domain_name, dns_resource, hosted_zone):
+    """gets to resource name attached to a domain name
+
+    Args:
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
+        domain_name (string) : FQDN of the public record to create / update
+        dns_resource (string) : Public FQDN of the AWS resource to map domain_name to
+        hosted_zone (string) : DNS Name of the Hosted Zone that contains domain_name
+
+    Returns:
+        (dict|None) : Dictionary with the "ChangeInfo" key containing a dict of
+                      information about the requested change or None if the session
+                      is None
+    """
+    if session is None:
+        return None
+
+    client = session.client('route53')
+    hosted_zone_id = get_hosted_zone_id(session, hosted_zone)
+
+    if hosted_zone_id is None:
+        print("Error: Unable to find Route 53 Hosted Zone, " + hosted_zone + ",  Cannot set resource record for: " +
+              dns_resource)
+        return None
+
+    response = client.change_resource_record_sets(
+        HostedZoneId=hosted_zone_id,
+        ChangeBatch={
+            'Changes': [
+                {
+                    'Action': 'UPSERT',
+                    'ResourceRecordSet': {
+                        'Name': domain_name,
+                        'Type': 'CNAME',
+                        'ResourceRecords': [
+                            {
+                                'Value': dns_resource
+                            },
+                        ],
+                        'TTL': 300,
+                    }
+                },
+            ]
+        }
+    )
+    return response
+
 
 def route53_delete_records(session, hosted_zone, cname):
     """Delete all of the matching CNAME records from a DNS Zone
