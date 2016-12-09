@@ -111,7 +111,7 @@ def create_config(session, domain, keypair=None, user_data=None):
     lambda_sec_group = aws.sg_lookup(session, vpc_id, names.internal)
     lambda_bucket = aws.get_lambda_s3_bucket(session)
     config.add_lambda("MultiLambda",
-                      names.multi_lambda,,
+                      names.multi_lambda,
                       "LambdaCacheExecutionRole",
                       s3=(aws.get_lambda_s3_bucket(session),
                           "multilambda.{}.zip".format(domain),
