@@ -146,6 +146,7 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["aws"]["s3-flush-deadletter-queue"] = '{{"Ref": "{}" }}'.format(deadqname)
     user_data["aws"]["cuboid_bucket"] = names.get_cuboid_bucket(domain)
     user_data["aws"]["tile_bucket"] = names.get_tile_bucket(domain)
+    user_data["aws"]["ingest_bucket"] = names.get_ingest_bucket(domain)
     user_data["aws"]["s3-index-table"] = names.get_s3_index(domain)
     user_data["aws"]["tile-index-table"] = names.get_tile_index(domain)
     user_data["aws"]["id-index-table"] = names.get_id_index(domain)

@@ -46,19 +46,19 @@ INCOMING_SUBNET = "52.3.13.189/32" # microns-bastion elastic IP
 AUTH_CLUSTER_SIZE = { # Auth Server Cluster is a fixed size
     "development" : 1,
     "production": 3, # should be an odd number
-    "ha-development": 3  # should be an odd number
+    "ha-development": 1  # should be an odd number
 }
 
 CONSUL_CLUSTER_SIZE = { # Consul Cluster is a fixed size
     "development" : 1,
     "production": 5,  # can tolerate 2 failures
-    "ha-development": 5  # can tolerate 2 failures
+    "ha-development": 3  # can tolerate 2 failures
 }
 
 VAULT_CLUSTER_SIZE = { # Vault Cluster is a fixed size
     "development" : 1,
     "production": 3,  # should be an odd number
-    "ha-development": 3  # should be an odd number
+    "ha-development": 1  # should be an odd number
 }
 
 TIMEOUT_VAULT = 120
@@ -424,7 +424,7 @@ def post_init(session, domain, startup_wait=False):
 def update(session, domain):
     # Only in the production scenario will data be preserved over the update
     if os.environ["SCENARIO"] not in ("production", "ha-development",):
-        print("Can only update the production scenario")
+        print("Can only update the production and ha-development scenario")
         return None
 
     consul_update_timeout = 5 # minutes
