@@ -58,8 +58,6 @@ def create_config(session, domain, keypair=None, user_data=None):
 
     names = AWSNames(domain)
     config = CloudFormationConfiguration("cachedb", domain, const.REGION)
-    # Prepare user data for parsing by CloudFormation.
-    parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
 
     vpc_id = config.find_vpc(session)
     internal_subnets, _ = config.find_all_availability_zones(session)
@@ -108,7 +106,6 @@ def create_config(session, domain, keypair=None, user_data=None):
                                 user_data=parsed_user_data,
                                 role="cachemanager")
 
-    lambda_sec_group = aws.sg_lookup(session, vpc_id, names.internal)
     lambda_bucket = aws.get_lambda_s3_bucket(session)
     config.add_lambda("MultiLambda",
                       names.multi_lambda,
@@ -118,7 +115,7 @@ def create_config(session, domain, keypair=None, user_data=None):
                           "local/lib/python3.4/site-packages/lambda/lambda_loader.handler"),
                       timeout=60,
                       memory=1024,
-                      security_groups=[lambda_sec_group],
+                      security_groups=[Ref('InternalSecurityGroup')],
                       subnets=internal_subnets)
 
     # Add topic to indicating that the object store has been write locked.
