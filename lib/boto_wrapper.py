@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # Copyright 2016 The Johns Hopkins University Applied Physics Laboratory
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,17 +17,8 @@ Wrapper class to wrap boto calls to catch errors and make it easier to read code
 
 """
 
-import argparse
-import sys
-import os
-import boto3
 import json
-from boto3 import Session
 from botocore.exceptions import ClientError
-import hosts
-import pprint
-import library as lib
-import datetime
 
 class IamWrapper:
 

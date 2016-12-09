@@ -32,24 +32,26 @@ Policy.PolicyDocument
 import argparse
 import sys
 import os
-import boto3
+import pprint
+import datetime
 import json
+
 from boto3 import Session
 from botocore.exceptions import ClientError
-import hosts
-import pprint
-import library as lib
-import datetime
-from boto_wrapper import IamWrapper as iw
 
-IAM_CONFIG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config", "iam"))
+import alter_path
+from lib import aws
+from lib import utils
+from lib import constants as const
+from lib.boto_wrapper import IamWrapper as iw
+
+IAM_CONFIG_DIR = const.repo_path("config", "iam")
 DEFAULT_POLICY_FILE = os.path.join(IAM_CONFIG_DIR, "policies.json")
 DEFAULT_GROUP_FILE = os.path.join(IAM_CONFIG_DIR, "groups.json")
 DEFAULT_ROLES_FILE = os.path.join(IAM_CONFIG_DIR, "roles.json")
 COMMANDS=["import", "export"]
 
 class IamUtils:
-
     def __init__(self, session):
         self.session = session
         self.iam_details = None
@@ -68,14 +70,14 @@ class IamUtils:
         os.makedirs(IAM_CONFIG_DIR, exist_ok=True)
 
     def to_prod_account(self, list):
-        current_account = lib.get_account_id_from_session(self.session)
+        current_account = aws.get_account_id_from_session(self.session)
         if current_account != hosts.PROD_ACCOUNT:
             return self.swap_accounts(list, current_account, hosts.PROD_ACCOUNT)
         else:
             return list
 
     def to_sessions_account(self, list):
-        current_account = lib.get_account_id_from_session(self.session)  # TODO SH this only works after we remove possible assume account
+        current_account = aws.get_account_id_from_session(self.session)  # TODO SH this only works after we remove possible assume account
         if current_account != hosts.PROD_ACCOUNT:
             return self.swap_accounts(list, hosts.PROD_ACCOUNT, current_account)
         else:
@@ -167,7 +169,7 @@ class IamUtils:
             client = import_session.client('iam')
             boto3_policy = policy.copy()
 
-            aws_policy = lib.find_dict_with(self.iam_details["Policies"], "PolicyName",  boto3_policy["PolicyName"])
+            aws_policy = utils.find_dict_with(self.iam_details["Policies"], "PolicyName",  boto3_policy["PolicyName"])
             if aws_policy is None:
                 try:
                     boto3_policy["PolicyDocument"] = json.dumps(boto3_policy["PolicyDocument"], indent=2, sort_keys=True)
@@ -267,7 +269,7 @@ class IamUtils:
             return
         for role in self.roles:
             client = import_session.client('iam')
-            aws_role = lib.find_dict_with(self.iam_details["RoleDetailList"], "RoleName",  role["RoleName"])
+            aws_role = utils.find_dict_with(self.iam_details["RoleDetailList"], "RoleName",  role["RoleName"])
             if aws_role is None:
                 self.create_full_role(role)
             else:
@@ -289,7 +291,7 @@ class IamUtils:
             self.iw.update_assume_role_policy(mem_role["RoleName"], mem_role["AssumeRolePolicyDocument"])
 
         for inline_pol in mem_role["RolePolicyList"]:
-            aws_inline_pol = lib.find_dict_with(aws_role["RolePolicyList"], "PolicyName", inline_pol["PolicyName"])
+            aws_inline_pol = utils.find_dict_with(aws_role["RolePolicyList"], "PolicyName", inline_pol["PolicyName"])
             if aws_inline_pol is None:
                 self.iw.put_role_policy(mem_role["RoleName"], inline_pol["PolicyName"], inline_pol["PolicyDocument"])
                 continue
@@ -298,7 +300,7 @@ class IamUtils:
             if mem_doc_str != aws_doc_str:
                 self.iw.put_role_policy(mem_role["RoleName"], inline_pol["PolicyName"], inline_pol["PolicyDocument"])
         for aws_inline_pol in aws_role["RolePolicyList"]:
-            matching_mem_pol = lib.find_dict_with(mem_role["RolePolicyList"], "PolicyName", aws_inline_pol["PolicyName"])
+            matching_mem_pol = utils.find_dict_with(mem_role["RolePolicyList"], "PolicyName", aws_inline_pol["PolicyName"])
             if matching_mem_pol is None:
                 # AWS has a policy that is not in memory version, it should be deleted.
                 self.iw.delete_role_policy(mem_role["RoleName"], aws_inline_pol["PolicyName"])
@@ -311,7 +313,7 @@ class IamUtils:
                 self.iw.detach_role_policy(mem_role["RoleName"], aws_mngd_pol["PolicyArn"])
 
         for inst_pro in mem_role["InstanceProfileList"]:
-            aws_inst_pro = lib.find_dict_with(aws_role["InstanceProfileList"], "InstanceProfileName",
+            aws_inst_pro = utils.find_dict_with(aws_role["InstanceProfileList"], "InstanceProfileName",
                                               inst_pro["InstanceProfileName"])
             if aws_inst_pro is None:
                 self.iw.create_instance_profile(inst_pro["InstanceProfileName"], inst_pro["Path"])
@@ -322,7 +324,7 @@ class IamUtils:
                         inst_pro["InstanceProfileName"], inst_pro["Path"], aws_inst_pro["Path"]))
                     print("You will need to manually delete the old instance profile for the Path to be changed.")
         for aws_ip in aws_role["InstanceProfileList"]:
-            mem_ip = lib.find_dict_with(mem_role["InstanceProfileList"], "InstanceProfileName", aws_ip["InstanceProfileName"])
+            mem_ip = utils.find_dict_with(mem_role["InstanceProfileList"], "InstanceProfileName", aws_ip["InstanceProfileName"])
             if mem_ip is None:
                 # AWS has an instance profile that is not in memory version, it should be deleted.
                 self.iw.remove_role_from_instance_profile(mem_role["RoleName"], aws_ip["InstanceProfileName"])
@@ -389,7 +391,7 @@ class IamUtils:
             return
         for group in self.groups:
             client = import_session.client('iam')
-            aws_group = lib.find_dict_with(self.iam_details["GroupDetailList"], "GroupName",  group["GroupName"])
+            aws_group = utils.find_dict_with(self.iam_details["GroupDetailList"], "GroupName",  group["GroupName"])
             if aws_group is None:
                 self.create_full_group(group)
             else:
@@ -406,7 +408,7 @@ class IamUtils:
             print("You will need to manually delete the old group for the Path to be changed.")
 
         for inline_pol in mem_group["GroupPolicyList"]:
-            aws_inline_pol = lib.find_dict_with(aws_group["GroupPolicyList"], "PolicyName", inline_pol["PolicyName"])
+            aws_inline_pol = utils.find_dict_with(aws_group["GroupPolicyList"], "PolicyName", inline_pol["PolicyName"])
             if aws_inline_pol is None:
                 self.iw.put_group_policy(mem_group["GroupName"], inline_pol["PolicyName"], inline_pol["PolicyDocument"])
                 continue
@@ -415,7 +417,7 @@ class IamUtils:
             if mem_doc_str != aws_doc_str:
                 self.iw.put_group_policy(mem_group["GroupName"], inline_pol["PolicyName"], inline_pol["PolicyDocument"])
         for aws_inline_pol in aws_group["GroupPolicyList"]:
-            matching_mem_pol = lib.find_dict_with(mem_group["GroupPolicyList"], "PolicyName", aws_inline_pol["PolicyName"])
+            matching_mem_pol = utils.find_dict_with(mem_group["GroupPolicyList"], "PolicyName", aws_inline_pol["PolicyName"])
             if matching_mem_pol is None:
                 # AWS has a policy that is not in memory version, it should be deleted.
                 self.iw.delete_group_policy(mem_group["GroupName"], aws_inline_pol["PolicyName"])
@@ -477,7 +479,7 @@ class IamUtils:
             import_session = assume_production_role(self.session)
         else:
             import_session = self.session
-        acc = lib.get_account_id_from_session(import_session)
+        acc = aws.get_account_id_from_session(import_session)
         while input("Your about to delete all policies from account {}.  type yes to continue: ".format(acc)) != 'yes':
             pass
         client = import_session.client('iam')
@@ -506,22 +508,6 @@ def assume_production_role(session):
 
 
 
-def create_session(credentials):
-    """
-    Read the AWS from the credentials dictionary and then create a boto3
-    connection to AWS with those credentials.
-    Args:
-        credentials: AWS credentials in JSON format
-
-    Returns: results boto3 AWS session object
-
-    """
-    session = Session(aws_access_key_id=credentials["aws_access_key"],
-                      aws_secret_access_key=credentials["aws_secret_key"],
-                      region_name='us-east-1')
-    return session
-
-
 def get_oldest_policy_version(policy):
     versions = []
     for ver in policy["PolicyVersionList"]:
@@ -532,7 +518,7 @@ def get_oldest_policy_version(policy):
 
 
 def get_default_policy_version(policy):
-    return lib.find_dict_with(policy["PolicyVersionList"], "VersionId", policy["DefaultVersionId"])
+    return utils.find_dict_with(policy["PolicyVersionList"], "VersionId", policy["DefaultVersionId"])
 
 
 if __name__ == '__main__':
@@ -558,9 +544,7 @@ if __name__ == '__main__':
         print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
         sys.exit(1)
 
-    credentials = json.load(args.aws_credentials)
-    session = create_session(credentials)
-
+    session = aws.create_session(args.aws_credentials)
     iam = IamUtils(session)
 
     if args.command == "export":
