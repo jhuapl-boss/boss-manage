@@ -18,7 +18,10 @@ import os
 # extract this from the session variable.  Hard coding for now.
 REGION = 'us-east-1'
 INCOMING_SUBNET = "52.3.13.189/32"  # microns-bastion elastic IP
+
 PRODUCTION_MAILING_LIST = "ProductionMicronsMailingList"
+PRODUCTION_BILLING_TOPIC = "ProductionBillingList"
+MAX_ALARM_DOLLAR = 30  # Maximum size of alarms in $1,000s
 
 
 ########################
