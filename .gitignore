@@ -75,6 +75,9 @@ vault/private/
 # PyCharm Stuff
 .idea/
 
+# Vim Swap Files
+.*.swp
+
 # Scylr
 config/set_scalyr_vars.sh
 */scalyr-cfg.json
