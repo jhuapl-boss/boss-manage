@@ -58,6 +58,7 @@ ROOT_CIDR = 8
 VPC_CIDR = 16 # make sure VPC_CIDR is greater than ROOT_CIDR
 SUBNET_CIDR = 24 # make sure SUBNET_CIDR is greater than VPC_CIDR
 
+# DP TODO: Migrate to constants.py
 PROD_ACCOUNT = "451493790433"
 PROD_DOMAIN = "theboss.io"
 PROD_LAMBDA_BUCKET = "boss-lambda-prod-env"

@@ -30,6 +30,7 @@ import json
 import re
 from boto3.session import Session
 
+from . import constants as const
 from . import hosts
 
 def create_session(credentials):
@@ -45,7 +46,7 @@ def create_session(credentials):
 
     session = Session(aws_access_key_id = credentials["aws_access_key"],
                       aws_secret_access_key = credentials["aws_secret_key"],
-                      region_name = credentials.get('aws_region', 'us-east-1'))
+                      region_name = credentials.get('aws_region', const.REGION))
     return session
 
 def machine_lookup_all(session, hostname, public_ip = True):
@@ -976,7 +977,7 @@ def get_account_id_from_session(session):
 
     return session.client('iam').list_users(MaxItems=1)["Users"][0]["Arn"].split(':')[4]
 
-
+# DP TODO: refactor all lambda server functions into some common entity so it is easy to handle multiple accounts
 def get_lambda_s3_bucket(session):
     '''
     returns the lambda bucket based on the session
@@ -1008,6 +1009,23 @@ def get_lambda_server(session):
         return hosts.PROD_LAMBDA_SERVER
     elif account == hosts.DEV_ACCOUNT:
         return hosts.DEV_LAMBDA_SERVER
+    else:
+        raise NameError("Unknown session account used, {}, lambda_build_server for this session is unknown.".format(account))
+
+def get_lambda_server_key(session):
+    '''
+    returns the lambda server based on the session
+    Args:
+        session:
+
+    Returns:
+        (str) build server for lambdas
+    '''
+    account = get_account_id_from_session(session)
+    if account == hosts.PROD_ACCOUNT:
+        return const.PROD_LAMBDA_KEY
+    elif account == hosts.DEV_ACCOUNT:
+        return const.DEV_LAMBDA_KEY
     else:
         raise NameError("Unknown session account used, {}, lambda_build_server for this session is unknown.".format(account))
 

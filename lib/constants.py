@@ -22,6 +22,12 @@ PRODUCTION_MAILING_LIST = "ProductionMicronsMailingList"
 
 
 ########################
+# Lambda Build Server
+PROD_LAMBDA_KEY = 'microns-bastion20151117'
+DEV_LAMBDA_KEY = 'microns-bastion20151117'
+
+
+########################
 # Path functions
 def find_dir(dir_):
     return os.path.dirname(os.path.realpath(dir_))
