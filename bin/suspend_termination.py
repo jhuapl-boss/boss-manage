@@ -42,6 +42,7 @@ def suspend_termination(session, hostname, reverse=False):
     if asg_name_full_name is None:
         print("Cannot find a asg for {}".format(hostname))
         return
+
     if reverse:
         response = client.resume_processes(AutoScalingGroupName=asg_name_full_name,
                                            ScalingProcesses=["Terminate","HealthCheck"])
@@ -83,6 +84,4 @@ if __name__ == '__main__':
 
     session = aws.create_session(args.aws_credentials)
     suspend_termination(session, args.hostname, args.reverse)
-
-
 

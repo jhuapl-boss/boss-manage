@@ -87,4 +87,8 @@ salt_stack/salt/keycloak/files/keycloak-*Final.tar.gz
 
 # Boss Set Vars
 config/set_vars_*.sh
+config/my_vars.sh
+
+# CloudFormation Templates
+cloud_formation/templates/
 
