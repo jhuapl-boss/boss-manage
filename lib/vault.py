@@ -28,7 +28,7 @@ POLICY_DIR = os.path.join(VAULT_DIR, "policies")
 PRIVATE_DIR = os.path.join(VAULT_DIR, "private")
 
 class Vault(object):
-    def __init__(self, machine, ip = None):
+    def __init__(self, machine, ip = None, proxy = True):
         # If the machine is X.vault.vpc.boss remove the X.
         if machine and machine.count(".") == 3:
             self.machine = machine.split(".", 1)[1]
@@ -46,7 +46,10 @@ class Vault(object):
             host = "localhost"
 
         self.url = "http://{}:8200".format(host)
-        self.proxy = {"http": "http://localhost:3128"}
+        if proxy:
+            self.proxy = {"http": "http://localhost:3128"}
+        else:
+            self.proxy = {} # DP XXX: {} or None???
 
     def path(self, filename):
         """Get the complete file path for given machine's private file.
