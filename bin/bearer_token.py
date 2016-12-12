@@ -89,9 +89,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description = "Script to get a KeyCloak Bearer Token",
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--username", default = None, help = "KeyCloak Username")
-    parser.add_argument("--password", default = None, help = "KeyCloak Password")
-    parser.add_argument("--output", "-o", default = '-', help = "File to save the token to (default '-' / stdout)")
+    parser.add_argument("--username", default = None, help = "KeyCloak Username ('-' to read from stdin)")
+    parser.add_argument("--password", default = None, help = "KeyCloak Password ('-' to read from stdin)")
+    parser.add_argument("--output", "-o", default = '-', help = "File to save the token to ('-' to write to stdout (DEFAULT))")
     parser.add_argument("hostname", help="Pulic hostname of the target Authentication server to get the bearer token for")
 
     args = parser.parse_args()
@@ -100,11 +100,15 @@ if __name__ == "__main__":
         username = input("Username: ")
     else:
         username = args.username
+        if username == '-':
+            username = sys.stdin.readline().strip()
 
     if args.password is None:
         password = getpass.getpass()
     else:
         password = args.password
+        if password == '-':
+            password = sys.stdin.readline().strip()
 
     if not args.hostname.lower().startswith("auth"):
         print("Hostname doesn't start with 'auth'", file=sys.stderr)
