@@ -7,16 +7,16 @@ the [Boss](https://github.com/aplmicrons/boss) repository.
 Components:
 
  * docs --- Instructions and tutorials
+ * bin --- Scripts and utilities for building / working with the BOSS infrastructure
+ * lib --- Python libraries containing common code used by scripts and utilities
  * packer --- [Packer](https://www.packer.io/) configurations for building VM
               images populated with Salt
  * salt_stack --- [SaltStack](http://saltstack.com/) formulas for installing
                   and configuring software
- * cloud_formation --- Python scripts for creating AWS [CloudFormation](https://aws.amazon.com/cloudformation/)
-                       templates, creating the CloudFormation Stacks, and
-                       related helper functions
- * vault --- Python scripts for connecting to and managing [Vault](http://www.vaultproject.io/)
-             instances used for storing secret information used by the other
-             machines that make up the BOSS infrastructure.
+ * cloud_formation --- Configuration files creating AWS [CloudFormation](https://aws.amazon.com/cloudformation/)
+                       templates
+ * vault --- [Vault](http://www.vaultproject.io/) private key / token storage
+             and policies used for initial configuration of a Vault instance.
 
 ## Getting Started
 
@@ -29,9 +29,7 @@ nothing will work.
 The Vault and CloudFormation scripts make use of two Python libraries. To
 install them run the following commands.
 
-`pip3 install boto3`
-
-`pip3 install hvac`
+`pip3 install -r requirements.txt`
 
 ## Subrepositories
 
@@ -68,3 +66,6 @@ file contains your private and secret key then you can point the other scripts
 environment variable.
 
 For example: `export AWS_CREDENTIALS=../packer/variables/aws-credentials`
+
+**Note:** Relative file paths are from the location of the script being executed.
+

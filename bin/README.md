@@ -121,8 +121,7 @@ one).
 Requirements:
 
 * git - Should be installed under $PATH
-* pip3 boto3 package
-* pip3 hvac package
+* pip3 install -r boss-manage.git/requirements.txt
 * access to private keys used to launch the core configuration under `~/.ssh/`
 * AWS API credentials with IAM privileges required to launch the configurations
   * Look at `docs/InstallGuide.md` for more specifics on IAM permissions required
