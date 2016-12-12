@@ -1164,6 +1164,33 @@ def instance_public_lookup(session, hostname):
             return None
 
 
+def cloudfront_public_lookup(session, hostname):
+    """
+    Lookup cloudfront public domain name which has hostname as the origin.
+    Args:
+        session(Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
+        hostname: name of api domain or auth domain. Ex: api.integration.theboss.io
+
+    Returns:
+        (string|None) : Public DNS name of cloud front or None if it could not be located
+    """
+    if session is None:
+        return None
+
+    client = session.client('cloudfront')
+    response = client.list_distributions(
+        MaxItems='100'
+    )
+    items = response["DistributionList"]["Items"]
+    for item in items:
+        cloud_front_domain_name = item["DomainName"]
+        for origin in item["Origins"]["Items"]:
+            if origin["DomainName"].startswith(hostname):
+                return cloud_front_domain_name
+    return None
+
+
 def elb_public_lookup(session, hostname):
     """Lookup the Public DNS name for a ELB
 
