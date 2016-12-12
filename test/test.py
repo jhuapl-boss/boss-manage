@@ -33,11 +33,9 @@ import os
 import random
 import time
 
-cur_dir = os.path.dirname(os.path.realpath(__file__))
-vault_dir = os.path.normpath(os.path.join(cur_dir, "..", "vault"))
-sys.path.append(vault_dir)
-import bastion
-import vault
+import alter_path
+from lib import aws
+from lib.external import ExternalCalls
 
 TARGET_MACHINES = [
     "consul.",
@@ -45,24 +43,6 @@ TARGET_MACHINES = [
     "auth."
 ]
 
-def create_session(cred_fh):
-    """Read AWS credentials from the given file object and create a Boto3 session.
-
-        Note: Currently is hardcoded to connect to Region US-East-1
-
-    Args:
-        cred_fh (file) : File object of a JSON formated data with the following keys
-                         "aws_access_key" and "aws_secret_key"
-
-    Returns:
-        (Session) : Boto3 session
-    """
-    credentials = json.load(cred_fh)
-
-    session = Session(aws_access_key_id = credentials["aws_access_key"],
-                      aws_secret_access_key = credentials["aws_secret_key"],
-                      region_name = 'us-east-1')
-    return session
 
 def machine_lookup(session, domain, az):
     hostnames = [m + domain for m in TARGET_MACHINES]
@@ -124,10 +104,8 @@ def test_consul(session, args):
         return 1
 
     global TARGET_MACHINES
-    TARGET_MACHINES = [TARGET_MACHINES[0]] # Limit to only consul
-    bastion_ip = bastion.machine_lookup(session, "bastion." + args.domain)
-    vault_ip = bastion.machine_lookup(session, "vault." + args.domain, public_ip=False)
-    vault_read = lambda: vault.vault_read("secret/auth/realm", "vault." + args.domain, vault_ip)
+    TARGET_MACHINES = ['consul.'] # Limit to only consul
+    calls = ExternalCalls(session, args.ssh_key, args.domain)
 
     azs = azs_lookup(session)
     for i in range(ITERATIONS):
@@ -143,9 +121,10 @@ def test_consul(session, args):
         time.sleep(5 * 60)
 
         try:
-            result = bastion.connect_vault(args.ssh_key, vault_ip, bastion_ip, vault_read)
-            username = result['data']['username']
-            print("Read username '{}' from Vault".format(username))
+            with calls.vault() as vault:
+                result = vault.read("secret/auth/realm")
+                username = result['data']['username']
+                print("Read username '{}' from Vault".format(username))
         except Exception as e:
             print("Problem connecting to Vault on iteration ", i)
             print(e)
@@ -200,7 +179,7 @@ if __name__ == "__main__":
         print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
         sys.exit(1)
 
-    session = create_session(args.aws_credentials)
+    session = aws.create_session(args.aws_credentials)
     # TODO: add sub command to log into each target machine and shutdown the service (leave the machine running)
 
     ret = tests[args.test](session, args)
