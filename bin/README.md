@@ -66,18 +66,18 @@ Used to setup a ssh tunnel to an AWS bastion instance, allowing connections
 to internal AWS instances (a Vault instance for example). The script has to
 different operations.
 
- * 'ssh': Forms a ssh tunnel to the bastion host and then launches a ssh session
+ * `ssh`: Forms a ssh tunnel to the bastion host and then launches a ssh session
           to the internal host.
- * 'scp': Forms a ssh tunnel to the bastion host and then launches a scp command
+ * `scp`: Forms a ssh tunnel to the bastion host and then launches a scp command
           to copy a file from/to the internal machine.
- * 'ssh-cmd': Forms a ssh tunnel to the bastion host and then launches ssh with
+ * `ssh-cmd`: Forms a ssh tunnel to the bastion host and then launches ssh with
               the given command. If no command is given on the command line the
               user will be prompted for the command.
- * 'ssh-tunnel': Forms a ssh tunnel to the bastion host and then a second ssh
+ * `ssh-tunnel`: Forms a ssh tunnel to the bastion host and then a second ssh
                  tunnel to the target machine. The tunnel will be kept up until
                  the user closes it. If the target port and local port are not
                  specified on the command line the user will be prompted for them.
- * 'vault-': Form a ssh tunnel to the bastion host and then call the specified
+ * `vault-`: Form a ssh tunnel to the bastion host and then call the specified
               method in vault.py to manipulate a remote Vault instance.
 
 **Note:** Currently the ssh commands only supports connecting to an internal
@@ -132,7 +132,7 @@ Important Arguments:
 * `--ami-version` selects the specific AMI build name as used by `packer.py`. By
   default this is the last built image tagged with a commit hash, but if the
   partial commit hash or specific name is given that AMI is used.
-* '--scenario' selects the deployment scenario (development, production, etc)
+* `--scenario` selects the deployment scenario (development, production, etc)
 
 ## Scalyr Enviroment Variables
 
