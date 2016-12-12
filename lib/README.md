@@ -3,21 +3,21 @@ Boss Manage Libraries
 
 Table of Contents:
 
-    * [aws.py](#awspy)
-    * [boto_wrapper.py](#boto_wrapperpy)
-    * [cloudformation.py](#cloudformationpy)
-    * [constants.py](#constantspy)
-    * [exceptions.py](#exceptionspy)
-    * [external.py](#externalpy)
-    * [hosts.py](#hostspy)
-    * [keycloak.py](#keycloakpy)
-    * [names.py](#namespy)
-    * [scalyr.py](#scalyrpy)
-    * [ssh.py](#sshpy)
-    * [userdata.py](#userdatapy)
-    * [utils.py](#utilspy)
-    * [vault.py](#vaultpy)
-    * [zip.py](#zippy)
+* [aws.py](#awspy)
+* [boto_wrapper.py](#boto_wrapperpy)
+* [cloudformation.py](#cloudformationpy)
+* [constants.py](#constantspy)
+* [exceptions.py](#exceptionspy)
+* [external.py](#externalpy)
+* [hosts.py](#hostspy)
+* [keycloak.py](#keycloakpy)
+* [names.py](#namespy)
+* [scalyr.py](#scalyrpy)
+* [ssh.py](#sshpy)
+* [userdata.py](#userdatapy)
+* [utils.py](#utilspy)
+* [vault.py](#vaultpy)
+* [zip.py](#zippy)
 
 aws.py
 ------
