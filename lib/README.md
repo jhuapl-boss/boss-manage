@@ -3,21 +3,21 @@ Boss Manage Libraries
 
 Table of Contents:
 
-    * [aws.py](#aws.py)
-    * [boto_wrapper.py](#boto_wrapper.py)
-    * [cloudformation.py](#cloudformation.py)
-    * [constants.py](#constants.py)
-    * [exceptions.py](#exceptions.py)
-    * [external.py](#external.py)
-    * [hosts.py](#hosts.py)
-    * [keycloak.py](#keycloak.py)
-    * [names.py](#names.py)
-    * [scalyr.py](#scalyr.py)
-    * [ssh.py](#ssh.py)
-    * [userdata.py](#userdata.py)
-    * [utils.py](#utils.py)
-    * [vault.py](#vault.py)
-    * [zip.py](#zip.py)
+    * [aws.py](#awspy)
+    * [boto_wrapper.py](#boto_wrapperpy)
+    * [cloudformation.py](#cloudformationpy)
+    * [constants.py](#constantspy)
+    * [exceptions.py](#exceptionspy)
+    * [external.py](#externalpy)
+    * [hosts.py](#hostspy)
+    * [keycloak.py](#keycloakpy)
+    * [names.py](#namespy)
+    * [scalyr.py](#scalyrpy)
+    * [ssh.py](#sshpy)
+    * [userdata.py](#userdatapy)
+    * [utils.py](#utilspy)
+    * [vault.py](#vaultpy)
+    * [zip.py](#zippy)
 
 aws.py
 ------
@@ -60,7 +60,7 @@ Library for connecting to and configuring Keycloak.
 names.py
 --------
 Library of resource names, reducing the number of `+ '.' + domain` statements
-appear in cloud_formation configs and making sure all configs have the same
+appearing in cloud_formation configs and making sure all configs have the same
 resource reference.
 
 scalyr.py
