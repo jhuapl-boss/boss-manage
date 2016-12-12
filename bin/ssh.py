@@ -33,77 +33,12 @@ Author:
 """
 
 import argparse
-import subprocess
-import shlex
 import os
 import sys
 
-from bastion import *
-
-def tunnel_aplnis(ip):
-    """Based on environmental variables form an optional tunnel through a bastion
-    machine that helps facilitate external SSH connections.
-
-    If the BASTION_IP, BASTION_KEY, BASTION_USER environmental variables are defined
-    then an SSH tunnel is formed through that machine to the target IP.
-
-    This was added to support using a single machine given access through the
-    APL firewall and tunnel all SSH connections through it.
-
-    Args:
-        ip (string) : The target IP to point the tunnel at
-
-    Returns:
-        (None, None) : if not all of the environmental variables are defined
-        (Popen, int) : SSH tunnel process and local port of the local tunnel endpoint
-    """
-    apl_bastion_ip = os.environ.get("BASTION_IP")
-    apl_bastion_key = os.environ.get("BASTION_KEY")
-    apl_bastion_user = os.environ.get("BASTION_USER")
-
-    if apl_bastion_ip is None or apl_bastion_key is None or apl_bastion_user is None:
-        print("APL Bastion information not defined, connecting directly")
-        return (None, None)
-    else:
-        print("Using APL Bastion host at {}".format(apl_bastion_ip))
-        port = locate_port()
-        proc = create_tunnel(apl_bastion_key, port, ip, 22, apl_bastion_ip, apl_bastion_user)
-        return (proc, port)
-
-def ssh(key, ip, user="ubuntu", cmd=None):
-    """Create an SSH session from the local machine to the given remote
-    remote IP address (using bastion.become_tty_fg).
-
-    Used tunnel_aplnis() form an optional tunnel before making the SSH connections.
-
-        Note: This function launches the SSH process into the foreground and will
-              stay active until the user closes the SSH connection.
-
-    Args:
-        key (string) : Path to a SSH private key, protected as required by SSH
-        ip (string) : IP of the target machine to form the SSH connection to
-        user (string) : User account to connect to the target machine as
-    """
-
-    proc, port = tunnel_aplnis(ip)
-    # depending of if a tunnel is created, update some arguments
-    if port is None:
-        port = 22
-    else:
-        ip = "localhost"
-
-    try:
-        ssh_cmd = "ssh -i {} {} -p {} {}@{}".format(key, SSH_OPTIONS, port, user, ip)
-        if(cmd):
-            ssh_cmd = "{} {}".format(ssh_cmd, cmd)
-            subprocess.call(shlex.split(ssh_cmd))
-        else:
-            subprocess.call(shlex.split(ssh_cmd), close_fds=True, preexec_fn=become_tty_fg)
-    finally:
-        if proc is not None:
-            proc.terminate()
-            proc.wait()
-
+import alter_path
+from lib import aws
+from lib.ssh import SSHConnection
 
 if __name__ == "__main__":
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
@@ -146,13 +81,11 @@ if __name__ == "__main__":
         print("Error: SSH key '{}' does not exist".format(args.ssh_key))
         sys.exit(1)
 
-    session = create_session(args.aws_credentials)
+    session = aws.create_session(args.aws_credentials)
     if args.private_ip:
         ip = args.hostname
     else:
-        ip = machine_lookup(session, args.hostname)
-
-
+        ip = aws.machine_lookup(session, args.hostname)
 
     # the bastion server (being an AWS AMI) has a differnt username
     if args.user is None:
@@ -160,4 +93,9 @@ if __name__ == "__main__":
     else:
         user = args.user
 
-    ssh(args.ssh_key, ip, user, cmd=args.cmd)
+    ssh = SSHConnection(args.ssh_key, (ip, 22, user))
+    if args.cmd:
+        ret = ssh.cmd(args.cmd)
+    else:
+        ret = ssh.shell()
+    sys.exit(ret)
