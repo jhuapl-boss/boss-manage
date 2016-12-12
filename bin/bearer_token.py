@@ -19,8 +19,6 @@
 Because the token is backed by a Keycloak session it will expire after a short
 period of time (the lifetime of the session before it expires).
 
-The Keycloak address is discovered by looking in AWS, using the supplied AWS credentials.
-
 The Keycloak token is save to a file called "keycloak.token" in the current directory.
 
 Environmental Variables:
@@ -37,52 +35,13 @@ import sys
 import getpass
 import json
 import ssl
-from boto3.session import Session
 
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 from urllib.error import HTTPError
 
-def elb_public_lookup(session, hostname):
-    """Lookup the public DNS name for an ELB based on the BOSS hostname.
-
-    Args:
-        session (Session) : Active Boto3 session used to lookup ELB
-        hostname (string) : Hostname of the desired ELB
-
-    Returns:
-        (None|string) : None if the ELB is not located or the public DNS name
-    """
-    if session is None: return None
-
-    client = session.client('elb')
-    responses = client.describe_load_balancers()
-
-    hostname_ = hostname.replace(".", "-")
-
-    for response in responses["LoadBalancerDescriptions"]:
-        if response["LoadBalancerName"].startswith(hostname_):
-            return response["DNSName"]
-    return None
-
-def create_session(cred_fh):
-    """Read AWS credentials from the given file object and create a Boto3 session.
-
-        Note: Currently is hardcoded to connect to Region US-East-1
-
-    Args:
-        cred_fh (file) : File object of a JSON formated data with the following keys
-                         "aws_access_key" and "aws_secret_key"
-
-    Returns:
-        (Session) : Boto3 session
-    """
-    credentials = json.load(cred_fh)
-
-    session = Session(aws_access_key_id = credentials["aws_access_key"],
-                      aws_secret_access_key = credentials["aws_secret_key"],
-                      region_name = 'us-east-1')
-    return session
+import alter_path
+from lib import utils
 
 def request(url, params = None, headers = {}, method = None, convert = urlencode):
     """Make an HTTP(S) query and return the results.
@@ -121,29 +80,21 @@ def request(url, params = None, headers = {}, method = None, convert = urlencode
         response = urlopen(rq, context=ctx).read().decode("utf-8")
         return response
     except HTTPError as e:
-        print(e)
-        return e.read().decode("utf-8")
+        print(e, file=sys.stderr)
+        print(e.read().decode("utf-8"), file=sys.stderr)
+        return None
 
 if __name__ == "__main__":
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
     parser = argparse.ArgumentParser(description = "Script to get a KeyCloak Bearer Token",
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--aws-credentials", "-a",
-                        metavar = "<file>",
-                        default = os.environ.get("AWS_CREDENTIALS"),
-                        type = argparse.FileType('r'),
-                        help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
     parser.add_argument("--username", default = None, help = "KeyCloak Username")
     parser.add_argument("--password", default = None, help = "KeyCloak Password")
-    parser.add_argument("domain_name", help="Domain in which to execute the configuration (example: integration.boss or auth.integration.theboss.io)")
+    parser.add_argument("--output", "-o", default = '-', help = "File to save the token to (default '-' / stdout)")
+    parser.add_argument("hostname", help="Pulic hostname of the target Authentication server to get the bearer token for")
 
     args = parser.parse_args()
-
-    if args.aws_credentials is None:
-        parser.print_usage()
-        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
-        sys.exit(1)
 
     if args.username is None:
         username = input("Username: ")
@@ -155,13 +106,10 @@ if __name__ == "__main__":
     else:
         password = args.password
 
-    session = create_session(args.aws_credentials)
-    if args.domain_name.endswith(".boss"):
-        hostname = elb_public_lookup(session, "auth." + args.domain_name)
-    else:
-        hostname = args.domain_name
+    if not args.hostname.lower().startswith("auth"):
+        print("Hostname doesn't start with 'auth'", file=sys.stderr)
 
-    url = "https://" + hostname + "/auth/realms/BOSS/protocol/openid-connect/token"
+    url = "https://" + args.hostname + "/auth/realms/BOSS/protocol/openid-connect/token"
     print(url)
     params = {
         "grant_type": "password",
@@ -174,20 +122,18 @@ if __name__ == "__main__":
     }
 
     response = request(url, params, headers)
-    response = json.loads(response)
-    print("Response:")
-    for key in response:
-        val = response[key]
-        if type(val) == type(""):
-            val = val[:15] + "..."
-        print("\t{} -> {}".format(key, val))
-    print()
+    if response is None:
+        sys.exit(1)
 
+    # DP NOTE: Prints are done to stderr so that stdout can be redirected / piped
+    #          without capturing status information from the program
+    response = json.loads(response)
     if "access_token" not in response:
-        print("Didn't get a token, exiting...")
+        print("Didn't get a token, exiting...", file=sys.stderr)
         sys.exit(1)
 
     token = response["access_token"]
-    with open("keycloak.token", "w") as fh:
+    with utils.open_(args.output, "w") as fh:
         fh.write(token)
-        print("Token writen to keycloak.token")
+        print("Token writen to '{}'".format(args.output), file=sys.stderr)
+        sys.exit(0)

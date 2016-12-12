@@ -19,6 +19,27 @@ import shlex
 import getpass
 import string
 
+from contextlib import contextmanager
+
+@contextmanager
+def open_(filename, mode='r'):
+    """Custom version of open that understands stdin/stdout"""
+    is_std = filename is None or filename == '-'
+    if is_std:
+        if 'r' in mode:
+            fh = sys.stdin
+        else:
+            fh = sys.stdout
+    else:
+        fh = open(filename, mode)
+
+    try:
+        yield fh
+    finally:
+        if not is_std:
+            fh.close()
+
+
 def get_command(action=None):
     argv = sys.argv[:]
     if action:
