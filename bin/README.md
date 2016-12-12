@@ -1,6 +1,27 @@
 Boss Manage Utilities
 =====
 
+Table of Contents:
+
+* [Connecting from within APL](#Connecting-from-within-APL)
+* [Hostnames](#Hostnames)
+* [packer.py](#packerpy)
+* [bastion.py](#bastionpy)
+* [ssh.py](#sshpy)
+* [vault.py](#vaultpy)
+* [cloudformation.py](#cloudformationpy)
+* [Scalyr Enviroment Variables](#Scalyr-Enviroment-Variables)
+* [create_certificate.py](#create_certificatepy)
+* [iam_utils.py](#iam_utilspy)
+* [one_time_aws_account_setup.py](#one_time_aws_account_setuppy)
+* [scalyr-tool](#scalyr-tool)
+* [suspend_termination.py](#suspend_terminationpy)
+* [update_lambda_fcn.py](#update_lambda_fcnpy)
+* [bearer_token.py](#bearer_tokenpy)
+* [bearer_token.sh](#bearer_token.sh)
+* [copy_password.sh](#copy_password.sh)
+* [pq](#pq)
+
 This directory contains the differe utilities and script for building and
 interacting with the BOSS infrastructure.
 
