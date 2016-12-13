@@ -87,7 +87,7 @@ if __name__ == '__main__':
     actions = ["create", "update", "delete", "post-init", "pre-init", "generate"]
     actions_help = create_help("action supports the following:", actions)
 
-    scenarios = ["development", "production"]
+    scenarios = ["development", "production", "ha-development"]
     scenario_help = create_help("scenario supports the following:", scenarios)
 
     parser = argparse.ArgumentParser(description = "Script the creation and provisioning of CloudFormation Stacks",

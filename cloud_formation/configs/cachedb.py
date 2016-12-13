@@ -47,6 +47,7 @@ INCOMING_SUBNET = "52.3.13.189/32"  # microns-bastion elastic IP
 CACHE_MANAGER_TYPE = {
     "development": "t2.micro",
     "production": "t2.medium",
+    "ha-development": "t2.micro",
 }
 
 # Prefixes uses to generate names of SQS queues.
@@ -121,11 +122,18 @@ def create_config(session, domain, keypair=None, user_data=None):
         { 'AWS': role})
 
     tile_bucket_name = names.get_tile_bucket(domain)
-    print ("tile bucket name: " + tile_bucket_name)
     if not lib.s3_bucket_exists(session, tile_bucket_name):
         config.add_s3_bucket("tileBucket", tile_bucket_name)
     config.add_s3_bucket_policy(
         "tileBucketPolicy", tile_bucket_name,
+        ['s3:GetObject', 's3:PutObject'],
+        { 'AWS': role})
+
+    ingest_bucket_name = names.get_ingest_bucket(domain)
+    if not lib.s3_bucket_exists(session, ingest_bucket_name):
+        config.add_s3_bucket("ingestBucket", ingest_bucket_name)
+    config.add_s3_bucket_policy(
+        "ingestBucketPolicy", ingest_bucket_name,
         ['s3:GetObject', 's3:PutObject'],
         { 'AWS': role})
 
@@ -206,6 +214,7 @@ def create(session, domain):
     user_data["aws"]["s3-flush-deadletter-queue"] = lib.sqs_lookup_url(session, deadqname)
 
     user_data["aws"]["cuboid_bucket"] = names.get_cuboid_bucket(domain)
+    user_data["aws"]["ingest_bucket"] = names.get_ingest_bucket(domain)
     user_data["aws"]["s3-index-table"] = names.get_s3_index(domain)
     user_data["aws"]["id-index-table"] = names.get_id_index(domain)
     user_data["aws"]["id-count-table"] = names.get_id_count_index(domain)

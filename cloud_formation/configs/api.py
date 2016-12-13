@@ -58,27 +58,32 @@ VAULT_DJANGO_AUTH = "secret/endpoint/auth"
 ENDPOINT_TYPE = {
     "development": "t2.small",
     "production": "m4.large",
+    "ha-development": "t2.small",
 }
 
 ENDPOINT_CLUSTER_SIZE = {
     "development": 1,
     "production": 1,
+    "ha-development": 1,
 }
 
 
 RDS_TYPE = {
     "development": "db.t2.micro",
     "production": "db.t2.medium",
+    "ha-development": "db.t2.micro",
 }
 
 REDIS_TYPE = {
     "development": "cache.t2.small",
     "production": "cache.m3.xlarge",
+    "ha-development": "cache.t2.small",
 }
 
 REDIS_CLUSTER_SIZE = {
     "development": 1,
     "production": 2,
+    "ha-development": 1,
 }
 
 ENDPOINT_DB_CONFIG = {
@@ -141,6 +146,7 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["aws"]["s3-flush-deadletter-queue"] = '{{"Ref": "{}" }}'.format(deadqname)
     user_data["aws"]["cuboid_bucket"] = names.get_cuboid_bucket(domain)
     user_data["aws"]["tile_bucket"] = names.get_tile_bucket(domain)
+    user_data["aws"]["ingest_bucket"] = names.get_ingest_bucket(domain)
     user_data["aws"]["s3-index-table"] = names.get_s3_index(domain)
     user_data["aws"]["tile-index-table"] = names.get_tile_index(domain)
     user_data["aws"]["id-index-table"] = names.get_id_index(domain)
@@ -149,6 +155,7 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
     user_data["lambda"]["flush_function"] = multilambda
     user_data["lambda"]["page_in_function"] = multilambda
+    user_data["lambda"]["ingest_function"] = multilambda
 
     # Prepare user data for parsing by CloudFormation.
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}

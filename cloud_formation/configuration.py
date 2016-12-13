@@ -28,10 +28,10 @@ import hosts
 import library as lib
 
 def get_scenario(var, default = None):
-    """Handle getting the appropriate value froma variable using the SCENARIO
+    """Handle getting the appropriate value from a variable using the SCENARIO
     environmental variable.
 
-    A common method that will corrently handle decoding the (potential) dictionary
+    A common method that will currently handle decoding the (potential) dictionary
     of variable values and selecting the correct on based on the SCENARIO environmental
     variable.
 

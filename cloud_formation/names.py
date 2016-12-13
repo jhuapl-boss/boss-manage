@@ -23,6 +23,7 @@ CUBOID_BUCKET = 'cuboids'
 MULTI_LAMBDA = 'multiLambda'
 S3_INDEX = 's3index'
 TILE_BUCKET = 'tiles'
+INGEST_BUCKET = 'ingest'
 TILE_INDEX = 'tileindex'
 ID_INDEX = 'idIndex'
 ID_COUNT_INDEX = 'idCount'
@@ -66,6 +67,17 @@ def get_s3_index(domain):
         (string)
     """
     return S3_INDEX + '.' + domain
+
+def get_ingest_bucket(domain):
+    """Get the domain name of the S3 ingest bucket.
+
+    Messages stored in this bucket are enqueued in a job specific upload queue
+    by a lambda function.
+
+    Returns:
+        (string)
+    """
+    return INGEST_BUCKET + '.' + domain
 
 def get_tile_bucket(domain):
     """Get the domain name of the S3 tile bucket.

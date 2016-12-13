@@ -28,7 +28,7 @@ fi
 
 which pbcopy > /dev/null
 if [ $? -eq 0 ] ; then
-    CB="bpcopy"
+    CB="pbcopy"
 fi
 
 
