@@ -125,7 +125,7 @@ they are configured.*
 
 ### Run One time setup script to create
 ```shell
-$ /boss-manage/cloud_formation/one_time_aws_account_setup.py --aws-credentials /path/to/credentials
+$ bin/one_time_aws_account_setup.py --aws-credentials /path/to/credentials
 ```
 this is create 
 * Topics
@@ -174,7 +174,7 @@ saving time overall.
 #### Running Lambda packer
 From the packer 
 ```shell
-$ cd boss-manager/packer
+$ cd boss-manage.git/packer
 $ packer build -var-file=../config/aws-credentials -var-file=variables/lambda -var-file=../config/aws-bastion -var 'force_deregister=true' lambda.packer
 ```
 
@@ -196,7 +196,7 @@ check: Protect against accidental termination
 For Vault to be able to generate AWS credentials it needs to be configured with
 an AWS account that has access to specific resources.
 
-1. Copy `boss-manage.git/packer/variables/aws-credentials.example` to
+1. Copy `boss-manage.git/config/aws-credentials.example` to
 `boss-manage.git/vault/private/vault_aws_credentials`
   * You may have to create the directory "private"
 2. Open `vault_aws_credentials` in a text editor
@@ -217,7 +217,7 @@ an AWS account that has access to specific resources.
 17. Select **aplVaultPolicy** and click **Attach Policy**
 
 ### Configure Scalyr account
-1. Create `boss-manage.git/cloudformation/scalyr_keys.sh` with the following
+1. Create `boss-manage.git/config/scalyr_keys.sh` with the following
 content
 ```bash
 #!/bin/bash
@@ -270,9 +270,9 @@ variables that can be sourced before launching different scripts.
 4. Update the BASTION_IP to contain the IP of the SSH bastion host
 5. Save `set_keys.sh` and close the text editor
 ```shell
-$ cd cloudformation/
-$ source ../vault/set_vars.sh
-$ source ../scalyr_keys.sh
+$ cd boss-manage.git/bin/
+$ source ../config/set_vars.sh
+$ source ../config/scalyr_keys.sh
 ```
 
 ### Setting up Certificates in Amazon Certificates Manage.
@@ -327,10 +327,9 @@ will deploy the stack with the minimum set of resources.*
 
 ## Get bossadmin password
 ```shell
-cd vault
-./bastion.py bastion.integration.boss vault.integration.boss vault-read secret/auth/realm
+./bastion.py vault.integration.boss vault-read secret/auth/realm
 ```
-Login to https://api.integration.theboss.io/v0.5/resource/collections/
+Login to https://api.theboss.io/
 Uses bossadmin and the password you now have to sync bossadmin to django
 
 ## Run unit tests on Endpoint 
@@ -341,7 +340,7 @@ to run and will fail in your environment
 
 ```shell
 cd vault
-./bastion.py bastion.integration.boss endpoint.integration.boss ssh
+./bastion.py endpoint.integration.boss ssh
 export RUN_HIGH_MEM_TESTS=true
 cd /srv/www/django
 sudo python3 manage.py test
@@ -419,7 +418,7 @@ git checkout integration
 sudo pip3 install -r requirements.txt
 ```
 
-In your browser, open https://api.integration.theboss.io/token
+In your browser, open https://api.theboss.io/vX.Y/mgmt/token
 
 Your browser should be redirected to the KeyCloak login page.
 
@@ -440,21 +439,21 @@ all tokens with the token displayed in your browser.
 ```
 [Project Service]
 protocol = https
-host = api.integration.theboss.io
+host = api.theboss.io
 # Replace with your token.
-token = c23b48ceb35cae212b470a23d99d4185bac1c226
+token = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 [Metadata Service]
 protocol = https
-host = api.integration.theboss.io
+host = api.theboss.io
 # Replace with your token.
-token = c23b48ceb35cae212b470a23d99d4185bac1c226
+token = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 [Volume Service]
 protocol = https
-host = api.integration.theboss.io
+host = api.theboss.io
 # Replace with your token.
-token = c23b48ceb35cae212b470a23d99d4185bac1c226
+token = cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 Additionally, create a copy of `~/.ndio/ndio.cfg` as `test.cfg` in the ndio
@@ -462,7 +461,7 @@ repository directory.
 
 ##### Setup via the Django Admin Page
 
-In your browser, go to https://api.integration.theboss.io/admin
+In your browser, go to https://api.theboss.io/admin
 
 Login using the bossadmin account created previously (this was created during
 the endpoint initialization and unit test step).
@@ -502,9 +501,9 @@ OK
 To be filled out
 
 ### Manual Checks
-* https://api.integration.theboss.io/ping/
-* https://api.integration.theboss.io/v0.4/resource/collections
-* https://api.integration.theboss.io/v0.5/resource/collections
+* https://api.theboss.io/ping/
+* https://api.theboss.io/v0.4/resource/collections
+* https://api.theboss.io/v0.5/resource/collections
 * Login into Scalyr and verify that the new instances appear on the overview page.
 * Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint and proofreader.
 

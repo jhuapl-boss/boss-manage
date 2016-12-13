@@ -60,7 +60,7 @@ Verify IAM Policy, Groups and Roles are the latest.  Master IAM scripts are loca
 Make sure your AWS_CREDENTIALS is set for the production account
 
 ```shell
-$ cd boss-manage/cloud_formation
+$ cd boss-manage.git/bin
 $ ./iam_utils import
 ```
 
@@ -84,12 +84,12 @@ that are named with a commit hash.  If you want to use specific AMIs use the **-
 
 After completion check that vault still works, look for password:
 ```shell
-./bastion.py bastion.production.boss vault.production.boss vault-read secret/auth/realm
+./bastion.py vault.production.boss vault-read secret/auth/realm
 ```
 
 This will show the status of all the consul nodes:
 ```shell
-$ ./bastion.py bastion.production.boss consul.production.boss ssh-all 'sudo consul operator raft -list-peers; sudo consul members'
+$ ./bastion.py consul.production.boss ssh-all 'sudo consul operator raft -list-peers; sudo consul members'
 ```
 
 ```shell
@@ -108,7 +108,7 @@ $ ./cloudformation.py create production.boss --scenario production cloudwatch
 ## Get bossadmin password
 ```shell
 cd vault
-./bastion.py bastion.integration.boss vault.integration.boss vault-read secret/auth/realm
+./bastion.py vault.integration.boss vault-read secret/auth/realm
 ```
 Login to https://api.theboss.io/v0.7/collection/
 Uses bossadmin and the password you now have to sync bossadmin to django
@@ -211,7 +211,7 @@ git checkout integration
 sudo pip3 install -r requirements.txt
 ```
 
-In your browser, open https://api.integration.theboss.io/token
+In your browser, open https://api.theboss.io/vX.Y/mgmt/token
 
 Your browser should be redirected to the KeyCloak login page.
 
@@ -232,21 +232,21 @@ all tokens with the token displayed in your browser.
 ```
 [Project Service]
 protocol = https
-host = api.integration.theboss.io
+host = api.theboss.io
 # Replace with your token.
-token = c23b48ceb35cae212b470a23d99d4185bac1c226
+token = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 [Metadata Service]
 protocol = https
-host = api.integration.theboss.io
+host = api.theboss.io
 # Replace with your token.
-token = c23b48ceb35cae212b470a23d99d4185bac1c226
+token = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 [Volume Service]
 protocol = https
-host = api.integration.theboss.io
+host = api.theboss.io
 # Replace with your token.
-token = c23b48ceb35cae212b470a23d99d4185bac1c226
+token = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 Additionally, create a copy of `~/.intern/intern.cfg` as `test.cfg` in the intern
@@ -254,7 +254,7 @@ repository directory.
 
 ##### Setup via the Django Admin Page
 
-In your browser, go to https://api.production.theboss.io/admin
+In your browser, go to https://api.theboss.io/admin
 
 Login using the bossadmin account created previously (this was created during
 the endpoint initialization and unit test step).
@@ -288,8 +288,8 @@ OK
 To be filled out
 
 ### Manual Checks
-* https://api.integration.theboss.io/ping/
-* https://api.integration.theboss.io/v0.7/collection/
+* https://api.theboss.io/ping/
+* https://api.theboss.io/v0.7/collection/
 * Login into Scalyr and verify that the new instances appear on the overview page.
 * Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint and proofreader.
 
