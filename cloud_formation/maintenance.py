@@ -40,23 +40,44 @@ def create_help(header, options):
 
 cmd_help = create_help("options are", CMDS)
 
-MAINTENANCE_BUCKET = "s3-website-us-east-1.amazonaws.com"
-CLOUDFRONT = "d3pu2r8smrllig.cloudfront.net"
-
+def warnings():
+    print("")
+    print("It can take up to 10 to 15 minutes for the route53 changes to be seen outside of AWS.")
+    print("You can you use: dig api.integration.theboss.io")
+    print("       This will show either cloudfront or elb server")
 
 def migrations_on(session, domain):
+    """
+    changes Route53 entries for the domain to use the auth and api cloudfronts for the s3 maintenance bucket.
+    Args:
+        session(Session): boto3 session object
+        domain(str): name of api domain or auth domain. Ex: api.integration.theboss.io
+
+    Returns:
+        Nothing
+    """
     hosted_zone = lib.get_hosted_zone(session)
     (api, auth) = get_api_auth_names(session, domain)
-    api_cloud_front = lib.cloudfront_public_lookup(session, api)
-    auth_cloud_front = lib.cloudfront_public_lookup(session, auth)
+    api_cloud_front = lib.cloudfront_public_lookup(session, api[:-1])
+    auth_cloud_front = lib.cloudfront_public_lookup(session, auth[:-1])
     print("Setting Route53 for: ")
     print("{}: {}".format(api, api_cloud_front))
     print("{}: {}".format(auth, auth_cloud_front))
     lib.set_domain_to_dns_name(session, api, api_cloud_front, hosted_zone)
     lib.set_domain_to_dns_name(session, auth, auth_cloud_front, hosted_zone)
+    warnings()
 
 
 def migrations_off(session, domain):
+    """
+    changes Route53 entries for the domain to use the auth and api elastic load balancers
+    Args:
+        session(Session): boto3 session object
+        domain(str): name of api domain or auth domain. Ex: api.integration.theboss.io
+
+    Returns:
+        Nothing
+    """
     hosted_zone = lib.get_hosted_zone(session)
     (api, auth) = get_api_auth_names(session, domain)
     api_elb = lib.elb_public_lookup(session, "elb." + domain)
@@ -66,9 +87,19 @@ def migrations_off(session, domain):
     print("{}: {}".format(auth, auth_elb))
     lib.set_domain_to_dns_name(session, api, api_elb, hosted_zone)
     lib.set_domain_to_dns_name(session, auth, auth_elb, hosted_zone)
+    warnings()
 
 
 def get_api_auth_names(session, domain):
+    """
+    gets the api and auth hostnames from the domain
+    Args:
+        session(Session): boto3 session object
+        domain(str): name of api domain or auth domain. Ex: api.integration.theboss.io
+
+    Returns:
+        tuple(str) of api hostname and auth hostname
+    """
     hosted_zone = lib.get_hosted_zone(session)
     if domain in hosts.BASE_DOMAIN_CERTS.keys():
         if hosted_zone != hosts.PROD_DOMAIN:
@@ -104,6 +135,11 @@ def create_session(credentials):
 
 
 def create_parser():
+    """
+    Creates the argumentPaser for the maintenance command.
+    Returns:
+        (ArgumentParser) not yet parsed.
+    """
     parser = argparse.ArgumentParser(
         description="",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -143,7 +179,7 @@ if __name__ == '__main__':
     if args.cmd == "on":
         if not args.yes:
             print("Maintenance mode will update api.")
-            print("Are you sure you want to got into maintenance mode")
+            print("Are you sure you want to got into maintenance mode for {}?".format(args.domain_name))
             resp = input("Update? [N/y] ")
             if len(resp) == 0 or resp[0] not in ('y', 'Y'):
                 print("Canceled")
@@ -151,6 +187,4 @@ if __name__ == '__main__':
         migrations_on(session, args.domain_name)
     elif args.cmd == "off":
         migrations_off(session, args.domain_name)
-
-    print("ending script")
 

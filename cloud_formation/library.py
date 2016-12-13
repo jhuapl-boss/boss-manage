@@ -1185,8 +1185,8 @@ def cloudfront_public_lookup(session, hostname):
     items = response["DistributionList"]["Items"]
     for item in items:
         cloud_front_domain_name = item["DomainName"]
-        for origin in item["Origins"]["Items"]:
-            if origin["DomainName"].startswith(hostname):
+        if item["Aliases"]["Quantity"] > 0:
+            if hostname in item["Aliases"]["Items"]:
                 return cloud_front_domain_name
     return None
 
