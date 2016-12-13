@@ -22,14 +22,11 @@ Script will change the DNS entries for api and auth to point to a static mainten
 import argparse
 import sys
 import os
-import boto3
-import json
-from boto3 import Session
-from botocore.exceptions import ClientError
-import hosts
-import pprint
-import library as lib
-import datetime
+
+import alter_path
+from lib import aws
+from lib import hosts
+from lib.names import AWSNames
 
 CMDS = ['on', 'off']
 
@@ -56,15 +53,15 @@ def migrations_on(session, domain):
     Returns:
         Nothing
     """
-    hosted_zone = lib.get_hosted_zone(session)
+    hosted_zone = aws.get_hosted_zone(session)
     (api, auth) = get_api_auth_names(session, domain)
-    api_cloud_front = lib.cloudfront_public_lookup(session, api[:-1])
-    auth_cloud_front = lib.cloudfront_public_lookup(session, auth[:-1])
+    api_cloud_front = aws.cloudfront_public_lookup(session, api[:-1])
+    auth_cloud_front = aws.cloudfront_public_lookup(session, auth[:-1])
     print("Setting Route53 for: ")
     print("{}: {}".format(api, api_cloud_front))
     print("{}: {}".format(auth, auth_cloud_front))
-    lib.set_domain_to_dns_name(session, api, api_cloud_front, hosted_zone)
-    lib.set_domain_to_dns_name(session, auth, auth_cloud_front, hosted_zone)
+    aws.set_domain_to_dns_name(session, api, api_cloud_front, hosted_zone)
+    aws.set_domain_to_dns_name(session, auth, auth_cloud_front, hosted_zone)
     warnings()
 
 
@@ -78,15 +75,16 @@ def migrations_off(session, domain):
     Returns:
         Nothing
     """
-    hosted_zone = lib.get_hosted_zone(session)
+    names = AWSNames(domain)
+    hosted_zone = aws.get_hosted_zone(session)
     (api, auth) = get_api_auth_names(session, domain)
-    api_elb = lib.elb_public_lookup(session, "elb." + domain)
-    auth_elb = lib.elb_public_lookup(session, "auth." + domain)
+    api_elb = aws.elb_public_lookup(session, names.endpoint_elb)
+    auth_elb = aws.elb_public_lookup(session, names.auth)
     print("Setting Route53 for: ")
     print("{}: {}".format(api, api_elb))
     print("{}: {}".format(auth, auth_elb))
-    lib.set_domain_to_dns_name(session, api, api_elb, hosted_zone)
-    lib.set_domain_to_dns_name(session, auth, auth_elb, hosted_zone)
+    aws.set_domain_to_dns_name(session, api, api_elb, hosted_zone)
+    aws.set_domain_to_dns_name(session, auth, auth_elb, hosted_zone)
     warnings()
 
 
@@ -100,7 +98,7 @@ def get_api_auth_names(session, domain):
     Returns:
         tuple(str) of api hostname and auth hostname
     """
-    hosted_zone = lib.get_hosted_zone(session)
+    hosted_zone = aws.get_hosted_zone(session)
     if domain in hosts.BASE_DOMAIN_CERTS.keys():
         if hosted_zone != hosts.PROD_DOMAIN:
             print("Incorrect AWS credentials being provided for the production domain, please check them.")
@@ -116,22 +114,6 @@ def get_api_auth_names(session, domain):
         # api = "api-{}.{}.".format(domain.split('.')[0], hosts.DEV_DOMAIN)
         # auth = "auth-{}.{}.".format(domain.split('.')[0], hosts.DEV_DOMAIN)
     return (api, auth)
-
-
-def create_session(credentials):
-    """
-    Read the AWS from the credentials dictionary and then create a boto3
-    connection to AWS with those credentials.
-    Args:
-        credentials: AWS credentials in JSON format
-
-    Returns: results boto3 AWS session object
-
-    """
-    session = Session(aws_access_key_id=credentials["aws_access_key"],
-                      aws_secret_access_key=credentials["aws_secret_key"],
-                      region_name='us-east-1')
-    return session
 
 
 def create_parser():
@@ -173,8 +155,7 @@ if __name__ == '__main__':
         print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
         sys.exit(1)
 
-    credentials = json.load(args.aws_credentials)
-    session = create_session(credentials)
+    session = aws.create_session(args.aws_credentials)
 
     if args.cmd == "on":
         if not args.yes:
