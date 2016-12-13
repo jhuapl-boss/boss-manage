@@ -79,6 +79,7 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["aws"]["s3-flush-deadletter-queue"] = str(Ref("DeadLetterQueue"))
     user_data["aws"]["cuboid_bucket"] = names.cuboid_bucket
     user_data["aws"]["tile_bucket"] = names.tile_bucket
+    user_data["aws"]["ingest_bucket"] = names.ingest_bucket
     user_data["aws"]["s3-index-table"] = names.s3_index
     user_data["aws"]["tile-index-table"] = names.tile_index
     user_data["aws"]["id-index-table"] = names.id_index
@@ -87,6 +88,7 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
     user_data["lambda"]["flush_function"] = names.multi_lambda
     user_data["lambda"]["page_in_function"] = names.multi_lambda
+    user_data["lambda"]["ingest_function"] = names.multi_lambda
 
     # Prepare user data for parsing by CloudFormation.
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}

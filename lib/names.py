@@ -64,6 +64,7 @@ class AWSNames(object):
         "cuboid_bucket": "cuboids",
         "multi_lambda": "multiLambda",
         "s3_index": "s3index",
+        "ingest_bucket": "ingest",
         "tile_bucket": "tiles",
         "tile_index": "tileindex",
         "id_index": "idIndex",

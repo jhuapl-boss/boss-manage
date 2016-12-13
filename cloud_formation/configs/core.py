@@ -136,7 +136,7 @@ def create_config(session, domain):
             "DNSLambdaExecute"]
 
     SCENARIO = os.environ["SCENARIO"]
-    USE_DB = SCENARIO in ("production",)
+    USE_DB = SCENARIO in ("production", "ha-development",)
     # Problem: If development scenario uses a local DB. If the auth server crashes
     #          and is auto restarted by the autoscale group then the new auth server
     #          will not have any of the previous configuration, because the old DB
@@ -351,8 +351,8 @@ def post_init(session, domain, startup_wait=False):
 
 def update(session, domain):
     # Only in the production scenario will data be preserved over the update
-    if os.environ["SCENARIO"] not in ("production",):
-        print("Can only update the production scenario")
+    if os.environ["SCENARIO"] not in ("production", "ha-development",):
+        print("Can only update the production and ha-development scenario")
         return None
 
     consul_update_timeout = 5 # minutes

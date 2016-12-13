@@ -87,11 +87,18 @@ def create_config(session, domain, keypair=None, user_data=None):
         { 'AWS': role})
 
     tile_bucket_name = names.tile_bucket
-    print ("tile bucket name: " + tile_bucket_name)
     if not aws.s3_bucket_exists(session, tile_bucket_name):
         config.add_s3_bucket("tileBucket", tile_bucket_name)
     config.add_s3_bucket_policy(
         "tileBucketPolicy", tile_bucket_name,
+        ['s3:GetObject', 's3:PutObject'],
+        { 'AWS': role})
+
+    ingest_bucket_name = names.ingest_bucket
+    if not aws.s3_bucket_exists(session, ingest_bucket_name):
+        config.add_s3_bucket("ingestBucket", ingest_bucket_name)
+    config.add_s3_bucket_policy(
+        "ingestBucketPolicy", ingest_bucket_name,
         ['s3:GetObject', 's3:PutObject'],
         { 'AWS': role})
 
@@ -147,7 +154,10 @@ def create(session, domain):
     user_data["aws"]["s3-flush-deadletter-queue"] = aws.sqs_lookup_url(session, names.deadletter_queue)
 
     user_data["aws"]["cuboid_bucket"] = names.cuboid_bucket
+    user_data["aws"]["ingest_bucket"] = names.ingest_bucket
     user_data["aws"]["s3-index-table"] = names.s3_index
+    user_data["aws"]["id-index-table"] = names.id_index
+    user_data["aws"]["id-count-table"] = names.id_count_index
 
     # SNS and Lambda names can't have periods.
     user_data["aws"]["sns-write-locked"] = str(Ref('WriteLock'))

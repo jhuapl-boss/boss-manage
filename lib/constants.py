@@ -92,21 +92,25 @@ TIMEOUT_KEYCLOAK = 120
 ENDPOINT_TYPE = {
     "development": "t2.small",
     "production": "m4.large",
+    "ha-development": "t2.small",
 }
 
 RDS_TYPE = {
     "development": "db.t2.micro",
     "production": "db.t2.medium",
+    "ha-development": "db.t2.micro",
 }
 
 REDIS_TYPE = {
     "development": "cache.t2.small",
     "production": "cache.m3.xlarge",
+    "ha-development": "cache.t2.small",
 }
 
 CACHE_MANAGER_TYPE = {
     "development": "t2.micro",
     "production": "t2.medium",
+    "ha-development": "t2.micro",
 }
 
 
@@ -115,26 +119,31 @@ CACHE_MANAGER_TYPE = {
 AUTH_CLUSTER_SIZE = { # Auth Server Cluster is a fixed size
     "development" : 1,
     "production": 3 # should be an odd number
+    "ha-development": 1  # should be an odd number
 }
 
 CONSUL_CLUSTER_SIZE = { # Consul Cluster is a fixed size
     "development" : 1,
     "production": 5 # can tolerate 2 failures
+    "ha-development": 3  # can tolerate 1 failures
 }
 
 VAULT_CLUSTER_SIZE = { # Vault Cluster is a fixed size
     "development" : 1,
     "production": 3 # should be an odd number
+    "ha-development": 1  # should be an odd number
 }
 
 ENDPOINT_CLUSTER_SIZE = {
     "development": 1,
     "production": 1,
+    "ha-development": 1,
 }
 
 REDIS_CLUSTER_SIZE = {
     "development": 1,
     "production": 2,
+    "ha-development": 1,
 }
 
 
