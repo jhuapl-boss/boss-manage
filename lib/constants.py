@@ -118,20 +118,20 @@ CACHE_MANAGER_TYPE = {
 # Machine Cluster Sizes
 AUTH_CLUSTER_SIZE = { # Auth Server Cluster is a fixed size
     "development" : 1,
-    "production": 3 # should be an odd number
-    "ha-development": 1  # should be an odd number
+    "production": 3, # should be an odd number
+    "ha-development": 1,  # should be an odd number
 }
 
 CONSUL_CLUSTER_SIZE = { # Consul Cluster is a fixed size
     "development" : 1,
-    "production": 5 # can tolerate 2 failures
-    "ha-development": 3  # can tolerate 1 failures
+    "production": 5, # can tolerate 2 failures
+    "ha-development": 3,  # can tolerate 1 failures
 }
 
 VAULT_CLUSTER_SIZE = { # Vault Cluster is a fixed size
     "development" : 1,
-    "production": 3 # should be an odd number
-    "ha-development": 1  # should be an odd number
+    "production": 3, # should be an odd number
+    "ha-development": 1,  # should be an odd number
 }
 
 ENDPOINT_CLUSTER_SIZE = {
