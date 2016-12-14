@@ -99,6 +99,7 @@ def create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_u
                                  bastion_user,
                                  bastion_ip)
 
+    #print(fwd_cmd)
     proc = subprocess.Popen(shlex.split(fwd_cmd))
 
     try:
@@ -316,6 +317,9 @@ class SSHConnection(object):
             remote_file = input("remote file: ")
 
         def parse_upload(s):
+            if type(s) == bool:
+                return s
+
             if s and len(s) > 0:
                 if s[0] in ('U', 'u'):
                     return True

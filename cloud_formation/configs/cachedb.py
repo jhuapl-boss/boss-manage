@@ -142,6 +142,8 @@ def generate(session, domain):
 
 def create(session, domain):
     """Create the configuration, and launch it"""
+    names = AWSNames(domain)
+
     user_data = UserData()
     user_data["system"]["fqdn"] = names.cache_manager
     user_data["system"]["type"] = "cachemanager"
@@ -173,7 +175,6 @@ def create(session, domain):
         config = create_config(session, domain, keypair, user_data)
 
         success = config.create(session)
-        print("finished config.create")
         if not success:
             raise Exception("Create Failed")
         else:
@@ -188,7 +189,9 @@ def pre_init(session, domain):
     """Send spdb, bossutils, lambda, and lambda_utils to the lambda build
     server, build the lambda environment, and upload to S3.
     """
-    load_lambdas_on_s3(session, domain)
+
+    bucket = aws.get_lambda_s3_bucket(session)
+    load_lambdas_on_s3(session, domain, bucket)
 
 
 def post_init(session, domain):

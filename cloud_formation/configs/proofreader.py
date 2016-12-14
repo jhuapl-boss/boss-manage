@@ -103,7 +103,7 @@ def create(session, domain):
     with call.vault() as vault:
         proofreader_token = vault.provision("proofreader")
 
-        user_data = configuration.UserData()
+        user_data = UserData()
         user_data["vault"]["token"] = proofreader_token
         user_data["system"]["fqdn"] = names.proofreader
         user_data["system"]["type"] = "proofreader-web"
@@ -117,7 +117,7 @@ def create(session, domain):
     config = create_config(session, domain, keypair, user_data, db)
 
     try:
-        success = config.create(session, name)
+        success = config.create(session)
     except:
         print("Error detected, revoking secrets") # Do we want to revoke if an exception from post_init?
         with call.vault() as vault:

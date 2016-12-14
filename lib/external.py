@@ -189,7 +189,7 @@ class ExternalCalls:
         else:
             return False
 
-    def check_djagngo(self, machine, manage_py, exception=True):
+    def check_django(self, machine, manage_py, exception=True):
         cmd = "sudo python3 {} check 2> /dev/null > /dev/null".format(manage_py) # suppress all output
 
         with self.ssh(machine) as ssh:
