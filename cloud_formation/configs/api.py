@@ -269,12 +269,10 @@ def post_init(session, domain):
     # Add the API servers to the list of OIDC valid redirects
     with call.tunnel(names.auth, 8080) as auth_port:
         print("Update KeyCloak Client Info")
-        kc = KeyCloakClient("http://localhost:{}".format(auth_port))
-        kc.login(creds["username"], creds["password"])
-
-        # DP TODO: make add_redirect_uri able to work multiple times without issue
-        kc.add_redirect_uri("BOSS","endpoint", uri + "/*")
-        kc.logout()
+        auth_url = "http://localhost:{}".format(auth_port)
+        with KeyCloakClient(auth_url, **creds) as kc:
+            # DP TODO: make add_redirect_uri able to work multiple times without issue
+            kc.add_redirect_uri("BOSS","endpoint", uri + "/*")
 
     # Tell Scalyr to get CloudWatch metrics for these instances.
     instances = [names.endpoint]

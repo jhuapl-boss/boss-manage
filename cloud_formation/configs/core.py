@@ -326,24 +326,21 @@ def post_init(session, domain, startup_wait=False):
     with call.tunnel(names.auth, 8080) as port:
         URL = "http://localhost:{}".format(port) # TODO move out of tunnel and use public address
 
-        kc = KeyCloakClient(URL)
-        kc.login(username, password)
+        with KeyCloakClient(URL, username, password) as kc:
+            print("Opening realm file at '{}'".format(const.KEYCLOAK_REALM))
+            with open(const.KEYCLOAK_REALM, "r") as fh:
+                realm = json.load(fh)
 
-        print("Opening realm file at '{}'".format(const.KEYCLOAK_REALM))
-        with open(const.KEYCLOAK_REALM, "r") as fh:
-            realm = json.load(fh)
+            try:
+                realm["users"][0]["username"] = realm_username
+                realm["users"][0]["credentials"][0]["value"] = realm_password
+            except:
+                print("Could not set realm admin's username or password, not creating user")
+                if "users" in realm:
+                    del realm["users"]
 
-        try:
-            realm["users"][0]["username"] = realm_username
-            realm["users"][0]["credentials"][0]["value"] = realm_password
-        except:
-            print("Could not set realm admin's username or password, not creating user")
-            if "users" in realm:
-                del realm["users"]
-
-        print("Uploading BOSS.realm configuration")
-        kc.create_realm(realm)
-        kc.logout()
+            print("Uploading BOSS.realm configuration")
+            kc.create_realm(realm)
 
     # Tell Scalyr to get CloudWatch metrics for these instances.
     instances = [ names.vault ]

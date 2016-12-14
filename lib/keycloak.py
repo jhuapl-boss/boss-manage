@@ -20,14 +20,22 @@ from urllib.error import HTTPError
 
 from . import exceptions
 
-# DP TODO: Add support for context manager for automatic logout
 class KeyCloakClient:
     """Client for connecting to Keycloak and using the REST API.
 
     Client provides a method for issuing requests to the Keycloak REST API and
     a set of methods to simplify Keycloak configuration.
+
+    Context manager examples:
+
+    kc = KeyCloakClient(url)
+    with kc.login(username, password):
+        kc.method(arguments)
+
+    with KeyCloakClient(url, username, password) as kc:
+        kc.method(arguments)
     """
-    def __init__(self, url_base, verify_ssl=True):
+    def __init__(self, url_base, username=None, password=None, client_id='admin-cli', verify_ssl=True):
         """KeyCloakClient constructor
 
         Args:
@@ -36,6 +44,9 @@ class KeyCloakClient:
         """
         self.url_base = url_base
         self.token = None
+        self.username = username
+        self.password = password
+        self.client_id = client_id
 
         if self.url_base.startswith("https") and not verify_ssl:
             self.ctx = ssl.create_default_context()
@@ -79,7 +90,7 @@ class KeyCloakClient:
         except HTTPError as e:
             raise exceptions.KeyCloakError(e.code, e.reason)
 
-    def login(self, username, password):
+    def login(self, username=None, password=None, client_id=None):
         """Login to the Keycloak master realm and retrieve an access token.
 
         WARNING: If the base_url is not using HTTPS the password will be submitted
@@ -94,14 +105,30 @@ class KeyCloakClient:
         Args:
             username (string) : Keycloak username
             password (string) : Keycloak password
+            client_id (string) : Keycloak Client ID to authenticate with
         """
+        if username is None:
+            username = self.username
+        if username is None:
+            raise Exception("No username set")
+
+        if password is None:
+            password = self.password
+        if password is None:
+            raise Exception("No password set")
+
+        if client_id is None:
+            client_id = self.client_id
+        if client_id is None:
+            raise Exception("No client_id set")
+
         self.token = self.request(
             "/auth/realms/master/protocol/openid-connect/token",
             params={
                 "username": username,
                 "password": password,
                 "grant_type": "password",
-                "client_id": "admin-cli",
+                "client_id": client_id,
             },
             headers={
                 "Content-Type": "application/x-www-form-urlencoded",
@@ -111,6 +138,8 @@ class KeyCloakClient:
         if self.token is None:
             #print("Could not authenticate to KeyCloak Server")
             raise exceptions.KeyCloakLoginError(self.url_base, username)
+
+        return self # DP NOTE: So context manager works correctly
 
     def logout(self):
         """Logout from Keycloak.
@@ -133,6 +162,25 @@ class KeyCloakClient:
         )
 
         self.token = None
+
+    def __enter__(self):
+        """The start of the context manager, which handles automatically calling logout."""
+        if self.token is None:
+            self.login()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """The end of the context manager. Print any error when trying to logut and
+        propogate any exception that happened while the context was active."""
+        try:
+            self.logout()
+        except:
+            print("Error logging out of Keycloak")
+
+        if exc_type is None:
+            return None
+        else:
+            return False # don't supress the exception
 
     def create_realm(self, realm):
         """Create a new realm based on the JSON based configuration.
