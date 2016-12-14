@@ -199,7 +199,7 @@ def create_config(session, domain):
                               [("tcp", "22", "22", const.INCOMING_SUBNET)])
 
     config.add_security_group("AuthSecurityGroup",
-                              names.auth,
+                              names.https,
                               [("tcp", "443", "443", "0.0.0.0/0")])
 
     # Create the internal route table to route traffic to the NAT Bastion

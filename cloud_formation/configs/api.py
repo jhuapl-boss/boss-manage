@@ -97,11 +97,7 @@ def create_config(session, domain, keypair=None, db_config={}):
 
     vpc_id = config.find_vpc(session)
     az_subnets, external_subnets = config.find_all_availability_zones(session)
-
-    internal_sg_id = aws.sg_lookup(session, vpc_id, names.internal)
-    config.add_arg(Arg.SecurityGroup("InternalSecurityGroup",
-                                     internal_sg_id,
-                                     "ID of internal Security Group"))
+    sgs = aws.sg_lookup_all(session, vpc_id)
 
     # Create SQS queues and apply access control policies.
     config.add_sqs_queue("DeadLetterQueue", names.deadletter_queue, 30, 20160)
@@ -127,7 +123,7 @@ def create_config(session, domain, keypair=None, db_config={}):
                                keypair,
                                subnets=az_subnets,
                                type_=const.ENDPOINT_TYPE,
-                               security_groups=[Ref("InternalSecurityGroup")],
+                               security_groups=[sgs[names.internal]],
                                user_data=parsed_user_data,
                                min=const.ENDPOINT_CLUSTER_SIZE,
                                max=const.ENDPOINT_CLUSTER_SIZE,
@@ -142,14 +138,8 @@ def create_config(session, domain, keypair=None, db_config={}):
                             names.endpoint_elb,
                             [("443", "80", "HTTPS", cert)],
                             subnets=external_subnets,
-                            security_groups=[Ref("InternalSecurityGroup"), Ref("AllHTTPSSecurityGroup")],
-                            public=True,
-                            depends_on=["AllHTTPSSecurityGroup"])
-
-    # Allow HTTPS access to endpoint loadbalancer from anywhere
-    config.add_security_group("AllHTTPSSecurityGroup",
-                              names.https,
-                              [("tcp", "443", "443", "0.0.0.0/0")])
+                            security_groups=[sgs[names.internal], sgs[names.https]],
+                            public=True)
 
     config.add_rds_db("EndpointDB",
                       names.endpoint_db,
@@ -159,7 +149,7 @@ def create_config(session, domain, keypair=None, db_config={}):
                       db_config.get("password"),
                       az_subnets,
                       type_ = const.RDS_TYPE,
-                      security_groups=[Ref("InternalSecurityGroup")])
+                      security_groups=[sgs[names.internal]])
 
     # Create the Meta, s3Index, tileIndex, annotation Dynamo tables
     with open(const.DYNAMO_METADATA_SCHEMA, 'r') as fh:
@@ -186,14 +176,14 @@ def create_config(session, domain, keypair=None, db_config={}):
     config.add_redis_replication("Cache",
                                  names.cache,
                                  az_subnets,
-                                 [Ref("InternalSecurityGroup")],
+                                 [sgs[names.internal]],
                                  type_=const.REDIS_TYPE,
                                  clusters=const.REDIS_CLUSTER_SIZE)
 
     config.add_redis_replication("CacheState",
                                  names.cache_state,
                                  az_subnets,
-                                 [Ref("InternalSecurityGroup")],
+                                 [sgs[names.internal]],
                                  type_=const.REDIS_TYPE,
                                  clusters=const.REDIS_CLUSTER_SIZE)
 

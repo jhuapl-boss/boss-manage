@@ -306,6 +306,47 @@ def ami_lookup(session, ami_name, version = None):
 
         return (ami, commit)
 
+class NoneDict(dict):
+    """Custom Dictionary that returns none if the key doesn't exist.
+
+    Normal behavior it to throw an exception.
+    """
+    def __getitem__(self, key):
+        if key not in self:
+            return None
+        else:
+            return super().__getitem__(key)
+
+def sg_lookup_all(session, vpc_id):
+    """Lookup the Ids for all of the VPC Security Groups.
+
+    Args:
+        session (Session|None) : Boto3 session used to lookup information in AWS
+                                 If session is None no lookup is performed
+        vpc_id (string) : VPC ID of the VPC to search in
+
+    Returns:
+        (dict|None) : Dictionary of Security Group Name and ID
+                      Dictionary will be empty if session is None or no security groups
+                      could be located
+    """
+    if session is None:
+        return NoneDict()
+
+    client = session.client('ec2')
+    response = client.describe_security_groups(Filters=[{"Name": "vpc-id", "Values": [vpc_id]}])
+
+    if len(response['SecurityGroups']) == 0:
+        return NoneDict()
+    else:
+        sgs = NoneDict()
+        for sg in response['SecurityGroups']:
+            key = _find(sg.get('Tags', []), lambda x: x["Key"] == "Name")
+            if key:
+                key = key['Value']
+            sgs[key] = sg['GroupId']
+
+        return sgs
 
 def sg_lookup(session, vpc_id, group_name):
     """Lookup the Id for the VPC Security Group with the given name.
