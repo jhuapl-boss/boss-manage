@@ -116,7 +116,7 @@ def create_config(session, domain, keypair=None, user_data=None):
     lambda_bucket = aws.get_lambda_s3_bucket(session)
     config.add_lambda("MultiLambda",
                       names.multi_lambda,
-                      "LambdaCacheExecutionRole",
+                      Ref("LambdaCacheExecutionRole"),
                       s3=(aws.get_lambda_s3_bucket(session),
                           "multilambda.{}.zip".format(domain),
                           "local/lib/python3.4/site-packages/lambda/lambda_loader.handler"),
@@ -205,5 +205,6 @@ def post_init(session, domain):
 
 def delete(session, domain):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
+    names = AWSNames(domain)
     aws.route53_delete_records(session, domain, names.cache_manager)
     CloudFormationConfiguration("cachedb", domain).delete(session)

@@ -99,7 +99,6 @@ def create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_u
                                  bastion_user,
                                  bastion_ip)
 
-    #print(fwd_cmd)
     proc = subprocess.Popen(shlex.split(fwd_cmd))
 
     try:
