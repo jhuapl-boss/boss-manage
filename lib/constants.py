@@ -79,6 +79,9 @@ VAULT_KEYCLOAK = "secret/keycloak"
 VAULT_ENDPOINT = "secret/endpoint/django"
 VAULT_ENDPOINT_DB = "secret/endpoint/django/db"
 VAULT_ENDPOINT_AUTH = "secret/endpoint/auth"
+VAULT_PROOFREAD = "secret/proofreader/django"
+VAULT_PROOFREAD_DB = "secret/proofreader/django/db"
+VAULT_PROOFREAD_AUTH = "secret/proofreader/auth"
 
 
 ########################

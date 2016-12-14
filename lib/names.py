@@ -51,10 +51,13 @@ class AWSNames(object):
         "endpoint": "endpoint",
         "endpoint_db": "endpoint-db",
         "endpoint_elb": "elb",
+        "proofreader": "proofreader-web",
+        "proofreader_db": "proofreader-db",
         "dns": "dns", # lambda, sns topic display name, sns topic name
         "internal": "internal", # subnet, security group, route table
         "ssh": "ssh",
         "https": "https",
+        "http": "http",
         "internet": "internet",
         "meta": "bossmeta",
         "cache": "cache",

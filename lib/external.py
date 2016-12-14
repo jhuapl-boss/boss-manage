@@ -102,6 +102,8 @@ class ExternalCalls:
             write = self.vaults[0].write
             update = self.vaults[0].update
             delete = self.vaults[0].delete
+            provision = self.vaults[0].provision
+            revoke = self.vaults[0].revoke
 
         with vault_tunnel(self.keypair_file, self.bastion_ip):
             yield ContextVault()
