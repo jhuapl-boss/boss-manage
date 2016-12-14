@@ -45,7 +45,7 @@ def call_config(session, domain, config, func_name):
     if func_name in module.__dict__:
         module.__dict__[func_name](session, domain)
     elif func_name == 'delete':
-        CloudFormationConfiguration(domain).delete(session)
+        CloudFormationConfiguration(config, domain).delete(session)
     else:
         print("Configuration '{}' doesn't implement function '{}'".format(config, func_name))
 

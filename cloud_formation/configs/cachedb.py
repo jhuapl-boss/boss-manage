@@ -198,6 +198,7 @@ def post_init(session, domain):
     print("post_init")
 
     # Tell Scalyr to get CloudWatch metrics for these instances.
+    names = AWSNames(domain)
     instances = [names.cache_manager]
     scalyr.add_instances_to_scalyr(
         session, const.REGION, instances)

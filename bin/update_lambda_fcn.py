@@ -84,6 +84,7 @@ def update_lambda_code(session, domain, bucket):
         Publish=True)
     print(resp)
 
+# DP TODO: Move to a lib/ library
 def load_lambdas_on_s3(session, domain, bucket):
     """Zip up spdb, bossutils, lambda and lambda_utils.  Upload to S3.
 
@@ -126,14 +127,15 @@ def load_lambdas_on_s3(session, domain, bucket):
     lambda_build_server_key = aws.get_lambda_server_key(session)
     lambda_build_server_key = utils.keypair_to_file(lambda_build_server_key)
     ssh = SSHConnection(lambda_build_server_key, (lambda_build_server, 22, 'ec2-user'))
-    ret = ssh.scp(zipname, domain + ".zip", upload=True)
+    target_file = "sitezips/{}.zip".format(domain)
+    ret = ssh.scp(zipname, target_file, upload=True)
     print("scp return code: " + str(ret))
 
     os.remove(zipname)
 
     # This section will run makedomainenv on lambda-build-server
     print("calling makedomainenv on lambda-build-server")
-    cmd = '"source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {} {}"'.format(domain, bucket)
+    cmd = 'source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {} {}'.format(domain, bucket)
     ssh.cmd(cmd)
 
 def create_ndingest_settings(domain, fp):
