@@ -685,6 +685,36 @@ class CloudFormationConfiguration:
 
         return (internal, external)
 
+    def add_endpoint(self, key, service, route_tables, vpc="VPC"):
+        self.resources[key] = {
+            "Type" : "AWS::EC2::VPCEndpoint",
+            "Properties" : {
+                #"PolicyDocument" : JSON object, # allow full access
+                "RouteTableIds" : route_tables,
+                "ServiceName" : 'com.amazonaws.us-east-1.{}'.format(service),
+                "VpcId" : {"Ref": vpc},
+            }
+        }
+
+    def add_nat(self, key, subnet, depends_on=None):
+        self.resources[key] = {
+            "Type" : "AWS::EC2::NatGateway",
+            "Properties" : {
+                "AllocationId" : { 'Fn::GetAtt': [key + "IP", "AllocationId"]},
+                "SubnetId" : subnet,
+            }
+        }
+
+        if depends_on is not None:
+            self.resources[key]["DependsOn"] = depends_on
+
+        self.resources[key + "IP"] = {
+            "Type" : "AWS::EC2::EIP",
+            "Properties" : {
+                "Domain" : "vpc"
+            }
+        }
+
     def add_ec2_instance(self, key, hostname, ami, keypair, subnet="Subnet", type_="t2.micro", iface_check=True, public_ip=False, security_groups=None, user_data=None, meta_data=None, role=None, depends_on=None):
         """Add an EC2 instance to the configuration
 
@@ -1105,7 +1135,7 @@ class CloudFormationConfiguration:
           }
         }
 
-    def add_route_table_route(self, key, route_table, cidr="0.0.0.0/0", gateway=None, peer=None, instance=None, depends_on=None):
+    def add_route_table_route(self, key, route_table, cidr="0.0.0.0/0", gateway=None, peer=None, instance=None, nat=None, depends_on=None):
         """Add a Route to the configuration
 
         Note: Only one of gateway/peer/instance should be specified for a call
@@ -1128,10 +1158,9 @@ class CloudFormationConfiguration:
           }
         }
 
-        checks = [gateway, peer, instance]
-        check = checks.count(None)
+        checks = [gateway, peer, instance, nat]
         if len(checks) - checks.count(None) != 1:
-            raise Exception("Required to specify one and only one of the following arguments: gateway|peer|instance")
+            raise Exception("Required to specify one and only one of the following arguments: gateway|peer|instance|nat")
 
 
         if gateway is not None:
@@ -1140,6 +1169,8 @@ class CloudFormationConfiguration:
             self.resources[key]["Properties"]["VpcPeeringConnectionId"] = { "Ref" : peer }
         if instance is not None:
             self.resources[key]["Properties"]["InstanceId"] = { "Ref" : instance }
+        if nat is not None:
+            self.resources[key]["Properties"]["NatGatewayId"] = { "Ref" : nat }
 
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on

@@ -148,7 +148,6 @@ runcmd:
                             keypair,
                             subnet = "ExternalSubnet",
                             public_ip = True,
-                            iface_check = False,
                             user_data = user_data,
                             security_groups = ["InternalSecurityGroup", "BastionSecurityGroup"],
                             depends_on = "AttachInternetGateway")
@@ -277,8 +276,8 @@ runcmd:
 
     config.add_route_table_route("InternalNatRoute",
                                  "InternalRouteTable",
-                                 instance = "Bastion",
-                                 depends_on = "Bastion")
+                                 nat = "NAT",
+                                 depends_on = "NAT")
 
     # Create the internet gateway and internet router
     external_subnets.append("ExternalSubnet")
@@ -292,6 +291,10 @@ runcmd:
                                  depends_on = "AttachInternetGateway")
 
     config.add_internet_gateway("InternetGateway")
+    config.add_endpoint("S3Endpoint", "s3", [{"Ref": "InternalRouteTable"}])
+    config.add_nat("NAT",
+                   {"Ref":"ExternalSubnet"},
+                   depends_on="AttachInternetGateway")
 
     return config
 
@@ -309,7 +312,7 @@ def create(session, domain):
     success = config.create(session, name)
     if success:
         vpc_id = lib.vpc_id_lookup(session, domain)
-        lib.rt_name_default(session, vpc_id, "internal." + domain)
+        lib.rt_name_default(session, vpc_id, "default." + domain)
 
         post_init(session, domain)
 
