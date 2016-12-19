@@ -1433,7 +1433,7 @@ class CloudFormationConfiguration:
                                "Hostname of the EC2 Instance '{}'".format(key))
         self.add_arg(_hostname)
 
-    def add_s3_bucket(self, key, name, access_control=None, life_cycle_config=None, notification_config=None, tags=None):
+    def add_s3_bucket(self, key, name, access_control=None, life_cycle_config=None, notification_config=None, tags=None, depends_on=None):
         """Create or configure a S3 bucket.
 
         Bucket is configured to never be deleted for safety reasons.
@@ -1445,6 +1445,7 @@ class CloudFormationConfiguration:
             life_cycle_config (optional[dict]): Life cycle configuration object.
             notification_config (optional[dict]): Optionally send notification to lamba function/SQS/SNS.
             tags (optional[dict]): Optional key-value pairs to add to bucket.
+            depends_on (optional[string]): Optional key of resource bucket depends on.
 
         """
         self.resources[key] = {
@@ -1454,6 +1455,9 @@ class CloudFormationConfiguration:
             },
             "DeletionPolicy": "Retain"
         }
+
+        if depends_on is not None:
+            self.resources[key]['DependsOn'] = depends_on
 
         if access_control is not None:
             self.resources[key]['Properties']['AccessControl'] = access_control
@@ -1577,7 +1581,7 @@ class CloudFormationConfiguration:
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
 
-    def add_lambda_permission(self, key, lambda_, action="lambda:invokeFunction", principal="sns.amazonaws.com", source=None):
+    def add_lambda_permission(self, key, lambda_, action="lambda:invokeFunction", principal="sns.amazonaws.com", source=None, depends_on=None):
         """Add permissions to a Lambda
 
         Args:
@@ -1586,6 +1590,7 @@ class CloudFormationConfiguration:
             action (string) : Permission action to grant the lambda
             principal (string) : AWS principal to grant the action to
             source (string) : Source ARN to restrict the permission to
+            depends_on (optional[string]): Optional key of resource that permission depends on.
         """
         self.resources[key] = {
             "Type": "AWS::Lambda::Permission",
@@ -1598,6 +1603,9 @@ class CloudFormationConfiguration:
 
         if source is not None:
             self.resources[key]["Properties"]["SourceArn"] = source
+
+        if depends_on is not None:
+            self.resources[key]['DependsOn'] = depends_on
 
     def _add_record_cname(self, key, hostname, vpc="VPC", ttl="300", rds=False, cluster=False, replication=False, ec2=False, elb=False):
         """Add a CNAME RecordSet to the configuration
