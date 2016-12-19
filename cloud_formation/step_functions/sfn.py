@@ -1,9 +1,9 @@
 import json
 from collections import OrderedDict
 
-class Machine(dict):
-    def __init__(self, comment="", states=None, start=None):
-        super().__init__(Comment = comment)
+class Branch(dict):
+    def __init__(self, states=None, start=None):
+        super().__init__()
         self['States'] = OrderedDict() # Makes states be dumped in the same order they were added
 
         if type(states) == list:
@@ -21,11 +21,14 @@ class Machine(dict):
     def addState(self, state):
         self['States'][state.Name] = state
 
+
+class Machine(Branch):
+    def __init__(self, comment="", states=None, start=None):
+        super().__init__(states, start)
+        self['Comment'] = comment
+
     def definition(self):
         return json.dumps(self)
-
-class Branch(Machine):
-    pass # remove comment / make Machine a sub of Branch??
 
 class State(dict):
     # DP ???: should catches and retries be only for Tasks??

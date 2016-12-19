@@ -8,6 +8,7 @@ from sfn import PassState
 from sfn import TaskState, Lambda
 from sfn import WaitState
 from sfn import ChoiceState, Choice
+from sfn import ParallelState, Branch
 
 def link(states, final=None):
     linked = []
@@ -120,6 +121,23 @@ def make_if_else(args):
     state.branches = branches
     return state
 
+def make_parallel(args):
+    line, steps, parallels = args
+
+    branches = []
+
+    #DP XXX: calling link in the middle of parsing. should call after all states are parsed
+    #        to do so, the order of steps need to be preserved
+    branches.append(Branch(link(steps), str(steps[0])))
+
+    for line_, steps_ in parallels:
+        branches.append(Branch(link(steps_), str(steps_[0])))
+
+    name = make_name(line)
+    state = ParallelState(name, branches)
+    return state
+
+
 def parse(seq):
     number = toktype('NUMBER') >> make_number
     string = toktype('STRING') >> make_string
@@ -129,11 +147,13 @@ def parse(seq):
     wait = l('Wait') + op_('(') + wait_types + op_('=') + number + op_(')') >> make_wait
     simple_state = lambda_ | wait
 
-    block = block_s + many(simple_state) + block_e
+    state = forward_decl()
+    block = block_s + many(state) + block_e
     comparison = string + op_('==') + number + op_(':')
     while_ = l('while') + comparison + block >> make_while
     if_else = l('if') + comparison + block + many(l('elif') + comparison + block) + maybe(l('else') + op_(':') + block) >> make_if_else
-    state = simple_state | while_ | if_else
+    parallel = l('parallel') + op_(':') + block + many(l('parallel') + op_(':') + block) >> debug >> make_parallel
+    state.define(simple_state | while_ | if_else | parallel)
 
     machine = many(state) + end
 
