@@ -194,6 +194,8 @@ def make_catch(args):
     errors, steps = args
     next_ = str(steps[0])
 
+    if errors == []:
+        errors = ['States.ALL'] # match all errors if none is given
     catch = Catch(errors, next_)
     catch.branches = {next_: steps}
     return catch
