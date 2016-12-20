@@ -42,8 +42,7 @@ def link(states, final=None):
                 state['Next'] = str(next_)
 
         if hasattr(state, 'branches'):
-            for name in state.branches:
-                branch = state.branches[name]
+            for branch in state.branches:
                 linked.extend(link(branch, final=next_))
 
     return linked
@@ -103,20 +102,11 @@ def make_fail(args):
     return FailState(name, error, cause)
 
 def make_lambda(args):
-    line, func, modifiers = args
-    if modifiers:
-        retries, catches = modifiers
-    else:
-        retries, catches = None, None
+    line, func = args
 
     name = make_name(line)
     lambda_ = Lambda(None, func)
-    state = TaskState(name, lambda_, retries=retries, catches=catches)
-    if catches:
-        state.branches = {}
-        for catch in catches:
-            state.branches.update(catch.branches)
-    return state
+    return TaskState(name, lambda_)
 
 def make_wait(args):
     line, key, value = args
@@ -130,26 +120,26 @@ def make_while(args):
 
     choice = Choice(kv[0], kv[1], str(steps[0]))
     choices = ChoiceState(name, [choice])
-    choices.branches = {line: steps}
+    choices.branches = [steps]
     steps[-1]['Next'] = name # Create the loop
     return choices
 
 def make_if_else(args):
     line, kv, steps, elif_, else_ = args
 
-    branches = {}
+    branches = []
     choices = []
 
-    branches[line] = steps
+    branches.append(steps)
     choices.append(Choice(kv[0], kv[1], str(steps[0])))
 
     for line_, kv_, steps_ in elif_:
-        branches[line_] = steps_
+        branches.append(steps_)
         choices.append(Choice(kv_[0], kv_[1], str(steps_[0])))
 
     if else_:
         line_, steps_ = else_
-        branches[line_] = steps_
+        branches.append(steps_)
         default = str(steps_[0])
     else:
         default = None
@@ -160,11 +150,7 @@ def make_if_else(args):
     return state
 
 def make_parallel(args):
-    line, steps, parallels, modifiers = args
-    if modifiers:
-        retries, catches = modifiers
-    else:
-        retries, catches = None, None
+    line, steps, parallels = args
 
     branches = []
 
@@ -176,12 +162,7 @@ def make_parallel(args):
         branches.append(Branch(link(steps_), str(steps_[0])))
 
     name = make_name(line)
-    state = ParallelState(name, branches, retries=retries, catches=catches)
-    if catches:
-        state.branches = {}
-        for catch in catches:
-            state.branches.update(catch.branches)
-    return state
+    return ParallelState(name, branches)
 
 def make_retry(args):
     errors, interval, max_, backoff = args
@@ -197,10 +178,10 @@ def make_catch(args):
     if errors == []:
         errors = ['States.ALL'] # match all errors if none is given
     catch = Catch(errors, next_)
-    catch.branches = {next_: steps}
+    catch.branches = [steps]
     return catch
 
-def make_modifier_tuple(args):
+def make_modifiers(args):
     retry = []
     catch = []
     for modifier in args:
@@ -216,6 +197,22 @@ def make_modifier_tuple(args):
         catch = None
     return (retry, catch)
 
+def add_modifiers(args):
+    state, modifiers = args
+
+    if modifiers:
+        retries, catches = modifiers
+        if retries:
+            state['Retry'] = retries
+        if catches:
+            state['Catches'] = catches
+            state.branches = []
+            for catch in catches:
+                state.branches.extend(catch.branches)
+
+    return state
+
+
 
 def parse(seq):
     state = forward_decl()
@@ -227,15 +224,16 @@ def parse(seq):
     catch = n_('catch') + (array|string) + op_(':') + block_s + many(state) + block_e >> make_catch
 
     modifier = retry | catch
-    modifiers = block_s + modifier + many(modifier) + block_e >> make_array >> make_modifier_tuple
+    modifiers = block_s + modifier + many(modifier) + block_e >> make_array >> make_modifiers
 
     pass_ = l('Pass') + op_('(') + op_(')') >> make_pass
     success = l('Success') + op_('(') + op_(')') >> make_success
     fail = l('Fail') + op_('(') + string + op_(',') + string + op_(')') >> make_fail
-    lambda_ = l('Lambda') + op_('(') + string + op_(')') + maybe(modifiers) >> debug >> make_lambda
+    lambda_ = l('Lambda') + op_('(') + string + op_(')') >> make_lambda
+    task = lambda_ + maybe(modifiers) >> add_modifiers
     wait_types = n('seconds') | n('seconds_path') | n('timestamp') | n('timestamp_path')
     wait = l('Wait') + op_('(') + wait_types + op_('=') + number + op_(')') >> make_wait
-    simple_state = pass_ | success | fail | lambda_ | wait
+    simple_state = pass_ | success | fail | task | wait
 
     block = block_s + many(state) + block_e
     comparison = string + op_('==') + number + op_(':')
@@ -244,9 +242,9 @@ def parse(seq):
                many(l('elif') + comparison + block) +
                maybe(l('else') + op_(':') + block)) >> make_if_else
     parallel = (l('parallel') + op_(':') + block + 
-                many(l('parallel') + op_(':') + block) +
-                maybe(n_('error') + op_(':') + modifiers)) >> make_parallel
-    state.define(simple_state | while_ | if_else | parallel)
+                many(l('parallel') + op_(':') + block)) >> make_parallel
+    parallel_ = parallel + maybe(n_('error') + op_(':') + modifiers) >> add_modifiers
+    state.define(simple_state | while_ | if_else | parallel_)
 
     machine = many(state) + end
 
