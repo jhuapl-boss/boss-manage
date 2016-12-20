@@ -53,19 +53,19 @@
   <concurrentBuild>false</concurrentBuild>
   <builders>
     <hudson.tasks.Shell>
-      <command>cd cloud_formation
+      <command>cd lib
 nose2</command>
     </hudson.tasks.Shell>
   </builders>
   <publishers>
     <hudson.tasks.junit.JUnitResultArchiver plugin="junit@1.2-beta-4">
-      <testResults>cloud_formation/nose2-junit.xml</testResults>
+      <testResults>lib/nose2-junit.xml</testResults>
       <keepLongStdio>false</keepLongStdio>
       <testDataPublishers/>
       <healthScaleFactor>1.0</healthScaleFactor>
     </hudson.tasks.junit.JUnitResultArchiver>
     <hudson.plugins.cobertura.CoberturaPublisher plugin="cobertura@1.9.7">
-      <coberturaReportFile>cloud_formation/coverage.xml</coberturaReportFile>
+      <coberturaReportFile>lib/coverage.xml</coberturaReportFile>
       <onlyStable>false</onlyStable>
       <failUnhealthy>false</failUnhealthy>
       <failUnstable>false</failUnstable>
@@ -127,7 +127,7 @@ nose2</command>
     <jenkins.plugins.slack.SlackNotifier plugin="slack@1.8.1">
       <teamDomain>apl-microns</teamDomain>
       <authToken>XAoRfwgxZJhScrKC03VXdgyI</authToken>
-      <buildServerUrl>http://jenkins-microns:8080/</buildServerUrl>
+      <buildServerUrl>http://jenkins-microns.jhuapl.edu:8080/</buildServerUrl>
       <room>#ci</room>
     </jenkins.plugins.slack.SlackNotifier>
   </publishers>
