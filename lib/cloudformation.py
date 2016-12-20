@@ -718,6 +718,36 @@ class CloudFormationConfiguration:
 
         return (internal, external)
 
+    def add_endpoint(self, key, service, route_tables, vpc="VPC"):
+        self.resources[key] = {
+            "Type" : "AWS::EC2::VPCEndpoint",
+            "Properties" : {
+                #"PolicyDocument" : JSON object, # allow full access
+                "RouteTableIds" : route_tables,
+                "ServiceName" : 'com.amazonaws.us-east-1.{}'.format(service),
+                "VpcId" : {"Ref": vpc},
+            }
+        }
+
+    def add_nat(self, key, subnet, depends_on=None):
+        self.resources[key] = {
+            "Type" : "AWS::EC2::NatGateway",
+            "Properties" : {
+                "AllocationId" : { 'Fn::GetAtt': [key + "IP", "AllocationId"]},
+                "SubnetId" : subnet,
+            }
+        }
+
+        if depends_on is not None:
+            self.resources[key]["DependsOn"] = depends_on
+
+        self.resources[key + "IP"] = {
+            "Type" : "AWS::EC2::EIP",
+            "Properties" : {
+                "Domain" : "vpc"
+            }
+        }
+
     def add_ec2_instance(self, key, hostname, ami, keypair, subnet=Ref("Subnet"), type_="t2.micro", iface_check=True, public_ip=False, security_groups=None, user_data=None, meta_data=None, role=None, depends_on=None):
         """Add an EC2 instance to the configuration
 
@@ -1075,7 +1105,7 @@ class CloudFormationConfiguration:
           }
         }
 
-    def add_route_table_route(self, key, route_table, cidr="0.0.0.0/0", gateway=None, peer=None, instance=None, depends_on=None):
+    def add_route_table_route(self, key, route_table, cidr="0.0.0.0/0", gateway=None, peer=None, instance=None, nat=None, depends_on=None):
         """Add a Route to the configuration
 
         Note: Only one of gateway/peer/instance should be specified for a call
@@ -1098,10 +1128,9 @@ class CloudFormationConfiguration:
           }
         }
 
-        checks = [gateway, peer, instance]
-        check = checks.count(None)
+        checks = [gateway, peer, instance, nat]
         if len(checks) - checks.count(None) != 1:
-            raise Exception("Required to specify one and only one of the following arguments: gateway|peer|instance")
+            raise Exception("Required to specify one and only one of the following arguments: gateway|peer|instance|nat")
 
 
         if gateway is not None:
@@ -1110,6 +1139,8 @@ class CloudFormationConfiguration:
             self.resources[key]["Properties"]["VpcPeeringConnectionId"] = peer
         if instance is not None:
             self.resources[key]["Properties"]["InstanceId"] = instance
+        if nat is not None:
+            self.resources[key]["Properties"]["NatGatewayId"] = nat
 
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
@@ -1345,7 +1376,11 @@ class CloudFormationConfiguration:
 
         self.keypairs[hostname] = keypair
 
-    def add_s3_bucket(self, key, name, access_control=None, life_cycle_config=None, notification_config=None, tags=None):
+        _hostname = Arg.String(key + "Hostname", hostname,
+                               "Hostname of the EC2 Instance '{}'".format(key))
+        self.add_arg(_hostname)
+
+    def add_s3_bucket(self, key, name, access_control=None, life_cycle_config=None, notification_config=None, tags=None, depends_on=None):
         """Create or configure a S3 bucket.
 
         Bucket is configured to never be deleted for safety reasons.
@@ -1357,6 +1392,7 @@ class CloudFormationConfiguration:
             life_cycle_config (optional[dict]): Life cycle configuration object.
             notification_config (optional[dict]): Optionally send notification to lamba function/SQS/SNS.
             tags (optional[dict]): Optional key-value pairs to add to bucket.
+            depends_on (optional[string]): Optional key of resource bucket depends on.
 
         """
         self.resources[key] = {
@@ -1366,6 +1402,9 @@ class CloudFormationConfiguration:
             },
             "DeletionPolicy": "Retain"
         }
+
+        if depends_on is not None:
+            self.resources[key]['DependsOn'] = depends_on
 
         if access_control is not None:
             self.resources[key]['Properties']['AccessControl'] = access_control
@@ -1479,7 +1518,7 @@ class CloudFormationConfiguration:
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
 
-    def add_lambda_permission(self, key, lambda_, action="lambda:invokeFunction", principal="sns.amazonaws.com", source=None):
+    def add_lambda_permission(self, key, lambda_, action="lambda:invokeFunction", principal="sns.amazonaws.com", source=None, depends_on=None):
         """Add permissions to a Lambda
 
         Args:
@@ -1488,6 +1527,7 @@ class CloudFormationConfiguration:
             action (string) : Permission action to grant the lambda
             principal (string) : AWS principal to grant the action to
             source (string) : Source ARN to restrict the permission to
+            depends_on (optional[string]): Optional key of resource that permission depends on.
         """
         self.resources[key] = {
             "Type": "AWS::Lambda::Permission",
@@ -1500,6 +1540,9 @@ class CloudFormationConfiguration:
 
         if source is not None:
             self.resources[key]["Properties"]["SourceArn"] = source
+
+        if depends_on is not None:
+            self.resources[key]['DependsOn'] = depends_on
 
     def _add_record_cname(self, key, hostname, vpc=Ref("VPC"), ttl="300", rds=False, cluster=False, replication=False, ec2=False, elb=False):
         """Add a CNAME RecordSet to the configuration

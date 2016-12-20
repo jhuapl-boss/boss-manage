@@ -86,9 +86,12 @@ def create_config(session, domain, keypair=None, user_data=None):
         ['s3:GetObject', 's3:PutObject'],
         { 'AWS': role})
 
+    creating_tile_bucket = False
     tile_bucket_name = names.tile_bucket
     if not aws.s3_bucket_exists(session, tile_bucket_name):
+        creating_tile_bucket = True
         config.add_s3_bucket("tileBucket", tile_bucket_name)
+
     config.add_s3_bucket_policy(
         "tileBucketPolicy", tile_bucket_name,
         ['s3:GetObject', 's3:PutObject'],
@@ -124,6 +127,20 @@ def create_config(session, domain, keypair=None, user_data=None):
                       memory=1024,
                       security_groups=[Ref('InternalSecurityGroup')],
                       subnets=internal_subnets)
+
+    if creating_tile_bucket:
+        config.add_lambda_permission(
+            'tileBucketInvokeMultiLambda', 'MultiLambda',
+            principal='s3.amazonaws.com', source={
+                'Fn::Join': [':', ['arn', 'aws', 's3', '', '', tile_bucket_name]]}, #DP TODO: move into constants
+            depends_on='tileBucket'
+        )
+    else:
+        config.add_lambda_permission(
+            'tileBucketInvokeMultiLambda', 'MultiLambda',
+            principal='s3.amazonaws.com', source={
+                'Fn::Join': [':', ['arn', 'aws', 's3', '', '', tile_bucket_name]]}
+        )
 
     # Add topic to indicating that the object store has been write locked.
     config.add_sns_topic('WriteLock',
@@ -197,11 +214,48 @@ def pre_init(session, domain):
 def post_init(session, domain):
     print("post_init")
 
+    print('adding tile bucket trigger of multi-lambda')
+    add_tile_bucket_trigger(session, domain)
+
     # Tell Scalyr to get CloudWatch metrics for these instances.
     names = AWSNames(domain)
     instances = [names.cache_manager]
     scalyr.add_instances_to_scalyr(
         session, const.REGION, instances)
+
+def add_tile_bucket_trigger(session, domain):
+    """Trigger MultiLambda when file uploaded to tile bucket.
+
+    This is done in post-init() because the tile bucket isn't always
+    created during CloudFormation (it may already exist).
+
+    This function's effects should be idempotent because the same id is
+    used everytime the notification event is added to the tile bucket.
+
+    Args:
+        session (Boto3.Session)
+        domain (string): VPC domain name.
+    """
+    lambda_name = names.get_multi_lambda(domain).replace('.', '-')
+    bucket_name = names.get_tile_bucket(domain)
+
+    lam = boto3.client('lambda')
+    resp = lam.get_function_configuration(FunctionName=lambda_name)
+    lambda_arn = resp['FunctionArn']
+
+    s3 = boto3.resource('s3')
+    bucket = s3.Bucket(bucket_name)
+
+    notification = bucket.Notification()
+    notification.put(NotificationConfiguration={
+        'LambdaFunctionConfigurations': [
+            {
+                'Id': 'tileBucketInvokeMultiLambda',
+                'LambdaFunctionArn': lambda_arn,
+                'Events': ['s3:ObjectCreated:*']
+            }
+        ]
+    })
 
 
 def delete(session, domain):

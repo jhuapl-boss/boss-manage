@@ -45,6 +45,21 @@ Create this script and save it (config/set_scalyr_vars.sh) for the next time you
 ```shell
 source ../config/set_scalyr_vars.sh
 ```
+## Turn on Maintenance Mode
+In boss-manage/cloud_formation run:
+```shell
+python3 ./maintenance.py on production.boss
+```
+In can take up to 10 to 15 minutes for DNS to be updated externally.
+Use: dig api.theboss.io
+to see if DNS has been changed back to ELB.
+Once completed you will see a "Down for Maintenance Page" at both
+* api.theboss.io
+* auth.theboss.io
+In can take up to 10 to 15 minutes for DNS to be updated externally.  (sometimes its fast)
+Use: dig api.theboss.io
+to see if DNS has been changed to cloudfront servers.
+
 
 ## Create SprintXX AMIs 
 You can either create new AMIs:
@@ -113,6 +128,19 @@ cd vault
 Login to https://api.theboss.io/v0.7/collection/
 Uses bossadmin and the password you now have to sync bossadmin to django
 
+## Manually update the api ELB timeout
+Go to EC2 in AWS console
+select load balancers on left side
+click the checkbox for the loadbalancer to change
+under attributes 
+Set "Idle timeout: 300 seconds"
+
+## Manually update the multilambda timeout
+Go to Lambda in AWS console
+select Configuration tab
+Advanced Settings
+Change *Timeout* to be 2 mins.
+
 ## Add Trigger to multilambda.production.boss
 Go to S3 in the AWS console
 select tiles.production.boss bucket properties
@@ -120,7 +148,7 @@ under Events delete the current Lambda (if there is one)
 save
 
 Now Go to Lambda in the AWS console, 
-Select multilambda.integration.boss
+Select multilambda.production.boss
 Select trigger tab
 click in the empty box Lambda is pointing to in the diagram.  Now select the S3 in the drop down box.
 A new dialog will come up
@@ -128,15 +156,23 @@ Bucket:  tiles.production.boss
 Event Type:  Object Created (All)
 click submit (You may need to scroll down to see the submit button)
 
+## Turn off Maintenance Mode
+In boss-manage/cloud_formation run:
+```shell
+python3 ./maintenance.py off production.boss
+```
+In can take up to 10 to 15 minutes for DNS to be updated externally.
+Use: dig api.theboss.io
+to see if DNS has been changed back to ELB.
+
 ### Add Subscriptions to ProductionMicronsMailingList in SNS
 Take the list of emails and phone numbers you created earlier and 
 add them back into the ProductionMicronsMailingList Topic in SNS.
 
 ## Run unit tests on Endpoint
-
-If you are following these instructions for your personal development environment, skip the
+If you are following these instructions for the integration development environment, skip the
 export RUN_HIGH_MEM_TESTS line.  That line runs 2 tests that need >2.5GB of memory
-to run and will fail in your environment
+to run and will fail in the integration environment
 
 ```shell
 cd vault
@@ -160,18 +196,6 @@ cd /srv/www/django
 sudo python3 manage.py test --pattern="int_test_*.py"
 ```
 	output should say 55 Tests OK with 7 skipped tests
-
-## Proofreader Tests
-````shell
-cd vault
-./ssh.py proofreader-web.integration.boss
-cd /srv/www/app/proofreader_apis
-sudo python3 manage.py makemigrations --noinput
-sudo python3 manage.py makemigrations --noinput common
-sudo python3 manage.py migrate
-sudo python3 manage.py test
-````
-    output should say 350 Tests OK
 
 ### Cachemanager Integration Tests
 
@@ -211,15 +235,20 @@ git checkout integration
 sudo pip3 install -r requirements.txt
 ```
 
+##### Setup new user for testing  (don't use bossadmin for this)
 In your browser, open https://api.theboss.io/vX.Y/mgmt/token
 
 Your browser should be redirected to the KeyCloak login page.
-
 Create a new account and return to the token page.
-
-Generate a token.
-
 This token will be copied-pasted into the intern config file.
+
+then logout and login as bossadmin
+Go to boss console 
+https://api.production.theboss.io and give your new user
+* resource-manager
+* user-manager
+
+SSO -> Manager Users, select your user and add the roles
 
 ```shell
 mkdir ~/.intern
@@ -248,23 +277,8 @@ host = api.theboss.io
 # Replace with your token.
 token = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
-
 Additionally, create a copy of `~/.intern/intern.cfg` as `test.cfg` in the intern
 repository directory.
-
-##### Setup via the Django Admin Page
-
-In your browser, go to https://api.theboss.io/admin
-
-Login using the bossadmin account created previously (this was created during
-the endpoint initialization and unit test step).
-
-Click on `Boss roles`.
-
-Click on `ADD BOSS ROLE`.
-
-Find the user you created and add the `ADMIN` role to that user and save.
-
 
 ##### Run Intern Integration Tests
 
