@@ -4,7 +4,8 @@ from funcparserlib.parser import (some, a, many, skip, maybe, forward_decl)
 from lexer import Token
 
 from sfn import Machine
-from sfn import PassState
+from sfn import Retry, Catch
+from sfn import PassState, SuccessState, FailState
 from sfn import TaskState, Lambda
 from sfn import WaitState
 from sfn import ChoiceState, Choice
@@ -16,19 +17,22 @@ def link(states, final=None):
         state = states[i]
         linked.append(state)
 
-        if 'Next' in state:
-            continue
-        if 'End' in state:
-            continue
-
         next_ = states[i+1] if i+1 < len(states) else final
 
-        if type(state) == ChoiceState:
+        # The first three conditions are checking to see if the state needs
+        # to be linked with the next state or if it is already linked / terminates
+        if 'Next' in state:
+            pass
+        elif 'End' in state:
+            pass
+        elif type(state) in (SuccessState, FailState): #terminal states
+            pass
+        elif type(state) == ChoiceState:
             if 'Default' not in state:
                 next__ = next_ # prevent branches from using the new end state (just use End=True)
                 if next__ is None:
                     # DP ???: Can a choice state also end or do we need the extra state to end on?
-                    next__ = PassState(str(state) + "End", end=True)
+                    next__ = SuccessState(str(state) + "Next")
                     linked.append(next__)
                 state['Default'] = str(next__)
         else:
@@ -74,11 +78,45 @@ def make_number(n):
 def make_string(n):
     return n[1:-1]
 
+def make_array(n):
+    if n is None:
+        return []
+    else:
+        return [n[0]] + n[1]
+
+def make_pass(args):
+    line = args
+
+    name = make_name(line)
+    return PassState(name)
+
+def make_success(args):
+    line = args
+
+    name = make_name(line)
+    return SuccessState(name)
+
+def make_fail(args):
+    line, error, cause = args
+
+    name = make_name(line)
+    return FailState(name, error, cause)
+
 def make_lambda(args):
-    line, func = args
+    line, func, modifiers = args
+    if modifiers:
+        retries, catches = modifiers
+    else:
+        retries, catches = None, None
+
     name = make_name(line)
     lambda_ = Lambda(None, func)
-    return TaskState(name, lambda_)
+    state = TaskState(name, lambda_, retries=retries, catches=catches)
+    if catches:
+        state.branches = {}
+        for catch in catches:
+            state.branches.update(catch.branches)
+    return state
 
 def make_wait(args):
     line, key, value = args
@@ -122,7 +160,11 @@ def make_if_else(args):
     return state
 
 def make_parallel(args):
-    line, steps, parallels = args
+    line, steps, parallels, modifiers = args
+    if modifiers:
+        retries, catches = modifiers
+    else:
+        retries, catches = None, None
 
     branches = []
 
@@ -134,25 +176,74 @@ def make_parallel(args):
         branches.append(Branch(link(steps_), str(steps_[0])))
 
     name = make_name(line)
-    state = ParallelState(name, branches)
+    state = ParallelState(name, branches, retries=retries, catches=catches)
+    if catches:
+        state.branches = {}
+        for catch in catches:
+            state.branches.update(catch.branches)
     return state
+
+def make_retry(args):
+    errors, interval, max_, backoff = args
+
+    if errors == []:
+        errors = ['States.ALL'] # match all errors if none is given
+    return Retry(errors, interval, max_, backoff)
+
+def make_catch(args):
+    errors, steps = args
+    next_ = str(steps[0])
+
+    catch = Catch(errors, next_)
+    catch.branches = {next_: steps}
+    return catch
+
+def make_modifier_tuple(args):
+    retry = []
+    catch = []
+    for modifier in args:
+        if type(modifier) == Retry:
+            retry.append(modifier)
+        elif type(modifier) == Catch:
+            catch.append(modifier)
+        else:
+            raise Exception("Unknown modifier type: " + type(modifier).__name__)
+    if retry == []:
+        retry = None
+    if catch == []:
+        catch = None
+    return (retry, catch)
 
 
 def parse(seq):
+    state = forward_decl()
+
     number = toktype('NUMBER') >> make_number
     string = toktype('STRING') >> make_string
+    array = op_('[') + maybe(string + many(op_(',') + string)) + op_(']') >> make_array
+    retry = n_('retry') + (array|string) + number + number + number >> make_retry
+    catch = n_('catch') + (array|string) + op_(':') + block_s + many(state) + block_e >> make_catch
 
-    lambda_ = l('Lambda') + op_('(') + string + op_(')') >> make_lambda
+    modifier = retry | catch
+    modifiers = block_s + modifier + many(modifier) + block_e >> make_array >> make_modifier_tuple
+
+    pass_ = l('Pass') + op_('(') + op_(')') >> make_pass
+    success = l('Success') + op_('(') + op_(')') >> make_success
+    fail = l('Fail') + op_('(') + string + op_(',') + string + op_(')') >> make_fail
+    lambda_ = l('Lambda') + op_('(') + string + op_(')') + maybe(modifiers) >> debug >> make_lambda
     wait_types = n('seconds') | n('seconds_path') | n('timestamp') | n('timestamp_path')
     wait = l('Wait') + op_('(') + wait_types + op_('=') + number + op_(')') >> make_wait
-    simple_state = lambda_ | wait
+    simple_state = pass_ | success | fail | lambda_ | wait
 
-    state = forward_decl()
     block = block_s + many(state) + block_e
     comparison = string + op_('==') + number + op_(':')
     while_ = l('while') + comparison + block >> make_while
-    if_else = l('if') + comparison + block + many(l('elif') + comparison + block) + maybe(l('else') + op_(':') + block) >> make_if_else
-    parallel = l('parallel') + op_(':') + block + many(l('parallel') + op_(':') + block) >> debug >> make_parallel
+    if_else = (l('if') + comparison + block +
+               many(l('elif') + comparison + block) +
+               maybe(l('else') + op_(':') + block)) >> make_if_else
+    parallel = (l('parallel') + op_(':') + block + 
+                many(l('parallel') + op_(':') + block) +
+                maybe(n_('error') + op_(':') + modifiers)) >> make_parallel
     state.define(simple_state | while_ | if_else | parallel)
 
     machine = many(state) + end

@@ -2,7 +2,7 @@
 import tokenize
 import token
 
-USELESS = ['NEWLINE', 'NL']
+USELESS = ['NEWLINE', 'NL', 'COMMENT']
 
 class Token(object):
     def __init__(self, code, value, start=(0,0), stop=(0,0), line=''):

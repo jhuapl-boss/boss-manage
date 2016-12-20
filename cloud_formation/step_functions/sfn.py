@@ -32,8 +32,8 @@ class Machine(Branch):
 
 class State(dict):
     # DP ???: should catches and retries be only for Tasks??
-    def __init__(self, name, type, next=None, end=None, catches=None, retries=None):
-        super().__init__(Type = type)
+    def __init__(self, name, type_, next=None, end=None, catches=None, retries=None):
+        super().__init__(Type = type_)
         self.Name = name
 
         if next is not None:
@@ -48,7 +48,7 @@ class State(dict):
             self['Catches'] = catches
 
         if retries is not None:
-            if type(retires) != list:
+            if type(retries) != list:
                 retries = [retries]
             self['Retry'] = retries
 
@@ -69,9 +69,14 @@ class PassState(State):
     def __init__(self, name, **kwargs):
         super().__init__(name, 'Pass', **kwargs)
 
+class SuccessState(State):
+    def __init__(self, name, **kwargs):
+        super().__init__(name, 'Success', **kwargs)
+
 class FailState(State):
-    def __init__(self, name, cause, **kwargs):
+    def __init__(self, name, error, cause, **kwargs):
         super().__init__(name, 'Fail', **kwargs)
+        self['Error'] = error
         self['Cause'] = cause
 
 class TaskState(State):
