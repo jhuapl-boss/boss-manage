@@ -16,7 +16,7 @@
 
 """
 Script to put a stack in and out of maintenance mode.
-Script will change the DNS entries for api and auth to point to a static maintenance page.
+Script will change the DNS entries for api to point to a static maintenance page.
 """
 
 import argparse
@@ -40,18 +40,18 @@ def create_help(header, options):
 
 cmd_help = create_help("options are", CMDS)
 
-def warnings():
+def warnings(api):
     print("")
     print("It can take up to 10 to 15 minutes for the route53 changes to be seen outside of AWS.")
-    print("You can you use: dig api.integration.theboss.io")
+    print("You can you use: dig {}".format(api))
     print("       This will show either cloudfront or elb server")
 
 def migrations_on(session, domain):
     """
-    changes Route53 entries for the domain to use the auth and api cloudfronts for the s3 maintenance bucket.
+    changes Route53 entry for the api in domain to use cloudfront for the s3 maintenance bucket.
     Args:
         session(Session): boto3 session object
-        domain(str): name of api domain or auth domain. Ex: api.integration.theboss.io
+        domain(str): name of domain. Ex: integration.boss
 
     Returns:
         Nothing
@@ -59,21 +59,18 @@ def migrations_on(session, domain):
     hosted_zone = lib.get_hosted_zone(session)
     (api, auth) = get_api_auth_names(session, domain)
     api_cloud_front = lib.cloudfront_public_lookup(session, api[:-1])
-    auth_cloud_front = lib.cloudfront_public_lookup(session, auth[:-1])
     print("Setting Route53 for: ")
     print("{}: {}".format(api, api_cloud_front))
-    print("{}: {}".format(auth, auth_cloud_front))
     lib.set_domain_to_dns_name(session, api, api_cloud_front, hosted_zone)
-    lib.set_domain_to_dns_name(session, auth, auth_cloud_front, hosted_zone)
-    warnings()
+    warnings(api)
 
 
 def migrations_off(session, domain):
     """
-    changes Route53 entries for the domain to use the auth and api elastic load balancers
+    changes Route53 entries for the domain to use the api elastic load balancers
     Args:
         session(Session): boto3 session object
-        domain(str): name of api domain or auth domain. Ex: api.integration.theboss.io
+        domain(str): name of domain. Ex: integration.boss
 
     Returns:
         Nothing
@@ -81,13 +78,10 @@ def migrations_off(session, domain):
     hosted_zone = lib.get_hosted_zone(session)
     (api, auth) = get_api_auth_names(session, domain)
     api_elb = lib.elb_public_lookup(session, "elb." + domain)
-    auth_elb = lib.elb_public_lookup(session, "auth." + domain)
     print("Setting Route53 for: ")
     print("{}: {}".format(api, api_elb))
-    print("{}: {}".format(auth, auth_elb))
     lib.set_domain_to_dns_name(session, api, api_elb, hosted_zone)
-    lib.set_domain_to_dns_name(session, auth, auth_elb, hosted_zone)
-    warnings()
+    warnings(api)
 
 
 def get_api_auth_names(session, domain):
@@ -95,7 +89,7 @@ def get_api_auth_names(session, domain):
     gets the api and auth hostnames from the domain
     Args:
         session(Session): boto3 session object
-        domain(str): name of api domain or auth domain. Ex: api.integration.theboss.io
+        domain(str): name of domain. Ex: integration.boss
 
     Returns:
         tuple(str) of api hostname and auth hostname
@@ -108,7 +102,7 @@ def get_api_auth_names(session, domain):
         api = "api.{}.".format(hosts.BASE_DOMAIN_CERTS[domain])
         auth = "auth.{}.".format(hosts.BASE_DOMAIN_CERTS[domain])
     else:
-        print("Maintenance can only be performed in production account.")  # The reason for this is buckets need to be allocated to do this.
+        print("Maintenance can only be performed in production account.")  # The reason for this is cloudfront sessions would need to be created for dev systems.
         sys.exit(1)
         # if hosted_zone != hosts.DEV_DOMAIN:
         #     print("Possibly wrong credentials being used, domain, {}, is not supposed to be used in this aws account")
@@ -178,8 +172,8 @@ if __name__ == '__main__':
 
     if args.cmd == "on":
         if not args.yes:
-            print("Maintenance mode will update api.")
-            print("Are you sure you want to got into maintenance mode for {}?".format(args.domain_name))
+            print("Maintenance mode will update the api DNS entry to point to a maintenance page.")
+            print("Are you sure you want to go into maintenance mode for {}?".format(args.domain_name))
             resp = input("Update? [N/y] ")
             if len(resp) == 0 or resp[0] not in ('y', 'Y'):
                 print("Canceled")

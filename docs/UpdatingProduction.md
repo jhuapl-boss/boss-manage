@@ -56,7 +56,7 @@ to see if DNS has been changed back to ELB.
 Once completed you will see a "Down for Maintenance Page" at both
 * api.theboss.io
 * auth.theboss.io
-In can take up to 10 to 15 minutes for DNS to be updated externally.
+In can take up to 10 to 15 minutes for DNS to be updated externally.  (sometimes its fast)
 Use: dig api.theboss.io
 to see if DNS has been changed to cloudfront servers.
 
@@ -235,15 +235,20 @@ git checkout integration
 sudo pip3 install -r requirements.txt
 ```
 
-In your browser, open https://api.integration.theboss.io/token
-
-Your browser should be redirected to the KeyCloak login page.
-
-Create a new account and return to the token page.
-
-Generate a token.
-
+##### Setup new user for testing  (don't use bossadmin for this)
+go to
+https://api.production.theboss.io/v0.7/collection
+login / register new user
+https://api.production.theboss.io/token
 This token will be copied-pasted into the intern config file.
+
+then logout and login as bossadmin
+Go to boss console 
+https://api.production.theboss.io and give your new user
+* resource-manager
+* user-manager
+
+SSO -> Manager Users, select your user and add the roles
 
 ```shell
 mkdir ~/.intern
@@ -272,23 +277,8 @@ host = api.integration.theboss.io
 # Replace with your token.
 token = c23b48ceb35cae212b470a23d99d4185bac1c226
 ```
-
 Additionally, create a copy of `~/.intern/intern.cfg` as `test.cfg` in the intern
 repository directory.
-
-##### Setup via the Django Admin Page
-
-In your browser, go to https://api.production.theboss.io/admin
-
-Login using the bossadmin account created previously (this was created during
-the endpoint initialization and unit test step).
-
-Click on `Boss roles`.
-
-Click on `ADD BOSS ROLE`.
-
-Find the user you created and add the `ADMIN` role to that user and save.
-
 
 ##### Run Intern Integration Tests
 
