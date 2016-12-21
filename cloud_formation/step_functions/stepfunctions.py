@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import sys
-import json
 from lexer import tokenize_file
 from parser import parse
 
@@ -16,6 +15,6 @@ if __name__ == '__main__':
     else:
         try:
             machine = parse(tokens)
-            print(json.dumps(machine, indent=3))
+            print(machine.definition(indent=3))
         except NoParseError as e:
             print("Syntax Error: {}".format(e))

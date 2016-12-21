@@ -4,9 +4,9 @@ from funcparserlib.parser import (some, a, many, skip, maybe, forward_decl)
 from lexer import Token
 
 from sfn import Machine
-from sfn import Retry, Catch
+from sfn import Retry, Catch, Timestamp
 from sfn import PassState, SuccessState, FailState
-from sfn import TaskState, Lambda
+from sfn import TaskState, Lambda, Activity
 from sfn import WaitState
 from sfn import ChoiceState, Choice
 from sfn import ParallelState, Branch
@@ -50,15 +50,70 @@ def link(states, final=None):
 def make_name(line):
     return "Line{}".format(line)
 
+def add_name_comment(state, comment):
+    if comment:
+        name, comment = comment.split('\n', 1)
+        # DP TODO: cleanup comment (remove extra indents, possibly remove new lines)
+
+        if  len(name) > 0:
+            if type(state) == ChoiceState:
+                # update while loops to use the new name
+                if state.branches[0][-1]['Next'] == state.Name:
+                    state.branches[0][-1]['Next'] = name
+            state.Name = name
+
+        state['Comment'] = comment
+
+COMPARISON = {
+    '==': {
+        str: 'StringEquals',
+        int: 'NumericEquals',
+        float: 'NumericEquals',
+        bool: 'BooleanEquals',
+        Timestamp: 'TimestampEquals',
+    },
+    '<': {
+        str: 'StringLessThan',
+        int: 'NumericLessThan',
+        float: 'NumericLessThan',
+        Timestamp: 'TimestampLessThan',
+    },
+    '>': {
+        str: 'StringGreaterThan',
+        int: 'NumericGreaterThan',
+        float: 'NumericGreaterThan',
+        Timestamp: 'TimestampGreaterThan',
+    },
+    '<=': {
+        str: 'StringLessThanEquals',
+        int: 'NumericLessThanEquals',
+        float: 'NumericLessThanEquals',
+        Timestamp: 'TimestampLessThanEquals',
+    },
+    '>=': {
+        str: 'StringGreaterThanEquals',
+        int: 'NumericGreaterThanEquals',
+        float: 'NumericGreaterThanEquals',
+        '': 'TimestampGreaterThanEquals',
+    },
+    # DP TODO: handle these
+    #'and': 'And',
+    #'or': 'Or',
+    #'not': 'Not',
+}
+
 const = lambda x: lambda _: x
 tokval = lambda x: x.value
 tokline = lambda x: x.start[0]
+toklineval = lambda x: (x.start[0], x.value)
 toktype = lambda t: some(lambda x: x.code == t) >> tokval
 op = lambda s: a(Token('OP', s)) >> tokval
 op_ = lambda s: skip(op(s))
 n = lambda s: a(Token('NAME', s)) >> tokval
 n_ = lambda s: skip(n(s))
 l = lambda s: a(Token('NAME', s)) >> tokline
+# extract both line number and token value at the same time
+ln = lambda s: a(Token('NAME', s)) >> toklineval
 
 end = skip(a(Token('ENDMARKER', '')))
 block_s = skip(toktype('INDENT'))
@@ -76,9 +131,14 @@ def make_number(n):
 
 def make_string(n):
     if n[:3] in ('"""', "'''"):
-        return n[3:-3]
+        s = n[3:-3]
     else:
-        return n[1:-1]
+        s = n[1:-1]
+
+    try: # DP XXX: A bit of a hack. TSs are also valid strings, so it is a little hard to write token roles specifially for it
+        return Timestamp(s)
+    except:
+        return s
 
 def make_array(n):
     if n is None:
@@ -89,6 +149,9 @@ def make_array(n):
 def make_object(n):
     return dict(make_array(n))
 
+# =============
+# Simple States
+# =============
 def make_pass(args):
     line = args
 
@@ -113,13 +176,18 @@ def make_fail(args):
     state.line = line
     return state
 
-def make_lambda(args):
-    line, func = args
+def make_task(args):
+    (line, type_), func = args
 
     name = make_name(line)
-    lambda_ = Lambda(None, func)
+    if type_ == "Lambda":
+        task = Lambda(None, func)
+    elif type_ == "Activity":
+        task = Activity(None, func)
+    else:
+        raise Exception("{} at line {}: unsuported task type".format(type_, line))
 
-    state = TaskState(name, lambda_)
+    state = TaskState(name, task)
     state.line = line
     return state
 
@@ -133,31 +201,40 @@ def make_wait(args):
     state.line = line
     return state
 
+# ============
+# Flow Control
+# ============
+def _choice(logic, next_):
+    var, op, val = logic
+    op = COMPARISON[op][type(val)]
+    return Choice(var, op, val, str(next_))
+
 def make_while(args):
-    line, kv, steps = args
+    line, logic, (comment, steps) = args
     name = make_name(line)
 
-    choice = Choice(kv[0], kv[1], str(steps[0]))
+    choice = _choice(logic, steps[0])
     choices = ChoiceState(name, [choice])
     choices.branches = [steps]
     steps[-1]['Next'] = name # Create the loop
+    add_name_comment(choices, comment)
     return choices
 
 def make_if_else(args):
-    line, kv, steps, elif_, else_ = args
+    line, logic, (comment, steps), elif_, else_ = args
 
     branches = []
     choices = []
 
     branches.append(steps)
-    choices.append(Choice(kv[0], kv[1], str(steps[0])))
+    choices.append(_choice(logic, steps[0]))
 
-    for line_, kv_, steps_ in elif_:
+    for line_, logic_, (_, steps_) in elif_:
         branches.append(steps_)
-        choices.append(Choice(kv_[0], kv_[1], str(steps_[0])))
+        choices.append(_choice(logic_, steps_[0]))
 
     if else_:
-        line_, steps_ = else_
+        line_, (_, steps_) = else_
         branches.append(steps_)
         default = str(steps_[0])
     else:
@@ -166,10 +243,11 @@ def make_if_else(args):
     name = make_name(line)
     state = ChoiceState(name, choices, default)
     state.branches = branches
+    add_name_comment(state, comment)
     return state
 
 def make_parallel(args):
-    line, steps, parallels = args
+    line, (comment, steps), parallels = args
 
     branches = []
 
@@ -177,11 +255,13 @@ def make_parallel(args):
     #        to do so, the order of steps need to be preserved
     branches.append(Branch(link(steps), str(steps[0])))
 
-    for line_, steps_ in parallels:
+    for line_, (_, steps_) in parallels:
         branches.append(Branch(link(steps_), str(steps_[0])))
 
     name = make_name(line)
-    return ParallelState(name, branches)
+    state = ParallelState(name, branches)
+    add_name_comment(state, comment)
+    return state
 
 def make_retry(args):
     errors, interval, max_, backoff = args
@@ -216,6 +296,15 @@ def make_modifiers(args):
         catch = None
     return (retry, catch)
 
+def make_flow_modifiers(args):
+    try:
+        state, transform, errors = args
+    except:
+        state, transform = args
+        errors = None
+
+    return (state, (None, transform, None, errors))
+
 def add_modifiers(args):
     state, args = args
 
@@ -227,20 +316,9 @@ def add_modifiers(args):
         target = "{} named {}".format(type_name, str(state))
 
     if args:
-        comment, input_path, result_path, output_path, data, modifiers = args
+        comment, (input_path, result_path, output_path), data, modifiers = args
 
-        if comment:
-            name, comment = comment.split('\n', 1)
-            # DP TODO: cleanup comment (remove extra indents, possibly remove new lines)
-
-            if  len(name) > 0:
-                if type(state) == ChoiceState:
-                    # update while loops to use the new name
-                    if state.branches[0][-1]['Next'] == state.Name:
-                        state.branches[0][-1]['Next'] = name
-                state.Name = name
-
-            state['Comment'] = comment
+        add_name_comment(state, comment)
 
         if input_path:
             if type_ in (FailState,):
@@ -265,11 +343,11 @@ def add_modifiers(args):
         if modifiers:
             retries, catches = modifiers
             if retries:
-                if type_ in (FailState, SuccessState, PassState, WaitState):
+                if type_ not in (TaskState, ParallelState):
                     raise Exception("{}: Cannot have 'retry'".format(target))
                 state['Retry'] = retries
             if catches:
-                if type_ in (FailState, SuccessState, PassState, WaitState):
+                if type_ not in (TaskState, ParallelState):
                     raise Exception("{}: Cannot have 'catches'".format(target))
                 state['Catches'] = catches
                 state.branches = []
@@ -322,37 +400,41 @@ def parse(seq):
     catch = n_('catch') + (array|string) + op_(':') + block_s + many(state) + block_e >> make_catch
 
     path = lambda t: maybe(n_(t) + op_(':') + string)
+    mod_transform = path('input') + path('result') + path('output')
     data = n_('data') + op_(':') + block_s + json_text() + block_e
     modifier = retry | catch
+    mod_error = maybe(modifier + many(modifier) >> make_array >> make_modifiers)
     modifiers = (block_s +
                     maybe(string) +
-                    path('input') +
-                    path('result') +
-                    path('output') +
+                    mod_transform +
                     maybe(data) +
-                    maybe(modifier + many(modifier) >> make_array >> make_modifiers) +
+                    mod_error +
                  block_e)
 
     pass_ = l('Pass') + op_('(') + op_(')') >> make_pass
     success = l('Success') + op_('(') + op_(')') >> make_success
     fail = l('Fail') + op_('(') + string + op_(',') + string + op_(')') >> make_fail
-    lambda_ = l('Lambda') + op_('(') + string + op_(')') >> make_lambda
-    task = lambda_
+    task = (ln('Lambda') | ln('Activity')) + op_('(') + string + op_(')') >> make_task
     wait_types = n('seconds') | n('seconds_path') | n('timestamp') | n('timestamp_path')
     wait = l('Wait') + op_('(') + wait_types + op_('=') + (number|string) + op_(')') >> make_wait
     simple_state = pass_ | success | fail | task | wait
-    simple_state = simple_state + maybe(modifiers) >> add_modifiers
+    simple_state_ = simple_state + maybe(modifiers) >> add_modifiers
 
-    block = block_s + many(state) + block_e
-    comparison = string + op_('==') + number + op_(':')
+    transform_block = maybe(n_('transform') + op_(':') + block_s + maybe(mod_transform) + block_e)
+    error_block = maybe(n_('error') + op_(':') + block_s + maybe(mod_error) + block_e)
+    block = block_s + maybe(string) + many(state) + block_e
+    comparison_op = op('==') | op('<') | op('>') | op('<=') | op('>=')
+    comparison = string + comparison_op + (number|string) + op_(':')
     while_ = l('while') + comparison + block >> make_while
     if_else = (l('if') + comparison + block +
                many(l('elif') + comparison + block) +
                maybe(l('else') + op_(':') + block)) >> make_if_else
+    choice_state = while_ | if_else
+    choice_state_ = (choice_state + transform_block) >> make_flow_modifiers >> add_modifiers
     parallel = (l('parallel') + op_(':') + block +
                 many(l('parallel') + op_(':') + block)) >> make_parallel
-    parallel_ = parallel# + maybe(n_('error') + op_(':') + modifiers) >> add_modifiers
-    state.define(simple_state | while_ | if_else | parallel_)
+    parallel_ = (parallel + transform_block + error_block) >> make_flow_modifiers >> add_modifiers
+    state.define(simple_state_ | choice_state_ | parallel_)
 
     machine = many(state) + end
 
