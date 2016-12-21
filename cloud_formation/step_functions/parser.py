@@ -75,7 +75,10 @@ def make_number(n):
         return float(n)
 
 def make_string(n):
-    return n[1:-1]
+    if n[:3] in ('"""', "'''"):
+        return n[3:-3]
+    else:
+        return n[1:-1]
 
 def make_array(n):
     if n is None:
@@ -83,36 +86,52 @@ def make_array(n):
     else:
         return [n[0]] + n[1]
 
+def make_object(n):
+    return dict(make_array(n))
+
 def make_pass(args):
     line = args
 
     name = make_name(line)
-    return PassState(name)
+    state = PassState(name)
+    state.line = line
+    return state
 
 def make_success(args):
     line = args
 
     name = make_name(line)
-    return SuccessState(name)
+    state = SuccessState(name)
+    state.line = line
+    return state
 
 def make_fail(args):
     line, error, cause = args
 
     name = make_name(line)
-    return FailState(name, error, cause)
+    state = FailState(name, error, cause)
+    state.line = line
+    return state
 
 def make_lambda(args):
     line, func = args
 
     name = make_name(line)
     lambda_ = Lambda(None, func)
-    return TaskState(name, lambda_)
+
+    state = TaskState(name, lambda_)
+    state.line = line
+    return state
 
 def make_wait(args):
     line, key, value = args
+
     name = make_name(line)
     kwargs = {key: value}
-    return WaitState(name, **kwargs)
+
+    state = WaitState(name, **kwargs)
+    state.line = line
+    return state
 
 def make_while(args):
     line, kv, steps = args
@@ -198,21 +217,100 @@ def make_modifiers(args):
     return (retry, catch)
 
 def add_modifiers(args):
-    state, modifiers = args
+    state, args = args
 
-    if modifiers:
-        retries, catches = modifiers
-        if retries:
-            state['Retry'] = retries
-        if catches:
-            state['Catches'] = catches
-            state.branches = []
-            for catch in catches:
-                state.branches.extend(catch.branches)
+    type_ = type(state)
+    type_name = type_.__name__
+    if hasattr(state, 'line'):
+        target = "{} at line {}".format(type_name, state.line)
+    else:
+        target = "{} named {}".format(type_name, str(state))
+
+    if args:
+        comment, input_path, result_path, output_path, data, modifiers = args
+
+        if comment:
+            name, comment = comment.split('\n', 1)
+            # DP TODO: cleanup comment (remove extra indents, possibly remove new lines)
+
+            if  len(name) > 0:
+                if type(state) == ChoiceState:
+                    # update while loops to use the new name
+                    if state.branches[0][-1]['Next'] == state.Name:
+                        state.branches[0][-1]['Next'] = name
+                state.Name = name
+
+            state['Comment'] = comment
+
+        if input_path:
+            if type_ in (FailState,):
+                raise Exception("{}: Cannot have 'input'".format(target))
+            state['InputPath'] = input_path
+
+        if result_path:
+            if type_ in (FailState, SuccessState, WaitState):
+                raise Exception("{}: Cannot have 'result'".format(target))
+            state['ResultPath'] = result_path
+
+        if output_path:
+            if type_ in (FailState,):
+                raise Exception("{}: Cannot have 'output'".format(target))
+            state['OutputPath'] = output_path
+
+        if data:
+            if type_ != PassState:
+                raise Exception("{}: Cannot have 'data'".format(target))
+            state['Result'] = data
+
+        if modifiers:
+            retries, catches = modifiers
+            if retries:
+                if type_ in (FailState, SuccessState, PassState, WaitState):
+                    raise Exception("{}: Cannot have 'retry'".format(target))
+                state['Retry'] = retries
+            if catches:
+                if type_ in (FailState, SuccessState, PassState, WaitState):
+                    raise Exception("{}: Cannot have 'catches'".format(target))
+                state['Catches'] = catches
+                state.branches = []
+                for catch in catches:
+                    state.branches.extend(catch.branches)
 
     return state
 
+def json_text():
+    # Taken from https://github.com/vlasovskikh/funcparserlib/blob/master/funcparserlib/tests/json.py
+    # and modified slightly
+    null = (n('null') | n('Null')) >> const(None)
+    true = (n('true') | n('True')) >> const(True)
+    false = (n('false') | n('False')) >> const(False)
+    number = toktype('NUMBER') >> make_number
+    string = toktype('STRING') >> make_string
 
+    value = forward_decl()
+    member = string + op_(u':') + value >> tuple
+    object = (
+        op_(u'{') +
+        maybe(member + many(op_(u',') + member) + maybe(op_(','))) +
+        op_(u'}')
+        >> make_object)
+    array = (
+        op_(u'[') +
+        maybe(value + many(op_(u',') + value) + maybe(op_(','))) +
+        op_(u']')
+        >> make_array)
+
+    value.define(
+        null
+        | true
+        | false
+        | object
+        | array
+        | number
+        | string)
+    json_text = object | array
+
+    return json_text
 
 def parse(seq):
     state = forward_decl()
@@ -223,17 +321,27 @@ def parse(seq):
     retry = n_('retry') + (array|string) + number + number + number >> make_retry
     catch = n_('catch') + (array|string) + op_(':') + block_s + many(state) + block_e >> make_catch
 
+    path = lambda t: maybe(n_(t) + op_(':') + string)
+    data = n_('data') + op_(':') + block_s + json_text() + block_e
     modifier = retry | catch
-    modifiers = block_s + modifier + many(modifier) + block_e >> make_array >> make_modifiers
+    modifiers = (block_s +
+                    maybe(string) +
+                    path('input') +
+                    path('result') +
+                    path('output') +
+                    maybe(data) +
+                    maybe(modifier + many(modifier) >> make_array >> make_modifiers) +
+                 block_e)
 
     pass_ = l('Pass') + op_('(') + op_(')') >> make_pass
     success = l('Success') + op_('(') + op_(')') >> make_success
     fail = l('Fail') + op_('(') + string + op_(',') + string + op_(')') >> make_fail
     lambda_ = l('Lambda') + op_('(') + string + op_(')') >> make_lambda
-    task = lambda_ + maybe(modifiers) >> add_modifiers
+    task = lambda_
     wait_types = n('seconds') | n('seconds_path') | n('timestamp') | n('timestamp_path')
-    wait = l('Wait') + op_('(') + wait_types + op_('=') + number + op_(')') >> make_wait
+    wait = l('Wait') + op_('(') + wait_types + op_('=') + (number|string) + op_(')') >> make_wait
     simple_state = pass_ | success | fail | task | wait
+    simple_state = simple_state + maybe(modifiers) >> add_modifiers
 
     block = block_s + many(state) + block_e
     comparison = string + op_('==') + number + op_(':')
@@ -241,9 +349,9 @@ def parse(seq):
     if_else = (l('if') + comparison + block +
                many(l('elif') + comparison + block) +
                maybe(l('else') + op_(':') + block)) >> make_if_else
-    parallel = (l('parallel') + op_(':') + block + 
+    parallel = (l('parallel') + op_(':') + block +
                 many(l('parallel') + op_(':') + block)) >> make_parallel
-    parallel_ = parallel + maybe(n_('error') + op_(':') + modifiers) >> add_modifiers
+    parallel_ = parallel# + maybe(n_('error') + op_(':') + modifiers) >> add_modifiers
     state.define(simple_state | while_ | if_else | parallel_)
 
     machine = many(state) + end
