@@ -19,6 +19,8 @@ Lambda('FUNCTION_NAME')
     """Step 2
     FUNCTION_NAME is used to create actual ARN
     input / results / output / data are all valid"""
+    timeout: 60 # Lambda / Activity only
+    heartbeat: 30 # Lambda / Activity only, must be less than timeout
     retry ["Error(s)"] 0 0 0.0 # retry interval (seconds), max attempts, backoff rate
     retry [] 0 0 0.0 # Empty error to match all errors (Same as State.ALL)
     catch ["Error(s)"]:
@@ -45,10 +47,18 @@ Wait(timestamp_path='$.timestamp')
 # Flow Control #
 # ============ #
 
+# Comparison operators
+# ==, != for boolean
+# ==, !=, <, >, <=, >= for int/float/string/timestamp
+# Note: A timestamp is determined by trying to parse the string into the correct formatted
+# not, and, or are also supported with the written precedence
+# () are supported
+
 # if / elif / else becomes a Choice State
-if '$.a' == '1111-11-11T11:11:11Z':
+if '$.a' == '1111-11-11T11:11:11Z' or \
+   '$.a' == 1:
     Pass()
-elif '$.b' == "foo":
+elif '$.b' != "foo":
     Pass()
 elif '$.c' < 2:
     Pass()
