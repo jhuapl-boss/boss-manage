@@ -8,7 +8,7 @@ from sfn import Retry, Catch, Timestamp
 from sfn import PassState, SuccessState, FailState
 from sfn import TaskState, Lambda, Activity
 from sfn import WaitState
-from sfn import ChoiceState, Choice
+from sfn import ChoiceState, Choice, NotChoice, AndOrChoice
 from sfn import ParallelState, Branch
 
 def link(states, final=None):
@@ -123,6 +123,12 @@ def debug(x):
     print(x)
     return x
 
+def debug_(m):
+    def debug__(a):
+        print("{}: {!r}".format(m, a))
+        return a
+    return debug__
+
 def make_number(n):
     try:
         return int(n)
@@ -134,7 +140,9 @@ def make_string(n):
         s = n[3:-3]
     else:
         s = n[1:-1]
+    return s
 
+def make_ts_str(s):
     try: # DP XXX: A bit of a hack. TSs are also valid strings, so it is a little hard to write token roles specifially for it
         return Timestamp(s)
     except:
@@ -204,16 +212,39 @@ def make_wait(args):
 # ============
 # Flow Control
 # ============
-def _choice(logic, next_):
-    var, op, val = logic
-    op = COMPARISON[op][type(val)]
-    return Choice(var, op, val, str(next_))
+def make_comp_simple(args):
+    var, op, val = args
+    
+    if op == '!=':
+        op = COMPARISON['=='][type(val)]
+        choice = Choice(var, op, val)
+        return NotChoice(choice)
+    else:
+        op = COMPARISON[op][type(val)]
+        return Choice(var, op, val)
+
+def make_comp_not(args):
+    return NotChoice(args)
+
+def make_comp_andor(args):
+    x, xs = args
+
+    if len(xs) == 0:
+        return x
+
+    vals = [x]
+    op = ''
+    for op_, val in xs:
+        op = op_
+        vals.append(val)
+
+    return AndOrChoice(op.capitalize(), vals)
 
 def make_while(args):
-    line, logic, (comment, steps) = args
+    line, choice, (comment, steps) = args
     name = make_name(line)
 
-    choice = _choice(logic, steps[0])
+    choice['Next'] = str(steps[0])
     choices = ChoiceState(name, [choice])
     choices.branches = [steps]
     steps[-1]['Next'] = name # Create the loop
@@ -221,17 +252,19 @@ def make_while(args):
     return choices
 
 def make_if_else(args):
-    line, logic, (comment, steps), elif_, else_ = args
+    line, choice, (comment, steps), elif_, else_ = args
 
     branches = []
     choices = []
 
+    choice['Next'] = str(steps[0])
     branches.append(steps)
-    choices.append(_choice(logic, steps[0]))
+    choices.append(choice)
 
-    for line_, logic_, (_, steps_) in elif_:
+    for line_, choice_, (_, steps_) in elif_:
+        choice_['Next'] = str(steps_[0])
         branches.append(steps_)
-        choices.append(_choice(logic_, steps_[0]))
+        choices.append(choice_)
 
     if else_:
         line_, (_, steps_) = else_
@@ -303,9 +336,10 @@ def make_flow_modifiers(args):
         state, transform = args
         errors = None
 
-    return (state, (None, transform, None, errors))
+    return (state, (None, None, None, transform, None, errors))
 
 def add_modifiers(args):
+    print("add_modifiers: {!r}".format(args))
     state, args = args
 
     type_ = type(state)
@@ -316,24 +350,41 @@ def add_modifiers(args):
         target = "{} named {}".format(type_name, str(state))
 
     if args:
-        comment, (input_path, result_path, output_path), data, modifiers = args
+        comment, timeout, heartbeat, transform, data, modifiers = args
 
         add_name_comment(state, comment)
 
-        if input_path:
-            if type_ in (FailState,):
-                raise Exception("{}: Cannot have 'input'".format(target))
-            state['InputPath'] = input_path
+        if timeout:
+            if type_ not in (TaskState,):
+                raise Exception("{}: Cannot have 'timeout'".format(target))
+            state['TmeoutSeconds'] = timeout
+        else:
+            timeout = 60
 
-        if result_path:
-            if type_ in (FailState, SuccessState, WaitState):
-                raise Exception("{}: Cannot have 'result'".format(target))
-            state['ResultPath'] = result_path
+        if heartbeat:
+            if type_ not in (TaskState,):
+                raise Exception("{}: Cannot have 'heartbeat'".format(target))
+            if not heartbeat < timeout:
+                raise Exception("{}: 'heartbeat' must be less than 'timeout'".format(target))
+            state['HeartbeatSeconds'] = heartbeat
 
-        if output_path:
-            if type_ in (FailState,):
-                raise Exception("{}: Cannot have 'output'".format(target))
-            state['OutputPath'] = output_path
+        if transform:
+            input_path, result_path, output_path = transform
+
+            if input_path:
+                if type_ in (FailState,):
+                    raise Exception("{}: Cannot have 'input'".format(target))
+                state['InputPath'] = input_path
+
+            if result_path:
+                if type_ in (FailState, SuccessState, WaitState):
+                    raise Exception("{}: Cannot have 'result'".format(target))
+                state['ResultPath'] = result_path
+
+            if output_path:
+                if type_ in (FailState,):
+                    raise Exception("{}: Cannot have 'output'".format(target))
+                state['OutputPath'] = output_path
 
         if data:
             if type_ != PassState:
@@ -393,12 +444,15 @@ def json_text():
 def parse(seq):
     state = forward_decl()
 
+    # Primatives
     number = toktype('NUMBER') >> make_number
     string = toktype('STRING') >> make_string
+    ts_str = toktype('STRING') >> make_string >> make_ts_str
     array = op_('[') + maybe(string + many(op_(',') + string)) + op_(']') >> make_array
     retry = n_('retry') + (array|string) + number + number + number >> make_retry
     catch = n_('catch') + (array|string) + op_(':') + block_s + many(state) + block_e >> make_catch
 
+    # Transform / Error statements
     path = lambda t: maybe(n_(t) + op_(':') + string)
     mod_transform = path('input') + path('result') + path('output')
     data = n_('data') + op_(':') + block_s + json_text() + block_e
@@ -406,11 +460,14 @@ def parse(seq):
     mod_error = maybe(modifier + many(modifier) >> make_array >> make_modifiers)
     modifiers = (block_s +
                     maybe(string) +
+                    maybe(n_('timeout') + op_(':') + number) + 
+                    maybe(n_('heartbeat') + op_(':') + number) + 
                     mod_transform +
                     maybe(data) +
                     mod_error +
                  block_e)
 
+    # Simple States
     pass_ = l('Pass') + op_('(') + op_(')') >> make_pass
     success = l('Success') + op_('(') + op_(')') >> make_success
     fail = l('Fail') + op_('(') + string + op_(',') + string + op_(')') >> make_fail
@@ -420,11 +477,24 @@ def parse(seq):
     simple_state = pass_ | success | fail | task | wait
     simple_state_ = simple_state + maybe(modifiers) >> add_modifiers
 
+    # Flow Control blocks
     transform_block = maybe(n_('transform') + op_(':') + block_s + maybe(mod_transform) + block_e)
     error_block = maybe(n_('error') + op_(':') + block_s + maybe(mod_error) + block_e)
     block = block_s + maybe(string) + many(state) + block_e
-    comparison_op = op('==') | op('<') | op('>') | op('<=') | op('>=')
-    comparison = string + comparison_op + (number|string) + op_(':')
+
+    # Comparison logic
+    comp_op = op('==') | op('<') | op('>') | op('<=') | op('>=') | op('!=')
+    comp_simple = string + comp_op + (number|ts_str) >> make_comp_simple
+
+    comp_stmt = forward_decl()
+    comp_base = forward_decl()
+    comp_base.define((op_('(') + comp_stmt + op_(')')) | comp_simple | ((n_('not') + comp_base) >> make_comp_not))
+    comp_and = comp_base + many(n('and') + comp_base) >>  make_comp_andor
+    comp_or = comp_and + many(n('or') + comp_and) >> make_comp_andor
+    comp_stmt.define(comp_or)
+
+    # Control Flow states
+    comparison = comp_stmt + op_(':')
     while_ = l('while') + comparison + block >> make_while
     if_else = (l('if') + comparison + block +
                many(l('elif') + comparison + block) +
@@ -436,6 +506,7 @@ def parse(seq):
     parallel_ = (parallel + transform_block + error_block) >> make_flow_modifiers >> add_modifiers
     state.define(simple_state_ | choice_state_ | parallel_)
 
+    # State Machine
     machine = many(state) + end
 
     states_ = machine.parse(seq)

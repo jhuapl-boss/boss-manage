@@ -142,10 +142,53 @@ class ChoiceState(State):
         self['Default'] = str(default)
 
 class Choice(dict):
-    def __init__(self, variable, op, value, next):
-        super().__init__(Variable = variable,
-                         Next = str(next))
+    def __init__(self, variable, op, value, next_ = None):
+        super().__init__(Variable = variable)
+
         self[op] = value
+        self.op = op # for __str__ / __repr__
+
+        if next_ is not None:
+            self['Next'] = str(next_)
+
+    def __str__(self):
+        return repr(self)
+
+    def __repr__(self):
+        return "({} {} {})".format(self['Variable'], self.op, self[self.op])
+
+class NotChoice(dict):
+    def __init__(self, value, next_ = None):
+        super().__init__(Not = value)
+
+        if next_ is not None:
+            self['Next'] = str(next_)
+
+    def __str__(self):
+        return repr(self)
+
+    def __repr__(self):
+        return "(Not {!r})".format(self['Not'])
+
+class AndOrChoice(dict):
+    def __init__(self, op, values, next_ = None):
+        super().__init__()
+
+        if type(values) != list:
+            values = [values]
+
+        self[op] = values
+        self.op = op # for __str__ / __repr__
+
+        if next_ is not None:
+            self['Next'] = str(next_)
+
+    def __str__(self):
+        return repr(self)
+
+    def __repr__(self):
+        vals = map(repr, self[self.op])
+        return "(" + (" {} ".format(self.op.lower())).join(vals) + ")"
 
 class Retry(dict):
     def __init__(self, errors, interval, max, backoff):
