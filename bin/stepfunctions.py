@@ -1,19 +1,14 @@
 #!/usr/bin/env python3
 
 import sys
-from lexer import tokenize_file
-from parser import parse
 
-from funcparserlib.parser import NoParseError
+import alter_path
+from lib.stepfunctions import StateMachine
 
 if __name__ == '__main__':
     file_name = sys.argv[1]
 
-    tokens = tokenize_file(file_name)
-    #print('\n'.join(str(t) for t in tokens))
+    machine = StateMachine("")
+    def_ = machine.build(file_name, indent=3)
 
-    try:
-        machine = parse(tokens)
-        print(machine.definition(indent=3))
-    except NoParseError as e:
-        print("Syntax Error: {}".format(e))
+    print(def_)

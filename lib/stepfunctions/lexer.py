@@ -30,9 +30,8 @@ class Token(object):
     def __eq__(self, other):
         return (self.code, self.value) == (other.code, other.value)
 
-def tokenize_file(name):
-    with open(name, 'r') as fh:
-        tokens = tokenize.generate_tokens(fh.readline)
-        tokens = [Token(*t) for t in tokens]
-        return [t for t in tokens if t.code not in USELESS]
+def tokenize_source(source):
+    tokens = tokenize.generate_tokens(source)
+    tokens = [Token(*t) for t in tokens]
+    return [t for t in tokens if t.code not in USELESS]
 

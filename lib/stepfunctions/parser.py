@@ -1,15 +1,16 @@
 import json
 
 from funcparserlib.parser import (some, a, many, skip, maybe, forward_decl)
-from lexer import Token
 
-from sfn import Machine
-from sfn import Retry, Catch, Timestamp
-from sfn import PassState, SuccessState, FailState
-from sfn import TaskState, Lambda, Activity
-from sfn import WaitState
-from sfn import ChoiceState, Choice, NotChoice, AndOrChoice
-from sfn import ParallelState, Branch
+from .lexer import Token
+
+from .sfn import Machine
+from .sfn import Retry, Catch, Timestamp
+from .sfn import PassState, SuccessState, FailState
+from .sfn import TaskState, Lambda, Activity
+from .sfn import WaitState
+from .sfn import ChoiceState, Choice, NotChoice, AndOrChoice
+from .sfn import ParallelState, Branch
 
 def link(states, final=None):
     linked = []
@@ -339,7 +340,6 @@ def make_flow_modifiers(args):
     return (state, (None, None, None, transform, None, errors))
 
 def add_modifiers(args):
-    print("add_modifiers: {!r}".format(args))
     state, args = args
 
     type_ = type(state)
