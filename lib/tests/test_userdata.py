@@ -13,9 +13,14 @@
 # limitations under the License.
 
 import unittest
+import os, sys
 
-import alter_path
-from userdata import UserData
+# Allow unit test files to import the target library modules
+cur_dir = os.path.dirname(os.path.realpath(__file__))
+parent_dir = os.path.normpath(os.path.join(cur_dir, '..', '..'))
+sys.path.append(parent_dir)
+
+from lib.userdata import UserData
 
 
 class TestUserData(unittest.TestCase):

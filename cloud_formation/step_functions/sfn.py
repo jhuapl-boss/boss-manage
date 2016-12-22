@@ -1,6 +1,15 @@
 import json
 from collections import OrderedDict
 
+import iso8601
+
+# DP NOTE: Needed to allow encoding a Timestamp as a string
+class _StateMachineEncoder(json.JSONEncoder):
+    def default(self, o):
+        if type(o) == Timestamp:
+            return str(o)
+        return super().default(0)
+
 class Branch(dict):
     def __init__(self, states=None, start=None):
         super().__init__()
@@ -27,8 +36,8 @@ class Machine(Branch):
         super().__init__(states, start)
         self['Comment'] = comment
 
-    def definition(self):
-        return json.dumps(self)
+    def definition(self, **kwargs):
+        return json.dumps(self, cls=_StateMachineEncoder, **kwargs)
 
 class State(dict):
     # DP ???: should catches and retries be only for Tasks??
@@ -133,10 +142,10 @@ class ChoiceState(State):
         self['Default'] = str(default)
 
 class Choice(dict):
-    def __init__(self, variable, equals, next):
+    def __init__(self, variable, op, value, next):
         super().__init__(Variable = variable,
-                         NumericEquals = int(equals),
                          Next = str(next))
+        self[op] = value
 
 class Retry(dict):
     def __init__(self, errors, interval, max, backoff):
@@ -156,10 +165,40 @@ class Catch(dict):
         super().__init__(ErrorEquals = errors,
                          Next = str(next))
 
+def _resolve(actual, defaults):
+    """Break the actual arn apart and insert the defaults for the
+    unspecified begining parts of the arn (based on position in the
+    arn"""
+    actual = actual.split(':')
+    name = actual.pop()
+    offset = len(defaults) - len(actual)
+    arn = ":".join([*defaults[:offset], *actual, name])
+    return arn
+
 def Lambda(session, name):
     region = 'us-east-1'
-    account = None # DP TODO: lookup account id
-    return 'arn:aws:lambda:{}:{}:function:{}'.format(region, account, name)
+    account = '' # DP TODO: lookup account id
+    defaults = ['arn', 'aws', 'lambda', region, account, 'function']
+    return _resolve(name, defaults)
+
+def Activity(session, name):
+    region = 'us-east-1'
+    account = '' # DP TODO: lookup account id
+    defaults = ['arn', 'aws', 'states', region, account, 'activity']
+    return _resolve(name, defaults)
 
 def Timestamp(datetime):
     pass # DP TODO: format into appropriate format
+
+# DP NOTE: Used to determine if a given string is a valid timestamp and type the string during parsing
+class Timestamp(object):
+    def __init__(self, timestamp):
+        self.timestamp = timestamp
+        self.validate()
+
+    def validate(self):
+        iso8601.parse_date(self.timestamp)
+
+    def __str__(self):
+        return self.timestamp
+
