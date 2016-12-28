@@ -20,11 +20,7 @@ import argparse
 import sys
 import os
 import importlib
-from boto3.session import Session
-import json
-import pprint
 import glob
-import time
 
 import alter_path
 from lib import exceptions
@@ -103,9 +99,7 @@ if __name__ == '__main__':
     os.environ["AMI_VERSION"] = args.ami_version
     os.environ["SCENARIO"] = args.scenario
 
-    credentials = json.load(args.aws_credentials)
-
-    session = aws.create_session(credentials)
+    session = aws.create_session(args.aws_credentials)
 
     try:
         func = args.action.replace('-','_')
