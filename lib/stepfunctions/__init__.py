@@ -174,7 +174,10 @@ class StateMachine(object):
         while True:
             resp = self.client.describe_execution(executionArn = arn)
             if resp['status'] != 'RUNNING':
-                return resp['output']
+                if 'output' in resp:
+                    return resp['output']
+                else:
+                    return None
             else:
                 time.sleep(period)
 
