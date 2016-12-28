@@ -14,8 +14,16 @@ Wait(seconds = 30)
 Activity('Echo')
 """
 
-def run_activity(count, credentials):
-    activity = Activity('Echo', credentials = credentials)
+class BossStateMachine(StateMachine):
+    def __init__(self, domain, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.domain = domain
+
+    def _translate(self, function):
+        return "{}.{}".format(function, self.domain)
+
+def run_activity(domain, count, credentials):
+    activity = Activity('Echo.' + domain, credentials = credentials)
 
     activity.create()
     try:
@@ -37,6 +45,7 @@ if __name__ == '__main__':
                         metavar = "<file>",
                         default = os.environ.get("AWS_CREDENTIALS"),
                         help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
+    parser.add_argument("domain_name", help="Domain in which to execute the configuration (example: subnet.vpc.boss)")
 
     args = parser.parse_args()
 
@@ -46,11 +55,14 @@ if __name__ == '__main__':
         sys.exit(1)
 
     credentials = args.aws_credentials
+    domain = args.domain_name
 
-    activity = Thread(target = run_activity, args = (2, credentials))
+    activity = Thread(target = run_activity, args = (domain, 2, credentials))
     activity.start()
 
-    machine = StateMachine('HelloWorld', credentials = credentials)
+    name = 'hello.world.' + domain
+    name = ''.join([x.capitalize() for x in name.split('.')])
+    machine = StateMachine(name, credentials = credentials)
     if machine.arn is None:
         role = "arn:aws:iam::256215146792:role/service-role/StatesExecutionRole-us-ease-1"
         machine.create(sfn, role)
