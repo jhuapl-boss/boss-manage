@@ -218,20 +218,13 @@ def _resolve(actual, defaults):
     arn = ":".join([*defaults[:offset], *actual, name])
     return arn
 
-def Lambda(session, name):
-    region = 'us-east-1'
-    account = '' # DP TODO: lookup account id
+def Lambda(name, region=None, account=None):
     defaults = ['arn', 'aws', 'lambda', region, account, 'function']
     return _resolve(name, defaults)
 
-def Activity(session, name):
-    region = 'us-east-1'
-    account = '' # DP TODO: lookup account id
+def Activity(name, region=None, account=None):
     defaults = ['arn', 'aws', 'states', region, account, 'activity']
     return _resolve(name, defaults)
-
-def Timestamp(datetime):
-    pass # DP TODO: format into appropriate format
 
 # DP NOTE: Used to determine if a given string is a valid timestamp and type the string during parsing
 class Timestamp(object):

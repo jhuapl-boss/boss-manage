@@ -185,20 +185,7 @@ def make_fail(args):
     state.line = line
     return state
 
-def make_task(args):
-    (line, type_), func = args
-
-    name = make_name(line)
-    if type_ == "Lambda":
-        task = Lambda(None, func)
-    elif type_ == "Activity":
-        task = Activity(None, func)
-    else:
-        raise Exception("{} at line {}: unsuported task type".format(type_, line))
-
-    state = TaskState(name, task)
-    state.line = line
-    return state
+# make_task moved into parse function to have access to parse arguments
 
 def make_wait(args):
     line, key, value = args
@@ -441,7 +428,24 @@ def json_text():
 
     return json_text
 
-def parse(seq):
+def parse(seq, region=None, account=None, translate=lambda x: x):
+    def make_task(args):
+        (line, type_), func = args
+
+        func = translate(func)
+
+        name = make_name(line)
+        if type_ == "Lambda":
+            task = Lambda(func, region, account)
+        elif type_ == "Activity":
+            task = Activity(func, region, account)
+        else:
+            raise Exception("{} at line {}: unsuported task type".format(type_, line))
+
+        state = TaskState(name, task)
+        state.line = line
+        return state
+
     state = forward_decl()
 
     # Primatives
