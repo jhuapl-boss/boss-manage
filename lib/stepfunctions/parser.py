@@ -190,6 +190,9 @@ def make_fail(args):
 def make_wait(args):
     line, key, value = args
 
+    if key == 'timestamp' and type(value) != Timestamp:
+        raise Exception("Line {}: Invalid timestamp '{}'".format(line, value))
+
     name = make_name(line)
     kwargs = {key: value}
 
@@ -477,7 +480,7 @@ def parse(seq, region=None, account=None, translate=lambda x: x):
     fail = l('Fail') + op_('(') + string + op_(',') + string + op_(')') >> make_fail
     task = (ln('Lambda') | ln('Activity')) + op_('(') + string + op_(')') >> make_task
     wait_types = n('seconds') | n('seconds_path') | n('timestamp') | n('timestamp_path')
-    wait = l('Wait') + op_('(') + wait_types + op_('=') + (number|string) + op_(')') >> make_wait
+    wait = l('Wait') + op_('(') + wait_types + op_('=') + (number|ts_str) + op_(')') >> make_wait
     simple_state = pass_ | success | fail | task | wait
     simple_state_ = simple_state + maybe(modifiers) >> add_modifiers
 
