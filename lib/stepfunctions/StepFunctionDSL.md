@@ -1,17 +1,13 @@
 # AWS Step Function DSL
 
-DP XXX: Should the DSL language and DSL compiler implementation be kept completely
-        seperate? (The DSL doesn't link states together, do ARN resolution, name
-        states, etc)
-
 This document describes a domain specific language (DSL) for AWS Step Function
 (SFN) state machines. The using the Python stepfunctions library the DSL can be
 compiled down to the [AWS States Language][language definition].
 
-For more information on the Python [stepfunctions] library or its use visit the
+For more information on the Python [stepfunctions library] or its use visit the
 libraries page.
 
-Insert Copyright Statement for the DSL specification
+__Insert Copyright Statement for the DSL specification__
 
 ## Table of Contents:
 
@@ -50,10 +46,12 @@ The single flow control state has be translated into two of the basic flow
 control operations used in programming (if/elif/else and while loop).
 
 ## Style
-The DSL's style is influenced by Python code style. It is an indent based language
-where the level of indent is used to specify a block of code.
+The DSL's style is influenced by Python code style.
 
-EXPAND
+* It is an indent based language where the level of indent is used to specify a
+  block of code.
+* Strings can be defined using `'`, `"`, `'''`, `"""`
+* Doc String style comments for states
 
 ## Structure
 The SFN DSL format is an optional top level comment followed by a list of states.
@@ -74,7 +72,7 @@ used to compile and create the state machine.
 ## Concepts
 ### Error Names
 There is a predefined set of basic errors that can happen.
-[language definition errors]
+[State machine errors reference][language definition errors].
 
 ### Timestamps
 The SFN DSL supports comparison against timestamp values. The way a timestamp is
@@ -85,8 +83,7 @@ string comparison.
 
 ### JsonPath
 State machines use a version of JsonPath for referencing data that is is being
-processed.
-[language definition path]
+processed. [State machine path reference][language definition path].
 
 ## States
 The different types of state machine states are divided into two categories.
@@ -186,10 +183,10 @@ Modifiers:
   - `max attempts`: Number of retries to attempt before passing errors to `catch`
                   modifiers. Zero (0) is a valid value, meaning don't retry.
   - `backoff rate`: The multipler that increases the `retry interval` on each attempt
-* 'catch': If the given error(s) were encountered and not handled by a `retry`
+* `catch`: If the given error(s) were encountered and not handled by a `retry`
            then execute the given states. If the states in the catch block don't
            terminate, then execution will continue on the next valid state.
-  - error(s): A single string, array of strings, or empty array of errors to match
+  - `error(s)`: A single string, array of strings, or empty array of errors to match
               against. An empty array matches against all errors.
 
 Note: Ordering of everything besides `retry` and `catch` is currently fixed. There
