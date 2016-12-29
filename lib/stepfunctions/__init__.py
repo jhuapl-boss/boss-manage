@@ -37,6 +37,22 @@ def read(obj):
         if is_open:
             fh.close()
 
+def compile(source, region='', account_id='', translate=None, **kwargs):
+    try:
+        with read(source) as fh:
+            tokens = tokenize_source(fh.readline)
+
+        if translate is None:
+            translate = lambda x: x
+
+        machine = parse(tokens, region, account_id, translate)
+        def_ = machine.definition(**kwargs)
+        return def_
+    except NoParseError as e:
+        print("Syntax Error: {}".format(e))
+    #except Exception as e:
+    #    print("Unhandled Error: {}".format(e))
+
 def create_session(**kwargs):
     """
     Args:
@@ -109,18 +125,8 @@ class StateMachine(object):
         return function
 
     def build(self, source, **kwargs):
-        try:
-            with read(source) as fh:
-                tokens = tokenize_source(fh.readline)
-
-            region = self.session.region_name
-            machine = parse(tokens, region, self.account_id, self._translate)
-            def_ = machine.definition(**kwargs)
-            return def_
-        except NoParseError as e:
-            print("Syntax Error: {}".format(e))
-        except:
-            print("Unhandled Error: {}".format(e))
+        region = self.session.region_name
+        return compile(source, region, self.account_id, self._translate)
 
     def create(self, source, role):
         if self.arn is not None:

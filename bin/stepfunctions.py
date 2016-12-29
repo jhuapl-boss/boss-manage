@@ -3,12 +3,11 @@
 import sys
 
 import alter_path
-from lib.stepfunctions import StateMachine
+from lib.stepfunctions import compile
 
 if __name__ == '__main__':
     file_name = sys.argv[1]
 
-    machine = StateMachine("")
-    def_ = machine.build(file_name, indent=3)
+    def_ = compile(file_name, indent=3)
 
     print(def_)
