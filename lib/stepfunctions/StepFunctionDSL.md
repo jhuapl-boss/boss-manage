@@ -5,8 +5,8 @@ DP XXX: Should the DSL language and DSL compiler implementation be kept complete
         states, etc)
 
 This document describes a domain specific language (DSL) for AWS Step Function
-(SFN) state machines. The using the Python [stepfunctions] library the DSL can be
-compiled down to the AWS States Language documented at [https://states-language.net/spec.html].
+(SFN) state machines. The using the Python stepfunctions library the DSL can be
+compiled down to the [AWS States Language][language definition].
 
 For more information on the Python [stepfunctions] library or its use visit the
 libraries page.
@@ -14,27 +14,36 @@ libraries page.
 Insert Copyright Statement for the DSL specification
 
 ## Table of Contents
-Why
-Style
-Structure
-Concepts
-    Error Names
-    Timestamps
-    JSONPath
-States
-    Basic States
-    Flow Control States
+* (Why)[#Why]
+* (Style)[#Style]
+* (Structure)[#Structure]
+* (Concepts)[#Concepts]
+  - (Error Names)[#Error-Names]
+  - (Timestamps)[#Timestamps]
+  - (JsonPath)[#JsonPath]
+* (States)[#States]
+  - (Basic States)[#Basic-States]
+    - (Success State)[#Success-State]
+    - (Fail State)[#Fail-State]
+    - (Pass State)[#Pass-State]
+    - (Task State)[#Task-State]
+    - (Wait State)[#Wait-State]
+  - (Flow Control States)[#Flow-Control-States]
+    - (Comparison Operators)[#Comparison-Operators]
+    - (If)[#If]
+    - (While Loop)[#While-Loop]
+    - (Parallel)[#Parallel]
 
 ## Why
-When Amazon released AWS Step Functions they provided a [https://states-language.net/spec.html](definition)
+When Amazon released AWS Step Functions they provided a [language definition]
 for writing state machine in. While functional, it is cumbersome to write and
-maintain state machines in their JSON format. This DSL is designed to make it
+maintain state machines in their Json format. This DSL is designed to make it
 easier to read, write, and maintain step function state machines.
 
 The biggest benefit of using the DSL for writing a state machine is that when
-compiled to the AWS JSON format by a library like [stepfunctions] the states can
-be automatically linked together, instead of manually having to specify the next
-state for each state.
+compiled to the AWS Json format by a library like [stepfunctions library] the
+states can be automatically linked together, instead of manually having to
+specify the next state for each state.
 
 The single flow control state has be translated into two of the basic flow
 control operations used in programming (if/elif/else and while loop).
@@ -57,26 +66,26 @@ execution proceedes until the state at the end of the file is reached or until
 a state terminates execution.
 
 In this example there is one state. The full ARN for the Lambda will be determined
-when the DSL is compiled into the AWS JSON format. The full ARN can be passed if
+when the DSL is compiled into the AWS Json format. The full ARN can be passed if
 the desired Lambda doesn't reside in the same account or region as the connection
 used to compile and create the state machine.
 
 ## Concepts
 ### Error Names
 There is a predefined set of basic errors that can happen.
-https://states-language.net/spec.html#appendix-a
+[language definition errors]
 
 ### Timestamps
 The SFN DSL supports comparison against timestamp values. The way a timestamp is
 determined, compared to a regular string, is that it can be parsed as a timestamp
-according to RFC3339. This format often looks like yyyy-mm-ddThh:mm:ssZ. If a
+according to RFC3339. This format often looks like `yyyy-mm-ddThh:mm:ssZ`. If a
 timestamp is not in the correct format the comparison will be performed as a
 string comparison.
 
-### JSONPath
+### JsonPath
 State machines use a version of JsonPath for referencing data that is is being
 processed.
-https://states-language.net/spec.html#path
+[language definition path]
 
 ## States
 The different types of state machine states are divided into two categories.
@@ -85,7 +94,8 @@ another state. Flow control states are those that apply some flow control logic.
 
 ### Basic States
 #### Success State
-Terminal state, execution will end after this state
+A terminal state, `Success()` will cause the state machine to terminate execution
+successfully and return a result value.
 
     Success()
         """State Name
@@ -93,16 +103,32 @@ Terminal state, execution will end after this state
         input: JsonPath
         output: JsonPath
 
+States can have a Python style doc string. If given, the first line of the doc
+string is the state's name and the rest if the states comment. If no name is given
+(or an empty name) the state's name is built from the line number.
+
+Modifiers:
+* `input`: JsonPath selecting a value from the input object to be passed to the
+           current state (Default: `"$"`)
+* `output`: JsonPath selecting a value from the output object to be passed to the
+            next state (Default: `"$"`)
+
 #### Fail State
-Terminal state, execution will end after this state
-State Machine Execution will fail with the given error information
+A terminal state, `Fail()` will cause the state machine to terminate execution
+unsuccessfully with the given error and cause values.
+
     Fail(error, cause)
         """State Name
         State Comment"""
 
+Arguments:
+* `error`: String containing the error value
+* `cause`: String containing the error's cause, a more readable value
+
 #### Pass State
-Do nothing state
-Can be used to modify / inject data
+A state that does nothing `Pass()` can be used to modify the data being passed
+around or inject new data into the results.
+
     Pass()
         """State Name
         State Comment"""
@@ -112,14 +138,29 @@ Can be used to modify / inject data
         data:
             Json
 
+Modifiers:
+* `result`: JsonPath of where to place the results of the state, relative to the
+            raw input (before the `input` modifier was applied) (Default: `"$"`)
+* `data`: A block of Json data that will be used as the result of the state
+
 #### Task State
-Both are considered Tasks the only difference is how the ARN will be constructed if only the name is given
-    Lambda(arn | name)
-    Activity(arn | name)
+There are two types of task states, `Lambda()` and `Activity()`. The difference
+is where the code that will be executed is living. For `Lambda()` the code is a
+AWS Lambda function. For `Activity()` the code can be running anywhere, and is
+responsible for polling AWS to see if there is new work for it to perform. Both
+states are like function calls, where input it taken, processing is done, and a
+result is returned.
+
+Activity ARNs are created in the Step Functions section of AWS (console or API).
+Once defined multiple works can start polling for work and state machines can send
+data to the works for processing.
+
+    Lambda(name)
+    Activity(name)
         """State Name
         State Comment"""
-        Timeout: int
-        Heartbeat: int
+        timeout: int
+        heartbeat: int
         input: JsonPath
         result: JsonPath
         output: JsonPath
@@ -127,7 +168,37 @@ Both are considered Tasks the only difference is how the ARN will be constructed
         catch error(s):
             State(s)
 
+Arguments:
+* `name`: Full or partial ARN of the Lambda or Activity. A partial ARN leaves some
+          of the begining of the ARN off, to be automatically filled in during
+          compilation time. The farthest that this can be taken is just passing
+          the name of the Lambda or Activity.
+
+Modifiers:
+* `timeout`: Number of seconds before the task times out (Default: 60 seconds)
+* `heatbeat`: Number of seconds before the task times out if no heartbeat has been
+              received from the task. Needs to be less than the `timeout` value.
+* `retry`: If the given error(s) were encountered, rerun the state
+  - error(s): A single string, array of strings, or empty array of errors to match
+              against. An empty array matches against all errors.
+  - retry interval: Number of seconds to wait before the first retry
+  - max attempts: Number of retries to attempt before passing errors to `catch`
+                  modifiers. Zero (0) is a valid value, meaning don't retry.
+  - backoff rate: The multipler that increases the `retry interval` on each attempt
+* 'catch': If the given error(s) were encountered and not handled by a `retry`
+           then execute the given states. If the states in the catch block don't
+           terminate, then execution will continue on the next valid state.
+  - error(s): A single string, array of strings, or empty array of errors to match
+              against. An empty array matches against all errors.
+
+Note: Ordering of everything besides `retry` and `catch` is currently fixed. There
+      can be multiple `retry` and `catch` statements and there is no ordering of
+      those modifiers.
+
 #### Wait State
+There are four different versions of the `Wait()` state, but each pauses execution
+for a given amount of time.
+
     Wait(seconds=int)
     Wait(timestamp='yyyy-mm-ddThh:mm:ssZ')
     Wait(seconds_path=JsonPath)
@@ -137,47 +208,71 @@ Both are considered Tasks the only difference is how the ARN will be constructed
         input: JsonPath
         output: JsonPath
 
+Arguments:
+* `seconds`: Number of seconds to wait
+* `timestamp`: Wait until the specified time
+* `seconds_path`: Read the number of seconds to wait from the given JsonPath
+* `timestamp_path`: Read the timestamp to wait until from the givne JsonPath
+
 ### Flow Control States
 #### Comparison Operators
-Boolean: ==, !=
-Integer: ==, !=, <, >, <=, >=
-Float: ==, !=, <, >, <=, >=
-String: ==, !=, <, >, <=, >=
-Timestamp: ==, !=, <, >, <=, >=
 
-Comparison operators can be composed using:
+Value Type | Supported Operators
+-----------|--------------------
+Boolean    | ==, !=
+Integer    | ==, !=, <, >, <=, >=
+Float      | ==, !=, <, >, <=, >=
+String     | ==, !=, <, >, <=, >=
+Timestamp  | ==, !=, <, >, <=, >=
+
+Comparison operators can be composed using (order of list is order of precedence):
 * ()
 * not
 * and
 * or
 
-Order of precedence is the order of the list
-
 #### If
-    if JSONPath operator value:
+The basic `if` statement. Multiple (or no) `elif` statements can be included. The
+`else` statement is also optional.
+
+    if JsonPath operator value:
         """State Name
         State Comment"""
-        State(s) / Flow Control
-    elif JSONPath operator value:
-        State(s) / Flow Control
+        State(s)
+    elif JsonPath operator value:
+        State(s)
     else:
-        State(s) / Flow Control
+        State(s)
     transform:
-        input: JSONPath
-        result: JSONPath
-        output: JSONPath
+        input: JsonPath
+        result: JsonPath
+        output: JsonPath
+
+The `transform` block contains the same `input`, `result`, and `output` modifiers
+are the simple states use.
 
 #### While Loop
-    while JSONPath operator value:
+The basic `while` loop the continues to execute the given states until the condition
+is no longer true.
+
+    while JsonPath operator value:
         """State Name
         State Comment"""
-        State(s) / Flow Control
+        State(s)
     transform:
-        input: JSONPath
-        result: JSONPath
-        output: JSONPath
+        input: JsonPath
+        result: JsonPath
+        output: JsonPath
 
 #### Parallel
+The `parallel` control structure allows running multiple branches of execution
+in parallel. The parallel state waits until all branches have finished before
+moving to the next state. If there is any unhandled error in any branch, the
+whole state is considered to have failed.
+
+The state's input is passed to the first state in each branch and the results of
+the parallel state is an array of outputs from each branch.
+
     parallel:
         """State Name
         State Comment"""
@@ -185,11 +280,17 @@ Order of precedence is the order of the list
     parallel:
         State(s)
     transform:
-        input: JSONPath
-        result: JSONPath
-        output: JSONPath
+        input: JsonPath
+        result: JsonPath
+        output: JsonPath
     error:
-        Multiple retry / catch statements allowed, no ordering specified
         retry error(s) retry interval (seconds), max attempts, backoff rate
         catch error(s):
             State(s)
+
+The `error` block contains the same `retry` and `catch` modifiers as the task state.
+
+[stepfunctions library]: https://github.com/aplmicrons/stepfunctions
+[language definition]: https://states-language.net/spec.html
+[language definition errors]: https://states-language.net/spec.html#appendix-a
+[language definition path]: https://states-language.net/spec.html#path
