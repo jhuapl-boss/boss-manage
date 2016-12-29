@@ -13,26 +13,27 @@ libraries page.
 
 Insert Copyright Statement for the DSL specification
 
-## Table of Contents
-* (Why)[#Why]
-* (Style)[#Style]
-* (Structure)[#Structure]
-* (Concepts)[#Concepts]
-  - (Error Names)[#Error-Names]
-  - (Timestamps)[#Timestamps]
-  - (JsonPath)[#JsonPath]
-* (States)[#States]
-  - (Basic States)[#Basic-States]
-    - (Success State)[#Success-State]
-    - (Fail State)[#Fail-State]
-    - (Pass State)[#Pass-State]
-    - (Task State)[#Task-State]
-    - (Wait State)[#Wait-State]
-  - (Flow Control States)[#Flow-Control-States]
-    - (Comparison Operators)[#Comparison-Operators]
-    - (If)[#If]
-    - (While Loop)[#While-Loop]
-    - (Parallel)[#Parallel]
+## Table of Contents:
+
+* [Why](#Why)
+* [Style](#Style)
+* [Structure](#Structure)
+* [Concepts](#Concepts)
+  - [Error Names](#Error-Names)
+  - [Timestamps](#Timestamps)
+  - [JsonPath](#JsonPath)
+* [States](#States)
+  - [Basic States](#Basic-States)
+    - [Success State](#Success-State)
+    - [Fail State](#Fail-State)
+    - [Pass State](#Pass-State)
+    - [Task State](#Task-State)
+    - [Wait State](#Wait-State)
+  - [Flow Control States](#Flow-Control-States)
+    - [Comparison Operators](#Comparison-Operators)
+    - [If](#If)
+    - [While Loop](#While-Loop)
+    - [Parallel](#Parallel)
 
 ## Why
 When Amazon released AWS Step Functions they provided a [language definition]
@@ -179,12 +180,12 @@ Modifiers:
 * `heatbeat`: Number of seconds before the task times out if no heartbeat has been
               received from the task. Needs to be less than the `timeout` value.
 * `retry`: If the given error(s) were encountered, rerun the state
-  - error(s): A single string, array of strings, or empty array of errors to match
+  - `error(s)`: A single string, array of strings, or empty array of errors to match
               against. An empty array matches against all errors.
-  - retry interval: Number of seconds to wait before the first retry
-  - max attempts: Number of retries to attempt before passing errors to `catch`
+  - `retry interval`: Number of seconds to wait before the first retry
+  - `max attempts`: Number of retries to attempt before passing errors to `catch`
                   modifiers. Zero (0) is a valid value, meaning don't retry.
-  - backoff rate: The multipler that increases the `retry interval` on each attempt
+  - `backoff rate`: The multipler that increases the `retry interval` on each attempt
 * 'catch': If the given error(s) were encountered and not handled by a `retry`
            then execute the given states. If the states in the catch block don't
            terminate, then execution will continue on the next valid state.
