@@ -1,3 +1,5 @@
+"""State machine comment"""
+
 # ====== #
 # States #
 # ====== #
@@ -37,7 +39,7 @@ Activity('us-east-1:123456:activity:FUNCTION_NAME')
 # Four different versions of a sleep function
 # input / output are valid
 Wait(seconds=30)
-Wait(timestamp='yyyy-mm-ddThh:mm:ssZ') # RFC3339 formatted
+#Wait(timestamp='yyyy-mm-ddThh:mm:ssZ') # RFC3339 formatted
 Wait(timestamp='1111-11-11T11:11:11Z')
 Wait(seconds_path='$.seconds')
 Wait(timestamp_path='$.timestamp')
