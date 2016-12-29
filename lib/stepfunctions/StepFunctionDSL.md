@@ -18,6 +18,7 @@ __Insert Copyright Statement for the DSL specification__
   - [Error Names](#Error-Names)
   - [Timestamps](#Timestamps)
   - [JsonPath](#JsonPath)
+* [Top-Level Fields](#Top-Level-Fields)
 * [States](#States)
   - [Basic States](#Basic-States)
     - [Success State](#Success-State)
@@ -84,6 +85,21 @@ string comparison.
 ### JsonPath
 State machines use a version of JsonPath for referencing data that is is being
 processed. [State machine path reference][language definition path].
+
+## Top-Level Fields
+A SFN DSL file consists of three optional fields followed by a list of States.
+
+    """State machine comment"""
+    version: "1.0"
+    timeout: int
+
+The top level comment is the comment for the state machine that is created.
+
+* `version`: Is a string of the version number of the State Machine language to
+             compile down to. Currently only `"1.0"` is supported.
+* `timeout`: The overall timeout in seconds for the whole state machine execution.
+             If the state machine has not finished execution within this time
+             the execution fails with a `States.Timeout` error.
 
 ## States
 The different types of state machine states are divided into two categories.

@@ -514,12 +514,16 @@ def parse(seq, region=None, account=None, translate=lambda x: x):
     state.define(simple_state_ | choice_state_ | parallel_)
 
     # State Machine
-    machine = maybe(string) + many(state) + end
+    version = maybe(n_('version') + op_(':') + string)
+    timeout = maybe(n_('timeout') + op_(':') + number)
+    machine = maybe(string) + version + timeout + many(state) + end
 
-    comment, states_ = machine.parse(seq)
+    comment, version_, timeout_, states_ = machine.parse(seq)
     states_ = link(states_)
 
     return Machine(comment = comment,
                    states = states_,
-                   start = states_[0])
+                   start = states_[0],
+                   version = version_,
+                   timeout = timeout_)
 

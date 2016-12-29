@@ -1,5 +1,8 @@
 """State machine comment"""
 
+version: "1.0"
+timeout: 60
+
 # ====== #
 # States #
 # ====== #

@@ -32,9 +32,15 @@ class Branch(dict):
 
 
 class Machine(Branch):
-    def __init__(self, comment="", states=None, start=None):
+    def __init__(self, comment="", states=None, start=None, version=None, timeout=None):
         super().__init__(states, start)
         self['Comment'] = comment
+
+        if version is not None:
+            self['Version'] = version
+
+        if timeout is not None:
+            self['TimeoutSeconds'] = timeout
 
     def definition(self, **kwargs):
         return json.dumps(self, cls=_StateMachineEncoder, **kwargs)
