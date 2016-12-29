@@ -1,3 +1,17 @@
+# Copyright 2016 The Johns Hopkins University Applied Physics Laboratory
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import json
 
 from funcparserlib.parser import (some, a, many, skip, maybe, forward_decl)
@@ -13,6 +27,22 @@ from .sfn import ChoiceState, Choice, NotChoice, AndOrChoice
 from .sfn import ParallelState, Branch
 
 def link(states, final=None):
+    """Take a list of states and link each together in the order given
+
+    Automatically creates a default end state if there is no default and the ChoiceState
+    would terminate.
+
+    States for ChoceState branches (and other states) are processed and added to the list
+    of returned states.
+
+    Args:
+        states (list): List of States to link together
+        final (string|State|None): Name of next state to link the final state to
+                                   None to terminate execution with the final state
+
+    Returns:
+        list: List of linked States
+    """
     linked = []
     for i in range(len(states)):
         state = states[i]
