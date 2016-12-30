@@ -27,13 +27,17 @@ from .sfn import ChoiceState, Choice, NotChoice, AndOrChoice
 from .sfn import ParallelState, Branch
 
 def link(states, final=None):
-    """Take a list of states and link each together in the order given
+    """Take a list of states and links them together in the order given
 
     Automatically creates a default end state if there is no default and the ChoiceState
-    would terminate.
+    terminates.
 
-    States for ChoceState branches (and other states) are processed and added to the list
+    States for ChoiceState branches (and catch blocks) are processed and added to the list
     of returned states.
+
+    Convention: If the State has an attribute 'branches' is should be a list of list of state.
+                Each list of state will be linked together and then appended to the list of
+                returned States.
 
     Args:
         states (list): List of States to link together
@@ -53,9 +57,9 @@ def link(states, final=None):
         # The first three conditions are checking to see if the state needs
         # to be linked with the next state or if it is already linked / terminates
         if 'Next' in state:
-            pass
+            pass # process branches, if they exist
         elif 'End' in state:
-            pass
+            pass # process branches, if they exist
         elif type(state) in (SuccessState, FailState): #terminal states
             pass
         elif type(state) == ChoiceState:
@@ -79,12 +83,23 @@ def link(states, final=None):
     return linked
 
 def make_name(line):
+    """Take the line number of a state and return the state name"""
     return "Line{}".format(line)
 
 def add_name_comment(state, comment):
+    """Take a doc string comment and set the state name and comment
+
+    Args:
+        state (State): State to update the name of and add the comment to
+        comment (None|tuple): None or tuple of (name, comment)
+                              If name is an empty string no name change is performed
+    """
     if comment:
         name, comment = comment.split('\n', 1)
-        # DP TODO: cleanup comment (remove extra indents, possibly remove new lines)
+
+        name = name.strip()
+        # DP NOTE: strip each comment line. it can mess up comments if they contain internal indenting
+        comment = '\n'.join([l.strip() for l in comment.split('\n')])
 
         if  len(name) > 0:
             if type(state) == ChoiceState:
@@ -95,6 +110,8 @@ def add_name_comment(state, comment):
 
         state['Comment'] = comment
 
+# Dictionary of comparison operator and type that resolves
+# to the state machine comparison operator
 COMPARISON = {
     '==': {
         str: 'StringEquals',
@@ -127,10 +144,6 @@ COMPARISON = {
         float: 'NumericGreaterThanEquals',
         '': 'TimestampGreaterThanEquals',
     },
-    # DP TODO: handle these
-    #'and': 'And',
-    #'or': 'Or',
-    #'not': 'Not',
 }
 
 const = lambda x: lambda _: x
@@ -151,22 +164,33 @@ block_s = skip(toktype('INDENT'))
 block_e = skip(toktype('DEDENT'))
 
 def debug(x):
+    """Print the current object being parsed"""
     print(x)
     return x
 
 def debug_(m):
+    """Print the current object with a prefix
+
+    Args:
+        m (string): Prefix to print before debuged object
+    """
     def debug__(a):
         print("{}: {!r}".format(m, a))
         return a
     return debug__
 
 def make_number(n):
+    """Parse the given string as an int or float"""
     try:
         return int(n)
     except ValueError:
         return float(n)
 
 def make_string(n):
+    """Remove a strings quotes and return the raw string
+
+    NOTE: escaping is done / undone
+    """
     if n[:3] in ('"""', "'''"):
         s = n[3:-3]
     else:
@@ -174,24 +198,45 @@ def make_string(n):
     return s
 
 def make_ts_str(s):
+    """Check to see if the given string is a Timestamp
+
+    Returns:
+        Timestamp|string: Timestamp if the string is a valid timestamp
+                          String if the the string is not a timestamp
+    """
     try: # DP XXX: A bit of a hack. TSs are also valid strings, so it is a little hard to write token roles specifially for it
         return Timestamp(s)
     except:
         return s
 
 def make_array(n):
+    """Take the results of parsing an array and return an array
+
+    Args:
+        n (None|list): None for empty list
+                       list should be [head, [tail]]
+    """
     if n is None:
         return []
     else:
         return [n[0]] + n[1]
 
 def make_object(n):
+    """Take a list of pairs and create a dict
+    
+    NOTE: run through make_array to transform the results to an array
+    """
     return dict(make_array(n))
 
 # =============
 # Simple States
 # =============
 def make_pass(args):
+    """Make a PassState
+
+    Args:
+        args (int): Line number
+    """
     line = args
 
     name = make_name(line)
@@ -200,6 +245,11 @@ def make_pass(args):
     return state
 
 def make_success(args):
+    """Make a SuccessState
+
+    Args:
+        args (int): Line number
+    """
     line = args
 
     name = make_name(line)
@@ -208,6 +258,11 @@ def make_success(args):
     return state
 
 def make_fail(args):
+    """Make a FailState
+
+    Args:
+        args (tuple): (line number:int, error:string, cause:string)
+    """
     line, error, cause = args
 
     name = make_name(line)
@@ -218,6 +273,11 @@ def make_fail(args):
 # make_task moved into parse function to have access to parse arguments
 
 def make_wait(args):
+    """Make a WaitState
+
+    Args:
+        args (tuple): (line number:int, key:string, value:string|int|Timestamp)
+    """
     line, key, value = args
 
     if key == 'timestamp' and type(value) != Timestamp:
@@ -234,6 +294,11 @@ def make_wait(args):
 # Flow Control
 # ============
 def make_comp_simple(args):
+    """Make a Choice statement for a ChoiceState
+
+    Args:
+        args (tuple): (var:string, op:string, val:string|int|Timestamp)
+    """
     var, op, val = args
     
     if op == '!=':
@@ -245,9 +310,17 @@ def make_comp_simple(args):
         return Choice(var, op, val)
 
 def make_comp_not(args):
+    """Wrap the given Choice in a NotChoice"""
     return NotChoice(args)
 
 def make_comp_andor(args):
+    """Process a list of and / or combinding Choices into an AndOrChoice
+
+    Args:
+        args (tuple): (Choice, [('and'|'or', Choice)])
+                      The 'and' or 'or' operator should be
+                      the same for all tuples in the list
+    """
     x, xs = args
 
     if len(xs) == 0:
@@ -262,17 +335,34 @@ def make_comp_andor(args):
     return AndOrChoice(op.capitalize(), vals)
 
 def make_while(args):
+    """Make a while loop into a ChoiceState
+
+    Args
+        args (tuple): (line:int, choice:Choice, (comment:string, steps:[State]))
+                      choice: The loop conditional
+                      steps: The loop body
+    """
     line, choice, (comment, steps) = args
     name = make_name(line)
 
     choice['Next'] = str(steps[0])
     choices = ChoiceState(name, [choice])
+    choices.line = line
     choices.branches = [steps]
     steps[-1]['Next'] = name # Create the loop
     add_name_comment(choices, comment)
     return choices
 
 def make_if_else(args):
+    """Make an if/elif/else into a ChoiceState
+
+    Args
+        args (tuple): (line:int, choice:Choice, (comment:string, steps:[State]), elif, else)
+                      choice: The loop conditional
+                      steps: The loop body
+                      elif [(line:int, choice:Choice, (comment:string, steps:[State]))] The elif blocks (same as the if block)
+                      else (line:int, (comment:string, steps:[State])) The else block
+    """
     line, choice, (comment, steps), elif_, else_ = args
 
     branches = []
@@ -296,17 +386,24 @@ def make_if_else(args):
 
     name = make_name(line)
     state = ChoiceState(name, choices, default)
+    state.line = line
     state.branches = branches
     add_name_comment(state, comment)
     return state
 
 def make_parallel(args):
+    """Make a ParallelState
+
+    Args:
+        args (tuple): (line:int, (comment:string, steps:[State]), parallels)
+                      steps: The parallel body
+                      parallels [(line:int, (comment:string, steps:[State]))] Additional parallel blocks
+    """
     line, (comment, steps), parallels = args
 
     branches = []
 
-    #DP XXX: calling link in the middle of parsing. should call after all states are parsed
-    #        to do so, the order of steps need to be preserved
+    #DP ???: calling link in the middle of parsing. should this be called after all states are parsed??
     branches.append(Branch(link(steps), str(steps[0])))
 
     for line_, (_, steps_) in parallels:
@@ -314,10 +411,21 @@ def make_parallel(args):
 
     name = make_name(line)
     state = ParallelState(name, branches)
+    state.line = line
     add_name_comment(state, comment)
     return state
 
 def make_retry(args):
+    """Make a Retry statement
+
+    Args:
+        args (tuple): (errors:string|list, interval:int, max:int, backoff:int|float)
+                      errors: Single error or list of errors to catch
+                              If an empty list, replaced with ['States.ALL']
+                      interval: retry interval (seconds) for first retry
+                      max: total number of retry attempts
+                      backoff: multiplier applied to interval for each retry attempt
+    """
     errors, interval, max_, backoff = args
 
     if errors == []:
@@ -325,6 +433,14 @@ def make_retry(args):
     return Retry(errors, interval, max_, backoff)
 
 def make_catch(args):
+    """Make a Catch statement
+
+    Args:
+        args (tuple): (errors:string|list, steps:[State])
+                      errors: Single error or list of errors to catch
+                              If an empty list, replaced with ['States.ALL']
+                      steps: The catch body
+    """
     errors, steps = args
     next_ = str(steps[0])
 
@@ -335,6 +451,15 @@ def make_catch(args):
     return catch
 
 def make_modifiers(args):
+    """Take a mixed list of Catch and Retry statements and return a tuple of lists
+
+    Args:
+        args (list): List of Retry and Catch objects
+
+    Returns:
+        (retry, catch): retry is None or a list of Retry objects
+                        catch is None or a list of Catch objects
+    """
     retry = []
     catch = []
     for modifier in args:
@@ -351,6 +476,16 @@ def make_modifiers(args):
     return (retry, catch)
 
 def make_flow_modifiers(args):
+    """Prepare flow control statements to be passed to add_modifiers
+
+    Args:
+        args (tuple): (state:State, transform:, errors:)
+                      state: State to add the transform and error modifiers to
+                      transform:
+                      errors: An optional block
+    Returns:
+        tuple: Tuple formated for input to add_modifiers()
+    """
     try:
         state, transform, errors = args
     except:
@@ -360,6 +495,38 @@ def make_flow_modifiers(args):
     return (state, (None, None, None, transform, None, errors))
 
 def add_modifiers(args):
+    """Add modifiers to a state
+
+    Note all modifiers can be applied to all states. If a modifier is given
+    that cannot be applied to the given state, and exception is raised.
+
+    Args:
+        args (tuple): (state:State,
+                       (
+                            comment:string,
+                            timeout:int
+                            heartbeat:int,
+                            (
+                                input:string,
+                                 result:string,
+                                 output:string
+                            ),
+                            data:dict,
+                            (
+                                retries:[Retry],
+                                catches:[Catch]
+                            )
+                       )
+                      )
+                      timeout: task timeout
+                      heartbeat: task heartbeat
+                      input: input JsonPath selector
+                      result: result JsonPath selector
+                      output: output JsonPath selector
+                      data: PassState Json results
+                      retries: list of Retries
+                      catches: list of Catches
+    """
     state, args = args
 
     type_ = type(state)
@@ -428,6 +595,7 @@ def add_modifiers(args):
     return state
 
 def json_text():
+    """Returns the parser for Json formatted data"""
     # Taken from https://github.com/vlasovskikh/funcparserlib/blob/master/funcparserlib/tests/json.py
     # and modified slightly
     null = (n('null') | n('Null')) >> const(None)
@@ -461,8 +629,27 @@ def json_text():
 
     return json_text
 
-def parse(seq, region=None, account=None, translate=lambda x: x):
+def parse(seq, region='', account='', translate=lambda x: x):
+    """Parse the given sequence of tokens into a StateMachine object
+
+    Args:
+        seq (list): List of lexer.Token tokens to parse
+        region (string): AWS region for constructed Lambda/Activity ARNs
+        account (string): AWS account id for constructed Lambda/Activity ARNs
+        translate (function): Translation function applied to Lambda/Activity names
+                              before ARNs are constructed
+
+    Returns
+        sfn.StateMachine: StateMachine object
+    """
     def make_task(args):
+        """Make a TaskState
+
+        Args:
+            args (tuple): ((line number:int, type:string), function:string)
+                          type: 'Lambda' or 'Activity'
+                          function: Full or partial ARN of the Lambda or Activity
+        """
         (line, type_), func = args
 
         func = translate(func)
