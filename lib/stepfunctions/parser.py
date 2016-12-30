@@ -629,7 +629,7 @@ def json_text():
 
     return json_text
 
-def parse(seq, region='', account='', translate=lambda x: x):
+def parse(seq, region=None, account=None, translate=lambda x: x):
     """Parse the given sequence of tokens into a StateMachine object
 
     Args:
@@ -655,12 +655,15 @@ def parse(seq, region='', account='', translate=lambda x: x):
         func = translate(func)
 
         name = make_name(line)
-        if type_ == "Lambda":
-            task = Lambda(func, region, account)
-        elif type_ == "Activity":
-            task = Activity(func, region, account)
-        else:
-            raise Exception("{} at line {}: unsuported task type".format(type_, line))
+        try:
+            if type_ == "Lambda":
+                task = Lambda(func, region, account)
+            elif type_ == "Activity":
+                task = Activity(func, region, account)
+            else:
+                raise Exception("Unsuported task type '{}'".format(type_))
+        except Exception as e:
+            raise Exception("Line {}: {}".format(line, str(e)))
 
         state = TaskState(name, task)
         state.line = line

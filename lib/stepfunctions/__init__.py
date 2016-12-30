@@ -62,7 +62,7 @@ def read(obj):
         if is_open:
             fh.close()
 
-def compile(source, region='', account_id='', translate=None, file=sys.stderr, **kwargs):
+def compile(source, region=None, account_id=None, translate=None, file=sys.stderr, **kwargs):
     """Compile a source step function dsl file into the AWS state machine definition
 
     Args:

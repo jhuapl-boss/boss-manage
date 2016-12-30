@@ -389,12 +389,18 @@ def _resolve(actual, defaults):
     Returns:
         (string): Complete ARN
     """
-    actual = actual.split(':')
-    name = actual.pop()
-    offset = len(defaults) - len(actual)
-    # DP TODO: custom error that the ARN is missing data
-    arn = ":".join([*defaults[:offset], *actual, name])
-    return arn
+    actual_ = actual.split(':')
+    name = actual_.pop()
+    offset = len(defaults) - len(actual_)
+    try:
+        # Wrap the join because an error should only be produced if we try
+        # to use a None value. None can be passed in the defaults if that
+        # default value is never used
+        arn = ":".join([*defaults[:offset], *actual_, name])
+        return arn
+    except TypeError:
+        raise Exception("One or more of the default values for ARN '{}' was not specified".format(actual))
+
 
 def Lambda(name, region=None, account=None):
     """Resolve a partial Lambda ARN into a full ARN with the given region/account
@@ -420,7 +426,6 @@ def Activity(name, region=None, account=None):
     defaults = ['arn', 'aws', 'states', region, account, 'activity']
     return _resolve(name, defaults)
 
-# DP NOTE: Used to determine if a given string is a valid timestamp and type the string during parsing
 class Timestamp(object):
     """Wrapper around a timestamp string.
 
