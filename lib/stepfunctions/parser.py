@@ -15,8 +15,10 @@
 import json
 
 from funcparserlib.parser import (some, a, many, skip, maybe, forward_decl)
+from funcparserlib.parser import NoParseError, State
 
 from .lexer import Token
+from .exceptions import ParserError
 
 from .sfn import Machine
 from .sfn import Retry, Catch, Timestamp
@@ -281,6 +283,7 @@ def make_wait(args):
     line, key, value = args
 
     if key == 'timestamp' and type(value) != Timestamp:
+        raise ParserError(line, 0, "Invalid timestamp '{}'".format(value), '')
         raise Exception("Line {}: Invalid timestamp '{}'".format(line, value))
 
     name = make_name(line)
@@ -536,6 +539,8 @@ def add_modifiers(args):
     else:
         target = "{} named {}".format(type_name, str(state))
 
+    error = lambda m: ParserError(state.line, 0, m, '')
+
     if args:
         comment, timeout, heartbeat, transform, data, modifiers = args
 
@@ -738,12 +743,26 @@ def parse(seq, region=None, account=None, translate=lambda x: x):
     timeout = maybe(n_('timeout') + op_(':') + number)
     machine = maybe(string) + version + timeout + many(state) + end
 
-    comment, version_, timeout_, states_ = machine.parse(seq)
-    states_ = link(states_)
+    try:
+        # call run() directly to have better control of error handling
+        (tree, _) = machine.run(seq, State())
+        comment, version_, timeout_, states_ = tree
+        states_ = link(states_)
 
-    return Machine(comment = comment,
-                   states = states_,
-                   start = states_[0],
-                   version = version_,
-                   timeout = timeout_)
+        return Machine(comment = comment,
+                       states = states_,
+                       start = states_[0],
+                       version = version_,
+                       timeout = timeout_)
+    except NoParseError as e:
+        max = e.state.max
+        tok = seq[max] if len(seq) > max else Token('EOF', '<EOF>')
+
+        if tok.code == 'ERRORTOKEN':
+            msg = "Unterminated quote"
+        else:
+            msg = "Invalid syntax"
+            # DP NOTE: Should the actual token be used in the error message?
+
+        raise ParserError.from_token(tok, msg)
 

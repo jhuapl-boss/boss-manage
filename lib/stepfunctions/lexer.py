@@ -15,6 +15,8 @@
 import tokenize
 import token
 
+from .exceptions import TokenError
+
 USELESS = ['NEWLINE', 'NL', 'COMMENT']
 
 class Token(object):
@@ -65,7 +67,10 @@ def tokenize_source(source):
     Returns:
         list: List of parsed tokens
     """
-    tokens = tokenize.generate_tokens(source)
-    tokens = [Token(*t) for t in tokens]
-    return [t for t in tokens if t.code not in USELESS]
+    try:
+        tokens = tokenize.generate_tokens(source)
+        tokens = [Token(*t) for t in tokens]
+        return [t for t in tokens if t.code not in USELESS]
+    except tokenize.TokenError as e:
+        raise TokenError.from_tokenize(e)
 

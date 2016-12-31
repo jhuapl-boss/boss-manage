@@ -22,10 +22,10 @@ from contextlib import contextmanager
 
 from boto3.session import Session
 from botocore.exceptions import ClientError
-from funcparserlib.parser import NoParseError
 
 from .lexer import tokenize_source
 from .parser import parse
+from .exceptions import StepFunctionError
 
 # DP XXX: Currently using os.path.isfile to determine if a string is a filepath or data
 #         Should there also be a check to see if the string is in path format (but not a valid file)?
@@ -79,6 +79,7 @@ def compile(source, region=None, account_id=None, translate=None, file=sys.stder
     """
     try:
         with read(source) as fh:
+            source_name = fh.name
             tokens = tokenize_source(fh.readline)
 
         if translate is None:
@@ -87,8 +88,11 @@ def compile(source, region=None, account_id=None, translate=None, file=sys.stder
         machine = parse(tokens, region, account_id, translate)
         def_ = machine.definition(**kwargs)
         return def_
-    except NoParseError as e:
-        print("Syntax Error: {}".format(e), file=file)
+    except StepFunctionError as e:
+        print('File "{}", line {}'.format(source_name, e.lineno), file=file)
+        print(e.line, file=file)
+        print((' ' * e.pos) + '^', file=file)
+        print('Syntax Error: {}'.format(str(e)), file=file)
     #except Exception as e:
     #    print("Unhandled Error: {}".format(e), file=file)
 
