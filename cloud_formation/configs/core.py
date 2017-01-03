@@ -242,7 +242,7 @@ def create(session, domain):
 
     success = config.create(session)
     if success:
-        vpc_id = lib.vpc_id_lookup(session, domain)
+        vpc_id = aws.vpc_id_lookup(session, domain)
         aws.rt_name_default(session, vpc_id, "default." + domain)
 
         post_init(session, domain)
