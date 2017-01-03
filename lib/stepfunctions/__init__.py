@@ -16,6 +16,9 @@ import sys
 import os
 import time
 import json
+import rand
+from string import ascii_uppercase as CHARS
+from datetime import datetime
 from io import IOBase, StringIO
 from collections import Mapping
 from pathlib import Path
@@ -283,7 +286,7 @@ class StateMachine(object):
             raise Exception("Unknown input format")
 
         if name is None:
-            name = self.name # DP TODO: add random characters
+            name = self.name + "-" + datetime.now().strftime("%Y%m%d%H%M%s%f")
 
         resp = self.client.start_execution(stateMachineArn = self.arn,
                                            name = name,
@@ -361,7 +364,7 @@ class Activity(object):
         """
         self.name = name
         self.arn = arn
-        self.worker = worker or name # DP TODO: append random characters to the end of name
+        self.worker = worker or (name + "-" + "".join(random.sample(CHARS, 6)))
         self.token = None
         self.session, self.account_id = create_session(**kwargs)
         self.client = self.session.client('stepfunctions')
