@@ -107,6 +107,9 @@ def create_session(**kwargs):
         'aws_account_id': ''
     }
 
+    Note: If no arguments are given, a Boto3 session is created and it will attempt
+          to figure out this information for itself, from predefined locations.
+
     Args:
         credentials (dict|fh|filename|json string): source to load credentials from
 
@@ -122,40 +125,46 @@ def create_session(**kwargs):
         (Boto3 Session, account_id) : Boto3 session populated with given credentials and
                                       AWS Account ID (either given or derived from session)
     """
-    credentials = kwargs.get('credentials', {})
-    if isinstance(credentials, Mapping):
-        pass
-    elif isinstance(credentials, str):
-        if os.path.isfile(credentials):
-            with open(credentials, 'r') as fh:
-                credentials = json.load(fh)
-        else:
-            credentials = json.loads(credentials)
-    elif isinstance(credentials, IOBase):
-        credentials = json.load(credentials)
+    if len(kwargs) == 0:
+        session = Session() # Let boto3 try to resolve the keys iteself, potentially from EC2 meta data
+        account_id = None
     else:
-        raise Exception("Unknown credentials type: {}".format(type(credentials).__name__))
-    # DP TODO: figure out how to construct Session with no arguemnts to have boto3 load keys from EC2 meta data
+        credentials = kwargs.get('credentials', {})
+        if isinstance(credentials, Mapping):
+            pass
+        elif isinstance(credentials, str):
+            if os.path.isfile(credentials):
+                with open(credentials, 'r') as fh:
+                    credentials = json.load(fh)
+            else:
+                credentials = json.loads(credentials)
+        elif isinstance(credentials, IOBase):
+            credentials = json.load(credentials)
+        else:
+            raise Exception("Unknown credentials type: {}".format(type(credentials).__name__))
 
-    def locate(names, locations):
-        for location in locations:
-            for name in names:
-                if name in location:
-                    return location[name]
-        names = " or ".join(names)
-        raise Exception("Could not find credentials value for {}".format(names))
+        def locate(names, locations):
+            for location in locations:
+                for name in names:
+                    if name in location:
+                        return location[name]
+            names = " or ".join(names)
+            raise Exception("Could not find credentials value for {}".format(names))
 
-    access = locate(('access_key', 'aws_access_key'), (kwargs, credentials))
-    secret = locate(('secret_key', 'aws_secret_key'), (kwargs, credentials))
-    region = locate(('region', 'aws_region'), (kwargs, credentials))
+        access = locate(('access_key', 'aws_access_key'), (kwargs, credentials))
+        secret = locate(('secret_key', 'aws_secret_key'), (kwargs, credentials))
+        region = locate(('region', 'aws_region'), (kwargs, credentials))
 
-    session = Session(aws_access_key_id = access,
-                      aws_secret_access_key = secret,
-                      region_name = region)
+        session = Session(aws_access_key_id = access,
+                          aws_secret_access_key = secret,
+                          region_name = region)
 
-    try:
-        account_id = locate(('account_id', 'aws_account_id'), (kwargs, credentials))
-    except:
+        try:
+            account_id = locate(('account_id', 'aws_account_id'), (kwargs, credentials))
+        except:
+            account_id = None
+
+    if account_id is None:
         # From boss-manage.git/lib/aws.py:get_account_id_from_session()
         account_id = session.client('iam').list_users(MaxItems=1)["Users"][0]["Arn"].split(':')[4]
 
