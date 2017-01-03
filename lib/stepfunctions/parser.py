@@ -591,7 +591,7 @@ def add_modifiers(args):
                 state['Retry'] = retries
             if catches:
                 if type_ not in (TaskState, ParallelState):
-                    raise Exception("{}: Cannot have 'catches'".format(target))
+                    raise Exception("{}: Cannot have 'catch'".format(target))
                 state['Catches'] = catches
                 state.branches = []
                 for catch in catches:
