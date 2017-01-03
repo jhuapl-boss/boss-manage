@@ -166,8 +166,8 @@ states are like function calls, where input it taken, processing is done, and a
 result is returned.
 
 Activity ARNs are created in the Step Functions section of AWS (console or API).
-Once defined multiple works can start polling for work and state machines can send
-data to the works for processing.
+Once defined multiple workers can start polling for work and state machines can send
+data to the worker(s) for processing.
 
     Lambda(name)
     Activity(name)
