@@ -16,8 +16,12 @@ import sys
 import os
 import time
 import json
+import rand
+from string import ascii_uppercase as CHARS
+from datetime import datetime
 from io import IOBase, StringIO
 from collections import Mapping
+from pathlib import Path
 from contextlib import contextmanager
 
 from boto3.session import Session
@@ -27,30 +31,26 @@ from .lexer import tokenize_source
 from .parser import parse
 from .exceptions import StepFunctionError
 
-# DP XXX: Currently using os.path.isfile to determine if a string is a filepath or data
-#         Should there also be a check to see if the string is in path format (but not a valid file)?
-
 @contextmanager
 def read(obj):
     """Context manager for reading data from multiple sources as a file object
 
     Args:
-        obj (string|file object): Data to read / read from
+        obj (string|Path|file object): Data to read / read from
                                   If obj is a file object, this is just a pass through
-                                  If obj is a valid file path, this is similar to open(obj, 'r')
-                                  If obj is non file path string, this creates a StringIO so
+                                  If obj is a Path object, this is similar to obj.open()
+                                  If obj is a string, this creates a StringIO so
                                      the data can be read like a file object
 
     Returns:
         file object: File handle containing data
     """
     is_open = False
+    if isinstance(obj, Path):
+        fh = obj.open()
+        is_open = True
     if isinstance(obj, str):
-        if os.path.isfile(obj):
-            fh = open(obj, 'r')
-            is_open = True
-        else:
-            fh = StringIO(obj)
+        fh = StringIO(obj)
     elif isinstance(obj, IOBase):
         fh = obj
     else:
@@ -66,7 +66,7 @@ def compile(source, region=None, account_id=None, translate=None, file=sys.stder
     """Compile a source step function dsl file into the AWS state machine definition
 
     Args:
-        source (string|file path|file object): Source of step function dsl
+        source (string|Path|file object): Source of step function dsl, passed to read()
         region (string): AWS Region for Lambda / Activity ARNs that need to be filled in
         account_id (string): AWS Account ID for Lambda / Activity ARNs that need to be filled in
         translate (None|function): Function that translates a Lambda / Activity name before
@@ -107,8 +107,15 @@ def create_session(**kwargs):
         'aws_account_id': ''
     }
 
+    Note: If no arguments are given, a Boto3 session is created and it will attempt
+          to figure out this information for itself, from predefined locations.
+
     Args:
-        credentials (dict|fh|filename|json string): source to load credentials from
+        credentials (dict|fh|Path|json string): source to load credentials from
+                                                If a dict, used directly
+                                                If a fh, read and parsed as a Json object
+                                                If a Path, opened, read, and parsed as a Json object
+                                                If a string, parsed as a Json object
 
         Note: The following will override the values in credentials if they exist
         region / aws_region (string): AWS region to connect to
@@ -122,40 +129,45 @@ def create_session(**kwargs):
         (Boto3 Session, account_id) : Boto3 session populated with given credentials and
                                       AWS Account ID (either given or derived from session)
     """
-    credentials = kwargs.get('credentials', {})
-    if isinstance(credentials, Mapping):
-        pass
-    elif isinstance(credentials, str):
-        if os.path.isfile(credentials):
-            with open(credentials, 'r') as fh:
-                credentials = json.load(fh)
-        else:
-            credentials = json.loads(credentials)
-    elif isinstance(credentials, IOBase):
-        credentials = json.load(credentials)
+    if len(kwargs) == 0:
+        session = Session() # Let boto3 try to resolve the keys iteself, potentially from EC2 meta data
+        account_id = None
     else:
-        raise Exception("Unknown credentials type: {}".format(type(credentials).__name__))
-    # DP TODO: figure out how to construct Session with no arguemnts to have boto3 load keys from EC2 meta data
+        credentials = kwargs.get('credentials', {})
+        if isinstance(credentials, Mapping):
+            pass
+        if isinstance(credentials, Path):
+            with credentials.open() as fh:
+                credentials = json.load(fh)
+        elif isinstance(credentials, str):
+            credentials = json.loads(credentials)
+        elif isinstance(credentials, IOBase):
+            credentials = json.load(credentials)
+        else:
+            raise Exception("Unknown credentials type: {}".format(type(credentials).__name__))
 
-    def locate(names, locations):
-        for location in locations:
-            for name in names:
-                if name in location:
-                    return location[name]
-        names = " or ".join(names)
-        raise Exception("Could not find credentials value for {}".format(names))
+        def locate(names, locations):
+            for location in locations:
+                for name in names:
+                    if name in location:
+                        return location[name]
+            names = " or ".join(names)
+            raise Exception("Could not find credentials value for {}".format(names))
 
-    access = locate(('access_key', 'aws_access_key'), (kwargs, credentials))
-    secret = locate(('secret_key', 'aws_secret_key'), (kwargs, credentials))
-    region = locate(('region', 'aws_region'), (kwargs, credentials))
+        access = locate(('access_key', 'aws_access_key'), (kwargs, credentials))
+        secret = locate(('secret_key', 'aws_secret_key'), (kwargs, credentials))
+        region = locate(('region', 'aws_region'), (kwargs, credentials))
 
-    session = Session(aws_access_key_id = access,
-                      aws_secret_access_key = secret,
-                      region_name = region)
+        session = Session(aws_access_key_id = access,
+                          aws_secret_access_key = secret,
+                          region_name = region)
 
-    try:
-        account_id = locate(('account_id', 'aws_account_id'), (kwargs, credentials))
-    except:
+        try:
+            account_id = locate(('account_id', 'aws_account_id'), (kwargs, credentials))
+        except:
+            account_id = None
+
+    if account_id is None:
         # From boss-manage.git/lib/aws.py:get_account_id_from_session()
         account_id = session.client('iam').list_users(MaxItems=1)["Users"][0]["Arn"].split(':')[4]
 
@@ -208,6 +220,18 @@ class StateMachine(object):
         region = self.session.region_name
         return compile(source, region, self.account_id, self._translate, **kwargs)
 
+    def _resolve_role(self, role):
+        role = role.strip()
+        if not role.lower().startswith("arn:aws:iam"):
+            client = self.session.client('iam')
+            try:
+                response = client.get_role(RoleName=role)
+                role = response['Role']['Arn']
+            except:
+                raise Exception("Could not lookup role '{}'".format(role))
+
+        return role
+
     def create(self, source, role):
         """Create the state machine in AWS from the give source
 
@@ -220,7 +244,7 @@ class StateMachine(object):
         if self.arn is not None:
             raise Exception("State Machine {} already exists".format(self.arn))
 
-        # DP TODO: lookup role arn based on role name
+        role = self._resolve_role(role)
         definition = self.build(source)
 
         resp = self.client.create_state_machine(name = self.name,
@@ -262,7 +286,7 @@ class StateMachine(object):
             raise Exception("Unknown input format")
 
         if name is None:
-            name = self.name # DP TODO: add random characters
+            name = self.name + "-" + datetime.now().strftime("%Y%m%d%H%M%s%f")
 
         resp = self.client.start_execution(stateMachineArn = self.arn,
                                            name = name,
@@ -340,7 +364,7 @@ class Activity(object):
         """
         self.name = name
         self.arn = arn
-        self.worker = worker or name # DP TODO: append random characters to the end of name
+        self.worker = worker or (name + "-" + "".join(random.sample(CHARS, 6)))
         self.token = None
         self.session, self.account_id = create_session(**kwargs)
         self.client = self.session.client('stepfunctions')
