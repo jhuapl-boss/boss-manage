@@ -36,6 +36,7 @@ from lib import scalyr
 from lib import constants as const
 
 from update_lambda_fcn import load_lambdas_on_s3
+import boto3
 
 def create_config(session, domain, keypair=None, user_data=None):
     """
@@ -130,16 +131,17 @@ def create_config(session, domain, keypair=None, user_data=None):
 
     if creating_tile_bucket:
         config.add_lambda_permission(
-            'tileBucketInvokeMultiLambda', 'MultiLambda',
+            'tileBucketInvokeMultiLambda', names.multi_lambda,
             principal='s3.amazonaws.com', source={
                 'Fn::Join': [':', ['arn', 'aws', 's3', '', '', tile_bucket_name]]}, #DP TODO: move into constants
-            depends_on='tileBucket'
+            depends_on=['tileBucket', 'MultiLambda']
         )
     else:
         config.add_lambda_permission(
-            'tileBucketInvokeMultiLambda', 'MultiLambda',
+            'tileBucketInvokeMultiLambda', names.multi_lambda,
             principal='s3.amazonaws.com', source={
-                'Fn::Join': [':', ['arn', 'aws', 's3', '', '', tile_bucket_name]]}
+                'Fn::Join': [':', ['arn', 'aws', 's3', '', '', tile_bucket_name]]},
+            depends_on='MultiLambda'
         )
 
     # Add topic to indicating that the object store has been write locked.
@@ -236,8 +238,9 @@ def add_tile_bucket_trigger(session, domain):
         session (Boto3.Session)
         domain (string): VPC domain name.
     """
-    lambda_name = names.get_multi_lambda(domain).replace('.', '-')
-    bucket_name = names.get_tile_bucket(domain)
+    names = AWSNames(domain)
+    lambda_name = names.multi_lambda
+    bucket_name = names.tile_bucket
 
     lam = boto3.client('lambda')
     resp = lam.get_function_configuration(FunctionName=lambda_name)
