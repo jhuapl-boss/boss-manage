@@ -11,13 +11,15 @@ from lib.stepfunctions import StateMachine, Activity
 
 sfn = """
 Activity('Echo')
-Wait(seconds = 30)
+Wait(seconds = 5)
 Activity('Echo')
 """
 
 class BossStateMachine(StateMachine):
-    def __init__(self, domain, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, name, domain, *args, **kwargs):
+        name_ = name + "." + domain
+        name_ = ''.join([x.capitalize() for x in name_.split('.')])
+        super().__init__(name_, *args, **kwargs)
         self.domain = domain
 
     def _translate(self, function):
@@ -37,6 +39,9 @@ def run_activity(domain, count, credentials):
             print("Echo: {}".format(input_))
 
             activity.success(input_)
+    except Exception as e:
+        print("Error: {}".format(e))
+        raise
     finally:
         activity.delete()
 
@@ -61,9 +66,7 @@ if __name__ == '__main__':
     activity = Thread(target = run_activity, args = (domain, 2, credentials))
     activity.start()
 
-    name = 'hello.world.' + domain
-    name = ''.join([x.capitalize() for x in name.split('.')])
-    machine = StateMachine(name, credentials = credentials)
+    machine = BossStateMachine('hello.world', domain, credentials = credentials)
     if machine.arn is None:
         role = "StatesExecutionRole-us-east-1"
         machine.create(sfn, role)

@@ -16,7 +16,7 @@ import sys
 import os
 import time
 import json
-import rand
+import random
 from string import ascii_uppercase as CHARS
 from datetime import datetime
 from io import IOBase, StringIO
@@ -51,6 +51,7 @@ def read(obj):
         is_open = True
     if isinstance(obj, str):
         fh = StringIO(obj)
+        fh.name = '<string>'
     elif isinstance(obj, IOBase):
         fh = obj
     else:
@@ -79,7 +80,10 @@ def compile(source, region=None, account_id=None, translate=None, file=sys.stder
     """
     try:
         with read(source) as fh:
-            source_name = fh.name
+            if hasattr(fh, 'name'):
+                source_name = fh.name
+            else:
+                source_name = "<unknown>"
             tokens = tokenize_source(fh.readline)
 
         if translate is None:
@@ -335,8 +339,14 @@ class StateMachine(object):
                 if 'output' in resp:
                     return json.loads(resp['output'])
                 else:
-                    return None
-                    # DP TODO: figure out returning error information (and how to determine the difference between the returns)
+                    resp = self.client.get_execution_history(executionArn = arn,
+                                                             reverseOrder = True)
+                    event = resp['events'][0]
+                    for key in ['Failed', 'Aborted', 'TimedOut']:
+                        key = 'execution{}EventDetails'.format(key)
+                        if key in event:
+                            return event[key]
+                    raise Exception("Could not locate error output for execution '{}'".format(arn))
             else:
                 time.sleep(period)
 
@@ -461,9 +471,9 @@ class Activity(object):
         if self.token is None:
             raise Exception("Not currently working on a task")
 
-        resp = self.client.send_task_heartbeat(taskToken = self.token,
-                                               error = error,
-                                               cause = cause)
+        resp = self.client.send_task_failure(taskToken = self.token,
+                                             error = error,
+                                             cause = cause)
         self.token = None # finished with task
 
     def heartbeat(self):

@@ -72,7 +72,7 @@ class Branch(dict):
 class Machine(Branch):
     """State Machine, consisting of a single branch of execution"""
 
-    def __init__(self, comment="", states=None, start=None, version=None, timeout=None):
+    def __init__(self, comment=None, states=None, start=None, version=None, timeout=None):
         """
         Args:
             comment (string): State machine comment
@@ -82,7 +82,9 @@ class Machine(Branch):
             timeout (int): Overall state machine timeout
         """
         super().__init__(states, start)
-        self['Comment'] = comment
+
+        if comment is not None:
+            self['Comment'] = comment
 
         if version is not None:
             self['Version'] = version
