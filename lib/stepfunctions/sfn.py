@@ -17,7 +17,6 @@ from collections import OrderedDict
 
 import iso8601 # parser for timestamp format
 
-# DP NOTE: Needed to allow encoding a Timestamp as a string
 class _StateMachineEncoder(json.JSONEncoder):
     """Custom JSONEncoder that handles the Timestamp type"""
     def default(self, o):

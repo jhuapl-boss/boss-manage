@@ -68,7 +68,6 @@ def link(states, final=None):
             if 'Default' not in state:
                 next__ = next_ # prevent branches from using the new end state (just use End=True)
                 if next__ is None:
-                    # DP ???: Can a choice state also end or do we need the extra state to end on?
                     next__ = SuccessState(str(state) + "Next")
                     linked.append(next__)
                 state['Default'] = str(next__)
@@ -100,7 +99,7 @@ def add_name_comment(state, comment):
         name, comment = comment.split('\n', 1)
 
         name = name.strip()
-        # DP NOTE: strip each comment line. it can mess up comments if they contain internal indenting
+        # DP TODO: Remove indent from each line of the comment, preserving internal indent
         comment = '\n'.join([l.strip() for l in comment.split('\n')])
 
         if  len(name) > 0:
@@ -206,7 +205,9 @@ def make_ts_str(s):
         Timestamp|string: Timestamp if the string is a valid timestamp
                           String if the the string is not a timestamp
     """
-    try: # DP XXX: A bit of a hack. TSs are also valid strings, so it is a little hard to write token roles specifially for it
+    try:
+        # A timestamp is also a valid string, so it has to be manually parsed
+        # instead of using the lexer
         return Timestamp(s)
     except:
         return s
@@ -532,14 +533,9 @@ def add_modifiers(args):
     state, args = args
 
     type_ = type(state)
-    type_name = type_.__name__
-    if hasattr(state, 'line'):
-        target = "{} at line {}".format(type_name, state.line)
-    else:
-        target = "{} named {}".format(type_name, str(state))
 
+    # DP TODO: Create AST so that ParserError context can be filled in
     error = lambda m: ParserError(state.line, 0, m, '')
-    # DP TODO: update error messages to not include the target, it it part of the Exception
 
     if args:
         comment, timeout, heartbeat, transform, data, modifiers = args
@@ -548,16 +544,16 @@ def add_modifiers(args):
 
         if timeout:
             if type_ not in (TaskState,):
-                raise error("{}: Cannot have 'timeout'".format(target))
+                raise error("Invalid modifier 'timeout'")
             state['TmeoutSeconds'] = timeout
         else:
             timeout = 60
 
         if heartbeat:
             if type_ not in (TaskState,):
-                raise error("{}: Cannot have 'heartbeat'".format(target))
+                raise error("Invalid modifier 'heartbeat'")
             if not heartbeat < timeout:
-                raise error("{}: 'heartbeat' must be less than 'timeout'".format(target))
+                raise error("Modifier 'heartbeat' must be less than 'timeout'")
             state['HeartbeatSeconds'] = heartbeat
 
         if transform:
@@ -565,33 +561,33 @@ def add_modifiers(args):
 
             if input_path:
                 if type_ in (FailState,):
-                    raise error("{}: Cannot have 'input'".format(target))
+                    raise error("Invalid modifier 'input'")
                 state['InputPath'] = input_path
 
             if result_path:
                 if type_ in (FailState, SuccessState, WaitState):
-                    raise error("{}: Cannot have 'result'".format(target))
+                    raise error("Invalid modifier 'result'")
                 state['ResultPath'] = result_path
 
             if output_path:
                 if type_ in (FailState,):
-                    raise error("{}: Cannot have 'output'".format(target))
+                    raise error("Invalid modifier 'output'")
                 state['OutputPath'] = output_path
 
         if data:
             if type_ != PassState:
-                raise error("{}: Cannot have 'data'".format(target))
+                raise error("Invalid modifier 'data'")
             state['Result'] = data
 
         if modifiers:
             retries, catches = modifiers
             if retries:
                 if type_ not in (TaskState, ParallelState):
-                    raise error("{}: Cannot have 'retry'".format(target))
+                    raise error("Invalid modifier 'retry'")
                 state['Retry'] = retries
             if catches:
                 if type_ not in (TaskState, ParallelState):
-                    raise error("{}: Cannot have 'catch'".format(target))
+                    raise error("Invalid modifier 'catch'")
                 state['Catches'] = catches
                 state.branches = []
                 for catch in catches:
@@ -762,7 +758,7 @@ def parse(seq, region=None, account=None, translate=lambda x: x):
             msg = "Unterminated quote"
         else:
             msg = "Invalid syntax"
-            # DP NOTE: Should the actual token be used in the error message?
+            # DP ???: Should the actual token be used in the error message?
 
         raise ParserError.from_token(tok, msg)
 
