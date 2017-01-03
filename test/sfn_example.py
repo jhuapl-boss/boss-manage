@@ -4,6 +4,7 @@ import sys
 import os
 import argparse
 from threading import Thread
+from pathlib import Path
 
 import alter_path
 from lib.stepfunctions import StateMachine, Activity
@@ -54,7 +55,7 @@ if __name__ == '__main__':
         print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
         sys.exit(1)
 
-    credentials = args.aws_credentials
+    credentials = Path(args.aws_credentials)
     domain = args.domain_name
 
     activity = Thread(target = run_activity, args = (domain, 2, credentials))

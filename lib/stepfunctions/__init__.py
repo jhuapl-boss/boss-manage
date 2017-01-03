@@ -18,6 +18,7 @@ import time
 import json
 from io import IOBase, StringIO
 from collections import Mapping
+from pathlib import Path
 from contextlib import contextmanager
 
 from boto3.session import Session
@@ -27,30 +28,26 @@ from .lexer import tokenize_source
 from .parser import parse
 from .exceptions import StepFunctionError
 
-# DP XXX: Currently using os.path.isfile to determine if a string is a filepath or data
-#         Should there also be a check to see if the string is in path format (but not a valid file)?
-
 @contextmanager
 def read(obj):
     """Context manager for reading data from multiple sources as a file object
 
     Args:
-        obj (string|file object): Data to read / read from
+        obj (string|Path|file object): Data to read / read from
                                   If obj is a file object, this is just a pass through
-                                  If obj is a valid file path, this is similar to open(obj, 'r')
-                                  If obj is non file path string, this creates a StringIO so
+                                  If obj is a Path object, this is similar to obj.open()
+                                  If obj is a string, this creates a StringIO so
                                      the data can be read like a file object
 
     Returns:
         file object: File handle containing data
     """
     is_open = False
+    if isinstance(obj, Path):
+        fh = obj.open()
+        is_open = True
     if isinstance(obj, str):
-        if os.path.isfile(obj):
-            fh = open(obj, 'r')
-            is_open = True
-        else:
-            fh = StringIO(obj)
+        fh = StringIO(obj)
     elif isinstance(obj, IOBase):
         fh = obj
     else:
@@ -66,7 +63,7 @@ def compile(source, region=None, account_id=None, translate=None, file=sys.stder
     """Compile a source step function dsl file into the AWS state machine definition
 
     Args:
-        source (string|file path|file object): Source of step function dsl
+        source (string|Path|file object): Source of step function dsl, passed to read()
         region (string): AWS Region for Lambda / Activity ARNs that need to be filled in
         account_id (string): AWS Account ID for Lambda / Activity ARNs that need to be filled in
         translate (None|function): Function that translates a Lambda / Activity name before
@@ -111,7 +108,11 @@ def create_session(**kwargs):
           to figure out this information for itself, from predefined locations.
 
     Args:
-        credentials (dict|fh|filename|json string): source to load credentials from
+        credentials (dict|fh|Path|json string): source to load credentials from
+                                                If a dict, used directly
+                                                If a fh, read and parsed as a Json object
+                                                If a Path, opened, read, and parsed as a Json object
+                                                If a string, parsed as a Json object
 
         Note: The following will override the values in credentials if they exist
         region / aws_region (string): AWS region to connect to
@@ -132,12 +133,11 @@ def create_session(**kwargs):
         credentials = kwargs.get('credentials', {})
         if isinstance(credentials, Mapping):
             pass
+        if isinstance(credentials, Path):
+            with credentials.open() as fh:
+                credentials = json.load(fh)
         elif isinstance(credentials, str):
-            if os.path.isfile(credentials):
-                with open(credentials, 'r') as fh:
-                    credentials = json.load(fh)
-            else:
-                credentials = json.loads(credentials)
+            credentials = json.loads(credentials)
         elif isinstance(credentials, IOBase):
             credentials = json.load(credentials)
         else:
