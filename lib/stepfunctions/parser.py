@@ -284,7 +284,6 @@ def make_wait(args):
 
     if key == 'timestamp' and type(value) != Timestamp:
         raise ParserError(line, 0, "Invalid timestamp '{}'".format(value), '')
-        raise Exception("Line {}: Invalid timestamp '{}'".format(line, value))
 
     name = make_name(line)
     kwargs = {key: value}
@@ -540,6 +539,7 @@ def add_modifiers(args):
         target = "{} named {}".format(type_name, str(state))
 
     error = lambda m: ParserError(state.line, 0, m, '')
+    # DP TODO: update error messages to not include the target, it it part of the Exception
 
     if args:
         comment, timeout, heartbeat, transform, data, modifiers = args
@@ -548,16 +548,16 @@ def add_modifiers(args):
 
         if timeout:
             if type_ not in (TaskState,):
-                raise Exception("{}: Cannot have 'timeout'".format(target))
+                raise error("{}: Cannot have 'timeout'".format(target))
             state['TmeoutSeconds'] = timeout
         else:
             timeout = 60
 
         if heartbeat:
             if type_ not in (TaskState,):
-                raise Exception("{}: Cannot have 'heartbeat'".format(target))
+                raise error("{}: Cannot have 'heartbeat'".format(target))
             if not heartbeat < timeout:
-                raise Exception("{}: 'heartbeat' must be less than 'timeout'".format(target))
+                raise error("{}: 'heartbeat' must be less than 'timeout'".format(target))
             state['HeartbeatSeconds'] = heartbeat
 
         if transform:
@@ -565,33 +565,33 @@ def add_modifiers(args):
 
             if input_path:
                 if type_ in (FailState,):
-                    raise Exception("{}: Cannot have 'input'".format(target))
+                    raise error("{}: Cannot have 'input'".format(target))
                 state['InputPath'] = input_path
 
             if result_path:
                 if type_ in (FailState, SuccessState, WaitState):
-                    raise Exception("{}: Cannot have 'result'".format(target))
+                    raise error("{}: Cannot have 'result'".format(target))
                 state['ResultPath'] = result_path
 
             if output_path:
                 if type_ in (FailState,):
-                    raise Exception("{}: Cannot have 'output'".format(target))
+                    raise error("{}: Cannot have 'output'".format(target))
                 state['OutputPath'] = output_path
 
         if data:
             if type_ != PassState:
-                raise Exception("{}: Cannot have 'data'".format(target))
+                raise error("{}: Cannot have 'data'".format(target))
             state['Result'] = data
 
         if modifiers:
             retries, catches = modifiers
             if retries:
                 if type_ not in (TaskState, ParallelState):
-                    raise Exception("{}: Cannot have 'retry'".format(target))
+                    raise error("{}: Cannot have 'retry'".format(target))
                 state['Retry'] = retries
             if catches:
                 if type_ not in (TaskState, ParallelState):
-                    raise Exception("{}: Cannot have 'catch'".format(target))
+                    raise error("{}: Cannot have 'catch'".format(target))
                 state['Catches'] = catches
                 state.branches = []
                 for catch in catches:
@@ -668,7 +668,7 @@ def parse(seq, region=None, account=None, translate=lambda x: x):
             else:
                 raise Exception("Unsuported task type '{}'".format(type_))
         except Exception as e:
-            raise Exception("Line {}: {}".format(line, str(e)))
+            raise ParserError(line, 0, str(e), '')
 
         state = TaskState(name, task)
         state.line = line
