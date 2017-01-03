@@ -65,7 +65,7 @@ if __name__ == '__main__':
     name = ''.join([x.capitalize() for x in name.split('.')])
     machine = StateMachine(name, credentials = credentials)
     if machine.arn is None:
-        role = "arn:aws:iam::256215146792:role/service-role/StatesExecutionRole-us-ease-1"
+        role = "StatesExecutionRole-us-east-1"
         machine.create(sfn, role)
     else:
         for arn in machine.running_arns():

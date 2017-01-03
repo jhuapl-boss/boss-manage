@@ -217,6 +217,18 @@ class StateMachine(object):
         region = self.session.region_name
         return compile(source, region, self.account_id, self._translate, **kwargs)
 
+    def _resolve_role(self, role):
+        role = role.strip()
+        if not role.lower().startswith("arn:aws:iam"):
+            client = self.session.client('iam')
+            try:
+                response = client.get_role(RoleName=role)
+                role = response['Role']['Arn']
+            except:
+                raise Exception("Could not lookup role '{}'".format(role))
+
+        return role
+
     def create(self, source, role):
         """Create the state machine in AWS from the give source
 
@@ -229,7 +241,7 @@ class StateMachine(object):
         if self.arn is not None:
             raise Exception("State Machine {} already exists".format(self.arn))
 
-        # DP TODO: lookup role arn based on role name
+        role = self._resolve_role(role)
         definition = self.build(source)
 
         resp = self.client.create_state_machine(name = self.name,
