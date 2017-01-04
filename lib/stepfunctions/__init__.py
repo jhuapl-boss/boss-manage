@@ -422,6 +422,7 @@ class Activity(object):
                 raise Exception("Activity {} doesn't exist".format(self.name))
 
         resp = self.client.delete_activity(activityArn = self.arn)
+        self.arn = None
 
     def task(self):
         """Query to see if a task exists for processing.
@@ -482,4 +483,50 @@ class Activity(object):
             raise Exception("Not currently working on a task")
 
         resp = self.client.send_task_heartbeat(taskToken = self.token)
+
+# DP TODO: Should look at the multiprocess library and have these work with it
+class ActivityError(Exception):
+    def __init__(self, error, cause):
+        super().__init__(cause)
+        self.error = error
+
+class ActivityProcess(object):
+    def __init__(self, arn, handler):
+        name = arn.split(':')[6]
+        self.activity = Activity(name, arn)
+        
+        if isinstance(handler str):
+            import importlib
+            module, _, function = handler.rpartition('.')
+            module = importlib.import_module(module)
+            handler = module.__dict__[function]
+        self.handler = handler
+
+    def run(self):
+        while True:
+            input_ = self.activity.task()
+            if input_ is not None:
+                try:
+                    output_ = self.handler(input_)
+                    self.activity.success(output_)
+                except ActivityError as e:
+                    self.activity.failure(e.error, e.msg)
+
+    def handle(self, input_):
+        output_ = self.handler(input_)
+        self.activity.success(output_)
+
+class HeartbeatActivityProcess(ActivityProccess):
+    def handle(self, input_):
+        it = self.handler(input_)
+        output_ = next(it)
+        while output_ is None:
+            self.activity.heartbeat()
+            output_ = it.send()
+        self.activity.success(result)
+
+def heatbeat_handler(input_):
+    for key in input_:
+        yield # send heartbeat
+        # process input_[key] item
 
