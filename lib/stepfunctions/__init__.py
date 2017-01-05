@@ -495,7 +495,7 @@ class ActivityProcess(object):
         name = arn.split(':')[6]
         self.activity = Activity(name, arn)
         
-        if isinstance(handler str):
+        if isinstance(handler, str):
             import importlib
             module, _, function = handler.rpartition('.')
             module = importlib.import_module(module)
@@ -516,7 +516,7 @@ class ActivityProcess(object):
         output_ = self.handler(input_)
         self.activity.success(output_)
 
-class HeartbeatActivityProcess(ActivityProccess):
+class HeartbeatActivityProcess(ActivityProcess):
     def handle(self, input_):
         it = self.handler(input_)
         output_ = next(it)
