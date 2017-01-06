@@ -198,7 +198,8 @@ def create_config(session, domain):
                               [("tcp", "22", "22", const.INCOMING_SUBNET)])
 
     config.add_security_group("AuthSecurityGroup",
-                              names.https,
+                              #names.https, DP XXX: hack until we can get production updated correctly
+                              names.auth,
                               [("tcp", "443", "443", "0.0.0.0/0")])
 
     # Create the internal route table to route traffic to the NAT Bastion
@@ -278,6 +279,11 @@ def post_init(session, domain, startup_wait=False):
     with call.vault() as vault:
         print("Initializing Vault...")
         try:
+            ##############
+            # DP TODO: Update vault.configure() so that it will only configure what
+            #          hasn't already been configured, so this step can be run multiple
+            #          times without issue
+            ##############
             vault.initialize()
         except Exception as ex:
             print(ex)

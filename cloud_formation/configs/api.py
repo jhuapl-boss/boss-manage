@@ -99,6 +99,10 @@ def create_config(session, domain, keypair=None, db_config={}):
     az_subnets, external_subnets = config.find_all_availability_zones(session)
     sgs = aws.sg_lookup_all(session, vpc_id)
 
+    # DP XXX: hack until we can get productio updated correctly
+    config.add_security_group('AllHTTPSSecurityGroup', 'https.' + domain, [('tcp', '443', '443', '0.0.0.0/0')])
+    sgs[names.https] = Ref('AllHTTPSSecurityGroup')
+
     # Create SQS queues and apply access control policies.
     config.add_sqs_queue("DeadLetterQueue", names.deadletter_queue, 30, 20160)
 
