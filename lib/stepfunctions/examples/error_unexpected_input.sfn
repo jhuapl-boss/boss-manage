@@ -1,2 +1,0 @@
-Fail("ERROR", "Cause message")
-    input: '$'
