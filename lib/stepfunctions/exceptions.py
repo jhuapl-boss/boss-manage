@@ -35,3 +35,7 @@ class ParserError(StepFunctionError):
         line = tok.line.rstrip() # remove newline
         return cls(lineno, pos, msg, line)
 
+class ActivityError(Exception):
+    def __init__(self, error, cause):
+        super().__init__(cause)
+        self.error = error
