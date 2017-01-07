@@ -1721,7 +1721,7 @@ class CloudFormationConfiguration:
                                            configuration and is used to determine the launch order of resources
         """
         self.add_cloudwatch_alarm("Latency", "",
-                                  "Latency", "Average", "GreaterThanOrEqualToThreshold", "2.0",
+                                  "Latency", "Average", "GreaterThanOrEqualToThreshold", "10.0",
                                   alarm_actions, {"LoadBalancerName": lb_name}, depends_on)
 
         self.add_cloudwatch_alarm("SurgeCount", "Surge Count in Load Balance",
