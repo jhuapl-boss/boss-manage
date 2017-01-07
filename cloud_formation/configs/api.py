@@ -179,13 +179,19 @@ def create_config(session, domain, keypair=None, db_config={}):
     config.add_dynamo_table_from_json('idCountIndex', names.id_count_index, **dynamo_id_count_cfg)  # DP XXX
 
     # Create the Cache and CacheState Redis Clusters
+    REDIS_PARAMETERS = {
+        "maxmemory-policy": "volatile-lru",
+        "reserved-memory": str(get_scenario(const.REDIS_RESERVED_MEMORY, 0) * 1000000),
+        "maxmemory-samples": "5", # ~ 5 - 10
+    }
+
     config.add_redis_replication("Cache",
                                  names.cache,
                                  az_subnets,
                                  [sgs[names.internal]],
                                  type_=const.REDIS_CACHE_TYPE,
                                  clusters=const.REDIS_CLUSTER_SIZE
-                                 parameters=const.REDIS_PARAMETERS)
+                                 parameters=REDIS_PARAMETERS)
 
     config.add_redis_replication("CacheState",
                                  names.cache_state,

@@ -174,12 +174,6 @@ REDIS_RESERVED_MEMORY = {
     "ha-development": 387 ,
 }
 
-REDIS_PARAMETERS = {
-    "maxmemory-policy": "volatile-lru",
-    "reserved-memory": str(get_scenario(REDIS_RESERVED_MEMORY, 0) * 1000000),
-    "maxmemory-samples": "5", # ~ 5 - 10
-}
-
 BASTION_AMI = "amzn-ami-vpc-nat-hvm-2015.03.0.x86_64-ebs"
 # Configure Squid to allow clustered Vault access, restricted to connections from the Bastion
 BASTION_USER_DATA = """#cloud-config
