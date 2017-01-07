@@ -181,8 +181,9 @@ def create_config(session, domain, keypair=None, db_config={}):
                                  names.cache,
                                  az_subnets,
                                  [sgs[names.internal]],
-                                 type_=const.REDIS_TYPE,
-                                 clusters=const.REDIS_CLUSTER_SIZE)
+                                 type_=const.REDIS_CACHE_TYPE,
+                                 clusters=const.REDIS_CLUSTER_SIZE
+                                 parameters=const.REDIS_PARAMETERS)
 
     config.add_redis_replication("CacheState",
                                  names.cache_state,

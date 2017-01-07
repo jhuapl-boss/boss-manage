@@ -625,7 +625,7 @@ class CloudFormationConfiguration:
             session (Session) : Boto3 session used to lookup the VPC's ID
             key (string) : Unique name for the resource in the template
         """
-            
+
         vpc_id = aws.vpc_id_lookup(session, self.vpc_domain)
         vpc = Arg.VPC(key, vpc_id, "ID of the VPC")
         self.add_arg(vpc)
@@ -956,7 +956,7 @@ class CloudFormationConfiguration:
         Args:
             key (string) : Unique name for the resource in the template
             hostname (string) : The hostname / instance name of the Redis Cache
-            subnets (list) : A list of Subnet IDs or Refs across which to create a ElastiCache 
+            subnets (list) : A list of Subnet IDs or Refs across which to create a ElastiCache
                              SubnetGroup for the ElastiCache Instance to launch into
             security_groups (list) : A list of SecurityGroup IDs or Refs
             type_ (string) : The ElastiCache instance type to create
@@ -993,19 +993,20 @@ class CloudFormationConfiguration:
 
         self._add_record_cname(key, hostname, cluster = True)
 
-    def add_redis_replication(self, key, hostname, subnets, security_groups, type_="cache.m3.medium", port=6379, version="2.8.24", clusters=1):
+    def add_redis_replication(self, key, hostname, subnets, security_groups, type_="cache.m3.medium", port=6379, version="2.8.24", clusters=1, parameters={}):
         """Add a Redis ElastiCache Replication Group to the configuration
 
         Args:
             key (string) : Unique name for the resource in the template
             hostname (string) : The hostname / instance name of the Redis Cache
-            subnets (list) : A list of Subnet IDs or Refs across which to create a ElastiCache 
+            subnets (list) : A list of Subnet IDs or Refs across which to create a ElastiCache
                              SubnetGroup for the ElastiCache Instance to launch into
             security_groups (list) : A list of SecurityGroup IDs or Refs
             type_ (string) : The ElastiCache instance type to create
             port (int|string) : The port for the Redis instance to listen on
             version (string) : Redis version to run on the instance
             clusters (int|string) : Number of cluster instances to create (1 - 5)
+            parameters (dict): Key/Values of Redis configuration parameters
         """
         clusters = int(get_scenario(clusters, 1))
         self.resources[key] =  {
@@ -1034,6 +1035,18 @@ class CloudFormationConfiguration:
                 "SubnetIds" : subnets
             }
         }
+
+        if len(parameters) > 0:
+            self.resources[key]['Properties']['CacheParameterGroupName'] = Ref(key + 'ParameterGroup')
+
+            self.resources[key + 'ParameterGroup'] = {
+            "Type": "AWS::ElastiCache::ParameterGroup",
+                "Properties": {
+                    # DP TODO: Need to select family based on version number
+                    "CacheParameterGroupFamily" : "redis2.8",
+                    "Properties" : parameters
+                }
+            }
 
         self._add_record_cname(key, hostname, replication = True)
 

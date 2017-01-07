@@ -14,6 +14,8 @@
 
 import os
 
+from .cloudformation import get_scenario
+
 # Region api is created in.  Later versions of boto3 should allow us to
 # extract this from the session variable.  Hard coding for now.
 REGION = 'us-east-1'
@@ -104,6 +106,12 @@ RDS_TYPE = {
     "ha-development": "db.t2.micro",
 }
 
+REDIS_CACHE_TYPE = {
+    "development": "cache.t2.small",
+    "production": "cache.r3.2xlarge",
+    "ha-development": "cache.t2.small",
+}
+
 REDIS_TYPE = {
     "development": "cache.t2.small",
     "production": "cache.m3.xlarge",
@@ -157,6 +165,19 @@ ENDPOINT_DB_CONFIG = {
     "user":"testuser", # DP ???: Why is the name testuser? should we generate the username too?
     "password": "",
     "port": "3306"
+}
+
+REDIS_RESERVED_MEMORY = {
+    # Size in MB
+    "development": 387,
+    "production": 14550,
+    "ha-development": 387 ,
+}
+
+REDIS_PARAMETERS = {
+    "maxmemory-policy": "volatile-lru",
+    "reserved-memory": str(get_scenario(REDIS_RESERVED_MEMORY, 0) * 1000000),
+    "maxmemory-samples": "5", # ~ 5 - 10
 }
 
 BASTION_AMI = "amzn-ami-vpc-nat-hvm-2015.03.0.x86_64-ebs"
