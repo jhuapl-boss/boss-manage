@@ -199,7 +199,21 @@ def create_config(session, domain, keypair=None, db_config={}):
 
 def generate(session, domain):
     """Create the configuration and save it to disk"""
-    config = create_config(session, domain)
+# Testing start
+    keypair = aws.keypair_lookup(session)
+
+    call = ExternalCalls(session, keypair, domain)
+
+    db_config = const.ENDPOINT_DB_CONFIG.copy()
+    db_config['password'] = utils.generate_password()
+
+    with call.vault() as vault:
+        vault.write(const.VAULT_ENDPOINT, secret_key = str(uuid.uuid4()))
+        vault.write(const.VAULT_ENDPOINT_DB, **db_config)
+
+    config = create_config(session, domain, keypair, db_config)
+# testing end
+    #config = create_config(session, domain)
     config.generate()
 
 def create(session, domain):

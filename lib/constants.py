@@ -96,7 +96,7 @@ TIMEOUT_KEYCLOAK = 120
 # Machine Instance Types
 ENDPOINT_TYPE = {
     "development": "t2.small",
-    "production": "m4.large",
+    "production": "c4.4xlarge",
     "ha-development": "t2.small",
 }
 
