@@ -75,8 +75,8 @@ def create_config(session, domain, keypair=None, db_config={}):
 
     # Use CloudFormation's Ref function so that queues' URLs are placed into
     # the Boss config file.
-    user_data["aws"]["s3-flush-queue"] = str(Ref("S3FlushQueue")) 
-    user_data["aws"]["s3-flush-deadletter-queue"] = str(Ref("DeadLetterQueue"))
+    user_data["aws"]["s3-flush-queue"] = str(Ref(names.s3flush_queue)) # str(Ref("S3FlushQueue")) DP XXX
+    user_data["aws"]["s3-flush-deadletter-queue"] = str(Ref(names.deadletter_queue)) #str(Ref("DeadLetterQueue")) DP XXX
     user_data["aws"]["cuboid_bucket"] = names.cuboid_bucket
     user_data["aws"]["tile_bucket"] = names.tile_bucket
     user_data["aws"]["ingest_bucket"] = names.ingest_bucket
@@ -104,20 +104,22 @@ def create_config(session, domain, keypair=None, db_config={}):
     sgs[names.https] = Ref('AllHTTPSSecurityGroup')
 
     # Create SQS queues and apply access control policies.
-    config.add_sqs_queue("DeadLetterQueue", names.deadletter_queue, 30, 20160)
+    #config.add_sqs_queue("DeadLetterQueue", names.deadletter_queue, 30, 20160) DP XXX
+    config.add_sqs_queue(names.deadletter_queue, names.deadletter_queue, 30, 20160)
 
     max_receives = 3
-    config.add_sqs_queue("S3FlushQueue",
+    #config.add_sqs_queue("S3FlushQueue", DP XXX
+    config.add_sqs_queue(names.s3flush_queue,
                          names.s3flush_queue,
                          30,
-                         dead=(Arn("DeadLetterQueue"), max_receives))
+                         dead=(Arn(names.deadletter_queue), max_receives))
 
-    config.add_sqs_policy("EndpointPolicy", 'sqsEndpointPolicy',
-                          [Ref("DeadLetterQueue"), Ref("S3FlushQueue")],
+    config.add_sqs_policy("sqsEndpointPolicy", 'sqsEndpointPolicy', # DP XXX
+                          [Ref(names.deadletter_queue), Ref(names.s3flush_queue)],
                           endpoint_role_arn)
 
-    config.add_sqs_policy("CachemgrPolicy", 'sqsCachemgrPolicy',
-                          [Ref("DeadLetterQueue"), Ref("S3FlushQueue")],
+    config.add_sqs_policy("sqsCachemgrPolicy", 'sqsCachemgrPolicy', # DP XXX
+                          [Ref(names.deadletter_queue), Ref(names.s3flush_queue)],
                           cachemanager_role_arn)
 
     # Create the endpoint ASG, ELB, and RDS instance
@@ -162,19 +164,19 @@ def create_config(session, domain, keypair=None, db_config={}):
 
     with open(const.DYNAMO_S3_INDEX_SCHEMA , 'r') as s3fh:
         dynamo_s3_cfg = json.load(s3fh)
-    config.add_dynamo_table_from_json('S3Index', names.s3_index, **dynamo_s3_cfg)
+    config.add_dynamo_table_from_json('s3Index', names.s3_index, **dynamo_s3_cfg)  # DP XXX
 
     with open(const.DYNAMO_TILE_INDEX_SCHEMA , 'r') as tilefh:
         dynamo_tile_cfg = json.load(tilefh)
-    config.add_dynamo_table_from_json('TileIndex', names.tile_index, **dynamo_tile_cfg)
+    config.add_dynamo_table_from_json('tileIndex', names.tile_index, **dynamo_tile_cfg)  # DP XXX
 
     with open(const.DYNAMO_ID_INDEX_SCHEMA , 'r') as id_ind_fh:
         dynamo_id_ind__cfg = json.load(id_ind_fh)
-    config.add_dynamo_table_from_json('IdIndex', names.id_index, **dynamo_id_ind__cfg)
+    config.add_dynamo_table_from_json('idIndex', names.id_index, **dynamo_id_ind__cfg)  # DP XXX
 
     with open(const.DYNAMO_ID_COUNT_SCHEMA , 'r') as id_count_fh:
         dynamo_id_count_cfg = json.load(id_count_fh)
-    config.add_dynamo_table_from_json('IdCountIndex', names.id_count_index, **dynamo_id_count_cfg)
+    config.add_dynamo_table_from_json('idCountIndex', names.id_count_index, **dynamo_id_count_cfg)  # DP XXX
 
     # Create the Cache and CacheState Redis Clusters
     config.add_redis_replication("Cache",
