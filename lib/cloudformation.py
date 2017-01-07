@@ -836,6 +836,7 @@ class CloudFormationConfiguration:
         multi_az = {
             "development": "false",
             "production": "true",
+            "ha-development": "true",
         }.get(scenario, "false")
 
         hostname_ = hostname.replace('.','-')

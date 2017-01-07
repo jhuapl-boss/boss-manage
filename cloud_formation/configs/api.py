@@ -32,6 +32,7 @@ from lib import aws
 from lib import utils
 from lib import scalyr
 from lib import constants as const
+from lib.cloudformation import get_scenario
 
 import json
 import uuid
@@ -172,7 +173,7 @@ def create_config(session, domain, keypair=None, db_config={}):
 
     with open(const.DYNAMO_ID_INDEX_SCHEMA , 'r') as id_ind_fh:
         dynamo_id_ind__cfg = json.load(id_ind_fh)
-    config.add_dynamo_table_from_json('idIndex', names.id_index, **dynamo_id_ind__cfg)  # DP XXX
+    config.add_dynamo_table_from_json('idIndIndex', names.id_index, **dynamo_id_ind__cfg)  # DP XXX
 
     with open(const.DYNAMO_ID_COUNT_SCHEMA , 'r') as id_count_fh:
         dynamo_id_count_cfg = json.load(id_count_fh)
@@ -190,7 +191,7 @@ def create_config(session, domain, keypair=None, db_config={}):
                                  az_subnets,
                                  [sgs[names.internal]],
                                  type_=const.REDIS_CACHE_TYPE,
-                                 clusters=const.REDIS_CLUSTER_SIZE
+                                 clusters=const.REDIS_CLUSTER_SIZE,
                                  parameters=REDIS_PARAMETERS)
 
     config.add_redis_replication("CacheState",
@@ -205,22 +206,16 @@ def create_config(session, domain, keypair=None, db_config={}):
 
 def generate(session, domain):
     """Create the configuration and save it to disk"""
-# Testing start
     keypair = aws.keypair_lookup(session)
 
     call = ExternalCalls(session, keypair, domain)
 
-    db_config = const.ENDPOINT_DB_CONFIG.copy()
-    db_config['password'] = utils.generate_password()
-
     with call.vault() as vault:
-        vault.write(const.VAULT_ENDPOINT, secret_key = str(uuid.uuid4()))
-        vault.write(const.VAULT_ENDPOINT_DB, **db_config)
+        db_config = vault.read(const.VAULT_ENDPOINT_DB)
 
     config = create_config(session, domain, keypair, db_config)
-# testing end
-    #config = create_config(session, domain)
     config.generate()
+
 
 def create(session, domain):
     """Configure Vault, create the configuration, and launch it"""
