@@ -107,7 +107,7 @@ if __name__ == '__main__':
         return "\n" + header + "\n" + \
                "\n".join(map(lambda x: "  " + x, options)) + "\n"
 
-    config_glob = repo_root("packer", "variables", "*")
+    config_glob = repo_path("packer", "variables", "*")
     config_names = [x.split(os.path.sep)[-1] for x in glob.glob(config_glob)]
     config_help_names = list(config_names)
     config_help_names.append("all")

@@ -1045,7 +1045,8 @@ class CloudFormationConfiguration:
                 "Properties": {
                     # DP TODO: Need to select family based on version number
                     "CacheParameterGroupFamily" : "redis2.8",
-                    "Properties" : parameters
+                    "Properties" : parameters,
+                    "Description": "boss-redis-proprities"
                 }
             }
 
