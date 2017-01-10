@@ -79,6 +79,8 @@ class AWSNames(object):
         'vault_monitor': 'vaultMonitor',
         'consul_monitor': 'consulMonitor',
         'vault_consul_check': 'checkVaultConsul',
+        'activities': 'activities',
+        'delete_cuboid': 'DeleteCuboid',
     }
 
     def __getattr__(self, name):
@@ -94,7 +96,7 @@ class AWSNames(object):
         if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'consul_monitor', 'vault_consul_check']:
             fq_hostname = fq_hostname.replace('.','-')
 
-        if name in ['s3flush_queue', 'deadletter_queue']:
+        if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid']:
             fq_hostname = "".join(map(lambda x: x.capitalize(), fq_hostname.split('.')))
 
         return fq_hostname

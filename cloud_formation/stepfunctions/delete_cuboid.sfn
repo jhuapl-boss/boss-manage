@@ -1,0 +1,25 @@
+"""Delete Cuboid
+Removes all of the different data related to a given cuboid,
+removes the actual cuboid data, and then cleans up the final
+bookkeeping for the cuboid
+"""
+
+parallel:
+    # Delete the data from the ...
+    Lambda('DeleteIdIndex')
+parallel:
+    # Delete the data from the ...
+    Lambda('DeleteBossMeta')
+parallel:
+    # Delete the data from the ...
+    Lambda('DeleteIdCount')
+
+while '$.index' >= 0:
+    Lambda("DeleteS3") # either both steps or two different Lambdas
+        retry [] 0 0 0.0
+        catch []:
+            Lambda("SaveAndAdvance")
+            Lambda("NotifyAdmins")
+
+# Delete the data from the ...
+Lambda("CleanupDB")

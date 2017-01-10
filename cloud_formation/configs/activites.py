@@ -70,11 +70,11 @@ def create(session, domain):
 def post_init(session, domain, startup_wait=False):
     names = AWSNames(domain)
 
-    #sfn.create(session, names.activites, domain, 'foo.sfn')
+    #sfn.create(session, names.delete_cuboid, domain, 'delete_cuboid.sfn')
 
 def delete(session, domain):
     names = AWSNames(domain)
     # DP TODO: delete activities
     CloudFormationConfiguration('core', domain).delete(session)
 
-    #sfn.delete(session, names.activities)
+    #sfn.delete(session, names.delete_cuboid)
