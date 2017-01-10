@@ -16,7 +16,7 @@ activity-files:
 
 manager-service:
     file.managed:
-        - name: /etc/init/activity-manager.config
+        - name: /etc/init/activity-manager.conf
         - source: salt://boss-tools/files/activity-manager
         - user: root
         - group: root
