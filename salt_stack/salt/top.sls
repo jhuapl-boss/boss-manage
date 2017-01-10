@@ -57,3 +57,7 @@ base:
         - scalyr
         - scalyr.update_host
         - git
+
+    'activities*':
+        - boss-tools.activities
+
