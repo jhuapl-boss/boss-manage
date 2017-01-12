@@ -10,6 +10,7 @@ Table of Contents:
 * [ssh.py](#sshpy)
 * [vault.py](#vaultpy)
 * [cloudformation.py](#cloudformationpy)
+* [sfn-compile.py](#sfn-compile)
 * [Scalyr Enviroment Variables](#Scalyr-Enviroment-Variables)
 * [create_certificate.py](#create_certificatepy)
 * [iam_utils.py](#iam_utilspy)
@@ -153,6 +154,12 @@ Important Arguments:
   default this is the last built image tagged with a commit hash, but if the
   partial commit hash or specific name is given that AMI is used.
 * `--scenario` selects the deployment scenario (development, production, etc)
+
+sfn-compile.py
+-----------------
+Compiles a heaviside step function DSL file into the AWS Step Function format.
+The result can be manually inspected or uploaded using one of the different
+AWS Step Function APIs or console.
 
 ## Scalyr Enviroment Variables
 
