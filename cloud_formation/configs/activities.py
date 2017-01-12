@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, get_scenario
+from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, get_scenario, Arg
 from lib.userdata import UserData
 from lib.names import AWSNames
 from lib import aws
