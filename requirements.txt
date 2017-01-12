@@ -1,5 +1,6 @@
-boto3
+boto3>=1.4.3
 hvac
 pyminifier
-
+funcparserlib
+iso8601
 
