@@ -6,20 +6,22 @@ bookkeeping for the cuboid
 
 parallel:
     # Delete the data from the ...
-    Lambda('DeleteIdIndex')
+    Activity('DeleteIdIndex')
 parallel:
     # Delete the data from the ...
-    Lambda('DeleteBossMeta')
+    Activity('DeleteBossMeta')
 parallel:
     # Delete the data from the ...
-    Lambda('DeleteIdCount')
+    Activity('DeleteIdCount')
+
+Activity('FindS3Data')
 
 while '$.index' >= 0:
-    Lambda("DeleteS3") # either both steps or two different Lambdas
+    Activity("DeleteS3") # either both steps or two different Lambdas
         retry [] 0 0 0.0
         catch []:
-            Lambda("SaveAndAdvance")
-            Lambda("NotifyAdmins")
+            Activity("SaveAndAdvance")
+            Activity("NotifyAdmins")
 
 # Delete the data from the ...
-Lambda("CleanupDB")
+Activity("CleanupDB")

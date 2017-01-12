@@ -46,7 +46,7 @@ def create_config(session, domain):
 
     config.add_ec2_instance("Activities",
                             names.activities,
-                            aws.ami_lookup(session, const.ACTIVITIES_AMI),
+                            aws.ami_lookup(session, 'activities.boss'),
                             keypair,
                             subnet = Ref("InternalSubnet"),
                             user_data = str(user_data),
