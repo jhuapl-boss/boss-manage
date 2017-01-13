@@ -136,7 +136,7 @@ def create_config(session, domain, keypair=None, db_config={}):
                                max=const.ENDPOINT_CLUSTER_SIZE,
                                elb=Ref("EndpointLoadBalancer"),
                                notifications=dns_arn,
-                               role = aws.instance_profile_arn_lookup(session, 'endpoint'),
+                               role=aws.instance_profile_arn_lookup(session, 'endpoint'),
                                health_check_grace_period=90,
                                depends_on=["EndpointLoadBalancer", "EndpointDB"])
 

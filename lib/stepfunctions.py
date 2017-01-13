@@ -31,7 +31,7 @@ class BossStateMachine(heaviside.StateMachine):
         return "{}.{}".format(function, self.domain)
 
 def create(session, name, domain, sfn_file, role):
-    filepath = repo_root('cloud_formation', 'stepfunctions', sfn_file)
+    filepath = repo_path('cloud_formation', 'stepfunctions', sfn_file)
     filepath = Path(filepath)
 
     machine = BossStateMachine(name, domain, session)

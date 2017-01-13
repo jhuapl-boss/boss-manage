@@ -23,6 +23,7 @@ from lib import stepfunctions as sfn
 
 keypair = None
 
+
 def create_config(session, domain):
     """Create the CloudFormationConfiguration object."""
     config = CloudFormationConfiguration('activities', domain, const.REGION)
@@ -49,16 +50,18 @@ def create_config(session, domain):
                             aws.ami_lookup(session, 'activities.boss'),
                             keypair,
                             subnet = Ref("InternalSubnet"),
-                            role = aws.instance_profile_arn_lookup(session, 'activity'),
+                            role = "activity",
                             user_data = str(user_data),
                             security_groups = [sgs[names.internal]])
 
     return config
 
+
 def generate(session, domain):
     """Create the configuration and save it to disk"""
     config = create_config(session, domain)
     config.generate()
+
 
 def create(session, domain):
     """Create the configuration, launch it, and initialize Vault"""
