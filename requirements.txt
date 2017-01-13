@@ -1,4 +1,5 @@
 boto3>=1.4.3
+botocore>=1.4.93
 hvac
 pyminifier
 funcparserlib
