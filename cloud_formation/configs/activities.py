@@ -49,6 +49,7 @@ def create_config(session, domain):
                             aws.ami_lookup(session, 'activities.boss'),
                             keypair,
                             subnet = Ref("InternalSubnet"),
+                            role = aws.instance_profile_arn_lookup(session, 'testSFN'),
                             user_data = str(user_data),
                             security_groups = [sgs[names.internal]])
 
@@ -70,7 +71,7 @@ def create(session, domain):
 def post_init(session, domain, startup_wait=False):
     names = AWSNames(domain)
 
-    sfn.create(session, names.delete_cuboid, domain, 'delete_cuboid.sfn')
+    sfn.create(session, names.delete_cuboid, domain, 'delete_cuboid.sfn', 'testSFN')
 
 def delete(session, domain):
     names = AWSNames(domain)
