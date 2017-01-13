@@ -16,7 +16,8 @@ parallel:
 
 Activity('delete_test_3')  #FindS3Data
 
-#while '$.index' >= 0:
+while '$.index' >= 0:
+    Activity('delete_test_4')
 #    Activity("DeleteS3") # either both steps or two different Lambdas
 #        retry [] 0 0 0.0
 #        catch []:
