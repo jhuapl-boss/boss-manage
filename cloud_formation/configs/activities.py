@@ -76,6 +76,6 @@ def post_init(session, domain, startup_wait=False):
 def delete(session, domain):
     names = AWSNames(domain)
     # DP TODO: delete activities
-    CloudFormationConfiguration('core', domain).delete(session)
+    CloudFormationConfiguration('activities', domain).delete(session)
 
     sfn.delete(session, names.delete_cuboid)
