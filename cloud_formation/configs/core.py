@@ -360,7 +360,7 @@ def update(session, domain):
         return None
 
     consul_update_timeout = 5 # minutes
-    consul_size = int(get_scenario(CONSUL_CLUSTER_SIZE))
+    consul_size = int(get_scenario(const.CONSUL_CLUSTER_SIZE))
     min_time = consul_update_timeout * consul_size
     max_time = min_time + 5 # add some time to allow the CF update to happen
 
@@ -371,7 +371,7 @@ def update(session, domain):
         print("Canceled")
         return
 
-    config = create_config(session)
+    config = create_config(session, domain)
     success = config.update(session)
 
     if success:
