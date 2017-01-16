@@ -17,3 +17,4 @@ jenkins:
           endpoint: /srv/salt/jenkins-jobs/endpoint.xml
           spdb: /srv/salt/jenkins-jobs/spdb.xml
           boss-tools: /srv/salt/jenkins-jobs/ep-boss-tools.xml
+          ndingest: /srv/salt/jenkins-jobs/ep-ndingest.xml
