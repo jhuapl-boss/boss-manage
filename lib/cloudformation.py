@@ -488,7 +488,7 @@ class CloudFormationConfiguration:
                 rtn = False
         return rtn
 
-    def update(self, session, wait = True):
+    def update(self, session, wait = True, preview = True):
         """Update the template this object represents in CloudFormation.
 
         Args:
@@ -505,14 +505,72 @@ class CloudFormationConfiguration:
                 raise Exception("Could not determine argument '{}'".format(argument["ParameterKey"]))
 
         client = session.client('cloudformation')
-        response = client.update_stack(
-            StackName = self.stack_name,
-            TemplateBody = self._create_template(),
-            Parameters = self.arguments,
-            Tags = [
-                {"Key": "Commit", "Value": utils.get_commit()}
-            ]
-        )
+        if not preview:
+            response = client.update_stack(
+                StackName = self.stack_name,
+                TemplateBody = self._create_template(),
+                Parameters = self.arguments,
+                Tags = [
+                    {"Key": "Commit", "Value": utils.get_commit()}
+                ]
+            )
+        else:
+            commit = utils.get_commit()
+            response = client.create_change_set(
+                ChangeSetName = 'h' + commit,
+                StackName = self.stack_name,
+                TemplateBody = self._create_template(),
+                Parameters = self.arguments,
+                Tags = [
+                    {"Key": "Commit", "Value": commit}
+                ]
+            )
+
+            try:
+                response = {'Status': 'CREATE_PENDING'}
+                while response['Status'] in ('CREATE_PENDING', 'CREATE_IN_PROGRESS'):
+                    time.sleep(5)
+                    response = client.describe_change_set(
+                        ChangeSetName = 'h' + commit,
+                        StackName = self.stack_name
+                    )
+
+                fmt = "{:<10}{:<30}{:<50}{:<45}{:<14}{}"
+                print(fmt.format(
+                    "Action",
+                    "Logical ID",
+                    "Physical ID",
+                    "Resource Type",
+                    "Replacement",
+                    "Scope"
+                ))
+                for change in response['Changes']:
+                    if change['Type'] == 'Resource':
+                        change = change['ResourceChange']
+                        print(fmt.format(
+                            change['Action'],
+                            change['LogicalResourceId'],
+                            change['PhysicalResourceId'],
+                            change['ResourceType'],
+                            change['Replacement'],
+                            ", ".join(change['Scope'])
+                        ))
+
+                resp = input("Apply Update? [N/y] ")
+                if len(resp) == 0 or resp[0] not in ('y', 'Y'):
+                    raise Exception()
+                else:
+                    response = client.execute_change_set(
+                        ChangeSetName = 'h' + commit,
+                        StackName = self.stack_name
+                    )
+            except:
+                print("Canceled")
+                client.delete_change_set(
+                    ChangeSetName = 'h' + commit,
+                    StackName = self.stack_name
+                )
+                return
 
         rtn = None
         if wait:
