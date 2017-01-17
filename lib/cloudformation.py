@@ -488,7 +488,7 @@ class CloudFormationConfiguration:
                 rtn = False
         return rtn
 
-    def update(self, session, wait = True, preview = True):
+    def update(self, session, wait = True):
         """Update the template this object represents in CloudFormation.
 
         Args:
@@ -505,7 +505,10 @@ class CloudFormationConfiguration:
                 raise Exception("Could not determine argument '{}'".format(argument["ParameterKey"]))
 
         client = session.client('cloudformation')
-        if not preview:
+
+        disable_preview = str(os.environ.get("DISABLE_PREVIEW"))
+        disable_preview = disable_preview.lower() in ('yes', 'true', 'y', 't')
+        if disable_preview:
             response = client.update_stack(
                 StackName = self.stack_name,
                 TemplateBody = self._create_template(),
