@@ -538,6 +538,10 @@ class CloudFormationConfiguration:
                         StackName = self.stack_name
                     )
 
+                if response['Status'] != 'CREATE_COMPLETE':
+                    print("ChangeSet status is {}".format(response['Status']))
+                    raise Exception()
+
                 fmt = "{:<10}{:<30}{:<50}{:<45}{:<14}{}"
                 print(fmt.format(
                     "Action",
