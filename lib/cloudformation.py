@@ -540,6 +540,7 @@ class CloudFormationConfiguration:
 
                 if response['Status'] != 'CREATE_COMPLETE':
                     print("ChangeSet status is {}".format(response['Status']))
+                    print("Reason: {}".format(response['StatusReason']))
                     raise Exception()
 
                 fmt = "{:<10}{:<30}{:<50}{:<45}{:<14}{}"
