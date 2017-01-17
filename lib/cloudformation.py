@@ -1387,7 +1387,7 @@ class CloudFormationConfiguration:
         self.resources[key] = {
             "Type" : "AWS::AutoScaling::AutoScalingGroup",
             "Properties" : {
-                #"DesiredCapacity" : get_scenario(min, 1), Initial capacity, will min size also ensure the size on startup?
+                "DesiredCapacity" : get_scenario(min, 1), # Initial capacity, will min size also ensure the size on startup?
                 "HealthCheckType" : "EC2" if elb is None else "ELB",
                 "HealthCheckGracePeriod" : health_check_grace_period, # seconds
                 "LaunchConfigurationName" : Ref(key + "Configuration"),
@@ -1460,6 +1460,53 @@ class CloudFormationConfiguration:
         _hostname = Arg.String(key + "Hostname", hostname,
                                "Hostname of the EC2 Instance '{}'".format(key))
         self.add_arg(_hostname)
+
+    def add_autoscale_policy(self, key, asg, warmup=60, adjustments=[], alarms=[]):
+        """Add an AutoScalingGroup AutoScale Policy to the configuration
+
+        Args:
+            key (string) : Unique name for the resource in the template
+            asg (string): AutoScaleGroup ID or Ref of the ASG to scale
+            warmup (int): Number of seconds estimated for a new machine to boot
+                          and start processing data
+            adjustments (list): List of tuples of (lower, upper, step) that defined
+                                when and how machine machines to scale
+                                lower (int|float|None): Lower bound of adjustment step
+                                upper (int|float|None): Upper bound of adjustment step
+                                step (int): Number of machines to scale by
+            alarms (list): List of tuples of (metric, statistic, comparison, threashold)
+                           which are passed to add_cloudwatch_alarm() to create the alarms
+                           that will trigger the adjustments actions
+        """
+        adjustments_ = []
+        for lower, upper, step in adjustments:
+            adjustment = {"ScalingAdjustment": step}
+            if lower is not None:
+                adjustment["MetricIntervalLowerBound"] = lower
+            if upper is not None:
+                adjustment["MetricIntervalUpperBound"] = upper
+            adjustments_.append(adjustment)
+
+        self.resources[key] = {
+            "Type" : "AWS::AutoScaling::ScalingPolicy",
+            "Properties" : {
+                "AutoScalingGroupName" : asg,
+                "AdjustmentType" : "ChangeInCapacity",
+                "PolicyType" : "StepScaling",
+                "EstimatedInstanceWarmup" : warmup,
+                #"MetricAggregationType" : "Minimum|Maximum|Average", # Default Average
+
+                "StepAdjustments" : adjustments_
+            }
+        }
+
+        i = 0
+        for metric, statistic, comparison, threashold in alarms:
+            i += 1
+            self.add_cloudwatch_alarm(key + "Alarm{}".format(i), ""
+                                      metric, statistic, comparison, threashold,
+                                      [Ref(key)], # alarm_actions
+                                      {"AutoScalingGroupName": asg}) # dimensions
 
     def add_s3_bucket(self, key, name, access_control=None, life_cycle_config=None, notification_config=None, tags=None, depends_on=None):
         """Create or configure a S3 bucket.
@@ -1768,7 +1815,7 @@ class CloudFormationConfiguration:
                 "Period": "60",
                 "Statistic": statistic,
                 "Threshold": threashold,
-                "AlarmActions": [alarm_actions],
+                "AlarmActions": alarm_actions,
                 "Dimensions": [{"Name": k, "Value": v} for k,v in dimensions.items()]
               }
         }
