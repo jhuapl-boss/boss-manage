@@ -224,8 +224,6 @@ def vault_export(vault, output='-', path="secret/"):
         output (string) : Output path to save the data ('-' for stdout)
         path (string) : Vault path to export data from
     """
-    if path[-1] != '/':
-        path += '/'
     rtn = vault.export(path)
 
     with open_(output, 'w') as fh:
