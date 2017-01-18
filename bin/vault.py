@@ -213,22 +213,8 @@ def vault_delete(vault, path = None):
     vault.delete(path)
 
 def vault_dump(vault, path="secret/"):
-    rtn = {}
-    print("Listing {}".format(path))
-    results = vault.list(path)
-    for key in results['data']['keys']:
-        key = path + key
-        if key[-1] == '/':
-            data = vault_dump(vault, key)
-            rtn.update(data)
-        else:
-            print("Reading {}".format(key))
-            data = vault.read(key)
-            rtn[key] = data['data']
-
-    if path == 'secret/':
-        pprint(rtn)
-    return rtn
+    rtn = vault.dump(path)
+    pprint(rtn)
 
 COMMANDS = {
     "vault-init": vault_init,

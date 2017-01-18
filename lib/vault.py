@@ -416,7 +416,7 @@ class Vault(object):
         return client.read(path)
 
     def list(self, path):
-        """A generic method for listing data from a Vault secret backend.
+        """A generic method for listing data from Vault.
 
         Args:
             path (string) : Vault path to list data at
@@ -432,4 +432,23 @@ class Vault(object):
         """
         client = self.connect(PROVISIONER_TOKEN)
         client.delete(path)
+
+    def dump(self, path):
+        """A generic method for reading all of the paths and keys from Vault.
+
+        Args:
+            path (string) : Vault path to dump data from
+        """
+        rtn = {}
+        results = self.list(path)
+        for key in results['data']['keys']:
+            key = path + key
+            if key[-1] == '/':
+                data = self.dump(key)
+                rtn.update(data)
+            else:
+                data = self.read(key)
+                rtn[key] = data['data']
+
+        return rtn
 
