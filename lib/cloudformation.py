@@ -1503,7 +1503,7 @@ class CloudFormationConfiguration:
         i = 0
         for metric, statistic, comparison, threashold in alarms:
             i += 1
-            self.add_cloudwatch_alarm(key + "Alarm{}".format(i), ""
+            self.add_cloudwatch_alarm(key + "Alarm{}".format(i), "",
                                       metric, statistic, comparison, threashold,
                                       [Ref(key)], # alarm_actions
                                       {"AutoScalingGroupName": asg}) # dimensions
