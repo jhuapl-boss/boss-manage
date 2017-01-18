@@ -6,23 +6,22 @@ bookkeeping for the cuboid
 
 parallel:
     # Delete the data from the ...
-    Activity('delete_test_1')  #DeleteIdIndex
+    Activity('delete_metadata')
+#parallel:
+    # Delete the data from the ...
+    Activity('delete_id_count')
 parallel:
     # Delete the data from the ...
-    Activity('delete_test_2')  #DeleteBossMeta
-#parallel:
-#    # Delete the data from the ...
-#    Activity('DeleteIdCount')
+    Activity('delete_id_index')
 
-Activity('delete_test_3')  #FindS3Data
+Activity('find_s3_index')
 
-while '$.index' >= 0:
-    Activity('delete_test_4')
-#    Activity("DeleteS3") # either both steps or two different Lambdas
-#        retry [] 0 0 0.0
-#        catch []:
-#            Activity("SaveAndAdvance")
-#            Activity("NotifyAdmins")
-#
-## Delete the data from the ...
-#Activity("CleanupDB")
+#while '$.index' >= 0:
+Activity("delete_s3_index") # either both steps or two different Lambdas
+    retry [] 0 0 0.0
+    catch []:
+        Activity("SaveAndAdvance")
+        Activity("NotifyAdmins")
+
+# Delete the data from the ...
+Activity("delete_clean_up")
