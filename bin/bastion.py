@@ -55,8 +55,6 @@ from lib.ssh import SSHConnection, vault_tunnel
 from lib.vault import Vault
 
 if __name__ == "__main__":
-    os.chdir(os.path.abspath(os.path.dirname(__file__)))
-
     def create_help(header, options):
         """Create formated help."""
         return "\n" + header + "\n" + \
