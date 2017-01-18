@@ -505,14 +505,80 @@ class CloudFormationConfiguration:
                 raise Exception("Could not determine argument '{}'".format(argument["ParameterKey"]))
 
         client = session.client('cloudformation')
-        response = client.update_stack(
-            StackName = self.stack_name,
-            TemplateBody = self._create_template(),
-            Parameters = self.arguments,
-            Tags = [
-                {"Key": "Commit", "Value": utils.get_commit()}
-            ]
-        )
+
+        disable_preview = str(os.environ.get("DISABLE_PREVIEW"))
+        disable_preview = disable_preview.lower() in ('yes', 'true', 'y', 't')
+        if disable_preview:
+            response = client.update_stack(
+                StackName = self.stack_name,
+                TemplateBody = self._create_template(),
+                Parameters = self.arguments,
+                Tags = [
+                    {"Key": "Commit", "Value": utils.get_commit()}
+                ]
+            )
+        else:
+            commit = utils.get_commit()
+            response = client.create_change_set(
+                ChangeSetName = 'h' + commit,
+                StackName = self.stack_name,
+                TemplateBody = self._create_template(),
+                Parameters = self.arguments,
+                Tags = [
+                    {"Key": "Commit", "Value": commit}
+                ]
+            )
+
+            try:
+                response = {'Status': 'CREATE_PENDING'}
+                while response['Status'] in ('CREATE_PENDING', 'CREATE_IN_PROGRESS'):
+                    time.sleep(5)
+                    response = client.describe_change_set(
+                        ChangeSetName = 'h' + commit,
+                        StackName = self.stack_name
+                    )
+
+                if response['Status'] != 'CREATE_COMPLETE':
+                    print("ChangeSet status is {}".format(response['Status']))
+                    print("Reason: {}".format(response['StatusReason']))
+                    raise Exception()
+
+                fmt = "{:<10}{:<30}{:<50}{:<45}{:<14}{}"
+                print(fmt.format(
+                    "Action",
+                    "Logical ID",
+                    "Physical ID",
+                    "Resource Type",
+                    "Replacement",
+                    "Scope"
+                ))
+                for change in response['Changes']:
+                    if change['Type'] == 'Resource':
+                        change = change['ResourceChange']
+                        print(fmt.format(
+                            change['Action'],
+                            change['LogicalResourceId'],
+                            change['PhysicalResourceId'],
+                            change['ResourceType'],
+                            change['Replacement'],
+                            ", ".join(change['Scope'])
+                        ))
+
+                resp = input("Apply Update? [N/y] ")
+                if len(resp) == 0 or resp[0] not in ('y', 'Y'):
+                    raise Exception()
+                else:
+                    response = client.execute_change_set(
+                        ChangeSetName = 'h' + commit,
+                        StackName = self.stack_name
+                    )
+            except:
+                print("Canceled")
+                client.delete_change_set(
+                    ChangeSetName = 'h' + commit,
+                    StackName = self.stack_name
+                )
+                return
 
         rtn = None
         if wait:
@@ -1321,7 +1387,7 @@ class CloudFormationConfiguration:
         self.resources[key] = {
             "Type" : "AWS::AutoScaling::AutoScalingGroup",
             "Properties" : {
-                #"DesiredCapacity" : get_scenario(min, 1), Initial capacity, will min size also ensure the size on startup?
+                "DesiredCapacity" : get_scenario(min, 1), # Initial capacity, will min size also ensure the size on startup?
                 "HealthCheckType" : "EC2" if elb is None else "ELB",
                 "HealthCheckGracePeriod" : health_check_grace_period, # seconds
                 "LaunchConfigurationName" : Ref(key + "Configuration"),
@@ -1394,6 +1460,53 @@ class CloudFormationConfiguration:
         _hostname = Arg.String(key + "Hostname", hostname,
                                "Hostname of the EC2 Instance '{}'".format(key))
         self.add_arg(_hostname)
+
+    def add_autoscale_policy(self, key, asg, warmup=60, adjustments=[], alarms=[]):
+        """Add an AutoScalingGroup AutoScale Policy to the configuration
+
+        Args:
+            key (string) : Unique name for the resource in the template
+            asg (string): AutoScaleGroup ID or Ref of the ASG to scale
+            warmup (int): Number of seconds estimated for a new machine to boot
+                          and start processing data
+            adjustments (list): List of tuples of (lower, upper, step) that defined
+                                when and how machine machines to scale
+                                lower (int|float|None): Lower bound of adjustment step
+                                upper (int|float|None): Upper bound of adjustment step
+                                step (int): Number of machines to scale by
+            alarms (list): List of tuples of (metric, statistic, comparison, threashold)
+                           which are passed to add_cloudwatch_alarm() to create the alarms
+                           that will trigger the adjustments actions
+        """
+        adjustments_ = []
+        for lower, upper, step in adjustments:
+            adjustment = {"ScalingAdjustment": step}
+            if lower is not None:
+                adjustment["MetricIntervalLowerBound"] = lower
+            if upper is not None:
+                adjustment["MetricIntervalUpperBound"] = upper
+            adjustments_.append(adjustment)
+
+        self.resources[key] = {
+            "Type" : "AWS::AutoScaling::ScalingPolicy",
+            "Properties" : {
+                "AutoScalingGroupName" : asg,
+                "AdjustmentType" : "ChangeInCapacity",
+                "PolicyType" : "StepScaling",
+                "EstimatedInstanceWarmup" : warmup,
+                #"MetricAggregationType" : "Minimum|Maximum|Average", # Default Average
+
+                "StepAdjustments" : adjustments_
+            }
+        }
+
+        i = 0
+        for metric, statistic, comparison, threashold in alarms:
+            i += 1
+            self.add_cloudwatch_alarm(key + "Alarm{}".format(i), ""
+                                      metric, statistic, comparison, threashold,
+                                      [Ref(key)], # alarm_actions
+                                      {"AutoScalingGroupName": asg}) # dimensions
 
     def add_s3_bucket(self, key, name, access_control=None, life_cycle_config=None, notification_config=None, tags=None, depends_on=None):
         """Create or configure a S3 bucket.
@@ -1702,7 +1815,7 @@ class CloudFormationConfiguration:
                 "Period": "60",
                 "Statistic": statistic,
                 "Threshold": threashold,
-                "AlarmActions": [alarm_actions],
+                "AlarmActions": alarm_actions,
                 "Dimensions": [{"Name": k, "Value": v} for k,v in dimensions.items()]
               }
         }

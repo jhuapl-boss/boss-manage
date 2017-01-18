@@ -79,6 +79,9 @@ if __name__ == '__main__':
                         default = "development",
                         choices = scenarios,
                         help = "The deployment configuration to use when creating the stack (instance size, autoscale group size, etc) (default: development)")
+    parser.add_argument("--disable-preview",
+                        action = "store_true",
+                        help = "Disable update previews change sets (default: enable)"),
     parser.add_argument("action",
                         choices = actions,
                         metavar = "action",
@@ -98,6 +101,7 @@ if __name__ == '__main__':
 
     os.environ["AMI_VERSION"] = args.ami_version
     os.environ["SCENARIO"] = args.scenario
+    os.environ["DISABLE_PREVIEW"] = str(args.disable_preview)
 
     session = aws.create_session(args.aws_credentials)
 
