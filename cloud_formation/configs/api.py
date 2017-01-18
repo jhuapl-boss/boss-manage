@@ -132,8 +132,8 @@ def create_config(session, domain, keypair=None, db_config={}):
                                type_=const.ENDPOINT_TYPE,
                                security_groups=[sgs[names.internal]],
                                user_data=parsed_user_data,
-                               min=const.ENDPOINT_CLUSTER_SIZE,
-                               max=const.ENDPOINT_CLUSTER_SIZE,
+                               min=const.ENDPOINT_CLUSTER_MIN,
+                               max=const.ENDPOINT_CLUSTER_MAX,
                                elb=Ref("EndpointLoadBalancer"),
                                notifications=dns_arn,
                                role=aws.instance_profile_arn_lookup(session, 'endpoint'),
@@ -233,6 +233,8 @@ def generate(session, domain):
 
     with call.vault() as vault:
         db_config = vault.read(const.VAULT_ENDPOINT_DB)
+        if db_config is None:
+            db_config = const.ENDPOINT_DB_CONFIG.copy()
 
     config = create_config(session, domain, keypair, db_config)
     config.generate()
