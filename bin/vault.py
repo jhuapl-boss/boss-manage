@@ -25,10 +25,12 @@ Author:
 import argparse
 import sys
 import os
+import json
 from pprint import pprint
 
 import alter_path
 from lib.vault import Vault
+from lib.utils import open_
 
 NEW_TOKEN = "new_token"
 
@@ -212,9 +214,35 @@ def vault_delete(vault, path = None):
         path = input("path: ")
     vault.delete(path)
 
-def vault_dump(vault, path="secret/"):
-    rtn = vault.dump(path)
-    pprint(rtn)
+def vault_export(vault, output='-', path="secret/"):
+    """A generic method for exporting data from Vault
+
+    Note: output data is Json encoded
+
+    Args:
+        vault (Vault) : Vault connection to use
+        output (string) : Output path to save the data ('-' for stdout)
+        path (string) : Vault path to export data from
+    """
+    if path[-1] != '/':
+        path += '/'
+    rtn = vault.export(path)
+
+    with open_(output, 'w') as fh:
+        json.dump(rtn, fh, indent=3, sort_keys=True)
+
+def vault_import(vault, input_='-'):
+    """A generic method for importing data into Vault
+
+    Note: input data should be Json encoded
+
+    Args:
+        input_ (string) : Input path to read data from ('-' for stdin)
+    """
+    with open_(input_) as fh:
+        exported = json.load(fh)
+
+    vault.import_(exported)
 
 COMMANDS = {
     "vault-init": vault_init,
@@ -229,7 +257,8 @@ COMMANDS = {
     "vault-update":vault_update,
     "vault-read":vault_read,
     "vault-delete":vault_delete,
-    "vault-dump": vault_dump,
+    "vault-export": vault_export,
+    "vault-import": vault_import,
 }
 
 if __name__ == '__main__':

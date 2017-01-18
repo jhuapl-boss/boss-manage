@@ -415,15 +415,6 @@ class Vault(object):
         client = self.connect(PROVISIONER_TOKEN)
         return client.read(path)
 
-    def list(self, path):
-        """A generic method for listing data from Vault.
-
-        Args:
-            path (string) : Vault path to list data at
-        """
-        client = self.connect(VAULT_TOKEN)
-        return client.list(path)
-
     def delete(self, path):
         """A generic method for deleting data from Vault.
 
@@ -433,22 +424,48 @@ class Vault(object):
         client = self.connect(PROVISIONER_TOKEN)
         client.delete(path)
 
-    def dump(self, path):
+    def export(self, path):
         """A generic method for reading all of the paths and keys from Vault.
 
         Args:
             path (string) : Vault path to dump data from
         """
+        if path[-1] != '/':
+            path += '/'
+
         rtn = {}
-        results = self.list(path)
+
+        # DP NOTE: not using self.read becuase of the different token needed
+        client = self.connect(VAULT_TOKEN)
+        results =  client.read(path[:-1])
+        if results is not None:
+            rtn[path[:-1]] = results['data']
+
+        results = client.list(path)
         for key in results['data']['keys']:
             key = path + key
             if key[-1] == '/':
-                data = self.dump(key)
+                data = self.export(key)
                 rtn.update(data)
             else:
+                # DP NOTE: This will currently do a duplicate read if
+                #          data is stored at key and in paths under
+                #          key
+                #          To prevent this, check to see if (key + '/') is in keys
                 data = self.read(key)
                 rtn[key] = data['data']
 
         return rtn
+
+    def import_(self, exported, update=False):
+        """A generic method for writing / updating data in multiple paths in Vault.
+
+        Args:
+            exported (dict): Dict of Vault path and dict of key / values to store at the path
+            update (bool): If an Update should be done or if a Write should be done
+        """
+        for path in exported:
+            kv = exported[path]
+            fn = self.update if update else self.write
+            fn(path, **kv)
 
