@@ -134,7 +134,7 @@ if __name__ == "__main__":
         for addr in addrs:
             print("{} at {}".format(args.internal, addr))
             ssh = SSHConnection(args.ssh_key, addr, bastion)
-            ssh.cmd(args.ssh_key, addr, bastion, *args.arguments)
+            ssh.cmd(*args.arguments)
             print()
     elif args.command in vault.COMMANDS:
         with vault_tunnel(args.ssh_key, bastion):
