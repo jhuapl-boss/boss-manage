@@ -81,6 +81,7 @@ class AWSNames(object):
         'vault_consul_check': 'checkVaultConsul',
         'activities': 'activities',
         'delete_cuboid': 'DeleteCuboid',
+        'delete_bucket': 'delete',
     }
 
     def __getattr__(self, name):

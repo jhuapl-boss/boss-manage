@@ -17,11 +17,11 @@ parallel:
 Activity('find_s3_index')
 
 #while '$.index' >= 0:
-Activity("delete_s3_index") # either both steps or two different Lambdas
+Activity('delete_s3_index')  # either both steps or two different Lambdas
     retry [] 0 0 0.0
-    catch []:
-        Activity("SaveAndAdvance")
-        Activity("NotifyAdmins")
+    catch []: '$.error-info'
+        Activity("save_and_delete")
+        Activity("notify_admins")
 
 # Delete the data from the ...
 Activity("delete_clean_up")
