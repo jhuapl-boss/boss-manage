@@ -80,7 +80,7 @@ class AWSNames(object):
         'consul_monitor': 'consulMonitor',
         'vault_consul_check': 'checkVaultConsul',
         'activities': 'activities',
-        'delete_cuboid': 'DeleteCuboid',
+        'delete_cuboid': 'Delete.Cuboid',
         'delete_bucket': 'delete',
     }
 
