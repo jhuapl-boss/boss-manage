@@ -5,20 +5,19 @@ bookkeeping for the cuboid
 """
 
 parallel:
-    # Delete the data from the ...
     Activity('delete_metadata')
         """delete_metadata
            deletes metadata"""
-#parallel:
-    # Delete the data from the ...
+parallel:
     Activity('delete_id_count')
         """delete_id_count
            deletes from dynamodb table idcount"""
 parallel:
-    # Delete the data from the ...
     Activity('delete_id_index')
         """delete_id_index
            deletes from dyanmodb table idindex"""
+transform:
+    output: '$[0]'
 
 Activity('find_s3_index')
     """find_s3_index
