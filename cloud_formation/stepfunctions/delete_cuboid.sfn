@@ -4,20 +4,20 @@ removes the actual cuboid data, and then cleans up the final
 bookkeeping for the cuboid
 """
 
-#parallel:
-Activity('delete_metadata')
-    """delete_metadata
-       deletes metadata"""
-
-#parallel:
-Activity('delete_id_count')
-    """delete_id_count
-       deletes from dynamodb table idcount"""
-
-#parallel:
-Activity('delete_id_index')
-    """delete_id_index
-       deletes from dyanmodb table idindex"""
+parallel:
+    Activity('delete_metadata')
+        """delete_metadata
+           deletes metadata"""
+parallel:
+    Activity('delete_id_count')
+        """delete_id_count
+           deletes from dynamodb table idcount"""
+parallel:
+    Activity('delete_id_index')
+        """delete_id_index
+           deletes from dyanmodb table idindex"""
+transform:
+    output: '$[0]'
 
 Activity('find_s3_index')
     """find_s3_index
