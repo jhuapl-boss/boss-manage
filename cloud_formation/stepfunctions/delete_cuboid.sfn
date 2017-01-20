@@ -7,35 +7,34 @@ bookkeeping for the cuboid
 parallel:
     # Delete the data from the ...
     Activity('delete_metadata')
-    """delete_metadata
-       deletes metadata"""
+        """delete_metadata
+           deletes metadata"""
 #parallel:
     # Delete the data from the ...
     Activity('delete_id_count')
-    """delete_id_count
-       deletes from dynamodb table idcount"""
+        """delete_id_count
+           deletes from dynamodb table idcount"""
 parallel:
     # Delete the data from the ...
     Activity('delete_id_index')
-    """delete_id_index
-       deletes from dyanmodb table idindex"""
+        """delete_id_index
+           deletes from dyanmodb table idindex"""
 
 Activity('find_s3_index')
     """find_s3_index
        finds data to delete from s3index and s3"""
 
-#while '$.index' >= 0:
 Activity('delete_s3_index')  # either both steps or two different Lambdas
     """delete_s3_index
        deletes data from s3index and s3"""
     retry [] 120 4 2
     catch []: '$.error'
         Activity("save_and_delete")
-        """save_and_delete
-           saves any issues that came up"""
+            """save_and_delete
+               saves any issues that came up"""
         Activity("notify_admins")
-        """notify_admins
-           sends SNS message to microns topic"""
+            """notify_admins
+               sends SNS message to microns topic"""
 
 # Delete the data from the ...
 Activity("delete_clean_up")
