@@ -48,4 +48,5 @@ if __name__ == '__main__':
                                 account_id=args.account,
                                 indent=3)
 
-    args.output.write(machine)
+    if machine:
+        args.output.write(machine)
