@@ -42,6 +42,7 @@ from botocore.exceptions import ClientError
 import alter_path
 from lib import aws
 from lib import utils
+from lib import hosts
 from lib import constants as const
 from lib.boto_wrapper import IamWrapper as iw
 
