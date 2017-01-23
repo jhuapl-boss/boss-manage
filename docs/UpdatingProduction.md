@@ -69,6 +69,12 @@ $  ./packer.py auth vault consul endpoint proofreader-web cachemanager --name sp
 ```
 or copy the latest AMIs from the console to become sprintXX (this way is faster if the AMIs will end up being the same version of code.)
 
+### Backup vault
+
+```shell
+$ cd boss-manage.git/bin
+$ ./bastion.py vault.production.boss vault-export path/to//file
+```
 
 ### Updating IAM
 Verify IAM Policy, Groups and Roles are the latest.  Master IAM scripts are located boss-manage/config/iam.
@@ -80,9 +86,31 @@ $ ./iam_utils import
 ```
 
 ### Remove Subscriptions to ProductionMicronsMailingList in SNS 
-Delete all subscrioptions to Production mailing list before upgrading.  Leaving them in place
+Delete all subscriptions to Production mailing list before upgrading.  Leaving them in place
 will cause multiple emails and texts per minute to everyone on the list.
 *Make a note of the contents so you can add them back in later.*
+
+### Check Cloud Formation Change sets.
+Change sets will automatically be generated when doing an update, but doing it the
+way listed below will allow you to dig into the details of any issues.
+
+```shell
+$ ./cloudformation.py generate production.boss --scenario production core
+```
+Now go to CloudFormation in the console
+* check CoreProductionBoss
+* Under Actions select "Create Change Set For Current Stack"
+* Choose "Upload a template to Amazon S3"
+* File should be under boss-mange/cloud_formation/templates
+* Select the correct .template file. and select Next
+* Give it a Change set name and select Next
+* On options page just take defaults and select Next
+* push *Create change set*
+
+When it completed, look it over to make sure the changes do not require the delete of
+anything that holds data, like DynamoDB tables, or RDS tables.  
+The deletion of AutoScaleGroups are OK.
+
 
 ### Updating configs
 
@@ -123,38 +151,10 @@ $ ./cloudformation.py create production.boss --scenario production cloudwatch
 ## Get bossadmin password
 ```shell
 cd vault
-./bastion.py vault.integration.boss vault-read secret/auth/realm
+./bastion.py vault.production.boss vault-read secret/auth/realm
 ```
 Login to https://api.theboss.io/v0.7/collection/
 Uses bossadmin and the password you now have to sync bossadmin to django
-
-## Manually update the api ELB timeout
-Go to EC2 in AWS console
-select load balancers on left side
-click the checkbox for the loadbalancer to change
-under attributes 
-Set "Idle timeout: 300 seconds"
-
-## Manually update the multilambda timeout
-Go to Lambda in AWS console
-select Configuration tab
-Advanced Settings
-Change *Timeout* to be 2 mins.
-
-## Add Trigger to multilambda.production.boss
-Go to S3 in the AWS console
-select tiles.production.boss bucket properties
-under Events delete the current Lambda (if there is one)
-save
-
-Now Go to Lambda in the AWS console, 
-Select multilambda.production.boss
-Select trigger tab
-click in the empty box Lambda is pointing to in the diagram.  Now select the S3 in the drop down box.
-A new dialog will come up
-Bucket:  tiles.production.boss
-Event Type:  Object Created (All)
-click submit (You may need to scroll down to see the submit button)
 
 ## Turn off Maintenance Mode
 In boss-manage/cloud_formation run:
@@ -297,6 +297,18 @@ Ran x tests in x.xxxs.
 
 OK
 ```
+
+#### Run Ingest Tests
+
+* cd ingest-test
+* run ./setup.py
+* Copy the export and and ingest run commands 
+* cd ../ingest-client
+* paste the copied commands above.
+    this should start loading the ingest data
+* cd back to the ingest-test directory
+* validate-ingest.py
+
 
 ### Automated Tests
 To be filled out

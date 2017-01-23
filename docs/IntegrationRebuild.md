@@ -204,21 +204,6 @@ select Configuration tab
 Advanced Settings
 Change *Timeout* to be 2 mins.
 
-## Add Trigger to multilambda.integration.boss
-Go to S3 in the AWS console
-select tiles.integration.boss bucket properties
-under Events delete the current Lambda (if there is one)
-save
-
-Now Go to Lambda in the AWS console, 
-Select multilambda.integration.boss
-Select trigger tab
-click in the empty box Lambda is pointing to in the diagram.  Now select the S3 in the drop down box.
-A new dialog will come up
-Bucket:  tiles.integration.boss
-Event Type:  Object Created (All)
-click submit (You may need to scroll down to see the submit button)
-
 ## Run unit tests on Endpoint
 
 If you are following these instructions for your personal development environment, skip the
