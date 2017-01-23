@@ -12,20 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import library as lib
-import configuration
-import hosts
+from lib import hosts
+from lib import aws
+from lib.cloudformation import CloudFormationConfiguration, Ref
+from lib.names import AWSNames
 
 def create_config(session, domain, peer_domain):
-    config = configuration.CloudFormationConfiguration(domain)
+    config = CloudFormationConfiguration('peer', domain)
 
-    if config.subnet_domain is not None:
-        raise Exception("Invalid VPC domain name")
+    # Reconfigure the stack name from the default
+    stack_name = domain + ".to." + peer_domain
+    config.stack_name = "".join([x.capitalize() for x in stack_name.split('.')])
 
-    vpc_id = lib.vpc_id_lookup(session, domain)
+    vpc_id = aws.vpc_id_lookup(session, domain)
     vpc_subnet = hosts.lookup(domain)
-    peer_id = lib.vpc_id_lookup(session, peer_domain)
+    names = AWSNames(domain)
+
+    peer_id = aws.vpc_id_lookup(session, peer_domain)
     peer_subnet = hosts.lookup(peer_domain)
+    peer_names = AWSNames(peer_domain)
     
     if session is not None:
         if vpc_id is None:
@@ -38,27 +43,32 @@ def create_config(session, domain, peer_domain):
                            vpc_id,
                            peer_id)
                            
-    def add_route(key, rt_key, rt_name, vpc_subnet_, vpc_id_):
-        config.add_route_table_route(key, rt_key, vpc_subnet_, peer = "Peer")
-        config.add_arg(configuration.Arg.RouteTable(rt_key,
-                                                    lib.rt_lookup(session, vpc_id_, rt_name)))
+    def add_route(key, vpc_id_, rt_name, vpc_subnet_):
+        rt = aws.rt_lookup(session, vpc_id_, rt_name)
+        config.add_route_table_route(key, rt, vpc_subnet_, peer = Ref("Peer"))
     
-    add_route("PeeringRoute", "LocalRouteTable", "internal." + domain, peer_subnet, vpc_id)
-    add_route("PeeringRoute2", "LocalInternetRouteTable", "internet." + domain, peer_subnet, vpc_id)
-    add_route("PeerPeeringRoute", "PeerRouteTable", "internal." + peer_domain, vpc_subnet, peer_id)
-    add_route("PeerPeeringRoute2", "PeerInternetRouteTable", "internet." + peer_domain, vpc_subnet, peer_id)
+    add_route("PeeringRoute", vpc_id, names.internal, peer_subnet)
+    add_route("PeeringRoute2", vpc_id, names.internet, peer_subnet)
+    add_route("PeerPeeringRoute", peer_id, peer_names.internal, vpc_subnet)
+    add_route("PeerPeeringRoute2", peer_id, peer_names.internet, vpc_subnet)
 
     return config
     
-def generate(folder, domain):
-    name = lib.domain_to_stackname(domain)
-    config = create_config(None, domain)
-    config.generate(name, folder)
+def generate(session, domain):
+    peer_vpc = input("Peer VPC: ")
+
+    config = create_config(session, domain, peer_vpc)
+    config.generate()
     
 def create(session, domain):
     peer_vpc = input("Peer VPC: ")
 
-    name = lib.domain_to_stackname(domain + ".to." + peer_vpc)
     config = create_config(session, domain, peer_vpc)
+    config.create(session)
     
-    success = config.create(session, name)
+def delete(session, domain):
+    peer_vpc = input("Peer VPC: ")
+
+    config = create_config(session, domain, peer_vpc)
+    config.delete(session)
+

@@ -23,136 +23,114 @@ in a VPC created by the core configuration. It also expects for the user to
 select the same KeyPair used when creating the core configuration.
 """
 
+from lib.cloudformation import CloudFormationConfiguration, Arg, Ref
+from lib.userdata import UserData
+from lib.names import AWSNames
+from lib.keycloak import KeyCloakClient
+from lib.external import ExternalCalls
+from lib import aws
+from lib import utils
+from lib import scalyr
+from lib import constants as const
 
-import configuration
-import library as lib
-import hosts
 import uuid
-
-INCOMING_SUBNET = "52.3.13.189/32" # microns-bastion elastic IP
-
-VAULT_DJANGO = "secret/proofreader/django"
-VAULT_DJANGO_DB = "secret/proofreader/django/db"
-VAULT_DJANGO_AUTH = "secret/proofreader/auth"
 
 def create_config(session, domain, keypair=None, user_data=None, db_config={}):
     """Create the CloudFormationConfiguration object."""
-    config = configuration.CloudFormationConfiguration(domain)
+    names = AWSNames(domain)
+    config = CloudFormationConfiguration('proofreader', domain, const.REGION)
 
-    # do a couple of verification checks
-    if config.subnet_domain is not None:
-        raise Exception("Invalid VPC domain name")
-
-    vpc_id = lib.vpc_id_lookup(session, domain)
-    if session is not None and vpc_id is None:
-        raise Exception("VPC does not exists, exiting...")
-
-    # Lookup the VPC, External Subnet, Internal Security Group IDs that are
-    # needed by other resources
-    config.add_arg(configuration.Arg.VPC("VPC", vpc_id,
-                                         "ID of VPC to create resources in"))
-
-    external_subnet_id = lib.subnet_id_lookup(session, "external." + domain)
-    config.add_arg(configuration.Arg.Subnet("ExternalSubnet",
-                                            external_subnet_id,
-                                            "ID of External Subnet to create resources in"))
-
-    internal_sg_id = lib.sg_lookup(session, vpc_id, "internal." + domain)
-    config.add_arg(configuration.Arg.SecurityGroup("InternalSecurityGroup",
-                                                   internal_sg_id,
-                                                   "ID of internal Security Group"))
-
-    internet_sg_key = "InternetSecurityGroup"
-    internet_sg_id = lib.sg_lookup(session, vpc_id, "internet." + domain)
-    if internet_sg_id is None:
-        # Allow SSH/HTTP/HTTPS access to proofreader web server from anywhere
-        config.add_security_group(internet_sg_key,
-                                  "internet",
-                                  [
-                                    ("tcp", "22", "22", INCOMING_SUBNET),
-                                    ("tcp", "80", "80", "0.0.0.0/0"),
-                                    ("tcp", "443", "443", "0.0.0.0/0")
-                                  ])
-    else:
-        config.add_arg(configuration.Arg.SecurityGroup(internet_sg_key,
-                                                       internet_sg_id,
-                                                       "ID of internal Security Group"))
-
+    vpc_id = config.find_vpc(session)
     az_subnets, _ = config.find_all_availability_zones(session)
 
+    external_subnet_id = aws.subnet_id_lookup(session, names.subnet("external"))
+    config.add_arg(Arg.Subnet("ExternalSubnet",
+                              external_subnet_id,
+                              "ID of External Subnet to create resources in"))
+
+    sgs = aws.sg_lookup_all(session, vpc_id)
+
+    # Only allow unsecure web access from APL, until a ELB is configured for HTTPS
+    config.add_security_group("HttpSecurityGroup",
+                              names.http,
+                              [("tcp", "80", "80", const.INCOMING_SUBNET)])
+
     config.add_ec2_instance("ProofreaderWeb",
-                            "proofreader-web." + domain,
-                            lib.ami_lookup(session, "proofreader-web.boss"),
+                            names.proofreader,
+                            aws.ami_lookup(session, "proofreader-web.boss"),
                             keypair,
                             public_ip = True,
-                            subnet = "ExternalSubnet",
-                            security_groups = ["InternalSecurityGroup", "InternetSecurityGroup"],
+                            subnet = Ref("ExternalSubnet"),
+                            security_groups = [sgs[names.internal],
+                                               sgs[names.ssh],
+                                               Ref('HttpSecurityGroup')],
                             user_data = user_data,
                             depends_on = "ProofreaderDB") # make sure the DB is launched before we start
 
     config.add_rds_db("ProofreaderDB",
-                      "proofreader-db." + domain,
+                      names.proofreader_db,
                       db_config.get("port"),
                       db_config.get("name"),
                       db_config.get("user"),
                       db_config.get("password"),
                       az_subnets,
-                      security_groups = ["InternalSecurityGroup"])
+                      security_groups = [sgs[names.internal]])
 
     return config
 
-def generate(folder, domain):
+def generate(session, domain):
     """Create the configuration and save it to disk"""
-    name = lib.domain_to_stackname("proofreader." + domain)
-    config = create_config(None, domain)
-    config.generate(name, folder)
+    config = create_config(session, domain)
+    config.generate()
 
 def create(session, domain):
     """Configure Vault, create the configuration, and launch it"""
-    keypair = lib.keypair_lookup(session)
+    keypair = aws.keypair_lookup(session)
 
-    call = lib.ExternalCalls(session, keypair, domain)
+    names = AWSNames(domain)
+    call = ExternalCalls(session, keypair, domain)
 
     db = {
         "name": "microns_proofreader",
         "user": "proofreader",
-        "password": lib.generate_password(),
+        "password": utils.generate_password(),
         "port": "3306"
     }
 
     # Configure Vault and create the user data config that proofreader-web will
     # use for connecting to Vault and the DB instance
     # DP TODO: Remove token and use AWS-EC2 authentication with Vault
-    proofreader_token = call.vault("vault-provision", "proofreader")
-    user_data = configuration.UserData()
-    user_data["vault"]["token"] = proofreader_token
-    user_data["system"]["fqdn"] = "proofreader-web." + domain
-    user_data["system"]["type"] = "proofreader-web"
-    user_data["aws"]["db"] = "proofreader-db." + domain
-    user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
-    user_data = str(user_data)
+    with call.vault() as vault:
+        proofreader_token = vault.provision("proofreader")
 
+        user_data = UserData()
+        user_data["vault"]["token"] = proofreader_token
+        user_data["system"]["fqdn"] = names.proofreader
+        user_data["system"]["type"] = "proofreader-web"
+        user_data["aws"]["db"] = names.proofreader_db
+        user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
+        user_data = str(user_data)
 
-    # Should transition from vault-django to vault-write
-    call.vault_write(VAULT_DJANGO, secret_key = str(uuid.uuid4()))
-    call.vault_write(VAULT_DJANGO_DB, **db)
+        vault.write(const.VAULT_PROOFREAD, secret_key = str(uuid.uuid4()))
+        vault.write(const.VAULT_PROOFREAD_DB, **db)
 
-    name = lib.domain_to_stackname("proofreader." + domain)
     config = create_config(session, domain, keypair, user_data, db)
 
     try:
-        success = config.create(session, name)
+        success = config.create(session)
     except:
         print("Error detected, revoking secrets") # Do we want to revoke if an exception from post_init?
-        try:
-            call.vault_delete(VAULT_DJANGO)
-            call.vault_delete(VAULT_DJANGO_DB)
-        except:
-            print("Error revoking Django credentials")
-        try:
-            call.vault("vault-revoke", proofreader_token)
-        except:
-            print("Error revoking Proofreader Server Vault access token")
+        with call.vault() as vault:
+            try:
+                vault.delete(const.VAULT_PROOFREAD)
+                vault.delete(const.VAULT_PROOFREAD_DB)
+            except:
+                print("Error revoking Django credentials")
+
+            try:
+                vault.revoke(proofreader_token)
+            except:
+                print("Error revoking Proofreader Server Vault access token")
         raise
 
     if not success:
@@ -161,64 +139,56 @@ def create(session, domain):
         post_init(session, domain)
 
 def post_init(session, domain):
-    keypair = lib.keypair_lookup(session)
-    call = lib.ExternalCalls(session, keypair, domain)
+    keypair = aws.keypair_lookup(session)
+    call = ExternalCalls(session, keypair, domain)
+    names = AWSNames(domain)
 
     # Get Keycloak admin account credentials
-    creds = call.vault_read("secret/auth")
+    with call.vault() as vault:
+        creds = vault.read("secret/auth")
 
-    # Get Keycloak public address
-    if domain in hosts.BASE_DOMAIN_CERTS.keys():
-        auth = "auth." + hosts.BASE_DOMAIN_CERTS[domain]
-    else:
-        auth = "auth-{}.{}".format(domain.split(".")[0],
-                                  hosts.DEV_DOMAIN)
-    auth_url = "https://{}/".format(auth)
+        # Get Keycloak public address
+        auth_url = "https://{}/".format(names.public_dns("auth"))
 
-    # Write data into Vault
-    dns = lib.instance_public_lookup(session, "proofreader-web." + domain)
-    uri = "http://{}".format(dns)
-    call.vault_update(VAULT_DJANGO_AUTH, public_uri = uri)
-
-    # Verify Django install doesn't have any issues
-    print("Checking Django status")
-    call.django_check("proofreader-web", "/srv/www/app/proofreader_apis/manage.py")
-
-    print("Initializing Django")
-    call.set_ssh_target("proofreader-web")
-    def django(cmd):
-        ret = call.ssh("sudo python3 /srv/www/app/proofreader_apis/manage.py " + cmd)
-        if ret != 0:
-            print("Django command '{}' did not sucessfully execute".format(cmd))
-
-    django("makemigrations") # will hang if it cannot contact the auth server
-    django("makemigrations common")
-    django("makemigrations bossoidc")
-    django("migrate")
-    django("collectstatic --no-input")
-
-    call.ssh("sudo service uwsgi-emperor reload")
-    call.ssh("sudo service nginx restart")
+        # Write data into Vault
+        dns = aws.instance_public_lookup(session, names.proofreader)
+        uri = "http://{}".format(dns)
+        vault.update(const.VAULT_PROOFREAD_AUTH, public_uri = uri)
 
     # Verify Keycloak is accessible
-    TIMEOUT_KEYCLOAK = 90
     print("Checking for Keycloak availability")
-    call.http_check(auth_url + "auth/", TIMEOUT_KEYCLOAK)
+    call.check_url(auth_url + "auth/", const.TIMEOUT_KEYCLOAK)
 
-    kc = lib.KeyCloakClient(auth_url)
-    kc.login(creds["username"], creds["password"])
+    with KeyCloakClient(auth_url, **creds) as kc:
+        print("Configuring KeyCloak")
+        kc.append_list_properties("BOSS", "endpoint", {"redirectUris": uri + "/*", "webOrigins": uri})
 
-    print("Configuring KeyCloak")
-    kc.append_list_properties("BOSS", "endpoint", {"redirectUris": uri + "/*", "webOrigins": uri})
+        print("Generating keycloak.json")
+        client_install = kc.get_client_installation_url("BOSS", "endpoint")
 
-    print("Generating keycloak.json")
-    client_install = kc.get_client_installation_url("BOSS", "endpoint")
+        # Verify Django install doesn't have any issues
+        print("Checking Django status")
+        call.check_django("proofreader-web", "/srv/www/app/proofreader_apis/manage.py")
 
-    # NOTE: This will put a valid bearer token in the bash history until the history is cleared
-    call.ssh("sudo wget --header=\"{}\" --no-check-certificate {} -O /srv/www/html/keycloak.json"
-             .format(client_install["headers"], client_install["url"]))
-    # clear the history
-    call.ssh("history -c")
+        print("Initializing Django")
+        with call.ssh(names.proofreader) as ssh:
+            def django(cmd):
+                ret = ssh("sudo python3 /srv/www/app/proofreader_apis/manage.py " + cmd)
+                if ret != 0:
+                    print("Django command '{}' did not sucessfully execute".format(cmd))
 
-    # this should invalidate the token anyways
-    kc.logout()
+            django("makemigrations") # will hang if it cannot contact the auth server
+            django("makemigrations common")
+            django("makemigrations bossoidc")
+            django("migrate")
+            django("collectstatic --no-input")
+
+            ssh("sudo service uwsgi-emperor reload")
+            ssh("sudo service nginx restart")
+
+            # NOTE: This will put a valid bearer token in the bash history until the history is cleared
+            ssh("sudo wget --header=\"{}\" --no-check-certificate {} -O /srv/www/html/keycloak.json"
+                     .format(client_install["headers"], client_install["url"]))
+            # clear the history
+            ssh("history -c")
+

@@ -45,6 +45,21 @@ Create this script and save it (config/set_scalyr_vars.sh) for the next time you
 ```shell
 source ../config/set_scalyr_vars.sh
 ```
+## Turn on Maintenance Mode
+In boss-manage/cloud_formation run:
+```shell
+python3 ./maintenance.py on production.boss
+```
+In can take up to 10 to 15 minutes for DNS to be updated externally.
+Use: dig api.theboss.io
+to see if DNS has been changed back to ELB.
+Once completed you will see a "Down for Maintenance Page" at both
+* api.theboss.io
+* auth.theboss.io
+In can take up to 10 to 15 minutes for DNS to be updated externally.  (sometimes its fast)
+Use: dig api.theboss.io
+to see if DNS has been changed to cloudfront servers.
+
 
 ## Create SprintXX AMIs 
 You can either create new AMIs:
@@ -54,20 +69,48 @@ $  ./packer.py auth vault consul endpoint proofreader-web cachemanager --name sp
 ```
 or copy the latest AMIs from the console to become sprintXX (this way is faster if the AMIs will end up being the same version of code.)
 
+### Backup vault
+
+```shell
+$ cd boss-manage.git/bin
+$ ./bastion.py vault.production.boss vault-export path/to//file
+```
 
 ### Updating IAM
 Verify IAM Policy, Groups and Roles are the latest.  Master IAM scripts are located boss-manage/config/iam.
 Make sure your AWS_CREDENTIALS is set for the production account
 
 ```shell
-$ cd boss-manage/cloud_formation
+$ cd boss-manage.git/bin
 $ ./iam_utils import
 ```
 
 ### Remove Subscriptions to ProductionMicronsMailingList in SNS 
-Delete all subscrioptions to Production mailing list before upgrading.  Leaving them in place
+Delete all subscriptions to Production mailing list before upgrading.  Leaving them in place
 will cause multiple emails and texts per minute to everyone on the list.
 *Make a note of the contents so you can add them back in later.*
+
+### Check Cloud Formation Change sets.
+Change sets will automatically be generated when doing an update, but doing it the
+way listed below will allow you to dig into the details of any issues.
+
+```shell
+$ ./cloudformation.py generate production.boss --scenario production core
+```
+Now go to CloudFormation in the console
+* check CoreProductionBoss
+* Under Actions select "Create Change Set For Current Stack"
+* Choose "Upload a template to Amazon S3"
+* File should be under boss-mange/cloud_formation/templates
+* Select the correct .template file. and select Next
+* Give it a Change set name and select Next
+* On options page just take defaults and select Next
+* push *Create change set*
+
+When it completed, look it over to make sure the changes do not require the delete of
+anything that holds data, like DynamoDB tables, or RDS tables.  
+The deletion of AutoScaleGroups are OK.
+
 
 ### Updating configs
 
@@ -84,12 +127,12 @@ that are named with a commit hash.  If you want to use specific AMIs use the **-
 
 After completion check that vault still works, look for password:
 ```shell
-./bastion.py bastion.production.boss vault.production.boss vault-read secret/auth/realm
+./bastion.py vault.production.boss vault-read secret/auth/realm
 ```
 
 This will show the status of all the consul nodes:
 ```shell
-$ ./bastion.py bastion.production.boss consul.production.boss ssh-all 'sudo consul operator raft -list-peers; sudo consul members'
+$ ./bastion.py consul.production.boss ssh-all 'sudo consul operator raft -list-peers; sudo consul members'
 ```
 
 ```shell
@@ -108,35 +151,28 @@ $ ./cloudformation.py create production.boss --scenario production cloudwatch
 ## Get bossadmin password
 ```shell
 cd vault
-./bastion.py bastion.integration.boss vault.integration.boss vault-read secret/auth/realm
+./bastion.py vault.production.boss vault-read secret/auth/realm
 ```
 Login to https://api.theboss.io/v0.7/collection/
 Uses bossadmin and the password you now have to sync bossadmin to django
 
-## Add Trigger to multilambda.production.boss
-Go to S3 in the AWS console
-select tiles.production.boss bucket properties
-under Events delete the current Lambda (if there is one)
-save
-
-Now Go to Lambda in the AWS console, 
-Select multilambda.integration.boss
-Select trigger tab
-click in the empty box Lambda is pointing to in the diagram.  Now select the S3 in the drop down box.
-A new dialog will come up
-Bucket:  tiles.production.boss
-Event Type:  Object Created (All)
-click submit (You may need to scroll down to see the submit button)
+## Turn off Maintenance Mode
+In boss-manage/cloud_formation run:
+```shell
+python3 ./maintenance.py off production.boss
+```
+In can take up to 10 to 15 minutes for DNS to be updated externally.
+Use: dig api.theboss.io
+to see if DNS has been changed back to ELB.
 
 ### Add Subscriptions to ProductionMicronsMailingList in SNS
 Take the list of emails and phone numbers you created earlier and 
 add them back into the ProductionMicronsMailingList Topic in SNS.
 
 ## Run unit tests on Endpoint
-
-If you are following these instructions for your personal development environment, skip the
+If you are following these instructions for the integration development environment, skip the
 export RUN_HIGH_MEM_TESTS line.  That line runs 2 tests that need >2.5GB of memory
-to run and will fail in your environment
+to run and will fail in the integration environment
 
 ```shell
 cd vault
@@ -160,18 +196,6 @@ cd /srv/www/django
 sudo python3 manage.py test --pattern="int_test_*.py"
 ```
 	output should say 55 Tests OK with 7 skipped tests
-
-## Proofreader Tests
-````shell
-cd vault
-./ssh.py proofreader-web.integration.boss
-cd /srv/www/app/proofreader_apis
-sudo python3 manage.py makemigrations --noinput
-sudo python3 manage.py makemigrations --noinput common
-sudo python3 manage.py migrate
-sudo python3 manage.py test
-````
-    output should say 350 Tests OK
 
 ### Cachemanager Integration Tests
 
@@ -211,15 +235,20 @@ git checkout integration
 sudo pip3 install -r requirements.txt
 ```
 
-In your browser, open https://api.integration.theboss.io/token
+##### Setup new user for testing  (don't use bossadmin for this)
+In your browser, open https://api.theboss.io/vX.Y/mgmt/token
 
 Your browser should be redirected to the KeyCloak login page.
-
 Create a new account and return to the token page.
-
-Generate a token.
-
 This token will be copied-pasted into the intern config file.
+
+then logout and login as bossadmin
+Go to boss console 
+https://api.production.theboss.io and give your new user
+* resource-manager
+* user-manager
+
+SSO -> Manager Users, select your user and add the roles
 
 ```shell
 mkdir ~/.intern
@@ -232,39 +261,24 @@ all tokens with the token displayed in your browser.
 ```
 [Project Service]
 protocol = https
-host = api.integration.theboss.io
+host = api.theboss.io
 # Replace with your token.
-token = c23b48ceb35cae212b470a23d99d4185bac1c226
+token = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 [Metadata Service]
 protocol = https
-host = api.integration.theboss.io
+host = api.theboss.io
 # Replace with your token.
-token = c23b48ceb35cae212b470a23d99d4185bac1c226
+token = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 [Volume Service]
 protocol = https
-host = api.integration.theboss.io
+host = api.theboss.io
 # Replace with your token.
-token = c23b48ceb35cae212b470a23d99d4185bac1c226
+token = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
-
 Additionally, create a copy of `~/.intern/intern.cfg` as `test.cfg` in the intern
 repository directory.
-
-##### Setup via the Django Admin Page
-
-In your browser, go to https://api.production.theboss.io/admin
-
-Login using the bossadmin account created previously (this was created during
-the endpoint initialization and unit test step).
-
-Click on `Boss roles`.
-
-Click on `ADD BOSS ROLE`.
-
-Find the user you created and add the `ADMIN` role to that user and save.
-
 
 ##### Run Intern Integration Tests
 
@@ -284,12 +298,24 @@ Ran x tests in x.xxxs.
 OK
 ```
 
+#### Run Ingest Tests
+
+* cd ingest-test
+* run ./setup.py
+* Copy the export and and ingest run commands 
+* cd ../ingest-client
+* paste the copied commands above.
+    this should start loading the ingest data
+* cd back to the ingest-test directory
+* validate-ingest.py
+
+
 ### Automated Tests
 To be filled out
 
 ### Manual Checks
-* https://api.integration.theboss.io/ping/
-* https://api.integration.theboss.io/v0.7/collection/
+* https://api.theboss.io/ping/
+* https://api.theboss.io/v0.7/collection/
 * Login into Scalyr and verify that the new instances appear on the overview page.
 * Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint and proofreader.
 

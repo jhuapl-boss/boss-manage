@@ -82,7 +82,7 @@ set. Verify that the SSH_KEY being used is the desired one and that it exists un
 `~/.ssh/` and is chmoded 0400.
 
 ```shell
-$ cd cloud_formation/
+$ cd bin/
 $ source ../config/set_vars.sh
 ```
 
@@ -112,7 +112,7 @@ Before the new integration instance can be created, the existing CloudFormation
 Stacks need to be deleted.
 
 ```shell
-$ cd cloud_formation/
+$ cd bin/
 $ source ../config/set_vars.sh
 
 # Deletion of cloudwatch, api, proofreader and cachedb can probably
@@ -186,20 +186,23 @@ will deploy the stack with the minimum set of resources.*
 ## Get bossadmin password
 ```shell
 cd vault
-./bastion.py bastion.integration.boss vault.integration.boss vault-read secret/auth/realm
+./bastion.py vault.integration.boss vault-read secret/auth/realm
 ```
-Login to https://api.integration.theboss.io/v0.7/collection/
+Login to https://api.theboss.io/
 Uses bossadmin and the password you now have to sync bossadmin to django
 
-## Add Trigger to multilambda.integration.boss
-Go to Lambda in the AWS console, 
-Select multilambda.integration.boss
-Select trigger tab
-click in the empty box Lambda is pointing to in the diagram.  Now select the S3 in the drop down box.
-A new dialog will come up
-Bucket:  tiles.integration.boss
-Event Type:  Object Created (All)
-You may need to scroll down to click submit
+## Manually update the api ELB timeout
+Go to EC2 in AWS console
+select load balancers on left side
+click the checkbox for the loadbalancer to change
+under attributes 
+Set "Idle timeout: 300 seconds"
+
+## Manually update the multilambda timeout
+Go to Lambda in AWS console
+select Configuration tab
+Advanced Settings
+Change *Timeout* to be 2 mins.
 
 ## Run unit tests on Endpoint
 
@@ -209,7 +212,7 @@ to run and will fail in your environment
 
 ```shell
 cd vault
-./bastion.py bastion.integration.boss endpoint.integration.boss ssh
+./bastion.py endpoint.integration.boss ssh
 export RUN_HIGH_MEM_TESTS=True
 cd /srv/www/django
 sudo python3 manage.py test
@@ -295,7 +298,7 @@ git checkout integration
 sudo pip3 install -r requirements.txt
 ```
 
-In your browser, open https://api.integration.theboss.io/token
+In your browser, open https://api.theboss.io/vX.Y/mgmt/token
 
 Your browser should be redirected to the KeyCloak login page.
 
@@ -316,21 +319,21 @@ all tokens with the token displayed in your browser.
 ```
 [Project Service]
 protocol = https
-host = api.integration.theboss.io
+host = api.theboss.io
 # Replace with your token.
-token = c23b48ceb35cae212b470a23d99d4185bac1c226
+token = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 [Metadata Service]
 protocol = https
-host = api.integration.theboss.io
+host = api.theboss.io
 # Replace with your token.
-token = c23b48ceb35cae212b470a23d99d4185bac1c226
+token = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 [Volume Service]
 protocol = https
-host = api.integration.theboss.io
+host = api.theboss.io
 # Replace with your token.
-token = c23b48ceb35cae212b470a23d99d4185bac1c226
+token = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 Additionally, create a copy of `~/.intern/intern.cfg` as `test.cfg` in the intern
@@ -338,7 +341,7 @@ repository directory.
 
 ##### Setup via the Django Admin Page
 
-In your browser, go to https://api.integration.theboss.io/admin
+In your browser, go to https://api.theboss.io/admin
 
 Login using the bossadmin account created previously (this was created during
 the endpoint initialization and unit test step).
@@ -372,7 +375,7 @@ OK
 To be filled out
 
 ### Manual Checks
-* https://api.integration.theboss.io/ping/
-* https://api.integration.theboss.io/v0.7/collection/
+* https://api.theboss.io/ping/
+* https://api.theboss.io/v0.7/collection/
 * Login into Scalyr and verify that the new instances appear on the overview page.
 * Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint and proofreader.

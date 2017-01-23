@@ -19,7 +19,10 @@
 	url = http://github.com/jhuapl-boss/ndingest.git
 	branch = master
 [submodule "salt_stack/salt/ingest-client/files/ingest-client.git"]
-        path = salt_stack/salt/ingest-client/files/ingest-client.git
+    path = salt_stack/salt/ingest-client/files/ingest-client.git
 	url = http://github.com/jhuapl-boss/ingest-client.git
         branch = master
-
+[submodule "lib/heaviside.git"]
+	path = lib/heaviside.git
+	url = https://github.com/jhuapl-boss/heaviside
+	branch = master

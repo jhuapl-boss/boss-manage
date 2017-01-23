@@ -18,31 +18,9 @@
 import argparse
 import sys
 import os
-from boto3.session import Session
-import json
 
-# Add a reference to boss-manage/cloud_formation/ so that we can import those files
-cur_dir = os.path.dirname(os.path.realpath(__file__))
-cf_dir = os.path.normpath(os.path.join(cur_dir, "..", "cloud_formation"))
-sys.path.append(cf_dir)
-import library as lib
-
-
-def create_session(credentials):
-    """
-    Read the AWS from the credentials dictionary and then create a boto3
-    connection to AWS with those credentials.
-    Args:
-        credentials: AWS credentials in JSON format
-
-    Returns: results boto3 AWS session object
-
-    """
-    session = Session(aws_access_key_id=credentials["aws_access_key"],
-                      aws_secret_access_key=credentials["aws_secret_key"],
-                      region_name='us-east-1')
-    return session
-
+import alter_path
+from lib import aws
 
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
@@ -64,8 +42,7 @@ if __name__ == '__main__':
         print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
         sys.exit(1)
 
-    credentials = json.load(args.aws_credentials)
-    session = create_session(credentials)
+    session = aws.create_session(args.aws_credentials)
 
-    results = lib.request_cert(session, args.domain_name, lib.get_hosted_zone(session))
+    results = aws.request_cert(session, args.domain_name, aws.get_hosted_zone(session))
     print(results)

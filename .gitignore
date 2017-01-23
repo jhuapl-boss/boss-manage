@@ -14,7 +14,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -76,6 +75,9 @@ vault/private/
 # PyCharm Stuff
 .idea/
 
+# Vim Swap Files
+.*.swp
+
 # Scylr
 config/set_scalyr_vars.sh
 */scalyr-cfg.json
@@ -88,4 +90,8 @@ salt_stack/salt/keycloak/files/keycloak-*Final.tar.gz
 
 # Boss Set Vars
 config/set_vars_*.sh
+config/my_vars.sh
+
+# CloudFormation Templates
+cloud_formation/templates/
 

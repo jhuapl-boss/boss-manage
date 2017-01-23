@@ -1,0 +1,15 @@
+start on runlevel [2345]
+stop on runlevel [!2345]
+respawn
+
+# Log file /var/log/upstart/activity-manager.log
+exec /usr/local/bin/python3 /srv/activities/manager.py
+
+#script
+#exec 3>&1 4>&2
+#trap 'exec 1>&3 2>&4' 0 1 2 3
+#exec 1>/dev/.initramfs/activities.log 2>&1
+#set -x
+#
+#/usr/local/bin/python3 /srv/activities/manager.py
+#end script

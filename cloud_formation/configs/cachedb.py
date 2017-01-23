@@ -27,35 +27,16 @@ This will most likely be merged into production once it is finished.
 
 """
 
+from lib.cloudformation import CloudFormationConfiguration, Arg, Ref
+from lib.userdata import UserData
+from lib.names import AWSNames
+from lib.external import ExternalCalls
+from lib import aws
+from lib import scalyr
+from lib import constants as const
 
-import configuration
-import library as lib
-import hosts
-import json
-import scalyr
-import uuid
 from update_lambda_fcn import load_lambdas_on_s3
-import names
-
-
-# Region production is created in.  Later versions of boto3 should allow us to
-# extract this from the session variable.  Hard coding for now.
-PRODUCTION_REGION = 'us-east-1'
-
-INCOMING_SUBNET = "52.3.13.189/32"  # microns-bastion elastic IP
-
-CACHE_MANAGER_TYPE = {
-    "development": "t2.micro",
-    "production": "t2.medium",
-    "ha-development": "t2.micro",
-}
-
-# Prefixes uses to generate names of SQS queues.
-S3FLUSH_QUEUE_PREFIX = 'S3flush.'
-DEADLETTER_QUEUE_PREFIX = 'Deadletter.'
-
-WRITE_LOCK_SNS_PREFIX = 'WriteLockAlert'
-
+import boto3
 
 def create_config(session, domain, keypair=None, user_data=None):
     """
@@ -64,8 +45,7 @@ def create_config(session, domain, keypair=None, user_data=None):
         session: amazon session object
         domain: domain of the stack being created
         keypair: keypair used to by instances being created
-        user_data (configuration.UserData): information used by the endpoint instance and vault.  Data will be run through the CloudFormation Fn::Join template intrinsic function so other template intrinsic functions used in the user_data will be parsed and executed.
-        db_config: information needed by rds
+        user_data (UserData): information used by the endpoint instance and vault.  Data will be run through the CloudFormation Fn::Join template intrinsic function so other template intrinsic functions used in the user_data will be parsed and executed.
 
     Returns: the config for the Cloud Formation stack
 
@@ -77,60 +57,49 @@ def create_config(session, domain, keypair=None, user_data=None):
     else:
         parsed_user_data = user_data
 
-    config = configuration.CloudFormationConfiguration(domain, PRODUCTION_REGION)
-    # Prepare user data for parsing by CloudFormation.
-    parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
+    names = AWSNames(domain)
+    config = CloudFormationConfiguration("cachedb", domain, const.REGION)
 
-    # do a couple of verification checks
-    if config.subnet_domain is not None:
-        raise Exception("Invalid VPC domain name")
+    vpc_id = config.find_vpc(session)
+    internal_subnets, _ = config.find_all_availability_zones(session)
 
-    vpc_id = lib.vpc_id_lookup(session, domain)
-    if session is not None and vpc_id is None:
-        raise Exception("VPC does not exists, exiting...")
-
-    # Lookup the VPC, External Subnet, Internal Security Group IDs that are
+    # Lookup the External Subnet, Internal Security Group IDs that are
     # needed by other resources
-    config.add_arg(configuration.Arg.VPC("VPC", vpc_id,
-                                         "ID of VPC to create resources in"))
+    internal_subnet_id = aws.subnet_id_lookup(session, names.subnet("internal"))
+    config.add_arg(Arg.Subnet("InternalSubnet",
+                              internal_subnet_id,
+                              "ID of Internal Subnet to create resources in"))
 
-    external_subnet_id = lib.subnet_id_lookup(session, "external." + domain)
-    config.add_arg(configuration.Arg.Subnet("ExternalSubnet",
-                                            external_subnet_id,
-                                            "ID of External Subnet to create resources in"))
+    internal_sg_id = aws.sg_lookup(session, vpc_id, names.internal)
+    config.add_arg(Arg.SecurityGroup("InternalSecurityGroup",
+                                     internal_sg_id,
+                                     "ID of internal Security Group"))
 
-    internal_subnet_id = lib.subnet_id_lookup(session, "internal." + domain)
-    config.add_arg(configuration.Arg.Subnet("InternalSubnet",
-                                            internal_subnet_id,
-                                            "ID of Internal Subnet to create resources in"))
+    role = aws.role_arn_lookup(session, "lambda_cache_execution")
+    config.add_arg(Arg.String("LambdaCacheExecutionRole", role,
+                              "IAM role for multilambda." + domain))
 
-    internal_sg_id = lib.sg_lookup(session, vpc_id, "internal." + domain)
-    config.add_arg(configuration.Arg.SecurityGroup("InternalSecurityGroup",
-                                                   internal_sg_id,
-                                                   "ID of internal Security Group"))
-
-    role = lib.role_arn_lookup(session, "lambda_cache_execution")
-    config.add_arg(configuration.Arg.String("LambdaCacheExecutionRole", role,
-                                            "IAM role for multilambda." + domain))
-
-    index_bucket_name = names.get_cuboid_bucket(domain)
-    if not lib.s3_bucket_exists(session, index_bucket_name):
+    index_bucket_name = names.cuboid_bucket
+    if not aws.s3_bucket_exists(session, index_bucket_name):
         config.add_s3_bucket("cuboidBucket", index_bucket_name)
     config.add_s3_bucket_policy(
         "cuboidBucketPolicy", index_bucket_name,
         ['s3:GetObject', 's3:PutObject'],
         { 'AWS': role})
 
-    tile_bucket_name = names.get_tile_bucket(domain)
-    if not lib.s3_bucket_exists(session, tile_bucket_name):
+    creating_tile_bucket = False
+    tile_bucket_name = names.tile_bucket
+    if not aws.s3_bucket_exists(session, tile_bucket_name):
+        creating_tile_bucket = True
         config.add_s3_bucket("tileBucket", tile_bucket_name)
+
     config.add_s3_bucket_policy(
         "tileBucketPolicy", tile_bucket_name,
         ['s3:GetObject', 's3:PutObject'],
         { 'AWS': role})
 
-    ingest_bucket_name = names.get_ingest_bucket(domain)
-    if not lib.s3_bucket_exists(session, ingest_bucket_name):
+    ingest_bucket_name = names.ingest_bucket
+    if not aws.s3_bucket_exists(session, ingest_bucket_name):
         config.add_s3_bucket("ingestBucket", ingest_bucket_name)
     config.add_s3_bucket_policy(
         "ingestBucketPolicy", ingest_bucket_name,
@@ -138,111 +107,100 @@ def create_config(session, domain, keypair=None, user_data=None):
         { 'AWS': role})
 
     config.add_ec2_instance("CacheManager",
-                                names.get_cache_manager(domain),
-                                lib.ami_lookup(session, "cachemanager.boss"),
+                                names.cache_manager,
+                                aws.ami_lookup(session, "cachemanager.boss"),
                                 keypair,
-                                subnet="InternalSubnet",
+                                subnet=Ref("InternalSubnet"),
                                 public_ip=False,
-                                type_=CACHE_MANAGER_TYPE,
-                                security_groups=["InternalSecurityGroup"],
+                                type_=const.CACHE_MANAGER_TYPE,
+                                security_groups=[Ref("InternalSecurityGroup")],
                                 user_data=parsed_user_data,
                                 role="cachemanager")
 
-    lambda_sec_group = lib.sg_lookup(session, vpc_id, 'internal.' + domain)
-    filter_by_host_name = ([{
-        'Name': 'tag:Name',
-        'Values': ['*internal.' + domain]
-    }])
-    lambda_subnets = lib.multi_subnet_id_lookup(session, filter_by_host_name)
-
-    multi_lambda_name = names.get_multi_lambda(domain).replace('.', '-')
-    lambda_bucket = lib.get_lambda_s3_bucket(session)
+    lambda_bucket = aws.get_lambda_s3_bucket(session)
     config.add_lambda("MultiLambda",
-                      multi_lambda_name,
-                      "LambdaCacheExecutionRole",
-                      s3=(lambda_bucket,
+                      names.multi_lambda,
+                      Ref("LambdaCacheExecutionRole"),
+                      s3=(aws.get_lambda_s3_bucket(session),
                           "multilambda.{}.zip".format(domain),
                           "local/lib/python3.4/site-packages/lambda/lambda_loader.handler"),
-                      timeout=60,
+                      timeout=120,
                       memory=1024,
-                      security_groups=[lambda_sec_group],
-                      subnets=lambda_subnets)
+                      security_groups=[Ref('InternalSecurityGroup')],
+                      subnets=internal_subnets)
+
+    if creating_tile_bucket:
+        config.add_lambda_permission(
+            'tileBucketInvokeMultiLambda', names.multi_lambda,
+            principal='s3.amazonaws.com', source={
+                'Fn::Join': [':', ['arn', 'aws', 's3', '', '', tile_bucket_name]]}, #DP TODO: move into constants
+            depends_on=['tileBucket', 'MultiLambda']
+        )
+    else:
+        config.add_lambda_permission(
+            'tileBucketInvokeMultiLambda', names.multi_lambda,
+            principal='s3.amazonaws.com', source={
+                'Fn::Join': [':', ['arn', 'aws', 's3', '', '', tile_bucket_name]]},
+            depends_on='MultiLambda'
+        )
 
     # Add topic to indicating that the object store has been write locked.
-    write_lock_topic = WRITE_LOCK_SNS_PREFIX
-    write_lock_topic_logical_name = (
-        write_lock_topic + '-' + domain.replace('.', '-'))
-    # ToDo: add subscribers.
-    write_lock_subscribers = []
-    config.add_sns_topic(
-        write_lock_topic, write_lock_topic,
-        write_lock_topic_logical_name, write_lock_subscribers)
+    config.add_sns_topic('WriteLock',
+                         names.write_lock_topic,
+                         names.write_lock,
+                         []) # TODO: add subscribers
 
     return config
 
 
-def generate(folder, domain):
+def generate(session, domain):
     """Create the configuration and save it to disk"""
-    name = lib.domain_to_stackname(names.get_cache_db(domain))
-    config = create_config(None, domain)
-    config.generate(name, folder)
+    config = create_config(session, domain)
+    config.generate()
 
 
 def create(session, domain):
     """Create the configuration, and launch it"""
-    s3flushqname = lib.domain_to_stackname(S3FLUSH_QUEUE_PREFIX + domain)
-    deadqname = lib.domain_to_stackname(DEADLETTER_QUEUE_PREFIX + domain)
+    names = AWSNames(domain)
 
-    # Configure Vault and create the user data config that the endpoint will
-    # use for connecting to Vault and the DB instance
-    user_data = configuration.UserData()
-    user_data["system"]["fqdn"] = names.get_cache_manager(domain)
+    user_data = UserData()
+    user_data["system"]["fqdn"] = names.cache_manager
     user_data["system"]["type"] = "cachemanager"
-    user_data["aws"]["cache"] = "cache." + domain
-    user_data["aws"]["cache-state"] = "cache-state." + domain
+    user_data["aws"]["cache"] = names.cache
+    user_data["aws"]["cache-state"] = names.cache_state
     user_data["aws"]["cache-db"] = "0"
     user_data["aws"]["cache-state-db"] = "0"
 
-    # Use CloudFormation's Ref function so that queues' URLs are placed into
-    # the Boss config file.
-    # user_data["aws"]["s3-flush-queue"] = '{{"Ref": "{}" }}'.format(s3flushqname)
-    # user_data["aws"]["s3-flush-deadletter-queue"] = '{{"Ref": "{}" }}'.format(deadqname)
+    user_data["aws"]["s3-flush-queue"] = aws.sqs_lookup_url(session, names.s3flush_queue)
+    user_data["aws"]["s3-flush-deadletter-queue"] = aws.sqs_lookup_url(session, names.deadletter_queue)
 
-    # Until merged with production.py, look up queue urls instead of using
-    # the Ref intrinsic function.
-    user_data["aws"]["s3-flush-queue"] = lib.sqs_lookup_url(session, s3flushqname)
-    user_data["aws"]["s3-flush-deadletter-queue"] = lib.sqs_lookup_url(session, deadqname)
-
-    user_data["aws"]["cuboid_bucket"] = names.get_cuboid_bucket(domain)
-    user_data["aws"]["ingest_bucket"] = names.get_ingest_bucket(domain)
-    user_data["aws"]["s3-index-table"] = names.get_s3_index(domain)
-    user_data["aws"]["id-index-table"] = names.get_id_index(domain)
-    user_data["aws"]["id-count-table"] = names.get_id_count_index(domain)
-
+    user_data["aws"]["cuboid_bucket"] = names.cuboid_bucket
+    user_data["aws"]["ingest_bucket"] = names.ingest_bucket
+    user_data["aws"]["s3-index-table"] = names.s3_index
+    user_data["aws"]["id-index-table"] = names.id_index
+    user_data["aws"]["id-count-table"] = names.id_count_index
 
     # SNS and Lambda names can't have periods.
-    multilambda = names.get_multi_lambda(domain).replace('.', '-')
-    user_data["aws"]["sns-write-locked"] = '{{"Ref": "{}"}}'.format(WRITE_LOCK_SNS_PREFIX)
+    user_data["aws"]["sns-write-locked"] = str(Ref('WriteLock'))
 
-    user_data["lambda"]["flush_function"] = multilambda
-    user_data["lambda"]["page_in_function"] = multilambda
+    user_data["lambda"]["flush_function"] = names.multi_lambda
+    user_data["lambda"]["page_in_function"] = names.multi_lambda
 
-    keypair = lib.keypair_lookup(session)
+    keypair = aws.keypair_lookup(session)
 
     try:
-        name = lib.domain_to_stackname(names.get_cache_db(domain))
         pre_init(session, domain)
 
         config = create_config(session, domain, keypair, user_data)
 
-        success = config.create(session, name)
-        print("finished config.create")
+        success = config.create(session)
         if not success:
             raise Exception("Create Failed")
         else:
             post_init(session, domain)
     except:
-        print("Error detected") # Do we want to revoke if an exception from post_init?
+        # DP NOTE: This will catch errors from pre_init, create, and post_init
+        print("Error detected")
         raise
 
 
@@ -250,19 +208,61 @@ def pre_init(session, domain):
     """Send spdb, bossutils, lambda, and lambda_utils to the lambda build
     server, build the lambda environment, and upload to S3.
     """
-    load_lambdas_on_s3(session, domain)
+
+    bucket = aws.get_lambda_s3_bucket(session)
+    load_lambdas_on_s3(session, domain, bucket)
 
 
 def post_init(session, domain):
     print("post_init")
 
+    print('adding tile bucket trigger of multi-lambda')
+    add_tile_bucket_trigger(session, domain)
+
     # Tell Scalyr to get CloudWatch metrics for these instances.
-    instances = [names.get_cache_manager(domain)]
+    names = AWSNames(domain)
+    instances = [names.cache_manager]
     scalyr.add_instances_to_scalyr(
-        session, PRODUCTION_REGION, instances)
+        session, const.REGION, instances)
+
+def add_tile_bucket_trigger(session, domain):
+    """Trigger MultiLambda when file uploaded to tile bucket.
+
+    This is done in post-init() because the tile bucket isn't always
+    created during CloudFormation (it may already exist).
+
+    This function's effects should be idempotent because the same id is
+    used everytime the notification event is added to the tile bucket.
+
+    Args:
+        session (Boto3.Session)
+        domain (string): VPC domain name.
+    """
+    names = AWSNames(domain)
+    lambda_name = names.multi_lambda
+    bucket_name = names.tile_bucket
+
+    lam = session.client('lambda')
+    resp = lam.get_function_configuration(FunctionName=lambda_name)
+    lambda_arn = resp['FunctionArn']
+
+    s3 = session.resource('s3')
+    bucket = s3.Bucket(bucket_name)
+
+    notification = bucket.Notification()
+    notification.put(NotificationConfiguration={
+        'LambdaFunctionConfigurations': [
+            {
+                'Id': 'tileBucketInvokeMultiLambda',
+                'LambdaFunctionArn': lambda_arn,
+                'Events': ['s3:ObjectCreated:*']
+            }
+        ]
+    })
 
 
 def delete(session, domain):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
-    lib.delete_stack(session, domain, "cachedb")
-    lib.route53_delete_records(session, domain, names.get_cache_manager(domain))
+    names = AWSNames(domain)
+    aws.route53_delete_records(session, domain, names.cache_manager)
+    CloudFormationConfiguration("cachedb", domain).delete(session)
