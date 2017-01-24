@@ -25,4 +25,4 @@
 [submodule "lib/heaviside.git"]
 	path = lib/heaviside.git
 	url = https://github.com/jhuapl-boss/heaviside
-	branch = integration
+	branch = master
