@@ -1,27 +1,27 @@
 [submodule "salt_stack/salt/boss-tools/files/boss-tools.git"]
 	path = salt_stack/salt/boss-tools/files/boss-tools.git
 	url = ../boss-tools.git
-	branch = integration	
+	branch = master	
 [submodule "salt_stack/salt/boss/files/boss.git"]
 	path = salt_stack/salt/boss/files/boss.git
 	url = ../boss.git
-	branch = integration	
+	branch = master	
 [submodule "salt_stack/salt/proofreader-web/files/proofread.git"]
 	path = salt_stack/salt/proofreader-web/files/proofread.git
 	url = ../proofread.git
-	branch = integration	
+	branch = master	
 [submodule "salt_stack/salt/spdb/files/spdb.git"]
 	path = salt_stack/salt/spdb/files/spdb.git
 	url = ../spdb.git
-	branch = integration	
+	branch = master	
 [submodule "salt_stack/salt/ndingest/files/ndingest.git"]
 	path = salt_stack/salt/ndingest/files/ndingest.git
 	url = http://github.com/jhuapl-boss/ndingest.git
-	branch = integration
+	branch = master
 [submodule "salt_stack/salt/ingest-client/files/ingest-client.git"]
     path = salt_stack/salt/ingest-client/files/ingest-client.git
 	url = http://github.com/jhuapl-boss/ingest-client.git
-    branch = integration
+        branch = master
 [submodule "lib/heaviside.git"]
 	path = lib/heaviside.git
 	url = https://github.com/jhuapl-boss/heaviside
