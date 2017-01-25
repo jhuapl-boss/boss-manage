@@ -153,8 +153,8 @@ ENDPOINT_CLUSTER_MIN = { # Minimum and Default size of the ASG
 
 ENDPOINT_CLUSTER_MAX = { # Maximum number of instances in the ASG
     "development": 1,
-    "production": 1,
-    "ha-development": 1,
+    "production": 20,
+    "ha-development": 3,
 }
 
 REDIS_CLUSTER_SIZE = {
