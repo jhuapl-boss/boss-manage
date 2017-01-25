@@ -558,9 +558,9 @@ class CloudFormationConfiguration:
                         print(fmt.format(
                             change['Action'],
                             change['LogicalResourceId'],
-                            change['PhysicalResourceId'],
+                            change.get('PhysicalResourceId', ''),
                             change['ResourceType'],
-                            change['Replacement'],
+                            change.get('Replacement', ''),
                             ", ".join(change['Scope'])
                         ))
 
