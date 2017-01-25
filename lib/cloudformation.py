@@ -555,10 +555,11 @@ class CloudFormationConfiguration:
                 for change in response['Changes']:
                     if change['Type'] == 'Resource':
                         change = change['ResourceChange']
+                        limit = lambda s: s[:42] + "..." if len(s) > 45 else s
                         print(fmt.format(
                             change['Action'],
                             change['LogicalResourceId'],
-                            change.get('PhysicalResourceId', ''),
+                            limit(change.get('PhysicalResourceId', '')),
                             change['ResourceType'],
                             change.get('Replacement', ''),
                             ", ".join(change['Scope'])
