@@ -1507,7 +1507,8 @@ class CloudFormationConfiguration:
             self.add_cloudwatch_alarm(key + "Alarm{}".format(i), "",
                                       metric, statistic, comparison, threashold,
                                       [Ref(key)], # alarm_actions
-                                      {"AutoScalingGroupName": asg}) # dimensions
+                                      {"AutoScalingGroupName": asg}, # dimensions
+                                      period = 2)
 
     def add_s3_bucket(self, key, name, access_control=None, life_cycle_config=None, notification_config=None, tags=None, depends_on=None):
         """Create or configure a S3 bucket.
@@ -1789,7 +1790,7 @@ class CloudFormationConfiguration:
         if depends_on is not None:
             self.resources[key]['DependsOn'] = depends_on
 
-    def add_cloudwatch_alarm(self, key, description, metric, statistic, comparison, threashold, alarm_actions, dimensions={}, depends_on=None):
+    def add_cloudwatch_alarm(self, key, description, metric, statistic, comparison, threashold, alarm_actions, dimensions={}, period=5, depends_on=None):
         """Add CloudWatch Alarm for a LoadBalancer
 
         Args:
@@ -1810,7 +1811,7 @@ class CloudFormationConfiguration:
                 "ActionsEnabled": "true",
                 "AlarmDescription": description,
                 "ComparisonOperator": comparison,
-                "EvaluationPeriods": "5",
+                "EvaluationPeriods": str(period),
                 "MetricName": metric,
                 "Namespace": "AWS/ELB",
                 "Period": "60",
@@ -1838,15 +1839,15 @@ class CloudFormationConfiguration:
         """
         self.add_cloudwatch_alarm("Latency", "",
                                   "Latency", "Average", "GreaterThanOrEqualToThreshold", "10.0",
-                                  alarm_actions, {"LoadBalancerName": lb_name}, depends_on)
+                                  alarm_actions, {"LoadBalancerName": lb_name}, depends_on=depends_on)
 
         self.add_cloudwatch_alarm("SurgeCount", "Surge Count in Load Balance",
                                   "SurgeQueueLength", "Average", "GreaterThanOrEqualToThreshold", "3.0",
-                                  alarm_actions, {"LoadBalancerName": lb_name}, depends_on)
+                                  alarm_actions, {"LoadBalancerName": lb_name}, depends_on=depends_on)
 
         self.add_cloudwatch_alarm("UnhealthyHostCount", "Unhealthy Host Count in Load Balance",
                                   "UnHealthyHostCount", "Minimum", "GreaterThanOrEqualToThreshold", "1.0",
-                                  alarm_actions, {"LoadBalancerName": lb_name}, depends_on)
+                                  alarm_actions, {"LoadBalancerName": lb_name}, depends_on=depends_on)
 
     def add_sns_topic(self, key, name, topic, subscriptions=[]):
         """Create a SNS topic
