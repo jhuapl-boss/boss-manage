@@ -100,7 +100,7 @@ class Vault(object):
         connection object.
         """
         import code
-        client = connect(VAULT_TOKEN)
+        client = self.connect(VAULT_TOKEN)
         code.interact(local=locals())
 
     def initialize(self, secrets = 5, threashold = 3):
