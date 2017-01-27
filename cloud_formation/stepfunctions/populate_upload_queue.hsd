@@ -9,22 +9,6 @@ Activity('PopulateQueue')
     catch []:
         Failure('Error', 'Cause')
 
-# -- OR --------------------------------------------
-
-# Input
-# {'UploadTaskQueue':'ARN',
-#  'JobConfig': {},
-#  'RetryCount': 0}
-
-while '$.RetryCount' < 3:
-    Activity('PopulateQueue')
-        catch []:
-            Activity('PurgeQueue') # RetryCount++
-            Wait(seconds=60)
-
-if '$.RetryCount' == 3:
-    Failure('Error', 'Cause')
-
 # -- Both --------------------------------------------
 
 Activity('VerifyCount')
