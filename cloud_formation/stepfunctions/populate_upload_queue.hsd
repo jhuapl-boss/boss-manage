@@ -1,0 +1,15 @@
+
+# Input
+# {'UploadTaskQueue':'ARN',
+#  'JobConfig': {}}
+
+Activity('PopulateQueue')
+    # Should check the queue and purge if anything is in it
+    retry [] 60 3 1.0
+    catch []:
+        Failure('Error', 'Cause')
+
+# -- Both --------------------------------------------
+
+Activity('VerifyCount')
+# If count's don't match, activity should fail

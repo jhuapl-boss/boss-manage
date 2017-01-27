@@ -148,7 +148,6 @@ def create_config(session, domain, keypair=None, db_config={}):
                             security_groups=[sgs[names.internal], sgs[names.https]],
                             public=True)
 
-    """
     config.add_autoscale_policy("EndpointScaleUp",
                                 Ref("Endpoint"),
                                 adjustments=[
@@ -167,7 +166,6 @@ def create_config(session, domain, keypair=None, db_config={}):
                                 alarms=[
                                     ("CPUUtilization ", "Average", "LessThanThreshold", "0.40")
                                 ])
-    """
 
     config.add_rds_db("EndpointDB",
                       names.endpoint_db,
