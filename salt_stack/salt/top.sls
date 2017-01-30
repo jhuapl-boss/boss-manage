@@ -61,3 +61,6 @@ base:
     'activities*':
         - boss-tools.activities
 
+        # populate upload queue
+        - ndingest
+        - ingest-client.ingest

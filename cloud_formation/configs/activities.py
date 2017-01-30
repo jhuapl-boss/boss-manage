@@ -75,6 +75,7 @@ def post_init(session, domain, startup_wait=False):
     names = AWSNames(domain)
 
     sfn.create(session, names.delete_cuboid, domain, 'delete_cuboid.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(session, names.populate_upload_queue, domain, 'populate_upload_queue.hsd', 'StatesExecutionRole-us-east-1 ')
 
 def delete(session, domain):
     names = AWSNames(domain)
@@ -82,3 +83,4 @@ def delete(session, domain):
     CloudFormationConfiguration('activities', domain).delete(session)
 
     sfn.delete(session, names.delete_cuboid)
+    sfn.delete(session, names.populate_upload_queue)

@@ -91,6 +91,8 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["lambda"]["page_in_function"] = names.multi_lambda
     user_data["lambda"]["ingest_function"] = names.multi_lambda
 
+    user_data['sfn']['populate_upload_queue'] = names.populate_upload_queue
+
     # Prepare user data for parsing by CloudFormation.
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
 

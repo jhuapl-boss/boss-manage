@@ -1,15 +1,10 @@
-
-# Input
-# {'UploadTaskQueue':'ARN',
-#  'JobConfig': {}}
+"""Populate an ingest upload queue with message for each tile to be processed"""
 
 Activity('PopulateQueue')
-    # Should check the queue and purge if anything is in it
+    # Automatically purges the queue so retry works correctly
     retry [] 60 3 1.0
     catch []:
-        Failure('Error', 'Cause')
-
-# -- Both --------------------------------------------
+        Fail('Exception', 'Problems populating upload queue')
 
 Activity('VerifyCount')
-# If count's don't match, activity should fail
+
