@@ -99,7 +99,7 @@ class AWSNames(object):
         if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'consul_monitor', 'vault_consul_check']:
             fq_hostname = fq_hostname.replace('.','-')
 
-        if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'populate_upload_queue']:
+        if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes', 'populate_upload_queue']:
             fq_hostname = "".join(map(lambda x: x.capitalize(), fq_hostname.split('.')))
 
         return fq_hostname
