@@ -82,6 +82,7 @@ class AWSNames(object):
         'activities': 'activities',
         'delete_cuboid': 'Delete.Cuboid',
         'delete_bucket': 'delete',
+        'query_deletes': 'Query.Deletes',
     }
 
     def __getattr__(self, name):

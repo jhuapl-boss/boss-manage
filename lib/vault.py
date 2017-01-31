@@ -17,11 +17,10 @@ import glob
 import hvac
 import json
 from pprint import pprint
+import traceback
 
 VAULT_TOKEN = "vault_token"
 VAULT_KEY = "vault_key."
-PROVISIONER_TOKEN = "provisioner_token"
-
 
 VAULT_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "vault"))
 POLICY_DIR = os.path.join(VAULT_DIR, "policies")
@@ -121,6 +120,8 @@ class Vault(object):
             if client.is_sealed():
                 print("Unsealing Vault")
                 self.unseal()
+            else:
+                print("Vault already unsealed")
         else:
             print("Initializing with {} secrets and {} needed to unseal".format(secrets, threashold))
             result = client.initialize(secrets, threashold)
@@ -168,7 +169,10 @@ class Vault(object):
         audit_options = {
             'low_raw': 'True',
         }
-        client.enable_audit_backend('syslog', options=audit_options)
+        try:
+            client.enable_audit_backend('syslog', options=audit_options)
+        except hvac.exceptions.InvalidRequest as ex:
+            print("audit_backend already created.")
 
         # Policies
         provisioner_policies = []
@@ -177,15 +181,9 @@ class Vault(object):
             name = os.path.basename(policy).split('.')[0]
             with open(policy, 'r') as fh:
                 client.set_policy(name, fh.read())
-
             # Add every policy to the provisioner, as it has to have the
             # superset of any policies that it will provision
             provisioner_policies.append(name)
-
-        token_file = self.path(PROVISIONER_TOKEN)
-        token = client.create_token(policies=provisioner_policies)
-        with open(token_file, "w") as fh:
-            fh.write(token['auth']['client_token'])
 
         # Read AWS credentials file
         vault_aws_creds = os.path.join(PRIVATE_DIR, "vault_aws_credentials")
@@ -197,9 +195,12 @@ class Vault(object):
 
         # AWS Authentication Backend
         if aws_creds is None:
-            print("Vault AWS credentials files does nto exist, skipping configuration of AWS-EC2 authentication backend")
+            print("Vault AWS credentials files does not exist, skipping configuration of AWS-EC2 authentication backend")
         else:
-            client.enable_auth_backend('aws-ec2')
+            try:
+                client.enable_auth_backend('aws-ec2')
+            except hvac.exceptions.InvalidRequest as ex:
+                print("aws-ec2 auth backend already created.")
             client.write('auth/aws-ec2/config/client', access_key = aws_creds["aws_access_key"],
                                                        secret_key = aws_creds["aws_secret_key"])
 
@@ -213,7 +214,10 @@ class Vault(object):
         if aws_creds is None:
             print("Vault AWS credentials file does not exist, skipping configuration of AWS secret backend")
         else:
-            client.enable_secret_backend('aws')
+            try:
+                client.enable_secret_backend('aws')
+            except hvac.exceptions.InvalidRequest as ex:
+                print("aws secret backend already created.")
             client.write("aws/config/root", access_key = aws_creds["aws_access_key"],
                                             secret_key = aws_creds["aws_secret_key"],
                                             region = aws_creds.get("aws_region", "us-east-1"))
@@ -361,7 +365,7 @@ class Vault(object):
         Returns:
             (string) : String containing the new Vault token
         """
-        client = self.connect(PROVISIONER_TOKEN)
+        client = self.connect(VAULT_TOKEN)
         token = client.create_token(policies = [policy])
         return token["auth"]["client_token"]
 
@@ -371,7 +375,7 @@ class Vault(object):
         Args:
             token (string) : String containing the Vault token to revoke
         """
-        client = self.connect(PROVISIONER_TOKEN)
+        client = self.connect(VAULT_TOKEN)
         client.revoke_token(token)
 
     def write(self, path, **kwargs):
@@ -384,7 +388,7 @@ class Vault(object):
             path (string) : Vault path to write data to
             kwargs : Key value pairs to store at path
         """
-        client = self.connect(PROVISIONER_TOKEN)
+        client = self.connect(VAULT_TOKEN)
         client.write(path, **kwargs)
 
     def update(self, path, **kwargs):
@@ -394,7 +398,7 @@ class Vault(object):
             path (string) : Vault path to write data to
             kwargs : Key value pairs to store at path
         """
-        client = self.connect(PROVISIONER_TOKEN)
+        client = self.connect(VAULT_TOKEN)
 
         existing = client.read(path)
         if existing is None:
@@ -412,7 +416,7 @@ class Vault(object):
         Args:
             path (string) : Vault path to read data from
         """
-        client = self.connect(PROVISIONER_TOKEN)
+        client = self.connect(VAULT_TOKEN)
         return client.read(path)
 
     def delete(self, path):
@@ -421,7 +425,7 @@ class Vault(object):
         Args:
             path (string) : Vault path to delete all data from
         """
-        client = self.connect(PROVISIONER_TOKEN)
+        client = self.connect(VAULT_TOKEN)
         client.delete(path)
 
     def export(self, path):
