@@ -16,7 +16,7 @@ ingest-prerequirements:
 # env_vars.  This will probably be fixed in a new version of Salt (newer
 # than 8/2015).  See https://github.com/saltstack/salt/issues/19924 and
 # https://github.com/saltstack/salt/pull/29340.
-httpretty:
+ingest-httpretty:
     cmd.run:
         - name: |
             export LC_ALL=en_US.UTF-8
@@ -28,7 +28,7 @@ ingest-client-lib:
         - requirements: salt://ingest-client/files/ingest-client.git/requirements.txt
         - require:
             - pkg: ingest-prerequirements
-            - cmd: httpretty
+            - cmd: ingest-httpretty
 
     file.recurse:
         - name: /usr/local/lib/python3/site-packages/ingest
