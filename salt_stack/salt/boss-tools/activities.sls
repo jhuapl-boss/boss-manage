@@ -1,8 +1,8 @@
 include:
-    - boss-tools.bossutils
-    - heaviside
     - python.python35
     - python.pip
+    - boss-tools.bossutils
+    - heaviside
 
 activity-files:
     file.recurse:

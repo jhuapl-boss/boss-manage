@@ -274,16 +274,11 @@ def post_init(session, domain, startup_wait=False):
 
     # Initialize Vault
     print("Waiting for Vault...")
-    call.check_vault(const.TIMEOUT_VAULT) # Expecting this to also check Consul
+    call.check_vault(const.TIMEOUT_VAULT)  # Expecting this to also check Consul
 
     with call.vault() as vault:
         print("Initializing Vault...")
         try:
-            ##############
-            # DP TODO: Update vault.configure() so that it will only configure what
-            #          hasn't already been configured, so this step can be run multiple
-            #          times without issue
-            ##############
             vault.initialize()
         except Exception as ex:
             print(ex)
@@ -292,19 +287,29 @@ def post_init(session, domain, startup_wait=False):
             print("Before launching other stacks")
             return
 
+        #Check and see if these secrets already exist before we overwrite them with new ones.
         # Write data into Vault
-        print("Writing secret/auth")
-        vault.write("secret/auth", password = password, username = username, client_id = "admin-cli")
-        print("Writing secret/auth/realm")
-        vault.write("secret/auth/realm", username = realm_username, password = realm_password, client_id = "endpoint")
-        print("Updating secret/keycloak")
-        vault.update("secret/keycloak", password = password, username = username, client_id = "admin-cli", realm = "master")
-        # DP TODO: Move this update call into the api config
-        print("Updating secret/endpoint/auth")
-        vault.update("secret/endpoint/auth", url = auth_discovery_url, client_id = "endpoint")
-        # DP TODO: Move this update call into the proofreader config
-        print("Updating secret/proofreader/auth")
-        vault.update("secret/proofreader/auth", url = auth_discovery_url, client_id = "endpoint")
+        if not vault.read(const.VAULT_AUTH):
+            print("Writing {}".format(const.VAULT_AUTH))
+            vault.write(const.VAULT_AUTH, password = password, username = username, client_id = "admin-cli")
+
+        if not vault.read(const.VAULT_REALM):
+            print("Writing {}".format(const.VAULT_REALM))
+            vault.write(const.VAULT_REALM, username = realm_username, password = realm_password, client_id = "endpoint")
+
+        if not vault.read(const.VAULT_KEYCLOAK):
+            print("Updating {}".format(const.VAULT_KEYCLOAK))
+            vault.update(const.VAULT_KEYCLOAK, password = password, username = username, client_id = "admin-cli", realm = "master")
+
+        if not vault.read(const.VAULT_ENDPOINT_AUTH):
+            # DP TODO: Move this update call into the api config
+            print("Updating {}".format(const.VAULT_ENDPOINT_AUTH))
+            vault.update(const.VAULT_ENDPOINT_AUTH, url = auth_discovery_url, client_id = "endpoint")
+
+        if not vault.read(const.VAULT_PROOFREAD_AUTH):
+            # DP TODO: Move this update call into the proofreader config
+            print("Updating {}".format(const.VAULT_PROOFREAD_AUTH))
+            vault.update(const.VAULT_PROOFREAD_AUTH, url = auth_discovery_url, client_id = "endpoint")
 
     # Configure Keycloak
     print("Waiting for Keycloak to bootstrap")
