@@ -6,4 +6,3 @@ Activity('query_for_deletes')
     """query_for_deletes
        finds channels that need to be deleted and call delete_cuboid SFN"""
     retry [] 60 3 2
-    catch []: '$.error'
