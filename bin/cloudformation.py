@@ -25,7 +25,9 @@ import glob
 import alter_path
 from lib import exceptions
 from lib import aws
+from lib import utils
 from lib.cloudformation import CloudFormationConfiguration
+from lib.stepfunctions import heaviside
 
 # Add a reference to boss-manage/lib/ so that we can import those files
 cur_dir = os.path.dirname(os.path.realpath(__file__))
@@ -110,6 +112,8 @@ if __name__ == '__main__':
         ret = call_config(session, args.domain_name, args.config_name, func)
         if ret == False:
             sys.exit(1)
+        else:
+            sys.exit(0)
     except exceptions.StatusCheckError as ex:
         target = 'the server'
         if hasattr(ex, 'target') and ex.target is not None:
@@ -119,10 +123,26 @@ if __name__ == '__main__':
         print(ex)
         print("Check networking and {}".format(target))
         print("Then run the following command:")
-        print("\t" + lib.get_command("post-init"))
+        print("\t" + utils.get_command("post-init"))
+        sys.exit(2)
     except exceptions.KeyCloakLoginError as ex:
         print()
         print(ex)
         print("Check Vault and Keycloak")
         print("Then run the following command:")
-        print("\t" + lib.get_command("post-init"))
+        print("\t" + utils.get_command("post-init"))
+        sys.exit(2)
+    except heaviside.exceptions.CompileError as ex:
+        print()
+        print(ex)
+        print()
+        print("Fix the syntax error in {}".format(ex.source))
+        print("Then run the following command:")
+        print("\t" + utils.get_command("post-init"))
+        sys.exit(2)
+    except heaviside.exceptions.HeavisideError as ex:
+        print()
+        print("Heaviside Error: {}".format(ex))
+        print("Fix the problem, then run the following command:")
+        print("\t" + utils.get_command("post-init"))
+        sys.exit(2)

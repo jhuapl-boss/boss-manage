@@ -43,10 +43,13 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    machine = heaviside.compile(Path(args.file),
-                                region=args.region,
-                                account_id=args.account,
-                                indent=3)
-
-    if machine:
+    try:
+        machine = heaviside.compile(Path(args.file),
+                                    region=args.region,
+                                    account_id=args.account,
+                                    indent=3)
         args.output.write(machine)
+        sys.exit(0)
+    except heaviside.exceptions.CompileError as ex:
+        print(ex)
+        sys.exit(1)
