@@ -1174,3 +1174,26 @@ def get_lambda_server_key(session):
     else:
         raise NameError("Unknown session account used, {}, lambda_build_server for this session is unknown.".format(account))
 
+
+def lambda_arn_lookup(session, lambda_name):
+    """
+    Returns the arn for a lambda given a lambda function name.
+    Args:
+        session (Session): boto3.session.Session object
+        lambda_name (str): name of the lambda function
+
+    Returns:
+        (str):
+    """
+    if session is None:
+        return None
+
+    client = session.client("lambda")
+    response = client.get_function(FunctionName=lambda_name)
+    if response is None:
+        return None
+    else:
+        return response['Configuration']['FunctionArn']
+
+
+
