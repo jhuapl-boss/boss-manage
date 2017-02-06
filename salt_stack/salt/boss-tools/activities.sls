@@ -1,4 +1,6 @@
 include:
+    - python.python35
+    - python.pip
     - boss-tools.bossutils
     - heaviside
 
@@ -14,6 +16,14 @@ activity-files:
         - require:
             - sls: heaviside
 
+activites-lib:
+    pip.installed:
+        - name: pymysql
+        - bin_env: /usr/local/bin/pip3
+        - require:
+            - sls: python.python35
+            - sls: python.pip
+
 manager-service:
     file.managed:
         - name: /etc/init/activity-manager.conf
@@ -23,3 +33,4 @@ manager-service:
         - mode: 555
         - require:
             - file: activity-files
+

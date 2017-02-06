@@ -54,7 +54,7 @@ def create_config(session, domain):
         msg = "MailingList {} needs to be created before running config"
         raise Exception(msg.format(mailing_list_arn))
 
-    config.add_cloudwatch(loadbalancer_name, mailing_list_arn)
+    config.add_cloudwatch(loadbalancer_name, [mailing_list_arn])
 
     lambda_role = aws.role_arn_lookup(session, 'VaultConsulHealthChecker')
     config.add_arg(Arg.String(

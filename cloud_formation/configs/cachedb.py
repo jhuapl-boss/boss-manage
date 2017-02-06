@@ -124,7 +124,7 @@ def create_config(session, domain, keypair=None, user_data=None):
                       s3=(aws.get_lambda_s3_bucket(session),
                           "multilambda.{}.zip".format(domain),
                           "local/lib/python3.4/site-packages/lambda/lambda_loader.handler"),
-                      timeout=60,
+                      timeout=120,
                       memory=1024,
                       security_groups=[Ref('InternalSecurityGroup')],
                       subnets=internal_subnets)
@@ -242,11 +242,11 @@ def add_tile_bucket_trigger(session, domain):
     lambda_name = names.multi_lambda
     bucket_name = names.tile_bucket
 
-    lam = boto3.client('lambda')
+    lam = session.client('lambda')
     resp = lam.get_function_configuration(FunctionName=lambda_name)
     lambda_arn = resp['FunctionArn']
 
-    s3 = boto3.resource('s3')
+    s3 = session.resource('s3')
     bucket = s3.Bucket(bucket_name)
 
     notification = bucket.Notification()

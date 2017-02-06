@@ -540,6 +540,7 @@ class CloudFormationConfiguration:
 
                 if response['Status'] != 'CREATE_COMPLETE':
                     print("ChangeSet status is {}".format(response['Status']))
+                    print("Reason: {}".format(response['StatusReason']))
                     raise Exception()
 
                 fmt = "{:<10}{:<30}{:<50}{:<45}{:<14}{}"
@@ -554,12 +555,13 @@ class CloudFormationConfiguration:
                 for change in response['Changes']:
                     if change['Type'] == 'Resource':
                         change = change['ResourceChange']
+                        limit = lambda s: s[:42] + "..." if len(s) > 45 else s
                         print(fmt.format(
                             change['Action'],
                             change['LogicalResourceId'],
-                            change['PhysicalResourceId'],
+                            limit(change.get('PhysicalResourceId', '')),
                             change['ResourceType'],
-                            change['Replacement'],
+                            change.get('Replacement', ''),
                             ", ".join(change['Scope'])
                         ))
 
@@ -1386,7 +1388,7 @@ class CloudFormationConfiguration:
         self.resources[key] = {
             "Type" : "AWS::AutoScaling::AutoScalingGroup",
             "Properties" : {
-                #"DesiredCapacity" : get_scenario(min, 1), Initial capacity, will min size also ensure the size on startup?
+                "DesiredCapacity" : get_scenario(min, 1), # Initial capacity, will min size also ensure the size on startup?
                 "HealthCheckType" : "EC2" if elb is None else "ELB",
                 "HealthCheckGracePeriod" : health_check_grace_period, # seconds
                 "LaunchConfigurationName" : Ref(key + "Configuration"),
@@ -1459,6 +1461,54 @@ class CloudFormationConfiguration:
         _hostname = Arg.String(key + "Hostname", hostname,
                                "Hostname of the EC2 Instance '{}'".format(key))
         self.add_arg(_hostname)
+
+    def add_autoscale_policy(self, key, asg, warmup=60, adjustments=[], alarms=[]):
+        """Add an AutoScalingGroup AutoScale Policy to the configuration
+
+        Args:
+            key (string) : Unique name for the resource in the template
+            asg (string): AutoScaleGroup ID or Ref of the ASG to scale
+            warmup (int): Number of seconds estimated for a new machine to boot
+                          and start processing data
+            adjustments (list): List of tuples of (lower, upper, step) that defined
+                                when and how machine machines to scale
+                                lower (int|float|None): Lower bound of adjustment step
+                                upper (int|float|None): Upper bound of adjustment step
+                                step (int): Number of machines to scale by
+            alarms (list): List of tuples of (metric, statistic, comparison, threashold)
+                           which are passed to add_cloudwatch_alarm() to create the alarms
+                           that will trigger the adjustments actions
+        """
+        adjustments_ = []
+        for lower, upper, step in adjustments:
+            adjustment = {"ScalingAdjustment": step}
+            if lower is not None:
+                adjustment["MetricIntervalLowerBound"] = lower
+            if upper is not None:
+                adjustment["MetricIntervalUpperBound"] = upper
+            adjustments_.append(adjustment)
+
+        self.resources[key] = {
+            "Type" : "AWS::AutoScaling::ScalingPolicy",
+            "Properties" : {
+                "AutoScalingGroupName" : asg,
+                "AdjustmentType" : "ChangeInCapacity",
+                "PolicyType" : "StepScaling",
+                "EstimatedInstanceWarmup" : warmup,
+                #"MetricAggregationType" : "Minimum|Maximum|Average", # Default Average
+
+                "StepAdjustments" : adjustments_
+            }
+        }
+
+        i = 0
+        for metric, statistic, comparison, threashold in alarms:
+            i += 1
+            self.add_cloudwatch_alarm(key + "Alarm{}".format(i), "",
+                                      metric, statistic, comparison, threashold,
+                                      [Ref(key)], # alarm_actions
+                                      {"AutoScalingGroupName": asg}, # dimensions
+                                      period = 2)
 
     def add_s3_bucket(self, key, name, access_control=None, life_cycle_config=None, notification_config=None, tags=None, depends_on=None):
         """Create or configure a S3 bucket.
@@ -1740,7 +1790,7 @@ class CloudFormationConfiguration:
         if depends_on is not None:
             self.resources[key]['DependsOn'] = depends_on
 
-    def add_cloudwatch_alarm(self, key, description, metric, statistic, comparison, threashold, alarm_actions, dimensions={}, depends_on=None):
+    def add_cloudwatch_alarm(self, key, description, metric, statistic, comparison, threashold, alarm_actions, dimensions={}, period=5, depends_on=None):
         """Add CloudWatch Alarm for a LoadBalancer
 
         Args:
@@ -1761,13 +1811,13 @@ class CloudFormationConfiguration:
                 "ActionsEnabled": "true",
                 "AlarmDescription": description,
                 "ComparisonOperator": comparison,
-                "EvaluationPeriods": "5",
+                "EvaluationPeriods": str(period),
                 "MetricName": metric,
                 "Namespace": "AWS/ELB",
                 "Period": "60",
                 "Statistic": statistic,
                 "Threshold": threashold,
-                "AlarmActions": [alarm_actions],
+                "AlarmActions": alarm_actions,
                 "Dimensions": [{"Name": k, "Value": v} for k,v in dimensions.items()]
               }
         }
@@ -1789,15 +1839,15 @@ class CloudFormationConfiguration:
         """
         self.add_cloudwatch_alarm("Latency", "",
                                   "Latency", "Average", "GreaterThanOrEqualToThreshold", "10.0",
-                                  alarm_actions, {"LoadBalancerName": lb_name}, depends_on)
+                                  alarm_actions, {"LoadBalancerName": lb_name}, depends_on=depends_on)
 
         self.add_cloudwatch_alarm("SurgeCount", "Surge Count in Load Balance",
                                   "SurgeQueueLength", "Average", "GreaterThanOrEqualToThreshold", "3.0",
-                                  alarm_actions, {"LoadBalancerName": lb_name}, depends_on)
+                                  alarm_actions, {"LoadBalancerName": lb_name}, depends_on=depends_on)
 
         self.add_cloudwatch_alarm("UnhealthyHostCount", "Unhealthy Host Count in Load Balance",
                                   "UnHealthyHostCount", "Minimum", "GreaterThanOrEqualToThreshold", "1.0",
-                                  alarm_actions, {"LoadBalancerName": lb_name}, depends_on)
+                                  alarm_actions, {"LoadBalancerName": lb_name}, depends_on=depends_on)
 
     def add_sns_topic(self, key, name, topic, subscriptions=[]):
         """Create a SNS topic

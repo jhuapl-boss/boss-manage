@@ -44,6 +44,20 @@ def create_config(session, domain):
     user_data = UserData()
     user_data["system"]["fqdn"] = names.activities
     user_data["system"]["type"] = "activities"
+    user_data["aws"]["db"] = names.endpoint_db
+    user_data["aws"]["cache"] = names.cache
+    user_data["aws"]["cache-state"] = names.cache_state
+    user_data["aws"]["cache-db"] = "0"
+    user_data["aws"]["cache-state-db"] = "0"
+    user_data["aws"]["meta-db"] = names.meta
+    user_data["aws"]["cuboid_bucket"] = names.cuboid_bucket
+    user_data["aws"]["tile_bucket"] = names.tile_bucket
+    user_data["aws"]["ingest_bucket"] = names.ingest_bucket
+    user_data["aws"]["s3-index-table"] = names.s3_index
+    user_data["aws"]["tile-index-table"] = names.tile_index
+    user_data["aws"]["id-index-table"] = names.id_index
+    user_data["aws"]["id-count-table"] = names.id_count_index
+
 
     config.add_ec2_instance("Activities",
                             names.activities,
@@ -74,7 +88,9 @@ def create(session, domain):
 def post_init(session, domain, startup_wait=False):
     names = AWSNames(domain)
 
-    sfn.create(session, names.delete_cuboid, domain, 'delete_cuboid.sfn', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(session, names.query_deletes, domain, 'query_for_deletes.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(session, names.delete_cuboid, domain, 'delete_cuboid.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(session, names.populate_upload_queue, domain, 'populate_upload_queue.hsd', 'StatesExecutionRole-us-east-1 ')
 
 def delete(session, domain):
     names = AWSNames(domain)
@@ -82,3 +98,5 @@ def delete(session, domain):
     CloudFormationConfiguration('activities', domain).delete(session)
 
     sfn.delete(session, names.delete_cuboid)
+    sfn.delete(session, names.query_deletes)
+    sfn.delete(session, names.populate_upload_queue)

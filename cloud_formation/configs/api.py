@@ -91,6 +91,8 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["lambda"]["page_in_function"] = names.multi_lambda
     user_data["lambda"]["ingest_function"] = names.multi_lambda
 
+    user_data['sfn']['populate_upload_queue'] = names.populate_upload_queue
+
     # Prepare user data for parsing by CloudFormation.
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
 
@@ -132,8 +134,8 @@ def create_config(session, domain, keypair=None, db_config={}):
                                type_=const.ENDPOINT_TYPE,
                                security_groups=[sgs[names.internal]],
                                user_data=parsed_user_data,
-                               min=const.ENDPOINT_CLUSTER_SIZE,
-                               max=const.ENDPOINT_CLUSTER_SIZE,
+                               min=const.ENDPOINT_CLUSTER_MIN,
+                               max=const.ENDPOINT_CLUSTER_MAX,
                                elb=Ref("EndpointLoadBalancer"),
                                notifications=dns_arn,
                                role=aws.instance_profile_arn_lookup(session, 'endpoint'),
@@ -147,6 +149,25 @@ def create_config(session, domain, keypair=None, db_config={}):
                             subnets=external_subnets,
                             security_groups=[sgs[names.internal], sgs[names.https]],
                             public=True)
+
+    config.add_autoscale_policy("EndpointScaleUp",
+                                Ref("Endpoint"),
+                                adjustments=[
+                                    (0.0, 0.15, 1), # 75% - 90% Utilization add 1 instance
+                                    (0.15, None, 2) # Above 90% Utilization add 2 instances
+                                ],
+                                alarms=[
+                                    ("CPUUtilization ", "Average", "GreaterThanThreshold", "0.75")
+                                ])
+
+    config.add_autoscale_policy("EndpointScaleDown",
+                                Ref("Endpoint"),
+                                adjustments=[
+                                    (None, 0.0, 1),   # Under 40% Utilization remove 1 instance
+                                ],
+                                alarms=[
+                                    ("CPUUtilization ", "Average", "LessThanThreshold", "0.40")
+                                ])
 
     config.add_rds_db("EndpointDB",
                       names.endpoint_db,
@@ -212,6 +233,8 @@ def generate(session, domain):
 
     with call.vault() as vault:
         db_config = vault.read(const.VAULT_ENDPOINT_DB)
+        if db_config is None:
+            db_config = const.ENDPOINT_DB_CONFIG.copy()
 
     config = create_config(session, domain, keypair, db_config)
     config.generate()

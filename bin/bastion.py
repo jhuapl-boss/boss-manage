@@ -55,8 +55,6 @@ from lib.ssh import SSHConnection, vault_tunnel
 from lib.vault import Vault
 
 if __name__ == "__main__":
-    os.chdir(os.path.abspath(os.path.dirname(__file__)))
-
     def create_help(header, options):
         """Create formated help."""
         return "\n" + header + "\n" + \
@@ -110,7 +108,16 @@ if __name__ == "__main__":
         sys.exit(1)
 
     session = aws.create_session(args.aws_credentials)
-    bastion_host = args.bastion if args.bastion else "bastion." + args.internal.split(".", 1)[1]
+
+    # This next step will make bastion work with 1.consul or 1.vault internal names.
+    boss_position = 1
+    try:
+        int(args.internal.split(".", 1)[0])
+        boss_position = 2
+    except ValueError:
+        pass
+
+    bastion_host = args.bastion if args.bastion else "bastion." + args.internal.split(".", boss_position)[boss_position]
     bastion = aws.machine_lookup(session, bastion_host)
     if args.private_ip:
         private = args.internal
@@ -134,7 +141,7 @@ if __name__ == "__main__":
         for addr in addrs:
             print("{} at {}".format(args.internal, addr))
             ssh = SSHConnection(args.ssh_key, addr, bastion)
-            ssh.cmd(args.ssh_key, addr, bastion, *args.arguments)
+            ssh.cmd(*args.arguments)
             print()
     elif args.command in vault.COMMANDS:
         with vault_tunnel(args.ssh_key, bastion):

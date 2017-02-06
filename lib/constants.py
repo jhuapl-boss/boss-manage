@@ -145,10 +145,16 @@ VAULT_CLUSTER_SIZE = { # Vault Cluster is a fixed size
     "ha-development": 1,  # should be an odd number
 }
 
-ENDPOINT_CLUSTER_SIZE = {
+ENDPOINT_CLUSTER_MIN = { # Minimum and Default size of the ASG
     "development": 1,
     "production": 1,
     "ha-development": 1,
+}
+
+ENDPOINT_CLUSTER_MAX = { # Maximum number of instances in the ASG
+    "development": 1,
+    "production": 20,
+    "ha-development": 3,
 }
 
 REDIS_CLUSTER_SIZE = {

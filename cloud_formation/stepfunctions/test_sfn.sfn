@@ -1,0 +1,13 @@
+"""
+Test SFN to make sure it works.
+"""
+
+parallel:
+    Activity('delete_test_1')
+parallel:
+    Activity('delete_test_2')
+
+Activity('delete_test_3')
+
+while '$.index' >= 0:
+    Activity('delete_test_4')

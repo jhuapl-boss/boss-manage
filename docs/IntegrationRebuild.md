@@ -46,7 +46,7 @@ Place `microns-bastion20151117.pem` in the `bin` folder.
 
 ```shell
 $ cd bin
-$  ./packer.py auth vault consul endpoint proofreader-web cachemanager
+$  ./packer.py auth vault consul endpoint proofreader-web cachemanager activities
 ```
 
 *Note: because the packer.py script is running builds in parallel it is redirecting
@@ -115,12 +115,13 @@ Stacks need to be deleted.
 $ cd bin/
 $ source ../config/set_vars.sh
 
-# Deletion of cloudwatch, api, proofreader and cachedb can probably
+# Deletion of cloudwatch, api, actvities proofreader and cachedb can probably
 # be done in parallel.
 $ ./cloudformation.py delete integration.boss cloudwatch
+$ ./cloudformation.py delete integration.boss actvities
 $ ./cloudformation.py delete integration.boss cachedb
-$ ./cloudformation.py delete integration.boss api
 $ ./cloudformation.py delete integration.boss proofreader
+$ ./cloudformation.py delete integration.boss api
 $ ./cloudformation.py delete integration.boss core
 ```
 
@@ -162,7 +163,7 @@ If you are building a personal developer domain it should have this:
 
 ### Launching configs
 
-For the *core*, *api*, *cachedb*, *proofreader*, *cloudwatch* configurations
+For the *core*, *api*, *cachedb*, *activities*, *cloudwatch* configurations
 run the following command. You have to wait for each command to finish before
 launching the next configuration as they build upon each other.  **Only use the
 *--scenario production* flag** if you are rebuilding integration.  It is not used
@@ -204,21 +205,6 @@ select Configuration tab
 Advanced Settings
 Change *Timeout* to be 2 mins.
 
-## Add Trigger to multilambda.integration.boss
-Go to S3 in the AWS console
-select tiles.integration.boss bucket properties
-under Events delete the current Lambda (if there is one)
-save
-
-Now Go to Lambda in the AWS console, 
-Select multilambda.integration.boss
-Select trigger tab
-click in the empty box Lambda is pointing to in the diagram.  Now select the S3 in the drop down box.
-A new dialog will come up
-Bucket:  tiles.integration.boss
-Event Type:  Object Created (All)
-click submit (You may need to scroll down to see the submit button)
-
 ## Run unit tests on Endpoint
 
 If you are following these instructions for your personal development environment, skip the
@@ -252,18 +238,6 @@ cd /srv/www/django
 sudo python3 manage.py test --pattern="int_test_*.py"
 ```
 	output should say 55 Tests OK with 7 skipped tests
-
-## Proofreader Tests
-````shell
-cd vault
-./ssh.py proofreader-web.integration.boss
-cd /srv/www/app/proofreader_apis
-sudo python3 manage.py makemigrations --noinput
-sudo python3 manage.py makemigrations --noinput common
-sudo python3 manage.py migrate
-sudo python3 manage.py test
-````
-    output should say 350 Tests OK
 
 ##### Test the ndingest library.
 
@@ -393,4 +367,4 @@ To be filled out
 * https://api.theboss.io/ping/
 * https://api.theboss.io/v0.7/collection/
 * Login into Scalyr and verify that the new instances appear on the overview page.
-* Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint and proofreader.
+* Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint.

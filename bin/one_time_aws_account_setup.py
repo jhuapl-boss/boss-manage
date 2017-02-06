@@ -54,9 +54,9 @@ def create_billing_alarms(session):
 
 def create_initial_sns_accounts(session):
     print("Creating SNS Topics.")
-    topic_arn = aws.sns_create_topic(session, const.PRODUCTION_MAILING_TOPIC)
+    topic_arn = aws.sns_create_topic(session, const.PRODUCTION_MAILING_LIST)
     if topic_arn == None:
-        print("Failed to create {} topic".format(const.PRODUCTION_MAILING_TOPIC))
+        print("Failed to create {} topic".format(const.PRODUCTION_MAILING_LIST))
 
     topic_arn = aws.sns_create_topic(session, const.PRODUCTION_BILLING_TOPIC)
     if topic_arn == None:
