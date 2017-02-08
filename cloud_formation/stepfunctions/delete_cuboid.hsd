@@ -19,6 +19,10 @@ parallel:
         """delete_id_index
            deletes from dyanmodb table idindex"""
 
+Activity('merge_parallel_outputs')
+    """merge_parallel_outputs
+       merges the outputs of all the parallel activities into a single dictionary"""
+
 Activity('find_s3_index')
     """find_s3_index
        finds data to delete from s3index and s3"""
