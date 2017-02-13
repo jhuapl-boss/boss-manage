@@ -251,7 +251,8 @@ def azs_lookup(session):
 
     client = session.client('ec2')
     response = client.describe_availability_zones()
-    rtn = [(z["ZoneName"], z["ZoneName"][-1]) for z in response["AvailabilityZones"]]
+    # DP HACK: Currently AWS is returning us-east-1a, but it cannot be used right now...
+    rtn = [(z["ZoneName"], z["ZoneName"][-1]) for z in response["AvailabilityZones"] if z['ZoneName'] != 'us-east-1a']
 
     return rtn
 
