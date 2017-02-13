@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, get_scenario, Arg
 from lib.userdata import UserData
 from lib.names import AWSNames
@@ -41,6 +42,31 @@ def create_config(session, domain):
                               internal_subnet_id,
                               "ID of Internal Subnet to create resources in"))
 
+    # event_data = {
+    #     "lambda-name": names.delete_lambda,
+    #     "db": names.endpoint_db,
+    #     "meta-db": names.meta,
+    #     "s3-index-table": names.s3_index,
+    #     "id-index-table": names.id_index,
+    #     "id-count-table": names.id_count_index,
+    #     "cuboid_bucket": names.cuboid_bucket,
+    #     "delete_bucket": names.delete_bucket,
+    #     "topic-arn": "arn:aws:sns:us-east-1:256215146792:ProductionMicronsMailingList"
+    # }
+    #
+    # role_arn = aws.role_arn_lookup(session, "events_for_delete_lambda")
+    # multi_lambda = names.multi_lambda
+    # lambda_arn = aws.lambda_arn_lookup(session, multi_lambda)
+    # target_list = [{
+    #     "Arn": lambda_arn,
+    #     "Id": multi_lambda,
+    #     "Input": json.dumps(event_data)
+    #
+    # }]
+    # schedule_expression = "*/2 * * * ? *"  # this this one: "0/60 1-5 * * ? *"
+    # config.add_event_rule("DeleteEventRule", names.delete_event_rule, role_arn=role_arn,
+    #                       schedule_expression=schedule_expression, target_list=target_list, description=None)
+
     user_data = UserData()
     user_data["system"]["fqdn"] = names.activities
     user_data["system"]["type"] = "activities"
@@ -58,13 +84,12 @@ def create_config(session, domain):
     user_data["aws"]["id-index-table"] = names.id_index
     user_data["aws"]["id-count-table"] = names.id_count_index
 
-
     config.add_ec2_instance("Activities",
                             names.activities,
                             aws.ami_lookup(session, 'activities.boss'),
                             keypair,
                             subnet = Ref("InternalSubnet"),
-                            role = "activity",
+                            role = "activities",
                             user_data = str(user_data),
                             security_groups = [sgs[names.internal]])
 

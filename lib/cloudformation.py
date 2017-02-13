@@ -1941,3 +1941,43 @@ class CloudFormationConfiguration:
             }
         }
 
+    def add_event_rule(self, key, name, role_arn=None, schedule_expression=None, event_pattern=None, state=None,
+                       target_list=None, description=None):
+        """
+
+        Args:
+            key (string) : Unique name for the resource in the template
+            name (string): Display name of the event rule
+            role_arn (string): ARN of role this event will use
+            schedule_expression (string): string expression of how often this rule will run.
+            event_pattern (JSON object):  describes which events CloudWatch Events routes to the specified target
+            state (string): indicates whether the rule is enabled
+            target_list: List of targets to forward events to.
+            description: Description of the event rule.
+
+        Raises:
+            (exception): When neither schedule_expression or event_pattern are provided.
+
+        """
+        if schedule_expression is None and event_pattern is None:
+            raise Exception("schedule_expression and event_pattern cannot both be None.")
+
+        self.resource[key] = {
+            "Type": "AWS::Events::Rule",
+            "Properties": {
+                "Name": name,
+            }
+        }
+        if role_arn is not None:
+            self.resource[key]["Properties"]["RoleArn"] = role_arn
+        if schedule_expression is not None:
+            self.resource[key]["Properties"]["ScheduleExpression"] = schedule_expression
+        if event_pattern is not None:
+            self.resource[key]["Properties"]["EventPattern"] = event_pattern
+        if state is not None:
+            self.resource[key]["Properties"]["State"] = state
+        if target_list is not None:
+            self.resource[key]["Properties"]["Targets"] = target_list
+        if description is not None:
+            self.resource[key]["Properties"]["Description"] = description
+
