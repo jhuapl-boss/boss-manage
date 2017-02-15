@@ -22,7 +22,7 @@
 # Default-Stop:
 # Short-Description: boss Python library firstboot script
 # Description: Firstboot service script that configures the ndingest to populate
-#               the ndingest.ini with the correct settings.
+#               the ndingest.ini with the correct settings
 #
 ### END INIT INFO
 
