@@ -14,7 +14,7 @@ ndingest-lib:
         - require:
             - sls: python.python35
 
-boss-firstboot:
+ndingest-firstboot:
     file.managed:
         - name: /etc/init.d/ndingest-firstboot
         - source: salt://ndingest/files/ndingest_firstboot.py
