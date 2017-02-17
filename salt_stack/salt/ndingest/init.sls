@@ -1,6 +1,7 @@
 # Install ndingest into site-packages.
 include:
     - python.python35
+    - spdb
 
 ndingest-lib:
     file.recurse:
