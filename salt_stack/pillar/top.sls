@@ -8,6 +8,9 @@ base:
   'cachemanager*':
     - cachemanager
 
+  'activities*':
+    - activities
+
   'ep-jenkins*':
     - endpoint-jenkins
 
