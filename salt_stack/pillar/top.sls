@@ -5,6 +5,9 @@ base:
   'endpoint*':
     - endpoint
 
+  'cachemanager*':
+    - cachemanager
+
   'ep-jenkins*':
     - endpoint-jenkins
 
