@@ -1,0 +1,8 @@
+{
+    logs: [
+        {
+            path: "/var/log/boss/critical.log",
+            attributes: { parser: "json"}
+        }
+    ]
+}

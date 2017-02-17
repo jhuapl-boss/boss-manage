@@ -59,6 +59,8 @@ base:
         - git
 
     'activities*':
+        - scalyr
+        - scalyr.update_host
         - boss-tools.activities
 
         # populate upload queue
