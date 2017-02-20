@@ -106,6 +106,7 @@ else
        ln -s ../include include
        ln -s ../lib lib
        ln -s ../lib64 lib64
+       chmod -R 775 ./lib/python3.4/site-packages
        # fix put in because aws python2.7 now can't import a path with a period in it. (like python3.4)
        cp lib64/python3.4/site-packages/lambda/lambda_loader.py .
        cd ~/lambdazips/$1
