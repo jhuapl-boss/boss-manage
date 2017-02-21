@@ -66,3 +66,6 @@ base:
         # populate upload queue
         - ndingest
         - ingest-client.ingest
+
+        # Resolution hierarchy
+        - spdb

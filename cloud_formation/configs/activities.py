@@ -116,6 +116,7 @@ def post_init(session, domain, startup_wait=False):
     sfn.create(session, names.query_deletes, domain, 'query_for_deletes.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.delete_cuboid, domain, 'delete_cuboid.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.populate_upload_queue, domain, 'populate_upload_queue.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(session, names.resolution_hierarchy, domain, 'resolution_hierarchy.hsd', 'StatesExecutionRole-us-east-1')
 
 def delete(session, domain):
     names = AWSNames(domain)
@@ -125,3 +126,5 @@ def delete(session, domain):
     sfn.delete(session, names.delete_cuboid)
     sfn.delete(session, names.query_deletes)
     sfn.delete(session, names.populate_upload_queue)
+    sfn.delete(session, names.resolution_hierarchy)
+
