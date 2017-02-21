@@ -241,15 +241,13 @@ sudo python3 manage.py test --pattern="int_test_*.py"
 
 ##### Test the ndingest library.
 
-**SKIP FOR NOW.  NEEDS TWEAKING FOR RUNNING FROM NON-DEV ENVIRONMENTS.**
-
 ```shell
-# # Manual install for now.  Will likely remove use of pytest in the future.
-# sudo pip3 install pytest
-# cd /usr/local/lib/python3/site-packages/ndingest
-# # Use randomized queue names.
-# export NDINGEST_TEST=1
-# pytest -c test_apl.cfg
+# Manual install for now.  Will likely remove use of pytest in the future.
+sudo pip3 install pytest
+cd /usr/local/lib/python3/site-packages/ndingest
+# Use randomized queue names and prepend 'test_' to bucket/index names.
+export NDINGEST_TEST=1
+pytest -c test_apl.cfg
 ```
 
 ### Cachemanager Integration Tests
