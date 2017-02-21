@@ -6,5 +6,8 @@ Activity('PopulateQueue')
     catch []:
         Fail('Exception', 'Problems populating upload queue')
 
+# Wait and retry are to ensure SQS queue is consistent
+Wait(seconds=60)
 Activity('VerifyCount')
+    retry [] 60 3 1.0
 
