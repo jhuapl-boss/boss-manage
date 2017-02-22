@@ -38,7 +38,7 @@ import json
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-keypair = None
+key_pair = None
 
 def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, public=True, depends_on=None):
     security_groups = [Ref("InternalSecurityGroup")]
@@ -71,7 +71,7 @@ def create_config(session, domain):
     config = CloudFormationConfiguration('core', domain, const.REGION)
     names = AWSNames(domain)
 
-    global keypair
+    global key_pair
     keypair = aws.keypair_lookup(session)
 
     config.add_vpc()
@@ -250,7 +250,7 @@ def create(session, domain):
 
 def post_init(session, domain, startup_wait=False):
     # Keypair is needed by ExternalCalls
-    global keypair
+    global key_pair
     if keypair is None:
         keypair = aws.keypair_lookup(session)
     call = ExternalCalls(session, keypair, domain)

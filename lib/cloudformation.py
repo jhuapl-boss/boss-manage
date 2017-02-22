@@ -822,7 +822,7 @@ class CloudFormationConfiguration:
             key (string) : Unique name for the resource in the template
             hostname (string) : The hostname / instance name of the instance
             ami (string) : The AMI ID of the image to base the instance on
-            subnet (string) : The Subnet ID or Ref of the Subnet to launch this machine in
+            subnet (string|Ref) : The Subnet ID or Ref of the Subnet to launch this machine in
             type_ (string) : The instance type to create
             iface_check (bool) : Should the network check if the traffic is destined for itself
                                  (usedful for NAT instances)
@@ -1962,22 +1962,22 @@ class CloudFormationConfiguration:
         if schedule_expression is None and event_pattern is None:
             raise Exception("schedule_expression and event_pattern cannot both be None.")
 
-        self.resource[key] = {
+        self.resources[key] = {
             "Type": "AWS::Events::Rule",
             "Properties": {
                 "Name": name,
             }
         }
         if role_arn is not None:
-            self.resource[key]["Properties"]["RoleArn"] = role_arn
+            self.resources[key]["Properties"]["RoleArn"] = role_arn
         if schedule_expression is not None:
-            self.resource[key]["Properties"]["ScheduleExpression"] = schedule_expression
+            self.resources[key]["Properties"]["ScheduleExpression"] = schedule_expression
         if event_pattern is not None:
-            self.resource[key]["Properties"]["EventPattern"] = event_pattern
+            self.resources[key]["Properties"]["EventPattern"] = event_pattern
         if state is not None:
-            self.resource[key]["Properties"]["State"] = state
+            self.resources[key]["Properties"]["State"] = state
         if target_list is not None:
-            self.resource[key]["Properties"]["Targets"] = target_list
+            self.resources[key]["Properties"]["Targets"] = target_list
         if description is not None:
-            self.resource[key]["Properties"]["Description"] = description
+            self.resources[key]["Properties"]["Description"] = description
 

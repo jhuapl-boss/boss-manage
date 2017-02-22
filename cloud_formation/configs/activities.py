@@ -17,12 +17,10 @@ from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, get_scenar
 from lib.userdata import UserData
 from lib.names import AWSNames
 from lib import aws
-from lib import utils
-from lib import scalyr
 from lib import constants as const
 from lib import stepfunctions as sfn
 
-keypair = None
+key_pair = None
 
 
 def create_config(session, domain):
@@ -30,40 +28,39 @@ def create_config(session, domain):
     config = CloudFormationConfiguration('activities', domain, const.REGION)
     names = AWSNames(domain)
 
-    global keypair
-    keypair = aws.keypair_lookup(session)
+    global key_pair
+    key_pair = aws.keypair_lookup(session)
 
     vpc_id = config.find_vpc(session)
-    az_subnets, external_subnets = config.find_all_availability_zones(session)
     sgs = aws.sg_lookup_all(session, vpc_id)
 
     internal_subnet_id = aws.subnet_id_lookup(session, names.subnet("internal"))
     config.add_arg(Arg.Subnet("InternalSubnet",
                               internal_subnet_id,
                               "ID of Internal Subnet to create resources in"))
+    topic_arn = aws.sns_topic_lookup(session, "ProductionMicronsMailingList")
+    event_data = {
+        "lambda-name": names.delete_lambda,
+        "db": names.endpoint_db,
+        "meta-db": names.meta,
+        "s3-index-table": names.s3_index,
+        "id-index-table": names.id_index,
+        "id-count-table": names.id_count_index,
+        "cuboid_bucket": names.cuboid_bucket,
+        "delete_bucket": names.delete_bucket,
+        "topic-arn": topic_arn
+    }
 
-    # event_data = {
-    #     "lambda-name": names.delete_lambda,
-    #     "db": names.endpoint_db,
-    #     "meta-db": names.meta,
-    #     "s3-index-table": names.s3_index,
-    #     "id-index-table": names.id_index,
-    #     "id-count-table": names.id_count_index,
-    #     "cuboid_bucket": names.cuboid_bucket,
-    #     "delete_bucket": names.delete_bucket,
-    #     "topic-arn": "arn:aws:sns:us-east-1:256215146792:ProductionMicronsMailingList"
-    # }
+    role_arn = aws.role_arn_lookup(session, "events_for_delete_lambda")
+    multi_lambda = names.multi_lambda
+    lambda_arn = aws.lambda_arn_lookup(session, multi_lambda)
+    target_list = [{
+        "Arn": lambda_arn,
+        "Id": multi_lambda,
+        "Input": json.dumps(event_data)
+    }]
+    schedule_expression = "cron(0/2 * * * ? *)"  # testing fire every two minutes  Actual cron "cron(0/60 1-5 * * ? *)"
     #
-    # role_arn = aws.role_arn_lookup(session, "events_for_delete_lambda")
-    # multi_lambda = names.multi_lambda
-    # lambda_arn = aws.lambda_arn_lookup(session, multi_lambda)
-    # target_list = [{
-    #     "Arn": lambda_arn,
-    #     "Id": multi_lambda,
-    #     "Input": json.dumps(event_data)
-    #
-    # }]
-    # schedule_expression = "*/2 * * * ? *"  # this this one: "0/60 1-5 * * ? *"
     # config.add_event_rule("DeleteEventRule", names.delete_event_rule, role_arn=role_arn,
     #                       schedule_expression=schedule_expression, target_list=target_list, description=None)
 
@@ -87,11 +84,12 @@ def create_config(session, domain):
     config.add_ec2_instance("Activities",
                             names.activities,
                             aws.ami_lookup(session, 'activities.boss'),
-                            keypair,
-                            subnet = Ref("InternalSubnet"),
-                            role = "activities",
-                            user_data = str(user_data),
-                            security_groups = [sgs[names.internal]])
+                            key_pair,
+                            subnet=Ref("InternalSubnet"),
+                            role="activities",
+                            type_=const.ACTIVITIES_TYPE,
+                            user_data=str(user_data),
+                            security_groups=[sgs[names.internal]])
 
     return config
 
@@ -110,12 +108,15 @@ def create(session, domain):
     if success:
         post_init(session, domain)
 
-def post_init(session, domain, startup_wait=False):
+
+def post_init(session, domain):
     names = AWSNames(domain)
 
     sfn.create(session, names.query_deletes, domain, 'query_for_deletes.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.delete_cuboid, domain, 'delete_cuboid.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(session, names.populate_upload_queue, domain, 'populate_upload_queue.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(session, names.populate_upload_queue, domain, 'populate_upload_queue.hsd',
+               'StatesExecutionRole-us-east-1 ')
+
 
 def delete(session, domain):
     names = AWSNames(domain)

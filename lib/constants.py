@@ -124,6 +124,12 @@ CACHE_MANAGER_TYPE = {
     "ha-development": "t2.micro",
 }
 
+ACTIVITIES_TYPE = {
+    "development": "m4.large",
+    "production": "m4.xlarge",
+    "ha-development": "m4.large",
+}
+
 
 ########################
 # Machine Cluster Sizes
