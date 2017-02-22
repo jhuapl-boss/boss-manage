@@ -20,7 +20,7 @@ from lib import aws
 from lib import constants as const
 from lib import stepfunctions as sfn
 
-key_pair = None
+keypair = None
 
 
 def create_config(session, domain):
@@ -28,8 +28,8 @@ def create_config(session, domain):
     config = CloudFormationConfiguration('activities', domain, const.REGION)
     names = AWSNames(domain)
 
-    global key_pair
-    key_pair = aws.keypair_lookup(session)
+    global keypair
+    keypair = aws.keypair_lookup(session)
 
     vpc_id = config.find_vpc(session)
     sgs = aws.sg_lookup_all(session, vpc_id)
@@ -84,7 +84,7 @@ def create_config(session, domain):
     config.add_ec2_instance("Activities",
                             names.activities,
                             aws.ami_lookup(session, 'activities.boss'),
-                            key_pair,
+                            keypair,
                             subnet=Ref("InternalSubnet"),
                             role="activities",
                             type_=const.ACTIVITIES_TYPE,
