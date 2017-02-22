@@ -128,4 +128,3 @@ def delete(session, domain):
     sfn.delete(session, names.query_deletes)
     sfn.delete(session, names.populate_upload_queue)
     sfn.delete(session, names.resolution_hierarchy)
-

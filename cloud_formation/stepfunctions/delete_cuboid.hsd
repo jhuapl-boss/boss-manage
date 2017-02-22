@@ -8,29 +8,34 @@ parallel:
     Activity('delete_metadata')
         """delete_metadata
            deletes metadata"""
+        retry [] 60 4 2.0
 
 parallel:
     Activity('delete_id_count')
         """delete_id_count
            deletes from dynamodb table idcount"""
+        retry [] 60 4 2.0
 
 parallel:
     Activity('delete_id_index')
         """delete_id_index
            deletes from dyanmodb table idindex"""
+        retry [] 60 4 2.0
 
 Activity('merge_parallel_outputs')
     """merge_parallel_outputs
        merges the outputs of all the parallel activities into a single dictionary"""
+    retry [] 60 4 2.0
 
 Activity('find_s3_index')
     """find_s3_index
        finds data to delete from s3index and s3"""
+    retry [] 60 4 2.0
 
 Activity('delete_s3_index')
     """delete_s3_index
        deletes data from s3index and s3"""
-    retry [] 120 4 2
+    retry [] 120 4 2.0
     catch []: '$.error'
         Activity("notify_admins")
             """notify_admins
@@ -40,3 +45,4 @@ Activity('delete_s3_index')
 Activity("delete_clean_up")
     """delete_clean_up
        cleans up the delete s3 table."""
+    retry [] 120 4 2.0
