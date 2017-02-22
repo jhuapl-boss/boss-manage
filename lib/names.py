@@ -86,6 +86,7 @@ class AWSNames(object):
         'delete_event_rule': 'deleteEventRule',
         'delete_lambda': "deleteLambda",
         'populate_upload_queue': 'Populate.Upload.Queue',
+        'resolution_hierarchy': 'Resolution.Hierarchy'
     }
 
     def __getattr__(self, name):
@@ -102,7 +103,8 @@ class AWSNames(object):
                     'delete_lambda']:
             fq_hostname = fq_hostname.replace('.','-')
 
-        if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes', 'populate_upload_queue']:
+        if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
+                    'populate_upload_queue', 'resolution_hierarchy']:
             fq_hostname = "".join(map(lambda x: x.capitalize(), fq_hostname.split('.')))
 
         return fq_hostname

@@ -35,7 +35,11 @@ def create(session, name, domain, sfn_file, role):
     filepath = Path(filepath)
 
     machine = BossStateMachine(name, domain, session)
-    machine.create(filepath, role)
+
+    if machine.arn is not None:
+        print("StepFunction '{}' already exists, not creating".format(name))
+    else:
+        machine.create(filepath, role)
 
 def delete(session, name):
     machine = BossStateMachine(name, None, session)
