@@ -58,7 +58,7 @@ ROOT_CIDR = 8
 VPC_CIDR = 16 # make sure VPC_CIDR is greater than ROOT_CIDR
 SUBNET_CIDR = 24 # make sure SUBNET_CIDR is greater than VPC_CIDR
 
-LAMBDA_SUBNETS = 17 # TODO merge with constants.py variable of the same name
+LAMBDA_SUBNETS = 16 # TODO merge with constants.py variable of the same name
 
 # DP TODO: Migrate to constants.py
 PROD_ACCOUNT = "451493790433"
