@@ -95,3 +95,5 @@ config/my_vars.sh
 # CloudFormation Templates
 cloud_formation/templates/
 
+/config/aws-credentials-prod
+/config/aws-credentials-dev
