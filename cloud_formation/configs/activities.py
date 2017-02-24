@@ -40,7 +40,7 @@ def create_config(session, domain):
                               "ID of Internal Subnet to create resources in"))
     topic_arn = aws.sns_topic_lookup(session, "ProductionMicronsMailingList")
     event_data = {
-        "lambda-name": names.delete_lambda,
+        "lambda-name": "delete_lambda",
         "db": names.endpoint_db,
         "meta-db": names.meta,
         "s3-index-table": names.s3_index,
@@ -48,7 +48,9 @@ def create_config(session, domain):
         "id-count-table": names.id_count_index,
         "cuboid_bucket": names.cuboid_bucket,
         "delete_bucket": names.delete_bucket,
-        "topic-arn": topic_arn
+        "topic-arn": topic_arn,
+        "query-deletes-sfn-name": names.query_deletes,
+        "delete-sfn-name": names.delete_cuboid
     }
 
     role_arn = aws.role_arn_lookup(session, "events_for_delete_lambda")
@@ -59,11 +61,14 @@ def create_config(session, domain):
         "Id": multi_lambda,
         "Input": json.dumps(event_data)
     }]
-    schedule_expression = "cron(0/2 * * * ? *)"  # testing fire every two minutes  Actual cron "cron(0/60 1-5 * * ? *)"
-    #
-    # config.add_event_rule("DeleteEventRule", names.delete_event_rule, role_arn=role_arn,
-    #                       schedule_expression=schedule_expression, target_list=target_list, description=None)
+    schedule_expression = "cron(0/60 1-5 * * TUE-THU *)"
+    #schedule_expression = "cron(0/2 * * * ? *)"  # testing fire every two minutes
 
+    config.add_event_rule("DeleteEventRule", names.delete_event_rule, role_arn=role_arn,
+                          schedule_expression=schedule_expression, target_list=target_list, description=None)
+    # Events have to be given permission to run lambda.
+    config.add_lambda_permission('DeleteRulePerm', multi_lambda, principal='events.amazonaws.com',
+                                 source=Arn('DeleteEventRule'))
     user_data = UserData()
     user_data["system"]["fqdn"] = names.activities
     user_data["system"]["type"] = "activities"
