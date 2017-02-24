@@ -58,6 +58,8 @@ ROOT_CIDR = 8
 VPC_CIDR = 16 # make sure VPC_CIDR is greater than ROOT_CIDR
 SUBNET_CIDR = 24 # make sure SUBNET_CIDR is greater than VPC_CIDR
 
+LAMBDA_SUBNETS = 17 # TODO merge with constants.py variable of the same name
+
 # DP TODO: Migrate to constants.py
 PROD_ACCOUNT = "451493790433"
 PROD_DOMAIN = "theboss.io"
@@ -99,6 +101,9 @@ for vpc in VPCS:
     subnets = ["internal", "external",
                "a-internal", "b-internal", "c-internal", "d-internal", "e-internal",
                "a-external", "b-external", "c-external", "d-external", "e-external"]
+    for i in range(LAMBDA_SUBNETS):
+        subnets.append('lambda{}'.format(i))
+
     for subnet in subnets:
         SUBNETS[(vpc, subnet)] = subnets.index(subnet)
 
@@ -177,3 +182,10 @@ def lookup(domain):
 
     print("ERROR: domain contains extra information beyond Subnet and VPC")
     return None
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        print("Usage: {} domain".format(sys.argv[0]))
+        sys.exit(1)
+
+    print(lookup(sys.argv[1]))

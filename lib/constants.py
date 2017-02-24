@@ -47,6 +47,7 @@ def repo_path(*args):
     return path(REPO_ROOT, *args)
 
 
+LAMBDA_SUBNETS = 17
 ########################
 # Lambda Files
 LAMBDA_DIR = repo_path('cloud_formation', 'lambda')
