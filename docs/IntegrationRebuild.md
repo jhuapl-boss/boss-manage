@@ -46,7 +46,7 @@ Place `microns-bastion20151117.pem` in the `bin` folder.
 
 ```shell
 $ cd bin
-$  ./packer.py auth vault consul endpoint proofreader-web cachemanager activities
+$  ./packer.py auth vault consul endpoint cachemanager activities
 ```
 
 *Note: because the packer.py script is running builds in parallel it is redirecting
@@ -115,12 +115,11 @@ Stacks need to be deleted.
 $ cd bin/
 $ source ../config/set_vars.sh
 
-# Deletion of cloudwatch, api, actvities proofreader and cachedb can probably
+# Deletion of cloudwatch, api, actvities and cachedb can probably
 # be done in parallel.
 $ ./cloudformation.py delete integration.boss cloudwatch
 $ ./cloudformation.py delete integration.boss actvities
 $ ./cloudformation.py delete integration.boss cachedb
-$ ./cloudformation.py delete integration.boss proofreader
 $ ./cloudformation.py delete integration.boss api
 $ ./cloudformation.py delete integration.boss core
 ```
