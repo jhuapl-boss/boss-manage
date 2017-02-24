@@ -47,6 +47,7 @@ def repo_path(*args):
     return path(REPO_ROOT, *args)
 
 
+LAMBDA_SUBNETS = 17
 ########################
 # Lambda Files
 LAMBDA_DIR = repo_path('cloud_formation', 'lambda')
@@ -122,6 +123,12 @@ CACHE_MANAGER_TYPE = {
     "development": "t2.micro",
     "production": "t2.medium",
     "ha-development": "t2.micro",
+}
+
+ACTIVITIES_TYPE = {
+    "development": "m4.large",
+    "production": "m4.xlarge",
+    "ha-development": "m4.large",
 }
 
 

@@ -32,7 +32,11 @@
     </hudson.triggers.SCMTrigger>
   </triggers>
   <concurrentBuild>false</concurrentBuild>
-  <builders/>
+  <builders>
+    <hudson.tasks.Shell>
+      <command>bash -ex jenkins.sh</command>
+    </hudson.tasks.Shell>
+  </builders>
   <publishers>
     <hudson.tasks.BuildTrigger>
       <childProjects>spdb</childProjects>

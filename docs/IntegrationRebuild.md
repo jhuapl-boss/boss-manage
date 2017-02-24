@@ -186,7 +186,7 @@ will deploy the stack with the minimum set of resources.*
 
 ## Get bossadmin password
 ```shell
-cd vault
+cd bin
 ./bastion.py vault.integration.boss vault-read secret/auth/realm
 ```
 Login to https://api.theboss.io/
@@ -196,7 +196,7 @@ Uses bossadmin and the password you now have to sync bossadmin to django
 Go to EC2 in AWS console
 select load balancers on left side
 click the checkbox for the loadbalancer to change
-under attributes 
+under attributes
 Set "Idle timeout: 300 seconds"
 
 ## Manually update the multilambda timeout
@@ -212,7 +212,7 @@ export RUN_HIGH_MEM_TESTS line.  That line runs 2 tests that need >2.5GB of memo
 to run and will fail in your environment
 
 ```shell
-cd vault
+cd bin
 ./bastion.py endpoint.integration.boss ssh
 export RUN_HIGH_MEM_TESTS=True
 cd /srv/www/django
@@ -245,7 +245,7 @@ sudo python3 manage.py test --pattern="int_test_*.py"
 # Manual install for now.  Will likely remove use of pytest in the future.
 sudo pip3 install pytest
 cd /usr/local/lib/python3/site-packages/ndingest
-# Use randomized queue names.
+# Use randomized queue names and prepend 'test_' to bucket/index names.
 export NDINGEST_TEST=1
 pytest -c test_apl.cfg
 ```

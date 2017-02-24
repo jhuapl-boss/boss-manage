@@ -61,7 +61,12 @@ def create_config(session, domain, keypair=None, user_data=None):
     config = CloudFormationConfiguration("cachedb", domain, const.REGION)
 
     vpc_id = config.find_vpc(session)
-    internal_subnets, _ = config.find_all_availability_zones(session)
+
+    lambda_subnets = []
+    for i in range(const.LAMBDA_SUBNETS):
+        key = 'LambdaSubnet{}'.format(i)
+        config.add_subnet(key, names.subnet('lambda{}'.format(i)))
+        lambda_subnets.append(Ref(key))
 
     # Lookup the External Subnet, Internal Security Group IDs that are
     # needed by other resources
@@ -123,11 +128,11 @@ def create_config(session, domain, keypair=None, user_data=None):
                       Ref("LambdaCacheExecutionRole"),
                       s3=(aws.get_lambda_s3_bucket(session),
                           "multilambda.{}.zip".format(domain),
-                          "local/lib/python3.4/site-packages/lambda/lambda_loader.handler"),
+                          "local/lambda_loader.handler"),
                       timeout=120,
                       memory=1024,
                       security_groups=[Ref('InternalSecurityGroup')],
-                      subnets=internal_subnets)
+                      subnets=lambda_subnets)
 
     if creating_tile_bucket:
         config.add_lambda_permission(

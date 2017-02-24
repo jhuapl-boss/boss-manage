@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, get_scenario, Arg
 from lib.userdata import UserData
 from lib.names import AWSNames
 from lib import aws
-from lib import utils
-from lib import scalyr
 from lib import constants as const
 from lib import stepfunctions as sfn
 
@@ -33,14 +32,43 @@ def create_config(session, domain):
     keypair = aws.keypair_lookup(session)
 
     vpc_id = config.find_vpc(session)
-    az_subnets, external_subnets = config.find_all_availability_zones(session)
     sgs = aws.sg_lookup_all(session, vpc_id)
 
     internal_subnet_id = aws.subnet_id_lookup(session, names.subnet("internal"))
     config.add_arg(Arg.Subnet("InternalSubnet",
                               internal_subnet_id,
                               "ID of Internal Subnet to create resources in"))
+    topic_arn = aws.sns_topic_lookup(session, "ProductionMicronsMailingList")
+    event_data = {
+        "lambda-name": "delete_lambda",
+        "db": names.endpoint_db,
+        "meta-db": names.meta,
+        "s3-index-table": names.s3_index,
+        "id-index-table": names.id_index,
+        "id-count-table": names.id_count_index,
+        "cuboid_bucket": names.cuboid_bucket,
+        "delete_bucket": names.delete_bucket,
+        "topic-arn": topic_arn,
+        "query-deletes-sfn-name": names.query_deletes,
+        "delete-sfn-name": names.delete_cuboid
+    }
 
+    role_arn = aws.role_arn_lookup(session, "events_for_delete_lambda")
+    multi_lambda = names.multi_lambda
+    lambda_arn = aws.lambda_arn_lookup(session, multi_lambda)
+    target_list = [{
+        "Arn": lambda_arn,
+        "Id": multi_lambda,
+        "Input": json.dumps(event_data)
+    }]
+    schedule_expression = "cron(0/60 1-5 * * TUE-THU *)"
+    #schedule_expression = "cron(0/2 * * * ? *)"  # testing fire every two minutes
+
+    config.add_event_rule("DeleteEventRule", names.delete_event_rule, role_arn=role_arn,
+                          schedule_expression=schedule_expression, target_list=target_list, description=None)
+    # Events have to be given permission to run lambda.
+    config.add_lambda_permission('DeleteRulePerm', multi_lambda, principal='events.amazonaws.com',
+                                 source=Arn('DeleteEventRule'))
     user_data = UserData()
     user_data["system"]["fqdn"] = names.activities
     user_data["system"]["type"] = "activities"
@@ -58,15 +86,15 @@ def create_config(session, domain):
     user_data["aws"]["id-index-table"] = names.id_index
     user_data["aws"]["id-count-table"] = names.id_count_index
 
-
     config.add_ec2_instance("Activities",
                             names.activities,
                             aws.ami_lookup(session, 'activities.boss'),
                             keypair,
-                            subnet = Ref("InternalSubnet"),
-                            role = "activity",
-                            user_data = str(user_data),
-                            security_groups = [sgs[names.internal]])
+                            subnet=Ref("InternalSubnet"),
+                            role="activities",
+                            type_=const.ACTIVITIES_TYPE,
+                            user_data=str(user_data),
+                            security_groups=[sgs[names.internal]])
 
     return config
 
@@ -85,12 +113,16 @@ def create(session, domain):
     if success:
         post_init(session, domain)
 
-def post_init(session, domain, startup_wait=False):
+
+def post_init(session, domain):
     names = AWSNames(domain)
 
     sfn.create(session, names.query_deletes, domain, 'query_for_deletes.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.delete_cuboid, domain, 'delete_cuboid.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(session, names.populate_upload_queue, domain, 'populate_upload_queue.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(session, names.populate_upload_queue, domain, 'populate_upload_queue.hsd',
+               'StatesExecutionRole-us-east-1 ')
+    sfn.create(session, names.resolution_hierarchy, domain, 'resolution_hierarchy.hsd', 'StatesExecutionRole-us-east-1')
+
 
 def delete(session, domain):
     names = AWSNames(domain)
@@ -100,3 +132,4 @@ def delete(session, domain):
     sfn.delete(session, names.delete_cuboid)
     sfn.delete(session, names.query_deletes)
     sfn.delete(session, names.populate_upload_queue)
+    sfn.delete(session, names.resolution_hierarchy)

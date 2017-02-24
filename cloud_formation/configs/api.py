@@ -60,6 +60,11 @@ def create_config(session, domain, keypair=None, db_config={}):
     if dns_arn is None:
         raise Exception("SNS topic named dns." + domain + " does not exist.")
 
+    mailing_list_arn = aws.sns_topic_lookup(session, const.PRODUCTION_MAILING_LIST)
+    if mailing_list_arn is None:
+        msg = "MailingList {} needs to be created before running config".format(const.PRODUCTION_MAILING_LIST)
+        raise Exception(msg)
+
     # Configure Vault and create the user data config that the endpoint will
     # use for connecting to Vault and the DB instance
     user_data = UserData()
@@ -85,6 +90,7 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["aws"]["tile-index-table"] = names.tile_index
     user_data["aws"]["id-index-table"] = names.id_index
     user_data["aws"]["id-count-table"] = names.id_count_index
+    user_data["aws"]["prod_mailing_list"] = mailing_list_arn
 
     user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
     user_data["lambda"]["flush_function"] = names.multi_lambda

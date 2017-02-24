@@ -52,7 +52,7 @@ def create_config(session, domain):
     if mailing_list_arn is None:
         #config.add_sns_topic("topicList", production_mailing_list)
         msg = "MailingList {} needs to be created before running config"
-        raise Exception(msg.format(mailing_list_arn))
+        raise Exception(msg.format(const.PRODUCTION_MAILING_LIST))
 
     config.add_cloudwatch(loadbalancer_name, [mailing_list_arn])
 
@@ -138,4 +138,3 @@ def create(session, domain):
         print('success')
     else:
         print('failed')
-
