@@ -61,7 +61,7 @@ def create_config(session, domain):
         "Id": multi_lambda,
         "Input": json.dumps(event_data)
     }]
-    schedule_expression = "cron(1 1-5/1 ? * TUE-FRI *)"
+    schedule_expression = "cron(1 6-11/1 ? * TUE-FRI *)"
     #schedule_expression = "cron(0/2 * * * ? *)"  # testing fire every two minutes
 
     config.add_event_rule("DeleteEventRule", names.delete_event_rule, role_arn=role_arn,
