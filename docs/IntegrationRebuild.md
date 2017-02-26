@@ -197,12 +197,7 @@ select load balancers on left side
 click the checkbox for the loadbalancer to change
 under attributes
 Set "Idle timeout: 300 seconds"
-
-## Manually update the multilambda timeout
-Go to Lambda in AWS console
-select Configuration tab
-Advanced Settings
-Change *Timeout* to be 2 mins.
+save and refresh the page 
 
 ## Run unit tests on Endpoint
 
