@@ -38,6 +38,7 @@ from lib import constants as const
 from update_lambda_fcn import load_lambdas_on_s3
 import boto3
 
+
 def create_config(session, domain, keypair=None, user_data=None):
     """
     Create the CloudFormationConfiguration object.
@@ -69,14 +70,11 @@ def create_config(session, domain, keypair=None, user_data=None):
         config.add_subnet(key, names.subnet('lambda{}'.format(i)))
         lambda_subnets.append(Ref(key))
 
-    internal_route_table_id = aws.rt_lookup(session, vpc_id, names.internal)
-    config.add_arg(Arg.RouteTable("InternalRouteTable",
-                                  internal_route_table_id,
-                                  "ID of Internal Router Table"))
     # add lambda_subnets to internal router.
+    internal_route_table_id = aws.rt_lookup(session, vpc_id, names.internal)
     for lambda_subnet_ref in lambda_subnets:
-        config.add_route_table_association(lambda_subnet_ref + "RTA",
-                                           Ref("InternalRouteTable"),
+        config.add_route_table_association(lambda_subnet_ref['Ref'] + "RTA",
+                                           internal_route_table_id,
                                            lambda_subnet_ref)
 
     # Lookup the External Subnet, Internal Security Group IDs that are
@@ -224,7 +222,6 @@ def pre_init(session, domain):
     """Send spdb, bossutils, lambda, and lambda_utils to the lambda build
     server, build the lambda environment, and upload to S3.
     """
-
     bucket = aws.get_lambda_s3_bucket(session)
     load_lambdas_on_s3(session, domain, bucket)
 

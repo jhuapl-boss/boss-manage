@@ -1177,7 +1177,7 @@ class CloudFormationConfiguration:
         Args:
             key (string) : Unique name for the resource in the template
             route_table (string) : The unique name of the RouteTable in the configuration
-            subnet (string) : The the unique name of the Subnet to associate the RouteTable with
+            subnet (string|Ref) : The the unique name of the Subnet to associate the RouteTable with
         """
         self.resources[key] = {
           "Type" : "AWS::EC2::SubnetRouteTableAssociation",
