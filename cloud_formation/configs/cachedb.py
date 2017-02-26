@@ -62,11 +62,22 @@ def create_config(session, domain, keypair=None, user_data=None):
 
     vpc_id = config.find_vpc(session)
 
+    # Create several subnets for all the lambdas to use.
     lambda_subnets = []
     for i in range(const.LAMBDA_SUBNETS):
         key = 'LambdaSubnet{}'.format(i)
         config.add_subnet(key, names.subnet('lambda{}'.format(i)))
         lambda_subnets.append(Ref(key))
+
+    internal_route_table_id = aws.rt_lookup(session, vpc_id, names.internal)
+    config.add_arg(Arg.RouteTable("InternalRouteTable",
+                                  internal_route_table_id,
+                                  "ID of Internal Router Table"))
+    # add lambda_subnets to internal router.
+    for lambda_subnet_ref in lambda_subnets:
+        config.add_route_table_association(lambda_subnet_ref + "RTA",
+                                           Ref("InternalRouteTable"),
+                                           lambda_subnet_ref)
 
     # Lookup the External Subnet, Internal Security Group IDs that are
     # needed by other resources
