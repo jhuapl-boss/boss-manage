@@ -9,6 +9,20 @@
   },
   {
     "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess",
+      "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetAutoscaleRole",
+      "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetRole",
+      "arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole",
+      "arn:aws:iam::aws:policy/AWSBatchFullAccess",
+      "arn:aws:iam::aws:policy/AmazonEC2ContainerServiceFullAccess",
+      "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole"
+    ],
+    "GroupName": "aplCompute",
+    "GroupPolicyList": [],
+    "Path": "/"
+  },
+  {
+    "AttachedManagedPolicies": [
       "arn:aws:iam::aws:policy/IAMFullAccess"
     ],
     "GroupName": "aplIAMAdminGroup",

@@ -10,6 +10,36 @@
           }
         }
       ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/service-role/AWSQuickSightListIAM",
+      "arn:aws:iam::451493790433:policy/aplPopulateUploadQueue",
+      "arn:aws:iam::451493790433:policy/aplDeleteCuboid",
+      "arn:aws:iam::451493790433:policy/aplResolutionHierarchy",
+      "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess"
+    ],
+    "InstanceProfileList": [
+      {
+        "InstanceProfileName": "activities",
+        "Path": "/"
+      }
+    ],
+    "Path": "/",
+    "RoleName": "activities",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "ec2.amazonaws.com"
+          }
+        }
+      ],
       "Version": "2008-10-17"
     },
     "AttachedManagedPolicies": [
@@ -132,7 +162,8 @@
       "arn:aws:iam::aws:policy/AmazonS3FullAccess",
       "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
       "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess",
-      "arn:aws:iam::aws:policy/AmazonSNSFullAccess"
+      "arn:aws:iam::aws:policy/AmazonSNSFullAccess",
+      "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess"
     ],
     "InstanceProfileList": [
       {
@@ -143,6 +174,77 @@
     "Path": "/",
     "RoleName": "endpoint",
     "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "events.amazonaws.com"
+          },
+          "Sid": ""
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/AmazonEC2FullAccess",
+      "arn:aws:iam::aws:policy/AWSLambdaFullAccess",
+      "arn:aws:iam::aws:policy/service-role/CloudWatchEventsBuiltInTargetExecutionAccess",
+      "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+      "arn:aws:iam::aws:policy/service-role/AWSLambdaRole",
+      "arn:aws:iam::aws:policy/CloudWatchEventsFullAccess"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/",
+    "RoleName": "events_for_delete_lambda",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "lambda.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [],
+    "InstanceProfileList": [],
+    "Path": "/",
+    "RoleName": "goad-lambda-role",
+    "RolePolicyList": [
+      {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "sqs:SendMessage"
+              ],
+              "Effect": "Allow",
+              "Resource": "arn:aws:sqs:*:*:goad-*"
+            },
+            {
+              "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Effect": "Allow",
+              "Resource": "arn:aws:logs:*:*:*"
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "goad-lambda-role-policy"
+      }
+    ]
   },
   {
     "AssumeRolePolicyDocument": {
@@ -285,11 +387,36 @@
       "arn:aws:iam::aws:policy/AmazonElastiCacheFullAccess",
       "arn:aws:iam::aws:policy/AmazonS3FullAccess",
       "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
-      "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+      "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
+      "arn:aws:iam::aws:policy/AmazonSNSFullAccess",
+      "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess"
     ],
     "InstanceProfileList": [],
     "Path": "/",
     "RoleName": "lambda_cache_execution",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "events.amazonaws.com"
+          },
+          "Sid": ""
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/service-role/CloudWatchEventsBuiltInTargetExecutionAccess",
+      "arn:aws:iam::aws:policy/service-role/CloudWatchEventsInvocationAccess"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/",
+    "RoleName": "sandytest",
     "RolePolicyList": []
   },
   {
@@ -366,6 +493,70 @@
     "Path": "/service-role/",
     "RoleName": "snowballLambdaTestRole",
     "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "states.us-east-1.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/service-role/AWSLambdaRole",
+      "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/service-role/",
+    "RoleName": "StatesExecutionRole-us-east-1",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "ec2.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/service-role/AWSQuickSightListIAM"
+    ],
+    "InstanceProfileList": [
+      {
+        "InstanceProfileName": "testSFN",
+        "Path": "/"
+      }
+    ],
+    "Path": "/",
+    "RoleName": "testSFN",
+    "RolePolicyList": [
+      {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "states:*"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "StepFunctionsAllowAll"
+      }
+    ]
   },
   {
     "AssumeRolePolicyDocument": {
