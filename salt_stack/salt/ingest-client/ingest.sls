@@ -31,8 +31,8 @@ ingest-client-lib:
             - cmd: ingest-httpretty
 
     file.recurse:
-        - name: /usr/local/lib/python3/site-packages/ingest
-        - source: salt://ingest-client/files/ingest-client.git/ingest
+        - name: /usr/local/lib/python3/site-packages/ingestclient
+        - source: salt://ingest-client/files/ingest-client.git/ingestclient
         - include_empty: true
         - user: root
         - group: root
