@@ -165,10 +165,10 @@ If you are building a personal developer domain it should have this:
 For the *core*, *api*, *cachedb*, *activities*, *cloudwatch* configurations
 run the following command. You have to wait for each command to finish before
 launching the next configuration as they build upon each other.  **Only use the
-*--scenario production* flag** if you are rebuilding integration.  It is not used
+*--scenario ha-development* flag** if you are rebuilding integration.  It is not used
 if you are following these instructions to build a developer environment.
 ```shell
-$ ./cloudformation.py create integration.boss --scenario production <config>
+$ ./cloudformation.py create integration.boss --scenario ha-development <config>
 ```
 
 *Note: When launching some configurations there may be an message about manually

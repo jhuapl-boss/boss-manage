@@ -197,6 +197,18 @@ sudo python3 manage.py test --pattern="int_test_*.py"
 ```
 	output should say 55 Tests OK with 7 skipped tests
 
+##### Test the ndingest library.
+
+Run ndingest tests on the endpoint.
+```shell
+# Manual install for now.  Will likely remove use of pytest in the future.
+sudo pip3 install pytest
+cd /usr/local/lib/python3/site-packages/ndingest
+# Use randomized queue names and prepend 'test_' to bucket/index names.
+export NDINGEST_TEST=1
+pytest -c test_apl.cfg
+```
+
 ### Cachemanager Integration Tests
 
 #### Test While Logged onto the Cachemanager VM
@@ -213,7 +225,7 @@ sudo nose2 -c inttest.cfg
 #### Test Using Intern From a Client
 
 intern integration tests should be run from your local workstation or a VM
-**not** running within the integration VPC.
+**not** running within the production VPC.
 
 First ensure intern is current:
 
@@ -236,7 +248,7 @@ sudo pip3 install -r requirements.txt
 ```
 
 ##### Setup new user for testing  (don't use bossadmin for this)
-In your browser, open https://api.theboss.io/vX.Y/mgmt/token
+In your browser, open https://api.theboss.io/vX.Y/token
 
 Your browser should be redirected to the KeyCloak login page.
 Create a new account and return to the token page.
@@ -301,13 +313,13 @@ OK
 #### Run Ingest Tests
 
 * cd ingest-test
-* run ./setup.py
+* run python3 ./setup.py
 * Copy the export and and ingest run commands 
 * cd ../ingest-client
 * paste the copied commands above.
     this should start loading the ingest data
 * cd back to the ingest-test directory
-* validate-ingest.py
+* python3 validate-ingest.py
 
 
 ### Automated Tests
