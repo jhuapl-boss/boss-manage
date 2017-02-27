@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import time
-from urllib.request import urlopen
+from urllib.request import urlopen, HTTPError
 from contextlib import contextmanager
 
 from . import exceptions
@@ -21,6 +21,7 @@ from . import aws
 from .utils import keypair_to_file
 from .ssh import SSHConnection, vault_tunnel
 from .vault import Vault
+
 
 def gen_timeout(total, step):
     """Break the total timeout value into steps
