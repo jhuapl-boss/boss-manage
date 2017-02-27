@@ -96,9 +96,9 @@ TIMEOUT_KEYCLOAK = 120
 ########################
 # Machine Instance Types
 ENDPOINT_TYPE = {
-    "development": "t2.small",
+    "development": "t2.medium",
     "production": "c4.4xlarge",
-    "ha-development": "t2.small",
+    "ha-development": "t2.medium",
 }
 
 RDS_TYPE = {
