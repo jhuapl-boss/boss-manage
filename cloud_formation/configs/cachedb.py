@@ -65,20 +65,17 @@ def create_config(session, domain, keypair=None, user_data=None):
 
     # Create several subnets for all the lambdas to use.
     lambda_azs = aws.azs_lookup(session, lambda_compatible_only=True)
+    internal_route_table_id = aws.rt_lookup(session, vpc_id, names.internal)
 
     print("AZs for lambda: " + str(lambda_azs))
     lambda_subnets = []
     for i in range(const.LAMBDA_SUBNETS):
         key = 'LambdaSubnet{}'.format(i)
-        config.add_subnet(key, names.subnet('lambda{}'.format(i)), az=lambda_azs[i % len(lambda_azs)][0])
         lambda_subnets.append(Ref(key))
-
-    # add lambda_subnets to internal router.
-    internal_route_table_id = aws.rt_lookup(session, vpc_id, names.internal)
-    for lambda_subnet_ref in lambda_subnets:
-        config.add_route_table_association(lambda_subnet_ref['Ref'] + "RTA",
+        config.add_subnet(key, names.subnet('lambda{}'.format(i)), az=lambda_azs[i % len(lambda_azs)][0])
+        config.add_route_table_association(key + "RTA",
                                            internal_route_table_id,
-                                           lambda_subnet_ref)
+                                           Ref(key))
 
     # Lookup the External Subnet, Internal Security Group IDs that are
     # needed by other resources
