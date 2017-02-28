@@ -253,7 +253,10 @@ def azs_lookup(session):
     client = session.client('ec2')
     response = client.describe_availability_zones()
     # DP HACK: Currently AWS is returning us-east-1a, but it cannot be used right now...
-    rtn = [(z["ZoneName"], z["ZoneName"][-1]) for z in response["AvailabilityZones"] if z['ZoneName'] != 'us-east-1a']
+    # SH UnHACK: Removing the blocking of us-east-1a.  CF Update tries to delete the ASubnets and fails to do so
+    # as they are being used by RDS.
+    # rtn = [(z["ZoneName"], z["ZoneName"][-1]) for z in response["AvailabilityZones"] if z['ZoneName'] != 'us-east-1a']
+    rtn = [(z["ZoneName"], z["ZoneName"][-1]) for z in response["AvailabilityZones"]]
 
     return rtn
 
