@@ -90,7 +90,7 @@ VAULT_PROOFREAD_AUTH = "secret/proofreader/auth"
 ########################
 # Service Check Timeouts
 TIMEOUT_VAULT = 120
-TIMEOUT_KEYCLOAK = 120
+TIMEOUT_KEYCLOAK = 180
 
 
 ########################

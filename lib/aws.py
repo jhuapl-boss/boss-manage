@@ -237,13 +237,13 @@ def subnet_id_lookup(session, subnet_domain):
     else:
         return response['Subnets'][0]['SubnetId']
 
-def azs_lookup(session):
+def azs_lookup(session, lambda_compatible_only=False):
     """Lookup all of the Availablity Zones for the connected region.
 
     Args:
         session (Session|None) : Boto3 session used to lookup information in AWS
                                  If session is None no lookup is performed
-
+        lambda_compatible_only(bool): only return AZs that work with Lambda.
     Returns:
         (list) : List of tuples (availability zone, zone letter)
     """
@@ -252,11 +252,18 @@ def azs_lookup(session):
 
     client = session.client('ec2')
     response = client.describe_availability_zones()
-    # DP HACK: Currently AWS is returning us-east-1a, but it cannot be used right now...
-    rtn = [(z["ZoneName"], z["ZoneName"][-1]) for z in response["AvailabilityZones"] if z['ZoneName'] != 'us-east-1a']
+    # SH Removing Hack as subnet A is already in Production and causes issues trying to delete
+    #    We will strip out subnets A and C when creating the lambdas.
+    #rtn = [(z["ZoneName"], z["ZoneName"][-1]) for z in response["AvailabilityZones"] if z['ZoneName'] != 'us-east-1a']
+    rtn = [(z["ZoneName"], z["ZoneName"][-1]) for z in response["AvailabilityZones"]]
 
+    if lambda_compatible_only:
+        for az in rtn.copy():
+            if az[1] == 'c':
+                rtn.remove(az)
+            if az[1] == 'a':
+                rtn.remove(az)
     return rtn
-
 
 def ami_lookup(session, ami_name, version = None):
     """Lookup the Id for the AMI with the given name.

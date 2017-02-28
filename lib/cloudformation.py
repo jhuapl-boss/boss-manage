@@ -726,7 +726,7 @@ class CloudFormationConfiguration:
         if az is not None:
             self.resources[key]["Properties"]["AvailabilityZone"] = az
 
-    def add_all_azs(self, session):
+    def add_all_azs(self, session, lambda_compatible_only=False):
         """Add Internal and External subnets for each availability zone.
 
         For each availability zone in the connected region, create an Internal
@@ -735,6 +735,7 @@ class CloudFormationConfiguration:
 
         Args:
             session (Session) : Boto3 session used to lookup availability zones
+            lambda_compatible_only (bool): only return AZs that work with Lambda.
 
         Returns:
             (tuple) : Tuple of two lists (internal, external) that contain the
@@ -742,7 +743,7 @@ class CloudFormationConfiguration:
         """
         internal = []
         external = []
-        for az, sub in aws.azs_lookup(session):
+        for az, sub in aws.azs_lookup(session, lambda_compatible_only):
             name = sub.capitalize() + "InternalSubnet"
             self.add_subnet(name, sub + "-internal." + self.vpc_domain, az = az)
             internal.append(Ref(name))
@@ -753,7 +754,7 @@ class CloudFormationConfiguration:
 
         return (internal, external)
 
-    def find_all_availability_zones(self, session):
+    def find_all_availability_zones(self, session, lambda_compatible_only=False):
         """Add template arguments for each internal/external availability zone subnet.
 
         A companion method to add_all_azs(), that will add to the current template
@@ -762,7 +763,7 @@ class CloudFormationConfiguration:
 
         Args:
             session (Session) : Boto3 session used to lookup availability zones
-
+            lambda_compatible_only (bool): only return AZs that work with Lambda.
         Returns:
             (tuple) : Tuple of two lists (internal, external) that contain the
                       template argument names for each of the added subnet arguments
@@ -770,7 +771,7 @@ class CloudFormationConfiguration:
         internal = []
         external = []
 
-        for az, sub in aws.azs_lookup(session):
+        for az, sub in aws.azs_lookup(session, lambda_compatible_only):
             name = sub.capitalize() + "InternalSubnet"
             domain = sub + "-internal." + self.vpc_domain
             id = aws.subnet_id_lookup(session, domain)

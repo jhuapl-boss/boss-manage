@@ -64,12 +64,13 @@ def create_config(session, domain, keypair=None, user_data=None):
     vpc_id = config.find_vpc(session)
 
     # Create several subnets for all the lambdas to use.
-    # DMK - Lambda only works in certain AZs. Force to only use what the azs_lookup method returns
-    azs = aws.azs_lookup(session)
+    lambda_azs = aws.azs_lookup(session, lambda_compatible_only=True)
+
+    print("AZs for lambda: " + str(lambda_azs))
     lambda_subnets = []
     for i in range(const.LAMBDA_SUBNETS):
         key = 'LambdaSubnet{}'.format(i)
-        config.add_subnet(key, names.subnet('lambda{}'.format(i)), az=azs[i % len(azs)][0])
+        config.add_subnet(key, names.subnet('lambda{}'.format(i)), az=lambda_azs[i % len(lambda_azs)][0])
         lambda_subnets.append(Ref(key))
 
     # add lambda_subnets to internal router.

@@ -39,7 +39,9 @@ def create_config(session, domain):
     names = AWSNames(domain)
 
     vpc_id = config.find_vpc(session)
-    internal_subnets, _ = config.find_all_availability_zones(session)
+    lambda_subnets, _ = config.find_all_availability_zones(session, lambda_compatible_only=True)
+    print("lambda subnets:" + str(lambda_subnets))
+
     internal_sg = aws.sg_lookup(session, vpc_id, names.internal)
 
     loadbalancer_name = names.endpoint_elb
@@ -67,7 +69,7 @@ def create_config(session, domain):
                       timeout=30,
                       role=Ref('VaultConsulHealthChecker'),
                       security_groups=[internal_sg],
-                      subnets=internal_subnets,
+                      subnets=lambda_subnets,
                       handler='index.lambda_handler',
                       file=const.VAULT_LAMBDA)
 
@@ -77,7 +79,7 @@ def create_config(session, domain):
                       timeout=30,
                       role=Ref('VaultConsulHealthChecker'),
                       security_groups=[internal_sg],
-                      subnets=internal_subnets,
+                      subnets=lambda_subnets,
                       handler='index.lambda_handler',
                       file=const.CONSUL_LAMBDA)
 
