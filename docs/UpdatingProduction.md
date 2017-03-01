@@ -16,7 +16,8 @@ Integration Stack except for Tag and Merge)
 
 ## Tag and Merge
 Follow the instructions in  [TagAndMerge.md](TagAndMerge.md) to create 
-AMIs for sprintXX
+AMIs for sprintXX.  These instructions are still valid however I tend build production based off of the latest AMIs and
+only after the process is finished to I copy the latest AMIs and label them sprintXX.
 
 ## AWS Credentials File
 Make sure your:
@@ -53,9 +54,8 @@ python3 ./maintenance.py on production.boss
 In can take up to 10 to 15 minutes for DNS to be updated externally.
 Use: dig api.theboss.io
 to see if DNS has been changed back to ELB.
-Once completed you will see a "Down for Maintenance Page" at both
-* api.theboss.io
-* auth.theboss.io
+Once completed you will see a "Down for Maintenance Page" at api.theboss.io
+
 In can take up to 10 to 15 minutes for DNS to be updated externally.  (sometimes its fast)
 Use: dig api.theboss.io
 to see if DNS has been changed to cloudfront servers.
@@ -78,11 +78,26 @@ $ ./bastion.py vault.production.boss vault-export path/to//file
 
 ### Updating IAM
 Verify IAM Policy, Groups and Roles are the latest.  Master IAM scripts are located boss-manage/config/iam.
-Make sure your AWS_CREDENTIALS is set for the production account
-
+Make sure your AWS_CREDENTIALS is set for the dev account
 ```shell
 $ cd boss-manage.git/bin
-$ ./iam_utils import
+$ ./iam_utils.py export
+```
+this will update the boss-manage.git/config/iam files with the latest changes added
+to the dev account.  I use git diff on the three files to look over the changes.
+* groups.json
+* policies.json
+* roles.json
+
+If there new information that you believe should not be included in these files you 
+can edit iam_utils.py file.  It has keyword filters and whole word filters to 
+excluded groups, policies and roles that should not to into the config/iam files.
+
+
+Make sure your AWS_CREDENTIALS is set for the production account
+```shell
+$ cd boss-manage.git/bin
+$ ./iam_utils.py import
 ```
 
 ### Remove Subscriptions to ProductionMicronsMailingList in SNS 
@@ -138,6 +153,10 @@ $ ./bastion.py consul.production.boss ssh-all 'sudo consul operator raft -list-p
 ```shell
 $ ./cloudformation.py update production.boss --scenario production api
 ```
+
+You may have to manually remove entries in route53 for the old consuls and vaults.
+Its possible they will come back so keep deleting them until they stop coming back
+
 
 For *cachedb* and *cloudwatch* delete and create the cloud formation stacks again.
 
@@ -327,11 +346,14 @@ To be filled out
 
 ### Manual Checks
 * https://api.theboss.io/ping/
-* https://api.theboss.io/v0.7/collection/
+* https://api.theboss.io/v0.8/collection/
 * Login into Scalyr and verify that the new instances appear on the overview page.
-* Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint and proofreader.
+* Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint
 
 # Finally 
+## Have you created the production sprintXX IAMs yet?
+If not copy the latest versions with the sprintXX label.
+
 ## Change AWS Credentials back to dev account
 Make sure your:
 **boss-manage/config/aws_credentials** file contains the developer account keys
