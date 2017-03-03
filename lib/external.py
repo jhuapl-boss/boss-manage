@@ -122,7 +122,7 @@ class ExternalCalls:
 
         return self.connections[target].cmds()
 
-    def tunnel(self, target, port):
+    def tunnel(self, target, port, type_='ec2'):
         """Open a SSH connectio to the target machine (AWS instance name) / port and return the local
         port of the tunnel to connect to.
         """
@@ -131,7 +131,12 @@ class ExternalCalls:
             hostname = target
             if not hostname.endswith("." + self.domain):
                 hostname += "." + self.domain
-            target_ip = aws.machine_lookup(self.session, hostname, public_ip=False)
+            if type_ == 'ec2':
+                target_ip = aws.machine_lookup(self.session, hostname, public_ip=False)
+            elif type_ == 'rds':
+                target_ip = aws.rds_lookup(self.session, hostname.replace('.', '-'))
+            else:
+                raise Exception("Unsupported: tunnelling to machine type {}".format(type_))
             self.connections[key] = SSHConnection(self.keypair_file, (target_ip, port), self.bastion_ip)
 
         return self.connections[key].tunnel()

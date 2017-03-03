@@ -131,6 +131,29 @@ def machine_lookup(session, hostname, public_ip = True):
                 print("Could not find IP address for '{}'".format(hostname))
                 return None
 
+def rds_lookup(session, hostname):
+    """Lookup the public DNS for a given AWS RDS instance name.
+
+        Note: If not address could be located an error message is printed
+
+    Args:
+        session (Session) : Active Boto3 session
+        hostname (string) : Instance name of the RDS instance
+
+    Returns:
+        (string|None) : Public DNS or None if one could not be located.
+    """
+
+    client = session.client('rds')
+    response = client.describe_db_instances(DBInstanceIdentifier=hostname)
+
+    item = response['DBInstances']
+    if len(item) == 0:
+        print("Could not find DNS for '{}'".format(hostname))
+        return None
+    else:
+        return item[0]['Endpoint']['Address']
+
 
 def _find(xs, predicate):
     """Locate an item in a list based on a predicate function.

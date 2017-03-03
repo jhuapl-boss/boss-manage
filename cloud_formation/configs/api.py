@@ -322,14 +322,97 @@ def post_init(session, domain):
 
 def update(session, domain):
     keypair = aws.keypair_lookup(session)
+    names = AWSNames(domain)
 
     call = ExternalCalls(session, keypair, domain)
 
     with call.vault() as vault:
         db_config = vault.read(const.VAULT_ENDPOINT_DB)
 
+    try:
+        import MySQLdb as mysql
+    except:
+        print("Cannot save data before migrating schema, exiting...")
+        return
+
+    print("Saving time step data")
+    print("Tunneling")
+    with call.tunnel(names.endpoint_db, db_config['port'], type_='rds') as local_port:
+        print("Connecting to MySQL")
+        db = mysql.connect(host = '127.0.0.1',
+                           port = local_port,
+                           user = db_config['user'],
+                           passwd = db_config['password'],
+                           db = db_config['name'])
+        cur = db.cursor()
+
+        try:
+            sql = "DROP TABLE temp_time_step"
+            cur.execute(sql)
+        except Exception as e:
+            #print(e)
+            pass # Table doesn't exist
+
+        print("Saving Data")
+        sql = """CREATE TABLE temp_time_step(time_step_unit VARCHAR(100), exp_id INT(11), coord_frame_id INT(11), time_step INT(11))
+                 SELECT coordinate_frame.time_step_unit, experiment.id as exp_id, coord_frame_id, time_step
+                 FROM experiment, coordinate_frame
+                 WHERE coordinate_frame.id = experiment.coord_frame_id """
+        cur.execute(sql)
+
+        sql = "SELECT * FROM temp_time_step"
+        cur.execute(sql)
+        rows = cur.fetchall()
+        print("Saved {} rows of data".format(len(rows)))
+        #for r in rows:
+        #    print(r)
+
+        cur.close()
+        db.close()
+
     config = create_config(session, domain, keypair, db_config)
     success = config.update(session)
+
+    print("Restoring time step data")
+    print("Tunneling")
+    with call.tunnel(names.endpoint_db, db_config['port'], type_='rds') as local_port:
+        print("Connecting to MySQL")
+        db = mysql.connect(host = '127.0.0.1',
+                           port = local_port,
+                           user = db_config['user'],
+                           passwd = db_config['password'],
+                           db = db_config['name'])
+        cur = db.cursor()
+
+        if success:
+            sql = """UPDATE experiment, temp_time_step
+                     SET experiment.time_step_unit = temp_time_step.time_step_unit,
+                         experiment.time_step = temp_time_step.time_step
+                     WHERE  experiment.id = temp_time_step.exp_id AND
+                            experiment.coord_frame_id = temp_time_step.coord_frame_id"""
+            cur.execute(sql)
+            db.commit()
+
+            sql = "SELECT time_step_unit, id, coord_frame_id, time_step FROM experiment"
+            cur.execute(sql)
+            rows = cur.fetchall()
+            print("Migrated {} rows of data".format(len(rows)))
+            #for r in rows:
+            #    print(r)
+        else:
+            if success is None:
+                print("Update canceled, not migrating data")
+            else:
+                print("Error during update, not migrating data")
+
+        print("Deleting temp table")
+        sql = "DROP TABLE temp_time_step"
+        cur.execute(sql)
+
+        cur.close()
+        db.close()
+
+    
 
     return success
 
