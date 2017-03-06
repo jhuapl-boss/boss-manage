@@ -335,6 +335,7 @@ def update(session, domain):
         print("Cannot save data before migrating schema, exiting...")
         return
 
+    '''
     print("Saving time step data")
     print("Tunneling")
     with call.tunnel(names.endpoint_db, db_config['port'], type_='rds') as local_port:
@@ -369,10 +370,12 @@ def update(session, domain):
 
         cur.close()
         db.close()
+    '''
 
     config = create_config(session, domain, keypair, db_config)
     success = config.update(session)
 
+    '''
     print("Restoring time step data")
     print("Tunneling")
     with call.tunnel(names.endpoint_db, db_config['port'], type_='rds') as local_port:
@@ -411,7 +414,7 @@ def update(session, domain):
 
         cur.close()
         db.close()
-
+    '''
     
 
     return success
