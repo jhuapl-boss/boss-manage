@@ -775,14 +775,20 @@ class CloudFormationConfiguration:
             name = sub.capitalize() + "InternalSubnet"
             domain = sub + "-internal." + self.vpc_domain
             id = aws.subnet_id_lookup(session, domain)
-            self.add_arg(Arg.Subnet(name, id))
-            internal.append(Ref(name))
+            if id is None:
+                print("Subnet {} doesn't exist, not using.".format(domain))
+            else:
+                self.add_arg(Arg.Subnet(name, id))
+                internal.append(Ref(name))
 
             name = sub.capitalize() + "ExternalSubnet"
             domain = sub + "-external." + self.vpc_domain
             id = aws.subnet_id_lookup(session, domain)
-            self.add_arg(Arg.Subnet(name, id))
-            external.append(Ref(name))
+            if id is None:
+                print("Subnet {} doesn't exist, not using.".format(domain))
+            else:
+                self.add_arg(Arg.Subnet(name, id))
+                external.append(Ref(name))
 
         return (internal, external)
 
