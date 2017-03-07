@@ -33,11 +33,8 @@ def create_config(session, domain):
 
     vpc_id = config.find_vpc(session)
     sgs = aws.sg_lookup_all(session, vpc_id)
+    internal_subnets, _ = config.find_all_availability_zones(session)
 
-    internal_subnet_id = aws.subnet_id_lookup(session, names.subnet("internal"))
-    config.add_arg(Arg.Subnet("InternalSubnet",
-                              internal_subnet_id,
-                              "ID of Internal Subnet to create resources in"))
     topic_arn = aws.sns_topic_lookup(session, "ProductionMicronsMailingList")
     event_data = {
         "lambda-name": "delete_lambda",
@@ -86,15 +83,17 @@ def create_config(session, domain):
     user_data["aws"]["id-index-table"] = names.id_index
     user_data["aws"]["id-count-table"] = names.id_count_index
 
-    config.add_ec2_instance("Activities",
-                            names.activities,
-                            aws.ami_lookup(session, 'activities.boss'),
-                            keypair,
-                            subnet=Ref("InternalSubnet"),
-                            role="activities",
-                            type_=const.ACTIVITIES_TYPE,
-                            user_data=str(user_data),
-                            security_groups=[sgs[names.internal]])
+    config.add_autoscale_group("Activities",
+                               names.activities,
+                               aws.ami_lookup(session, 'activities.boss'),
+                               keypair,
+                               subnets=internal_subnets,
+                               type_=const.ACTIVITIES_TYPE,
+                               security_groups=[sgs[names.internal]],
+                               user_data=str(user_data),
+                               role=aws.instance_profile_arn_lookup(session, "activities"),
+                               min=1,
+                               max=1)
 
     return config
 
