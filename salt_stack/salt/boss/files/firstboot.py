@@ -49,6 +49,7 @@ def django_initialize():
         bossutils.utils.execute(migrate_cmd + "makemigrations bosscore", whole=True, shell=True)  # will hang if it cannot contact the auth server
         bossutils.utils.execute(migrate_cmd + "makemigrations bossoidc", whole=True, shell=True)
         bossutils.utils.execute(migrate_cmd + "makemigrations bossingest", whole=True, shell=True)
+        bossutils.utils.execute(migrate_cmd + "makemigrations bossmeta", whole=True, shell=True)
         bossutils.utils.execute(migrate_cmd + "makemigrations mgmt", whole=True, shell=True)
         bossutils.utils.execute(migrate_cmd + "migrate", whole=True, shell=True)
         bossutils.utils.execute(migrate_cmd + "collectstatic --no-input", whole=True, shell=True)
