@@ -253,6 +253,7 @@ def create(session, domain):
     keypair = aws.keypair_lookup(session)
 
     call = ExternalCalls(session, keypair, domain)
+    names = AWSNames(domain)
 
     db_config = const.ENDPOINT_DB_CONFIG.copy()
     db_config['password'] = utils.generate_password()
@@ -260,6 +261,10 @@ def create(session, domain):
     with call.vault() as vault:
         vault.write(const.VAULT_ENDPOINT, secret_key = str(uuid.uuid4()))
         vault.write(const.VAULT_ENDPOINT_DB, **db_config)
+
+        dns = names.public_dns("api")
+        uri = "https://{}".format(dns)
+        vault.update(const.VAULT_ENDPOINT_AUTH, public_uri = uri)
 
     config = create_config(session, domain, keypair, db_config)
 
@@ -300,8 +305,8 @@ def post_init(session, domain):
     # DP TODO: Move into the pre-launch Vault writes, so it is available when the
     #          machines initially start
     with call.vault() as vault:
-        uri = "https://{}".format(dns)
-        vault.update(const.VAULT_ENDPOINT_AUTH, public_uri = uri)
+        #uri = "https://{}".format(dns)
+        #vault.update(const.VAULT_ENDPOINT_AUTH, public_uri = uri)
 
         creds = vault.read("secret/auth")
         bossadmin = vault.read("secret/auth/realm")
@@ -336,6 +341,7 @@ def post_init(session, domain):
     resp = json.loads(urlopen(req).read().decode('utf-8'))
 
     # Make an API call that will log the boss admin into the endpoint
+    call.check_url(uri + '/ping', 60)
     headers = {
         'Authorization': 'Bearer {}'.format(resp['access_token']),
     }

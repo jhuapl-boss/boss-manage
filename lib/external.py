@@ -184,9 +184,12 @@ class ExternalCalls:
 
     def check_url(self, url, timeout, exception=True):
         for sleep in gen_timeout(timeout, 15): # 15 second sleep
-            res = urlopen(url)
-            if res.getcode() == 200:
-                return True
+            try:
+                res = urlopen(url)
+                if res.getcode() == 200:
+                    return True
+            except HTTPError:
+                pass
             time.sleep(sleep)
 
         if exception:
