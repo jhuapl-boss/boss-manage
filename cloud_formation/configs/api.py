@@ -37,6 +37,8 @@ from lib.cloudformation import get_scenario
 import json
 import uuid
 import sys
+from urllib.request import Request, urlopen
+from urllib.parse import urlencode
 
 def create_config(session, domain, keypair=None, db_config={}):
     """
@@ -302,6 +304,8 @@ def post_init(session, domain):
         vault.update(const.VAULT_ENDPOINT_AUTH, public_uri = uri)
 
         creds = vault.read("secret/auth")
+        bossadmin = vault.read("secret/auth/realm")
+        auth_uri = vault.read("secret/endpoint/auth")['url']
 
     # Verify Keycloak is accessible
     print("Checking for Keycloak availability")
@@ -314,6 +318,31 @@ def post_init(session, domain):
         with KeyCloakClient(auth_url, **creds) as kc:
             # DP TODO: make add_redirect_uri able to work multiple times without issue
             kc.add_redirect_uri("BOSS","endpoint", uri + "/*")
+
+    # Get the boss admin's bearer token
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+    }
+    params = {
+        'grant_type': 'password',
+        'client_id': bossadmin['client_id'],
+        'username': bossadmin['username'],
+        'password': bossadmin['password'],
+    }
+    auth_uri += '/protocol/openid-connect/token'
+    req = Request(auth_uri,
+                  headers = headers,
+                  data = urlencode(params).encode('utf-8'))
+    resp = json.loads(urlopen(req).read().decode('utf-8'))
+
+    # Make an API call that will log the boss admin into the endpoint
+    headers = {
+        'Authorization': 'Bearer {}'.format(resp['access_token']),
+    }
+    api_uri = uri + '/v0.8/collection' # DP TODO: implement /latest for version
+    req = Request(api_uri, headers = headers)
+    resp = json.loads(urlopen(req).read().decode('utf-8'))
+    print("Collections: {}".format(resp))
 
     # Tell Scalyr to get CloudWatch metrics for these instances.
     instances = [names.endpoint]
