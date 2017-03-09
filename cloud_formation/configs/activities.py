@@ -34,7 +34,7 @@ def create_config(session, domain):
     vpc_id = config.find_vpc(session)
     sgs = aws.sg_lookup_all(session, vpc_id)
     internal_subnets, _ = config.find_all_availability_zones(session)
-
+    internal_subnets_lambda, _ = config.find_all_availability_zones(session, lambda_compatible_only=True)
     topic_arn = aws.sns_topic_lookup(session, "ProductionMicronsMailingList")
     event_data = {
         "lambda-name": "delete_lambda",
@@ -87,7 +87,7 @@ def create_config(session, domain):
                                names.activities,
                                aws.ami_lookup(session, 'activities.boss'),
                                keypair,
-                               subnets=internal_subnets,
+                               subnets=internal_subnets_lambda,
                                type_=const.ACTIVITIES_TYPE,
                                security_groups=[sgs[names.internal]],
                                user_data=str(user_data),

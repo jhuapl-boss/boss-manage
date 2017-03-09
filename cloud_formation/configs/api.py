@@ -108,6 +108,7 @@ def create_config(session, domain, keypair=None, db_config={}):
 
     vpc_id = config.find_vpc(session)
     az_subnets, external_subnets = config.find_all_availability_zones(session)
+    az_subnets_lambda, external_subnets_lambda = config.find_all_availability_zones(session, lambda_compatible_only=True)
     sgs = aws.sg_lookup_all(session, vpc_id)
 
     # DP XXX: hack until we can get productio updated correctly
@@ -138,7 +139,7 @@ def create_config(session, domain, keypair=None, db_config={}):
                                names.endpoint,
                                aws.ami_lookup(session, "endpoint.boss"),
                                keypair,
-                               subnets=az_subnets,
+                               subnets=az_subnets_lambda,
                                type_=const.ENDPOINT_TYPE,
                                security_groups=[sgs[names.internal]],
                                user_data=parsed_user_data,
@@ -154,7 +155,7 @@ def create_config(session, domain, keypair=None, db_config={}):
     config.add_loadbalancer("EndpointLoadBalancer",
                             names.endpoint_elb,
                             [("443", "80", "HTTPS", cert)],
-                            subnets=external_subnets,
+                            subnets=external_subnets_lambda,
                             security_groups=[sgs[names.internal], sgs[names.https]],
                             public=True)
 

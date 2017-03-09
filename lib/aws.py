@@ -281,10 +281,11 @@ def azs_lookup(session, lambda_compatible_only=False):
     rtn = [(z["ZoneName"], z["ZoneName"][-1]) for z in response["AvailabilityZones"]]
 
     if lambda_compatible_only:
+        current_account = get_account_id_from_session(session)
         for az in rtn.copy():
-            if az[1] == 'c':
+            if az[1] == 'c' and current_account == hosts.PROD_ACCOUNT:
                 rtn.remove(az)
-            if az[1] == 'a':
+            if az[1] == 'a' and current_account == hosts.DEV_ACCOUNT:
                 rtn.remove(az)
     return rtn
 
