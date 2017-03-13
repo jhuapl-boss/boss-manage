@@ -198,7 +198,7 @@ cd vault
 ./bastion.py bastion.integration.boss endpoint.integration.boss ssh
 export RUN_HIGH_MEM_TESTS=true
 cd /srv/www/django
-sudo python3 manage.py test
+sudo -E python3 manage.py test
 ```
 	output should say Ran 257 tests.
 
@@ -212,9 +212,9 @@ results recorded, and developers notified of any problems.
 ```shell
 export RUN_HIGH_MEM_TESTS=true
 cd /srv/www/django
-sudo python3 manage.py test --pattern="int_test_*.py"
+sudo -E python3 manage.py test -- -c inttest.cfg
 ```
-	output should say 55 Tests OK with 7 skipped tests
+	output should say 85 Tests OK with 7 skipped tests
 
 ##### Test the ndingest library.
 
