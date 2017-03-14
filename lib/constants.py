@@ -110,13 +110,13 @@ RDS_TYPE = {
 REDIS_CACHE_TYPE = {
     "development": "cache.t2.small",
     "production": "cache.r3.2xlarge",
-    "ha-development": "cache.m3.medium",
+    "ha-development": "cache.t2.small",
 }
 
 REDIS_TYPE = {
     "development": "cache.t2.small",
     "production": "cache.m3.xlarge",
-    "ha-development": "cache.m3.medium",
+    "ha-development": "cache.t2.small",
 }
 
 CACHE_MANAGER_TYPE = {
