@@ -101,9 +101,13 @@ $ ./iam_utils.py import
 ```
 
 ### Remove Subscriptions to ProductionMicronsMailingList in SNS 
-Delete all subscriptions to Production mailing list before upgrading.  Leaving them in place
-will cause multiple emails and texts per minute to everyone on the list.
-*Make a note of the contents so you can add them back in later.*
+*Make a note of mailing subscribers so you can add them back in later.*
+
+Delete all subscriptions to Production mailing list except your email address.  Leaving them in place 
+will cause multiple emails and texts per minute to everyone on the list.  You need to leave yourself in the list or else when you put everyone back in all the built up
+ notifications will come down.
+ 
+
 
 ### Check Cloud Formation Change sets.
 Change sets will automatically be generated when doing an update, but doing it the
@@ -149,13 +153,20 @@ This will show the status of all the consul nodes:
 ```shell
 $ ./bastion.py consul.production.boss ssh-all 'sudo consul operator raft -list-peers; sudo consul members'
 ```
+You may have to manually remove entries in route53 for the old consuls and vaults.
+Its possible they will come back so keep deleting them until they stop coming back
+
+Make another template for api and compare it in cloud formation.
+```shell
+$ ./cloudformation.py generate production.boss --scenario production api 
+```
+
+Now update api.
 
 ```shell
 $ ./cloudformation.py update production.boss --scenario production api
 ```
 
-You may have to manually remove entries in route53 for the old consuls and vaults.
-Its possible they will come back so keep deleting them until they stop coming back
 
 
 For *cachedb* and *cloudwatch* delete and create the cloud formation stacks again.
@@ -163,6 +174,8 @@ For *cachedb* and *cloudwatch* delete and create the cloud formation stacks agai
 ```shell
 $ ./cloudformation.py delete production.boss --scenario production cachedb
 $ ./cloudformation.py create production.boss --scenario production cachedb
+$ ./cloudformation.py delete production.boss --scenario production activities
+$ ./cloudformation.py create production.boss --scenario production activities
 $ ./cloudformation.py delete production.boss --scenario production cloudwatch
 $ ./cloudformation.py create production.boss --scenario production cloudwatch
 ```

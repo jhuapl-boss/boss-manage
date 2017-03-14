@@ -164,7 +164,7 @@ def sns_publish_no_vaults(sns_client, topic_arn, vpc_name):
     """
     sns_client.publish(
         TopicArn=topic_arn,
-        Subject='No vault instance!',
+        Subject='No vault instance in {}!'.format(vpc_name),
         Message='No vault instances found in {}!'.format(vpc_name)
     )
 
@@ -181,16 +181,16 @@ def sns_publish_sealed(sns_client, inst_data, raw_err, topic_arn, domain_name):
     ip = inst_data['PrivateIpAddress']
     sns_client.publish(
         TopicArn=topic_arn,
-        Subject='vault instance sealed',
-        Message="""Vault instance with IP: {0} is uninitialized, sealed, or unreachable.
-Raw health check: {1}
-
-To unseal, from boss-manage.git/vault, run:
-./bastion.py bastion.{2} #-vault.{2} vault-unseal
-where # is the number of the vault instance that is sealed.
-
-Find the number of the sealed vault instance using:
-./bastion/py bastion.{2} #-vault.{2} vault-status
+        Subject='vault instance sealed in {}'.format(domain_name),
+        Message="""Vault instance with IP: {0} is uninitialized, sealed, or unreachable.\r\n
+Raw health check: {1}\r\n
+\r\n
+To unseal, from boss-manage.git/bin, run:\r\n
+./bastion.py #.vault.{2} vault-unseal\r\n
+where # is the number of the vault instance that is sealed.\r\n
+\r\n
+Find the number of the sealed vault instance using:\r\n
+./bastion.py #.vault.{2} vault-status\r\n
 """.format(ip, raw_err, domain_name)
     )
 

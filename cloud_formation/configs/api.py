@@ -306,7 +306,7 @@ def post_init(session, domain):
     # DP TODO: Move into the pre-launch Vault writes, so it is available when the
     #          machines initially start
     with call.vault() as vault:
-        #uri = "https://{}".format(dns)
+        uri = "https://{}".format(dns)
         #vault.update(const.VAULT_ENDPOINT_AUTH, public_uri = uri)
 
         creds = vault.read("secret/auth")
@@ -365,13 +365,13 @@ def update(session, domain):
     with call.vault() as vault:
         db_config = vault.read(const.VAULT_ENDPOINT_DB)
 
+    '''
     try:
         import MySQLdb as mysql
     except:
         print("Cannot save data before migrating schema, exiting...")
         return
 
-    '''
     print("Saving time step data")
     print("Tunneling")
     with call.tunnel(names.endpoint_db, db_config['port'], type_='rds') as local_port:
