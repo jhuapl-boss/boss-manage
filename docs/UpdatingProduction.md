@@ -65,7 +65,7 @@ to see if DNS has been changed to cloudfront servers.
 You can either create new AMIs:
 ```shell
 $ cd boss-manage/bin
-$  ./packer.py auth vault consul endpoint proofreader-web cachemanager --name sprintXX
+$  ./packer.py auth vault consul endpoint cachemanager activities --name sprintXX
 ```
 or copy the latest AMIs from the console to become sprintXX (this way is faster if the AMIs will end up being the same version of code.)
 
@@ -201,37 +201,46 @@ to see if DNS has been changed back to ELB.
 Take the list of emails and phone numbers you created earlier and 
 add them back into the ProductionMicronsMailingList Topic in SNS.
 
-## Run unit tests on Endpoint
+# Testing
+
+### Run unit tests on Endpoint
 If you are following these instructions for the integration development environment, skip the
-export RUN_HIGH_MEM_TESTS line.  That line runs 2 tests that need >2.5GB of memory
+export RUN_HIGH_MEM_TESTS line.  That line runs a few tests that need >2.5GB of memory
 to run and will fail in the integration environment
 
 ```shell
 cd vault
-./bastion.py bastion.integration.boss endpoint.integration.boss ssh
+./bastion.py endpoint.production.boss ssh
 export RUN_HIGH_MEM_TESTS=true
 cd /srv/www/django
 sudo -E python3 manage.py test
 ```
-	output should say Ran 257 tests.
+	output should say Ran XXX tests.
 
 ## Integration Tests
 After the integration instance is launched the following tests need to be run,
 results recorded, and developers notified of any problems.
 
-### Endpoint Integration Tests
+### Endpoint Django Integration Tests
 
-#### Test While Logged onto the Endpoint VM
+Test While Logged onto the Endpoint VM
 ```shell
 export RUN_HIGH_MEM_TESTS=true
 cd /srv/www/django
 sudo -E python3 manage.py test -- -c inttest.cfg
 ```
-	output should say 85 Tests OK with 7 skipped tests
+	output should say XXX Tests OK with 7 skipped tests
+
+#### SPDB Integration Tests 
+Test while logged onto the Endpoint VM 
+```shell
+cd /usr/local/lib/python3.5/site-packages/spdb
+sudo nose2
+sudo nose2 -c inttest.cfg
+```
 
 ##### Test the ndingest library.
-
-Run ndingest tests on the endpoint.
+Test while logged onto the Endpoint VM
 ```shell
 # Manual install for now.  Will likely remove use of pytest in the future.
 sudo pip3 install pytest
