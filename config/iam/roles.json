@@ -307,6 +307,27 @@
       "Version": "2012-10-17"
     },
     "AttachedManagedPolicies": [
+      "arn:aws:iam::451493790433:policy/aplPopulateUploadQueue"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/",
+    "RoleName": "IngestQueueUpload",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "lambda.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
       "arn:aws:iam::aws:policy/AWSLambdaFullAccess",
       "arn:aws:iam::aws:policy/AmazonElastiCacheFullAccess",
       "arn:aws:iam::aws:policy/AmazonS3FullAccess",
