@@ -354,13 +354,13 @@ OK
 #### Run Ingest Tests
 
 * cd ingest-test
-* run python3 ./setup.py
+* run python3 ./setup_test.py
 * Copy the export and and ingest run commands 
 * cd ../ingest-client
 * paste the copied commands above.
     this should start loading the ingest data
 * cd back to the ingest-test directory
-* python3 validate-ingest.py
+* python3 validate_ingest.py
 
 
 ### Automated Tests
