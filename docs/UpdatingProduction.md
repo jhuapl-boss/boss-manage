@@ -65,7 +65,7 @@ to see if DNS has been changed to cloudfront servers.
 You can either create new AMIs:
 ```shell
 $ cd boss-manage/bin
-$  ./packer.py auth vault consul endpoint proofreader-web cachemanager --name sprintXX
+$  ./packer.py auth vault consul endpoint cachemanager activities --name sprintXX
 ```
 or copy the latest AMIs from the console to become sprintXX (this way is faster if the AMIs will end up being the same version of code.)
 
@@ -101,9 +101,13 @@ $ ./iam_utils.py import
 ```
 
 ### Remove Subscriptions to ProductionMicronsMailingList in SNS 
-Delete all subscriptions to Production mailing list before upgrading.  Leaving them in place
-will cause multiple emails and texts per minute to everyone on the list.
-*Make a note of the contents so you can add them back in later.*
+*Make a note of mailing subscribers so you can add them back in later.*
+
+Delete all subscriptions to Production mailing list except your email address.  Leaving them in place 
+will cause multiple emails and texts per minute to everyone on the list.  You need to leave yourself in the list or else when you put everyone back in all the built up
+ notifications will come down.
+ 
+
 
 ### Check Cloud Formation Change sets.
 Change sets will automatically be generated when doing an update, but doing it the
@@ -149,13 +153,20 @@ This will show the status of all the consul nodes:
 ```shell
 $ ./bastion.py consul.production.boss ssh-all 'sudo consul operator raft -list-peers; sudo consul members'
 ```
+You may have to manually remove entries in route53 for the old consuls and vaults.
+Its possible they will come back so keep deleting them until they stop coming back
+
+Make another template for api and compare it in cloud formation.
+```shell
+$ ./cloudformation.py generate production.boss --scenario production api 
+```
+
+Now update api.
 
 ```shell
 $ ./cloudformation.py update production.boss --scenario production api
 ```
 
-You may have to manually remove entries in route53 for the old consuls and vaults.
-Its possible they will come back so keep deleting them until they stop coming back
 
 
 For *cachedb* and *cloudwatch* delete and create the cloud formation stacks again.
@@ -163,6 +174,8 @@ For *cachedb* and *cloudwatch* delete and create the cloud formation stacks agai
 ```shell
 $ ./cloudformation.py delete production.boss --scenario production cachedb
 $ ./cloudformation.py create production.boss --scenario production cachedb
+$ ./cloudformation.py delete production.boss --scenario production activities
+$ ./cloudformation.py create production.boss --scenario production activities
 $ ./cloudformation.py delete production.boss --scenario production cloudwatch
 $ ./cloudformation.py create production.boss --scenario production cloudwatch
 ```
@@ -188,37 +201,46 @@ to see if DNS has been changed back to ELB.
 Take the list of emails and phone numbers you created earlier and 
 add them back into the ProductionMicronsMailingList Topic in SNS.
 
-## Run unit tests on Endpoint
+# Testing
+
+### Run unit tests on Endpoint
 If you are following these instructions for the integration development environment, skip the
-export RUN_HIGH_MEM_TESTS line.  That line runs 2 tests that need >2.5GB of memory
+export RUN_HIGH_MEM_TESTS line.  That line runs a few tests that need >2.5GB of memory
 to run and will fail in the integration environment
 
 ```shell
 cd vault
-./bastion.py bastion.integration.boss endpoint.integration.boss ssh
+./bastion.py endpoint.production.boss ssh
 export RUN_HIGH_MEM_TESTS=true
 cd /srv/www/django
-sudo python3 manage.py test
+sudo -E python3 manage.py test
 ```
-	output should say Ran 257 tests.
+	output should say Ran XXX tests.
 
 ## Integration Tests
 After the integration instance is launched the following tests need to be run,
 results recorded, and developers notified of any problems.
 
-### Endpoint Integration Tests
+### Endpoint Django Integration Tests
 
-#### Test While Logged onto the Endpoint VM
+Test While Logged onto the Endpoint VM
 ```shell
 export RUN_HIGH_MEM_TESTS=true
 cd /srv/www/django
-sudo python3 manage.py test --pattern="int_test_*.py"
+sudo -E python3 manage.py test -- -c inttest.cfg
 ```
-	output should say 55 Tests OK with 7 skipped tests
+	output should say XXX Tests OK with 7 skipped tests
+
+#### SPDB Integration Tests 
+Test while logged onto the Endpoint VM 
+```shell
+cd /usr/local/lib/python3.5/site-packages/spdb
+sudo nose2
+sudo nose2 -c inttest.cfg
+```
 
 ##### Test the ndingest library.
-
-Run ndingest tests on the endpoint.
+Test while logged onto the Endpoint VM
 ```shell
 # Manual install for now.  Will likely remove use of pytest in the future.
 sudo pip3 install pytest
@@ -332,13 +354,13 @@ OK
 #### Run Ingest Tests
 
 * cd ingest-test
-* run python3 ./setup.py
+* run python3 ./setup_test.py
 * Copy the export and and ingest run commands 
 * cd ../ingest-client
 * paste the copied commands above.
     this should start loading the ingest data
 * cd back to the ingest-test directory
-* python3 validate-ingest.py
+* python3 validate_ingest.py
 
 
 ### Automated Tests

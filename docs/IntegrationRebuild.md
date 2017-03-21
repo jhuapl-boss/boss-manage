@@ -210,7 +210,7 @@ cd bin
 ./bastion.py endpoint.integration.boss ssh
 export RUN_HIGH_MEM_TESTS=True
 cd /srv/www/django
-sudo python3 manage.py test
+sudo -E python3 manage.py test
 ```
 	output should say Ran 257 tests.
 
@@ -229,7 +229,7 @@ of memory to run and will fail in your environment
 ```shell
 export RUN_HIGH_MEM_TESTS=True
 cd /srv/www/django
-sudo python3 manage.py test --pattern="int_test_*.py"
+sudo -E python3 manage.py test -- -c inttest.cfg
 ```
 	output should say 55 Tests OK with 7 skipped tests
 

@@ -366,13 +366,13 @@ def update(session, domain):
     with call.vault() as vault:
         db_config = vault.read(const.VAULT_ENDPOINT_DB)
 
+    '''
     try:
         import MySQLdb as mysql
     except:
         print("Cannot save data before migrating schema, exiting...")
         return
 
-    '''
     print("Saving time step data")
     print("Tunneling")
     with call.tunnel(names.endpoint_db, db_config['port'], type_='rds') as local_port:
