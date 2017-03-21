@@ -85,8 +85,10 @@ class AWSNames(object):
         'query_deletes': 'Query.Deletes',
         'delete_event_rule': 'deleteEventRule',
         'delete_lambda': "deleteLambda",
-        'populate_upload_queue': 'Populate.Upload.Queue',
-        'resolution_hierarchy': 'Resolution.Hierarchy'
+        'resolution_hierarchy': 'Resolution.Hierarchy',
+        'ingest_queue_populate': 'Ingest.Populate',
+        'ingest_queue_upload': 'Ingest.Upload',
+        'ingest_lambda': 'IngestUpload',
     }
 
     def __getattr__(self, name):
@@ -100,11 +102,11 @@ class AWSNames(object):
         fq_hostname = hostname + self.base_dot
 
         if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'consul_monitor', 'vault_consul_check',
-                    'delete_lambda']:
+                    'delete_lambda', 'ingest_lambda']:
             fq_hostname = fq_hostname.replace('.','-')
 
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
-                    'populate_upload_queue', 'resolution_hierarchy']:
+                    'ingest_queue_populate', 'ingest_queue_upload', 'resolution_hierarchy']:
             fq_hostname = "".join(map(lambda x: x.capitalize(), fq_hostname.split('.')))
 
         return fq_hostname

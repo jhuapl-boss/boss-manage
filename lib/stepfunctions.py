@@ -25,10 +25,11 @@ class BossStateMachine(heaviside.StateMachine):
     def __init__(self, name, domain, session):
         super().__init__(name, session=session)
 
-        self.domain = domain
+        if domain:
+            self.domain = domain.replace('.', '-')
 
     def _translate(self, function):
-        return "{}.{}".format(function, self.domain)
+        return "{}-{}".format(function, self.domain)
 
 def create(session, name, domain, sfn_file, role):
     filepath = repo_path('cloud_formation', 'stepfunctions', sfn_file)

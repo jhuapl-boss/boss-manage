@@ -99,7 +99,8 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["lambda"]["page_in_function"] = names.multi_lambda
     user_data["lambda"]["ingest_function"] = names.multi_lambda
 
-    user_data['sfn']['populate_upload_queue'] = names.populate_upload_queue
+    user_data['sfn']['populate_upload_queue'] = names.ingest_queue_populate
+    user_data['sfn']['upload_sfn'] = names.ingest_queue_upload
 
     # Prepare user data for parsing by CloudFormation.
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
@@ -306,7 +307,7 @@ def post_init(session, domain):
     # DP TODO: Move into the pre-launch Vault writes, so it is available when the
     #          machines initially start
     with call.vault() as vault:
-        #uri = "https://{}".format(dns)
+        uri = "https://{}".format(dns)
         #vault.update(const.VAULT_ENDPOINT_AUTH, public_uri = uri)
 
         creds = vault.read("secret/auth")

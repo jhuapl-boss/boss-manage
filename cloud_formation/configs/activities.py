@@ -95,6 +95,15 @@ def create_config(session, domain):
                                min=1,
                                max=1)
 
+    config.add_lambda("IngestLambda",
+                      names.ingest_lambda,
+                      aws.role_arn_lookup(session, 'IngestQueueUpload'),
+                      const.INGEST_LAMBDA,
+                      handler="index.handler",
+                      timeout=60 * 5)
+
+    config.add_lambda_permission("IngestLambdaExecute", Ref("IngestLambda"))
+
     return config
 
 
@@ -118,8 +127,10 @@ def post_init(session, domain):
 
     sfn.create(session, names.query_deletes, domain, 'query_for_deletes.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.delete_cuboid, domain, 'delete_cuboid.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(session, names.populate_upload_queue, domain, 'populate_upload_queue.hsd',
-               'StatesExecutionRole-us-east-1 ')
+    #sfn.create(session, names.populate_upload_queue, domain, 'populate_upload_queue.hsd',
+    #           'StatesExecutionRole-us-east-1 ')
+    sfn.create(session, names.ingest_queue_populate, domain, 'ingest_queue_populate.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(session, names.ingest_queue_upload, domain, 'ingest_queue_upload.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.resolution_hierarchy, domain, 'resolution_hierarchy.hsd', 'StatesExecutionRole-us-east-1')
 
 
@@ -130,5 +141,6 @@ def delete(session, domain):
 
     sfn.delete(session, names.delete_cuboid)
     sfn.delete(session, names.query_deletes)
-    sfn.delete(session, names.populate_upload_queue)
+    sfn.delete(session, names.ingest_queue_populate)
+    sfn.delete(session, names.ingest_queue_upload)
     sfn.delete(session, names.resolution_hierarchy)
