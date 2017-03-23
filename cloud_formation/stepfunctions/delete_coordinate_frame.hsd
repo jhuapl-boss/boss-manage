@@ -1,0 +1,18 @@
+"""Delete Coordinate Frame
+Removes Coordinate Frame from RDS Coordinate Frame and lookup tables and
+metadata from dynamoDB.
+"""
+
+Activity('delete_metadata')
+    """delete_metadata
+       deletes metadata from DynamoDB"""
+    retry [] 60 4 2.0
+
+Activity('delete_coordinate_frame')
+    """delete coordinate frame
+       deletes coordinate frame from RDS"""
+    retry [] 120 4 2.0
+    catch []: '$.error'
+        Activity("notify_admins")
+            """notify_admins
+               sends SNS message to microns topic"""
