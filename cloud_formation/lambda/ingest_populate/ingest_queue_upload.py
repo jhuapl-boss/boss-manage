@@ -39,6 +39,7 @@ def handler(args, context):
             'z_start': 0,
             'z_stop': 0
             'z_tile_size': 16,
+            'final_z_stop': 0, The full extent of the Z dimension
         }
 
     Returns:
@@ -122,7 +123,7 @@ def create_messages(args):
                     chunk_y = int(y/tile_size('y'))
                     chunk_z = int(z/tile_size('z'))
 
-                    num_of_tiles = min(tile_size('z'), args['z_stop'] - z)
+                    num_of_tiles = min(tile_size('z'), args['final_z_stop'] - z)
 
                     chunk_key = hashed_key(num_of_tiles,
                                            args['project_info'][0],
