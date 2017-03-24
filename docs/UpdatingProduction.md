@@ -169,7 +169,7 @@ $ ./cloudformation.py update production.boss --scenario production api
 
 
 
-For *cachedb* and *cloudwatch* delete and create the cloud formation stacks again.
+For *cachedb*, *activities* and *cloudwatch* delete and create the cloud formation stacks again.
 
 ```shell
 $ ./cloudformation.py delete production.boss --scenario production cachedb
@@ -185,7 +185,7 @@ $ ./cloudformation.py create production.boss --scenario production cloudwatch
 cd vault
 ./bastion.py vault.production.boss vault-read secret/auth/realm
 ```
-Login to https://api.theboss.io/v0.7/collection/
+Login to https://api.theboss.io/v0.8/collection/
 Uses bossadmin and the password you now have to sync bossadmin to django
 
 ## Turn off Maintenance Mode
