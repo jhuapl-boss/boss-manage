@@ -110,13 +110,13 @@ RDS_TYPE = {
 
 REDIS_CACHE_TYPE = {
     "development": "cache.t2.small",
-    "production": "cache.r3.2xlarge",
+    "production": "cache.m4.10xlarge",
     "ha-development": "cache.t2.small",
 }
 
 REDIS_TYPE = {
     "development": "cache.t2.small",
-    "production": "cache.m3.xlarge",
+    "production": "cache.m4.xlarge",
     "ha-development": "cache.t2.small",
 }
 
@@ -184,8 +184,8 @@ ENDPOINT_DB_CONFIG = {
 REDIS_RESERVED_MEMORY = {
     # Size in MB
     "development": 387,
-    "production": 14550,
-    "ha-development": 387 ,
+    "production": 38500,
+    "ha-development": 387,
 }
 
 BASTION_AMI = "amzn-ami-vpc-nat-hvm-2015.03.0.x86_64-ebs"
