@@ -222,6 +222,7 @@ def create_config(session, domain, keypair=None, db_config={}):
                                  az_subnets,
                                  [sgs[names.internal]],
                                  type_=const.REDIS_CACHE_TYPE,
+                                 version="3.2.4",
                                  clusters=const.REDIS_CLUSTER_SIZE,
                                  parameters=REDIS_PARAMETERS)
 
@@ -230,6 +231,7 @@ def create_config(session, domain, keypair=None, db_config={}):
                                  az_subnets,
                                  [sgs[names.internal]],
                                  type_=const.REDIS_TYPE,
+                                 version="3.2.4",
                                  clusters=const.REDIS_CLUSTER_SIZE)
 
     return config
