@@ -182,7 +182,7 @@ ENDPOINT_DB_CONFIG = {
 }
 
 REDIS_RESERVED_MEMORY = {
-    # Size in MB
+    # Size in MB, should be 75% of total.
     "development": 387,
     "production": 38500,
     "ha-development": 387,
