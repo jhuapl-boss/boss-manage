@@ -1114,11 +1114,17 @@ class CloudFormationConfiguration:
         if len(parameters) > 0:
             self.resources[key]['Properties']['CacheParameterGroupName'] = Ref(key + 'ParameterGroup')
 
+            if version.startswith("2.8"):
+                cache_parameter_group_family = "redis2.8"
+            elif version.startswith("3.2"):
+                cache_parameter_group_family = "redis3.2"
+            else:
+                raise Exception("Unknown CacheParameterGroupFamily for Redis version {}".format(version))
+
             self.resources[key + 'ParameterGroup'] = {
             "Type": "AWS::ElastiCache::ParameterGroup",
                 "Properties": {
-                    # DP TODO: Need to select family based on version number
-                    "CacheParameterGroupFamily" : "redis2.8",
+                    "CacheParameterGroupFamily" : cache_parameter_group_family ,
                     "Properties" : parameters,
                     "Description": "boss-redis-properties"
                 }
