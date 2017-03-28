@@ -150,6 +150,7 @@ def create_config(session, domain, keypair=None, db_config={}):
                                notifications=dns_arn,
                                role=aws.instance_profile_arn_lookup(session, 'endpoint'),
                                health_check_grace_period=90,
+                               detailed_monitoring=True,
                                depends_on=["EndpointLoadBalancer", "EndpointDB"])
 
     cert = aws.cert_arn_lookup(session, names.public_dns("api"))
@@ -454,7 +455,7 @@ def update(session, domain):
         cur.close()
         db.close()
     '''
-    
+
 
     return success
 
