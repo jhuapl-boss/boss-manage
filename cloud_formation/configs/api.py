@@ -161,24 +161,27 @@ def create_config(session, domain, keypair=None, db_config={}):
                             security_groups=[sgs[names.internal], sgs[names.https]],
                             public=True)
 
+    # Endpoint servers are not CPU bound typically, so react quickly to load
     config.add_autoscale_policy("EndpointScaleUp",
                                 Ref("Endpoint"),
                                 adjustments=[
-                                    (0.0, 0.15, 1), # 75% - 90% Utilization add 1 instance
-                                    (0.15, None, 2) # Above 90% Utilization add 2 instances
+                                    (0.0, 0.10, 1),  # 10% - 20% Utilization add 1 instance
+                                    (0.20, None, 2)  # Above 20% Utilization add 2 instances
                                 ],
                                 alarms=[
-                                    ("CPUUtilization ", "Average", "GreaterThanThreshold", "0.75")
-                                ])
+                                    ("CPUUtilization ", "Average", "GreaterThanThreshold", "0.10")
+                                ],
+                                period=1)
 
     config.add_autoscale_policy("EndpointScaleDown",
                                 Ref("Endpoint"),
                                 adjustments=[
-                                    (None, 0.0, 1),   # Under 40% Utilization remove 1 instance
+                                    (None, 0.0, 1),   # Under 1% Utilization remove 1 instance
                                 ],
                                 alarms=[
-                                    ("CPUUtilization ", "Average", "LessThanThreshold", "0.40")
-                                ])
+                                    ("CPUUtilization ", "Average", "LessThanThreshold", "0.01")
+                                ],
+                                period=5)
 
     config.add_rds_db("EndpointDB",
                       names.endpoint_db,
