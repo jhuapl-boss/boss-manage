@@ -214,29 +214,32 @@ def create_config(session, domain, keypair=None, db_config={}):
         dynamo_id_count_cfg = json.load(id_count_fh)
     config.add_dynamo_table_from_json('idCountIndex', names.id_count_index, **dynamo_id_count_cfg)  # DP XXX
 
-    # # Create the Cache and CacheState Redis Clusters
-    # REDIS_PARAMETERS = {
-    #     "maxmemory-policy": "volatile-lru",
-    #     "reserved-memory": str(get_scenario(const.REDIS_RESERVED_MEMORY, 0) * 1000000),
-    #     "maxmemory-samples": "5", # ~ 5 - 10
-    # }
-    #
-    # config.add_redis_replication("Cache",
-    #                              names.cache,
-    #                              az_subnets,
-    #                              [sgs[names.internal]],
-    #                              type_=const.REDIS_CACHE_TYPE,
-    #                              version="3.2.4",
-    #                              clusters=const.REDIS_CLUSTER_SIZE,
-    #                              parameters=REDIS_PARAMETERS)
-    #
-    # config.add_redis_replication("CacheState",
-    #                              names.cache_state,
-    #                              az_subnets,
-    #                              [sgs[names.internal]],
-    #                              type_=const.REDIS_TYPE,
-    #                              version="3.2.4",
-    #                              clusters=const.REDIS_CLUSTER_SIZE)
+    # TODO Remove Redis Cache information below to its own Cloudformation Config
+    #      It is already built manually outside of API in Integration and Production
+
+    # Create the Cache and CacheState Redis Clusters
+    REDIS_PARAMETERS = {
+        "maxmemory-policy": "volatile-lru",
+        "reserved-memory": str(get_scenario(const.REDIS_RESERVED_MEMORY, 0) * 1000000),
+        "maxmemory-samples": "5", # ~ 5 - 10
+    }
+
+    config.add_redis_replication("Cache",
+                                 names.cache,
+                                 az_subnets,
+                                 [sgs[names.internal]],
+                                 type_=const.REDIS_CACHE_TYPE,
+                                 version="3.2.4",
+                                 clusters=const.REDIS_CLUSTER_SIZE,
+                                 parameters=REDIS_PARAMETERS)
+
+    config.add_redis_replication("CacheState",
+                                 names.cache_state,
+                                 az_subnets,
+                                 [sgs[names.internal]],
+                                 type_=const.REDIS_TYPE,
+                                 version="3.2.4",
+                                 clusters=const.REDIS_CLUSTER_SIZE)
 
     return config
 
