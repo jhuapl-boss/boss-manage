@@ -127,6 +127,9 @@ def post_init(session, domain):
 
     sfn.create(session, names.query_deletes, domain, 'query_for_deletes.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.delete_cuboid, domain, 'delete_cuboid.hsd', 'StatesExecutionRole-us-east-1 ')
+    # sfn.create(session, names.delete_cuboid, domain, 'delete_experiment.hsd', 'StatesExecutionRole-us-east-1 ')
+    # sfn.create(session, names.delete_cuboid, domain, 'delete_coordinate_frame.hsd', 'StatesExecutionRole-us-east-1 ')
+    # sfn.create(session, names.delete_cuboid, domain, 'delete_collection.hsd', 'StatesExecutionRole-us-east-1 ')
     #sfn.create(session, names.populate_upload_queue, domain, 'populate_upload_queue.hsd',
     #           'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.ingest_queue_populate, domain, 'ingest_queue_populate.hsd', 'StatesExecutionRole-us-east-1 ')
