@@ -1511,7 +1511,7 @@ class CloudFormationConfiguration:
                 "PolicyType" : "StepScaling",
                 "EstimatedInstanceWarmup" : warmup,
                 #"MetricAggregationType" : "Minimum|Maximum|Average", # Default Average
-
+                #"MetricsCollection" : [{"Granularity":"1Minute", "Metrics":[]}]
                 "StepAdjustments" : adjustments_
             }
         }
@@ -1523,7 +1523,8 @@ class CloudFormationConfiguration:
                                       metric, statistic, comparison, threashold,
                                       [Ref(key)], # alarm_actions
                                       {"AutoScalingGroupName": asg}, # dimensions
-                                      period = period)
+                                      period = period,
+                                      namespace = "AWS/EC2")
 
     def add_s3_bucket(self, key, name, access_control=None, life_cycle_config=None, notification_config=None, tags=None, depends_on=None):
         """Create or configure a S3 bucket.
@@ -1805,7 +1806,7 @@ class CloudFormationConfiguration:
         if depends_on is not None:
             self.resources[key]['DependsOn'] = depends_on
 
-    def add_cloudwatch_alarm(self, key, description, metric, statistic, comparison, threashold, alarm_actions, dimensions={}, period=5, depends_on=None):
+    def add_cloudwatch_alarm(self, key, description, metric, statistic, comparison, threashold, alarm_actions, dimensions={}, period=5, namespace="AWS/ELB", depends_on=None):
         """Add CloudWatch Alarm for a LoadBalancer
 
         Args:
@@ -1818,6 +1819,7 @@ class CloudFormationConfiguration:
             alarm_actions (list) : List of ARN string of actions to execute when the alarm is triggered
             dimensions (dict) : Dictionary of dimensions for the alarm's associated metric
             period (int) : Number of 60 second periods over which the metric is evaluated
+            namespace (string) : AWS Namespace of the alarm metric (default AWS/ELB)
             depends_on (None|string|list): A unique name or list of unique names of resources within the
                                            configuration and is used to determine the launch order of resources
         """
@@ -1829,7 +1831,7 @@ class CloudFormationConfiguration:
                 "ComparisonOperator": comparison,
                 "EvaluationPeriods": str(period),
                 "MetricName": metric,
-                "Namespace": "AWS/ELB",
+                "Namespace": namespace,
                 "Period": "60",
                 "Statistic": statistic,
                 "Threshold": threashold,
