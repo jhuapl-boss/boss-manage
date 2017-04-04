@@ -165,23 +165,23 @@ def create_config(session, domain, keypair=None, db_config={}):
     config.add_autoscale_policy("EndpointScaleUp",
                                 Ref("Endpoint"),
                                 adjustments=[
-                                    (0.0, 0.10, 1),  # 10% - 20% Utilization add 1 instance
-                                    (0.10, None, 2)  # Above 20% Utilization add 2 instances
+                                    (0.0, 10, 1),  # 12% - 22% Utilization add 1 instance
+                                    (10, None, 2)  # Above 22% Utilization add 2 instances
                                 ],
                                 alarms=[
-                                    ("CPUUtilization ", "Average", "GreaterThanThreshold", "0.10")
+                                    ("CPUUtilization", "Maximum", "GreaterThanThreshold", "12")
                                 ],
                                 period=1)
 
     config.add_autoscale_policy("EndpointScaleDown",
                                 Ref("Endpoint"),
                                 adjustments=[
-                                    (None, 0.0, 1),   # Under 1% Utilization remove 1 instance
+                                    (None, 0.0, 1),   # Under 1.5% Utilization remove 1 instance
                                 ],
                                 alarms=[
-                                    ("CPUUtilization ", "Average", "LessThanThreshold", "0.01")
+                                    ("CPUUtilization", "Average", "LessThanThreshold", "1.5")
                                 ],
-                                period=5)
+                                period=50)
 
     config.add_rds_db("EndpointDB",
                       names.endpoint_db,
@@ -198,19 +198,19 @@ def create_config(session, domain, keypair=None, db_config={}):
         dynamo_cfg = json.load(fh)
     config.add_dynamo_table_from_json("EndpointMetaDB", names.meta, **dynamo_cfg)
 
-    with open(const.DYNAMO_S3_INDEX_SCHEMA , 'r') as s3fh:
+    with open(const.DYNAMO_S3_INDEX_SCHEMA, 'r') as s3fh:
         dynamo_s3_cfg = json.load(s3fh)
     config.add_dynamo_table_from_json('s3Index', names.s3_index, **dynamo_s3_cfg)  # DP XXX
 
-    with open(const.DYNAMO_TILE_INDEX_SCHEMA , 'r') as tilefh:
+    with open(const.DYNAMO_TILE_INDEX_SCHEMA, 'r') as tilefh:
         dynamo_tile_cfg = json.load(tilefh)
     config.add_dynamo_table_from_json('tileIndex', names.tile_index, **dynamo_tile_cfg)  # DP XXX
 
-    with open(const.DYNAMO_ID_INDEX_SCHEMA , 'r') as id_ind_fh:
+    with open(const.DYNAMO_ID_INDEX_SCHEMA, 'r') as id_ind_fh:
         dynamo_id_ind__cfg = json.load(id_ind_fh)
     config.add_dynamo_table_from_json('idIndIndex', names.id_index, **dynamo_id_ind__cfg)  # DP XXX
 
-    with open(const.DYNAMO_ID_COUNT_SCHEMA , 'r') as id_count_fh:
+    with open(const.DYNAMO_ID_COUNT_SCHEMA, 'r') as id_count_fh:
         dynamo_id_count_cfg = json.load(id_count_fh)
     config.add_dynamo_table_from_json('idCountIndex', names.id_count_index, **dynamo_id_count_cfg)  # DP XXX
 
