@@ -176,7 +176,7 @@ def create_config(session, domain, keypair=None, db_config={}):
     config.add_autoscale_policy("EndpointScaleDown",
                                 Ref("Endpoint"),
                                 adjustments=[
-                                    (None, 0.0, 1),   # Under 1.5% Utilization remove 1 instance
+                                    (None, 0.0, -1),   # Under 1.5% Utilization remove 1 instance
                                 ],
                                 alarms=[
                                     ("CPUUtilization", "Average", "LessThanThreshold", "1.5")
