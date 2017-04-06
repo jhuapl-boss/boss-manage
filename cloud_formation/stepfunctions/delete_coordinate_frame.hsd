@@ -1,12 +1,14 @@
 """Delete Coordinate Frame
 Removes Coordinate Frame from RDS Coordinate Frame and lookup tables and
 metadata from dynamoDB.
-"""
 
-Activity('delete_metadata')
-    """delete_metadata
-       deletes metadata from DynamoDB"""
-    retry [] 60 4 2.0
+Coordinate frames don't currently have metadata so they aren't in the
+lookup table.
+"""
+#Activity('delete_metadata')
+#    """delete_metadata
+#       deletes metadata from DynamoDB"""
+#    retry [] 60 4 2.0
 
 Activity('delete_coordinate_frame')
     """delete coordinate frame
