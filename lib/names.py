@@ -82,6 +82,9 @@ class AWSNames(object):
         'activities': 'activities',
         'delete_cuboid': 'Delete.Cuboid',
         'delete_bucket': 'delete',
+        'delete_experiment': 'Delete.Experiment',
+        'delete_collection': 'Delete.Collection',
+        'delete_coord_frame': 'Delete.CoordFrame',
         'query_deletes': 'Query.Deletes',
         'delete_event_rule': 'deleteEventRule',
         'delete_lambda': "deleteLambda",
@@ -106,7 +109,8 @@ class AWSNames(object):
             fq_hostname = fq_hostname.replace('.','-')
 
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
-                    'ingest_queue_populate', 'ingest_queue_upload', 'resolution_hierarchy']:
+                    'ingest_queue_populate', 'ingest_queue_upload', 'resolution_hierarchy',
+                    'delete_experiment', 'delete_collection', 'delete_coord_frame']:
             fq_hostname = "".join(map(lambda x: x.capitalize(), fq_hostname.split('.')))
 
         return fq_hostname
