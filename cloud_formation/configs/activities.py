@@ -47,7 +47,10 @@ def create_config(session, domain):
         "delete_bucket": names.delete_bucket,
         "topic-arn": topic_arn,
         "query-deletes-sfn-name": names.query_deletes,
-        "delete-sfn-name": names.delete_cuboid
+        "delete-sfn-name": names.delete_cuboid,
+        "delete-exp-sfn-name": names.delete_experiment,
+        "delete-coord-frame-sfn-name": names.delete_coord_frame,
+        "delete-coll-sfn-name": names.delete_collection
     }
 
     role_arn = aws.role_arn_lookup(session, "events_for_delete_lambda")
@@ -127,9 +130,9 @@ def post_init(session, domain):
 
     sfn.create(session, names.query_deletes, domain, 'query_for_deletes.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.delete_cuboid, domain, 'delete_cuboid.hsd', 'StatesExecutionRole-us-east-1 ')
-    # sfn.create(session, names.delete_cuboid, domain, 'delete_experiment.hsd', 'StatesExecutionRole-us-east-1 ')
-    # sfn.create(session, names.delete_cuboid, domain, 'delete_coordinate_frame.hsd', 'StatesExecutionRole-us-east-1 ')
-    # sfn.create(session, names.delete_cuboid, domain, 'delete_collection.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(session, names.delete_experiment, domain, 'delete_experiment.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(session, names.delete_coord_frame, domain, 'delete_coordinate_frame.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(session, names.delete_collection, domain, 'delete_collection.hsd', 'StatesExecutionRole-us-east-1 ')
     #sfn.create(session, names.populate_upload_queue, domain, 'populate_upload_queue.hsd',
     #           'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.ingest_queue_populate, domain, 'ingest_queue_populate.hsd', 'StatesExecutionRole-us-east-1 ')
@@ -143,6 +146,9 @@ def delete(session, domain):
     CloudFormationConfiguration('activities', domain).delete(session)
 
     sfn.delete(session, names.delete_cuboid)
+    sfn.delete(session, names.delete_experiment)
+    sfn.delete(session, names.delete_coord_frame)
+    sfn.delete(session, names.delete_collection)
     sfn.delete(session, names.query_deletes)
     sfn.delete(session, names.ingest_queue_populate)
     sfn.delete(session, names.ingest_queue_upload)
