@@ -101,6 +101,14 @@ def create_config(session, domain, keypair=None, user_data=None):
         ['s3:GetObject', 's3:PutObject'],
         { 'AWS': role})
 
+    delete_bucket_name = names.delete_bucket
+    if not aws.s3_bucket_exists(session, delete_bucket_name):
+        config.add_s3_bucket("deleteBucket", delete_bucket_name)
+    config.add_s3_bucket_policy(
+        "deleteBucketPolicy", delete_bucket_name,
+        ['s3:GetObject', 's3:PutObject'],
+        { 'AWS': role})
+
     creating_tile_bucket = False
     tile_bucket_name = names.tile_bucket
     if not aws.s3_bucket_exists(session, tile_bucket_name):
