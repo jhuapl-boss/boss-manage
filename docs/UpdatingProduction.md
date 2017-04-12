@@ -156,6 +156,31 @@ $ ./bastion.py consul.production.boss ssh-all 'sudo consul operator raft -list-p
 You may have to manually remove entries in route53 for the old consuls and vaults.
 Its possible they will come back so keep deleting them until they stop coming back
 
+Try to update redis
+
+```shell
+$ ./cloudformation.py update production.boss --scenario production redis
+```
+
+If the size is not identical you may have to delete the redis config and create it again.
+This should be done before updating api.  If you need to delete redis you'll need to make sure 
+there are not *write-cuboid* keys in the cache before deleting it.
+
+```shell
+$ cd boss-manage.git/bin
+./bastion.py endpoint.production.boss ssh
+sudo apt-get install redis-tools
+redis-cli -h cache.production.boss
+select 0
+keys WRITE-CUBOID*
+```
+If no keys come back it is OK to delete the cache. If keys exist, keep checking, the keys 
+should all disappear eventually.  Then delete and create the redis clusters
+```shell
+$ ./cloudformation.py delete production.boss --scenario production redis
+$ ./cloudformation.py create production.boss --scenario production redis
+```
+
 Make another template for api and compare it in cloud formation.
 ```shell
 $ ./cloudformation.py generate production.boss --scenario production api 
@@ -209,7 +234,7 @@ export RUN_HIGH_MEM_TESTS line.  That line runs a few tests that need >2.5GB of 
 to run and will fail in the integration environment
 
 ```shell
-cd vault
+cd boss-manage.git/bin
 ./bastion.py endpoint.production.boss ssh
 export RUN_HIGH_MEM_TESTS=true
 cd /srv/www/django
