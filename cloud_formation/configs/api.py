@@ -330,7 +330,7 @@ def post_init(session, domain):
     headers = {
         'Authorization': 'Bearer {}'.format(resp['access_token']),
     }
-    api_uri = uri + '/v0.8/collection' # DP TODO: implement /latest for version
+    api_uri = uri + '/latest/collection'
     req = Request(api_uri, headers = headers)
     resp = json.loads(urlopen(req).read().decode('utf-8'))
     print("Collections: {}".format(resp))
