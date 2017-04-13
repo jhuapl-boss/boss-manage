@@ -6,7 +6,7 @@
 
         "aws_region": "us-east-1",
 
-        "aws_instance_type": "t2.micro",
+        "aws_instance_type": "m4.large",
 
         "aws_source_ami": null,
 
