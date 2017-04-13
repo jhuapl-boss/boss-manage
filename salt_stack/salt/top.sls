@@ -69,3 +69,4 @@ base:
 
         # Resolution hierarchy
         - spdb
+        - scipy
