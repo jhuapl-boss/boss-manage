@@ -101,6 +101,7 @@ def create_config(session, domain, keypair=None, db_config={}):
 
     user_data['sfn']['populate_upload_queue'] = names.ingest_queue_populate
     user_data['sfn']['upload_sfn'] = names.ingest_queue_upload
+    user_data['sfn']['downsample_sfn'] = names.resolution_hierarchy
 
     # Prepare user data for parsing by CloudFormation.
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
@@ -213,33 +214,6 @@ def create_config(session, domain, keypair=None, db_config={}):
     with open(const.DYNAMO_ID_COUNT_SCHEMA, 'r') as id_count_fh:
         dynamo_id_count_cfg = json.load(id_count_fh)
     config.add_dynamo_table_from_json('idCountIndex', names.id_count_index, **dynamo_id_count_cfg)  # DP XXX
-
-    # TODO Remove Redis Cache information below to its own Cloudformation Config
-    #      It is already built manually outside of API in Integration and Production
-
-    # Create the Cache and CacheState Redis Clusters
-    REDIS_PARAMETERS = {
-        "maxmemory-policy": "volatile-lru",
-        "reserved-memory": str(get_scenario(const.REDIS_RESERVED_MEMORY, 0) * 1000000),
-        "maxmemory-samples": "5", # ~ 5 - 10
-    }
-
-    config.add_redis_replication("Cache",
-                                 names.cache,
-                                 az_subnets,
-                                 [sgs[names.internal]],
-                                 type_=const.REDIS_CACHE_TYPE,
-                                 version="3.2.4",
-                                 clusters=const.REDIS_CLUSTER_SIZE,
-                                 parameters=REDIS_PARAMETERS)
-
-    config.add_redis_replication("CacheState",
-                                 names.cache_state,
-                                 az_subnets,
-                                 [sgs[names.internal]],
-                                 type_=const.REDIS_TYPE,
-                                 version="3.2.4",
-                                 clusters=const.REDIS_CLUSTER_SIZE)
 
     return config
 
