@@ -174,7 +174,7 @@ redis-cli -h cache.production.boss
 select 0
 keys WRITE-CUBOID*
 ```
-If no keys come back it is OK to delete the cache. If keys exist, keep checking, the keys 
+**Only peform this step if the redis update did not work** If no keys come back it is OK to delete the cache. If keys exist, keep checking, the keys 
 should all disappear eventually.  Then delete and create the redis clusters
 ```shell
 $ ./cloudformation.py delete production.boss --scenario production redis
@@ -210,7 +210,7 @@ $ ./cloudformation.py create production.boss --scenario production cloudwatch
 cd vault
 ./bastion.py vault.production.boss vault-read secret/auth/realm
 ```
-Login to https://api.theboss.io/v0.8/collection/
+Login to https://api.theboss.io/latest/collection/
 Uses bossadmin and the password you now have to sync bossadmin to django
 
 ## Turn off Maintenance Mode
