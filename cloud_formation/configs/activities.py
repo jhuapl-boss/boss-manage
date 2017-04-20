@@ -33,11 +33,8 @@ def create_config(session, domain):
 
     vpc_id = config.find_vpc(session)
     sgs = aws.sg_lookup_all(session, vpc_id)
-
-    internal_subnet_id = aws.subnet_id_lookup(session, names.subnet("internal"))
-    config.add_arg(Arg.Subnet("InternalSubnet",
-                              internal_subnet_id,
-                              "ID of Internal Subnet to create resources in"))
+    internal_subnets, _ = config.find_all_availability_zones(session)
+    internal_subnets_lambda, _ = config.find_all_availability_zones(session, lambda_compatible_only=True)
     topic_arn = aws.sns_topic_lookup(session, "ProductionMicronsMailingList")
     event_data = {
         "lambda-name": "delete_lambda",
@@ -50,7 +47,10 @@ def create_config(session, domain):
         "delete_bucket": names.delete_bucket,
         "topic-arn": topic_arn,
         "query-deletes-sfn-name": names.query_deletes,
-        "delete-sfn-name": names.delete_cuboid
+        "delete-sfn-name": names.delete_cuboid,
+        "delete-exp-sfn-name": names.delete_experiment,
+        "delete-coord-frame-sfn-name": names.delete_coord_frame,
+        "delete-coll-sfn-name": names.delete_collection
     }
 
     role_arn = aws.role_arn_lookup(session, "events_for_delete_lambda")
@@ -86,15 +86,26 @@ def create_config(session, domain):
     user_data["aws"]["id-index-table"] = names.id_index
     user_data["aws"]["id-count-table"] = names.id_count_index
 
-    config.add_ec2_instance("Activities",
-                            names.activities,
-                            aws.ami_lookup(session, 'activities.boss'),
-                            keypair,
-                            subnet=Ref("InternalSubnet"),
-                            role="activities",
-                            type_=const.ACTIVITIES_TYPE,
-                            user_data=str(user_data),
-                            security_groups=[sgs[names.internal]])
+    config.add_autoscale_group("Activities",
+                               names.activities,
+                               aws.ami_lookup(session, 'activities.boss'),
+                               keypair,
+                               subnets=internal_subnets_lambda,
+                               type_=const.ACTIVITIES_TYPE,
+                               security_groups=[sgs[names.internal]],
+                               user_data=str(user_data),
+                               role=aws.instance_profile_arn_lookup(session, "activities"),
+                               min=1,
+                               max=1)
+
+    config.add_lambda("IngestLambda",
+                      names.ingest_lambda,
+                      aws.role_arn_lookup(session, 'IngestQueueUpload'),
+                      const.INGEST_LAMBDA,
+                      handler="index.handler",
+                      timeout=60 * 5)
+
+    config.add_lambda_permission("IngestLambdaExecute", Ref("IngestLambda"))
 
     return config
 
@@ -119,8 +130,13 @@ def post_init(session, domain):
 
     sfn.create(session, names.query_deletes, domain, 'query_for_deletes.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.delete_cuboid, domain, 'delete_cuboid.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(session, names.populate_upload_queue, domain, 'populate_upload_queue.hsd',
-               'StatesExecutionRole-us-east-1 ')
+    sfn.create(session, names.delete_experiment, domain, 'delete_experiment.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(session, names.delete_coord_frame, domain, 'delete_coordinate_frame.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(session, names.delete_collection, domain, 'delete_collection.hsd', 'StatesExecutionRole-us-east-1 ')
+    #sfn.create(session, names.populate_upload_queue, domain, 'populate_upload_queue.hsd',
+    #           'StatesExecutionRole-us-east-1 ')
+    sfn.create(session, names.ingest_queue_populate, domain, 'ingest_queue_populate.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(session, names.ingest_queue_upload, domain, 'ingest_queue_upload.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.resolution_hierarchy, domain, 'resolution_hierarchy.hsd', 'StatesExecutionRole-us-east-1')
 
 
@@ -130,6 +146,10 @@ def delete(session, domain):
     CloudFormationConfiguration('activities', domain).delete(session)
 
     sfn.delete(session, names.delete_cuboid)
+    sfn.delete(session, names.delete_experiment)
+    sfn.delete(session, names.delete_coord_frame)
+    sfn.delete(session, names.delete_collection)
     sfn.delete(session, names.query_deletes)
-    sfn.delete(session, names.populate_upload_queue)
+    sfn.delete(session, names.ingest_queue_populate)
+    sfn.delete(session, names.ingest_queue_upload)
     sfn.delete(session, names.resolution_hierarchy)

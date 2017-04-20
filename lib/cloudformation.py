@@ -775,14 +775,20 @@ class CloudFormationConfiguration:
             name = sub.capitalize() + "InternalSubnet"
             domain = sub + "-internal." + self.vpc_domain
             id = aws.subnet_id_lookup(session, domain)
-            self.add_arg(Arg.Subnet(name, id))
-            internal.append(Ref(name))
+            if id is None:
+                print("Subnet {} doesn't exist, not using.".format(domain))
+            else:
+                self.add_arg(Arg.Subnet(name, id))
+                internal.append(Ref(name))
 
             name = sub.capitalize() + "ExternalSubnet"
             domain = sub + "-external." + self.vpc_domain
             id = aws.subnet_id_lookup(session, domain)
-            self.add_arg(Arg.Subnet(name, id))
-            external.append(Ref(name))
+            if id is None:
+                print("Subnet {} doesn't exist, not using.".format(domain))
+            else:
+                self.add_arg(Arg.Subnet(name, id))
+                external.append(Ref(name))
 
         return (internal, external)
 
@@ -1108,11 +1114,17 @@ class CloudFormationConfiguration:
         if len(parameters) > 0:
             self.resources[key]['Properties']['CacheParameterGroupName'] = Ref(key + 'ParameterGroup')
 
+            if version.startswith("2.8"):
+                cache_parameter_group_family = "redis2.8"
+            elif version.startswith("3.2"):
+                cache_parameter_group_family = "redis3.2"
+            else:
+                raise Exception("Unknown CacheParameterGroupFamily for Redis version {}".format(version))
+
             self.resources[key + 'ParameterGroup'] = {
             "Type": "AWS::ElastiCache::ParameterGroup",
                 "Properties": {
-                    # DP TODO: Need to select family based on version number
-                    "CacheParameterGroupFamily" : "redis2.8",
+                    "CacheParameterGroupFamily" : cache_parameter_group_family ,
                     "Properties" : parameters,
                     "Description": "boss-redis-properties"
                 }
@@ -1358,7 +1370,7 @@ class CloudFormationConfiguration:
 
     def add_autoscale_group(self, key, hostname, ami, keypair, subnets=[Ref("Subnet")], type_="t2.micro", public_ip=False,
                             security_groups=[], user_data=None, min=1, max=1, elb=None, notifications=None,
-                            role=None, health_check_grace_period=30, support_update=True, depends_on=None):
+                            role=None, health_check_grace_period=30, support_update=True, detailed_monitoring=False, depends_on=None):
         """Add an AutoScalingGroup to the configuration
 
         Args:
@@ -1377,6 +1389,7 @@ class CloudFormationConfiguration:
             role (None|string) : Role name to use when creating instances
             health_check_grace_period (int) : grace period in seconds to wait before checking newly created instances.
             support_update (bool) : If the ASG should include RollingUpdate UpdatePolicy
+            detailed_monitoring (bool) : Enable detailed monitoring of the instances. False means 5 minute statistics.
             depends_on (None|string|list): A unique name or list of unique names of resources within the
                                            configuration and is used to determine the launch order of resources
         """
@@ -1442,7 +1455,7 @@ class CloudFormationConfiguration:
                 "AssociatePublicIpAddress" : public_ip,
                 #"EbsOptimized" : Boolean, EBS I/O optimized
                 "ImageId" : ami,
-                "InstanceMonitoring" : False, # CloudWatch Monitoring...
+                "InstanceMonitoring" : detailed_monitoring, # CloudWatch Monitoring...
                 "InstanceType" : get_scenario(type_, "t2.micro"),
                 "KeyName" : keypair,
                 "SecurityGroups" : security_groups,
@@ -1463,7 +1476,7 @@ class CloudFormationConfiguration:
                                "Hostname of the EC2 Instance '{}'".format(key))
         self.add_arg(_hostname)
 
-    def add_autoscale_policy(self, key, asg, warmup=60, adjustments=[], alarms=[]):
+    def add_autoscale_policy(self, key, asg, warmup=60, adjustments=[], alarms=[], period=2):
         """Add an AutoScalingGroup AutoScale Policy to the configuration
 
         Args:
@@ -1479,6 +1492,7 @@ class CloudFormationConfiguration:
             alarms (list): List of tuples of (metric, statistic, comparison, threashold)
                            which are passed to add_cloudwatch_alarm() to create the alarms
                            that will trigger the adjustments actions
+            period (int): Number of 60 second periods over which the alarm metrics are evaluated
         """
         adjustments_ = []
         for lower, upper, step in adjustments:
@@ -1497,7 +1511,7 @@ class CloudFormationConfiguration:
                 "PolicyType" : "StepScaling",
                 "EstimatedInstanceWarmup" : warmup,
                 #"MetricAggregationType" : "Minimum|Maximum|Average", # Default Average
-
+                #"MetricsCollection" : [{"Granularity":"1Minute", "Metrics":[]}]
                 "StepAdjustments" : adjustments_
             }
         }
@@ -1509,7 +1523,8 @@ class CloudFormationConfiguration:
                                       metric, statistic, comparison, threashold,
                                       [Ref(key)], # alarm_actions
                                       {"AutoScalingGroupName": asg}, # dimensions
-                                      period = 2)
+                                      period = period,
+                                      namespace = "AWS/EC2")
 
     def add_s3_bucket(self, key, name, access_control=None, life_cycle_config=None, notification_config=None, tags=None, depends_on=None):
         """Create or configure a S3 bucket.
@@ -1791,7 +1806,7 @@ class CloudFormationConfiguration:
         if depends_on is not None:
             self.resources[key]['DependsOn'] = depends_on
 
-    def add_cloudwatch_alarm(self, key, description, metric, statistic, comparison, threashold, alarm_actions, dimensions={}, period=5, depends_on=None):
+    def add_cloudwatch_alarm(self, key, description, metric, statistic, comparison, threashold, alarm_actions, dimensions={}, period=5, namespace="AWS/ELB", depends_on=None):
         """Add CloudWatch Alarm for a LoadBalancer
 
         Args:
@@ -1803,6 +1818,8 @@ class CloudFormationConfiguration:
             threashold (string) : Threashold limit
             alarm_actions (list) : List of ARN string of actions to execute when the alarm is triggered
             dimensions (dict) : Dictionary of dimensions for the alarm's associated metric
+            period (int) : Number of 60 second periods over which the metric is evaluated
+            namespace (string) : AWS Namespace of the alarm metric (default AWS/ELB)
             depends_on (None|string|list): A unique name or list of unique names of resources within the
                                            configuration and is used to determine the launch order of resources
         """
@@ -1814,7 +1831,7 @@ class CloudFormationConfiguration:
                 "ComparisonOperator": comparison,
                 "EvaluationPeriods": str(period),
                 "MetricName": metric,
-                "Namespace": "AWS/ELB",
+                "Namespace": namespace,
                 "Period": "60",
                 "Statistic": statistic,
                 "Threshold": threashold,

@@ -163,6 +163,10 @@ class ExternalCalls:
         # DP ???: use the actual login url so the actual API is checked..
         #         (and parse response for 403 unauthorized vs any other error..)
 
+        # SH Manually waiting 30 secs before opening the ssh tunnel
+        #    Have seen tunnel timeout a few times now before the URL returns OK.
+        time.sleep(30)
+
         with self.tunnel("auth", 8080) as port:
             # Could move to connecting through the ELB, but then KC will have to be healthy
             URL = "http://localhost:{}/auth/".format(port)
@@ -184,9 +188,12 @@ class ExternalCalls:
 
     def check_url(self, url, timeout, exception=True):
         for sleep in gen_timeout(timeout, 15): # 15 second sleep
-            res = urlopen(url)
-            if res.getcode() == 200:
-                return True
+            try:
+                res = urlopen(url)
+                if res.getcode() == 200:
+                    return True
+            except HTTPError:
+                pass
             time.sleep(sleep)
 
         if exception:

@@ -91,6 +91,27 @@
           "Action": "sts:AssumeRole",
           "Effect": "Allow",
           "Principal": {
+            "Service": "batch.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/service-role/",
+    "RoleName": "AWSBatchServiceRole",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
             "Service": "ec2.amazonaws.com"
           }
         }
@@ -139,6 +160,32 @@
     ],
     "Path": "/",
     "RoleName": "consul",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "ec2.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
+    ],
+    "InstanceProfileList": [
+      {
+        "InstanceProfileName": "ecsInstanceRole",
+        "Path": "/"
+      }
+    ],
+    "Path": "/",
+    "RoleName": "ecsInstanceRole",
     "RolePolicyList": []
   },
   {
@@ -245,6 +292,27 @@
         "PolicyName": "goad-lambda-role-policy"
       }
     ]
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "lambda.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::451493790433:policy/aplPopulateUploadQueue"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/",
+    "RoleName": "IngestQueueUpload",
+    "RolePolicyList": []
   },
   {
     "AssumeRolePolicyDocument": {

@@ -40,7 +40,6 @@ def create_config(session, domain):
 
     vpc_id = config.find_vpc(session)
     lambda_subnets, _ = config.find_all_availability_zones(session, lambda_compatible_only=True)
-    print("lambda subnets:" + str(lambda_subnets))
 
     internal_sg = aws.sg_lookup(session, vpc_id, names.internal)
 

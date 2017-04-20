@@ -15,6 +15,7 @@ include:
   - python.pep8
   - python.nose2-3
   - python.nose2-cov-3
+  - python.virtualenvwrapper
   - jenkins
   - jenkins.plugins
   - jenkins.slack

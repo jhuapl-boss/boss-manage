@@ -54,6 +54,7 @@ LAMBDA_DIR = repo_path('cloud_formation', 'lambda')
 DNS_LAMBDA = LAMBDA_DIR + '/updateRoute53/index.py'
 VAULT_LAMBDA = LAMBDA_DIR + '/monitors/chk_vault.py'
 CONSUL_LAMBDA = LAMBDA_DIR + '/monitors/chk_consul.py'
+INGEST_LAMBDA = LAMBDA_DIR + '/ingest_populate/ingest_queue_upload.py'
 
 
 ########################
@@ -90,7 +91,7 @@ VAULT_PROOFREAD_AUTH = "secret/proofreader/auth"
 ########################
 # Service Check Timeouts
 TIMEOUT_VAULT = 120
-TIMEOUT_KEYCLOAK = 180
+TIMEOUT_KEYCLOAK = 150
 
 
 ########################
@@ -109,13 +110,13 @@ RDS_TYPE = {
 
 REDIS_CACHE_TYPE = {
     "development": "cache.t2.small",
-    "production": "cache.r3.2xlarge",
+    "production": "cache.m4.10xlarge",
     "ha-development": "cache.t2.small",
 }
 
 REDIS_TYPE = {
     "development": "cache.t2.small",
-    "production": "cache.m3.xlarge",
+    "production": "cache.m4.xlarge",
     "ha-development": "cache.t2.small",
 }
 
@@ -181,10 +182,10 @@ ENDPOINT_DB_CONFIG = {
 }
 
 REDIS_RESERVED_MEMORY = {
-    # Size in MB
+    # Size in MB, should be 75% of total.
     "development": 387,
-    "production": 14550,
-    "ha-development": 387 ,
+    "production": 38500,
+    "ha-development": 387,
 }
 
 BASTION_AMI = "amzn-ami-vpc-nat-hvm-2015.03.0.x86_64-ebs"

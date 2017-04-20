@@ -1,0 +1,18 @@
+"""Delete Collection
+Removes Collection from RDS collection and lookup tables and
+metadata from dynamoDB.
+"""
+
+Activity('delete_metadata')
+    """delete_metadata
+       deletes metadata from DynamoDB"""
+    retry [] 60 4 2.0
+
+Activity('delete_collection')
+    """delete_collection
+       deletes collection from RDS"""
+    retry [] 120 4 2.0
+    catch []: '$.error'
+        Activity("notify_admins")
+            """notify_admins
+               sends SNS message to microns topic"""

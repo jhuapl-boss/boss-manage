@@ -80,6 +80,8 @@ def create_config(session, domain):
     config.add_subnet('InternalSubnet', names.subnet('internal'))
     config.add_subnet('ExternalSubnet', names.subnet('external'))
     internal_subnets, external_subnets = config.add_all_azs(session)
+    # it seems that both Lambdas and ASGs needs lambda_compatible_only subnets.
+    internal_subnets_lambda, external_subnets_lambda = config.add_all_azs(session, lambda_compatible_only=True)
 
     config.add_ec2_instance("Bastion",
                             names.bastion,
@@ -99,7 +101,7 @@ def create_config(session, domain):
                                names.consul,
                                aws.ami_lookup(session, "consul.boss"),
                                keypair,
-                               subnets = internal_subnets,
+                               subnets = internal_subnets_lambda,
                                security_groups = [Ref("InternalSecurityGroup")],
                                user_data = str(user_data),
                                min = const.CONSUL_CLUSTER_SIZE,
@@ -116,7 +118,7 @@ def create_config(session, domain):
                                names.vault,
                                aws.ami_lookup(session, "vault.boss"),
                                keypair,
-                               subnets = internal_subnets,
+                               subnets = internal_subnets_lambda,
                                security_groups = [Ref("InternalSecurityGroup")],
                                user_data = str(user_data),
                                min = const.VAULT_CLUSTER_SIZE,
@@ -153,8 +155,8 @@ def create_config(session, domain):
                    keypair,
                    str(user_data),
                    const.AUTH_CLUSTER_SIZE,
-                   internal_subnets,
-                   external_subnets,
+                   internal_subnets_lambda,
+                   external_subnets_lambda,
                    [("443", "8080", "HTTPS", cert)],
                    "HTTP:8080/index.html",
                    sgs = [Ref("AuthSecurityGroup")],

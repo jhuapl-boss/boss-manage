@@ -1,0 +1,13 @@
+"""Populate an ingest upload queue with message for each tile to be processed"""
+
+Activity('IngestPopulate')
+    # Automatically purges the queue so retry works correctly
+    retry [] 60 3 1.0
+    catch []:
+        Fail('Exception', 'Problems populating upload queue')
+
+# Wait and retry are to ensure SQS queue is consistent
+Wait(seconds=60)
+Activity('VerifyCount')
+    retry [] 60 3 1.0
+

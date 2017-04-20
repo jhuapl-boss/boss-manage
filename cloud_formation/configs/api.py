@@ -37,6 +37,8 @@ from lib.cloudformation import get_scenario
 import json
 import uuid
 import sys
+from urllib.request import Request, urlopen
+from urllib.parse import urlencode
 
 def create_config(session, domain, keypair=None, db_config={}):
     """
@@ -97,7 +99,9 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["lambda"]["page_in_function"] = names.multi_lambda
     user_data["lambda"]["ingest_function"] = names.multi_lambda
 
-    user_data['sfn']['populate_upload_queue'] = names.populate_upload_queue
+    user_data['sfn']['populate_upload_queue'] = names.ingest_queue_populate
+    user_data['sfn']['upload_sfn'] = names.ingest_queue_upload
+    user_data['sfn']['downsample_sfn'] = names.resolution_hierarchy
 
     # Prepare user data for parsing by CloudFormation.
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
@@ -106,6 +110,7 @@ def create_config(session, domain, keypair=None, db_config={}):
 
     vpc_id = config.find_vpc(session)
     az_subnets, external_subnets = config.find_all_availability_zones(session)
+    az_subnets_lambda, external_subnets_lambda = config.find_all_availability_zones(session, lambda_compatible_only=True)
     sgs = aws.sg_lookup_all(session, vpc_id)
 
     # DP XXX: hack until we can get productio updated correctly
@@ -136,7 +141,7 @@ def create_config(session, domain, keypair=None, db_config={}):
                                names.endpoint,
                                aws.ami_lookup(session, "endpoint.boss"),
                                keypair,
-                               subnets=az_subnets,
+                               subnets=az_subnets_lambda,
                                type_=const.ENDPOINT_TYPE,
                                security_groups=[sgs[names.internal]],
                                user_data=parsed_user_data,
@@ -146,34 +151,38 @@ def create_config(session, domain, keypair=None, db_config={}):
                                notifications=dns_arn,
                                role=aws.instance_profile_arn_lookup(session, 'endpoint'),
                                health_check_grace_period=90,
+                               detailed_monitoring=True,
                                depends_on=["EndpointLoadBalancer", "EndpointDB"])
 
     cert = aws.cert_arn_lookup(session, names.public_dns("api"))
     config.add_loadbalancer("EndpointLoadBalancer",
                             names.endpoint_elb,
                             [("443", "80", "HTTPS", cert)],
-                            subnets=external_subnets,
+                            subnets=external_subnets_lambda,
                             security_groups=[sgs[names.internal], sgs[names.https]],
                             public=True)
 
+    # Endpoint servers are not CPU bound typically, so react quickly to load
     config.add_autoscale_policy("EndpointScaleUp",
                                 Ref("Endpoint"),
                                 adjustments=[
-                                    (0.0, 0.15, 1), # 75% - 90% Utilization add 1 instance
-                                    (0.15, None, 2) # Above 90% Utilization add 2 instances
+                                    (0.0, 10, 1),  # 12% - 22% Utilization add 1 instance
+                                    (10, None, 2)  # Above 22% Utilization add 2 instances
                                 ],
                                 alarms=[
-                                    ("CPUUtilization ", "Average", "GreaterThanThreshold", "0.75")
-                                ])
+                                    ("CPUUtilization", "Maximum", "GreaterThanThreshold", "12")
+                                ],
+                                period=1)
 
     config.add_autoscale_policy("EndpointScaleDown",
                                 Ref("Endpoint"),
                                 adjustments=[
-                                    (None, 0.0, 1),   # Under 40% Utilization remove 1 instance
+                                    (None, 0.0, -1),   # Under 1.5% Utilization remove 1 instance
                                 ],
                                 alarms=[
-                                    ("CPUUtilization ", "Average", "LessThanThreshold", "0.40")
-                                ])
+                                    ("CPUUtilization", "Average", "LessThanThreshold", "1.5")
+                                ],
+                                period=50)
 
     config.add_rds_db("EndpointDB",
                       names.endpoint_db,
@@ -190,43 +199,21 @@ def create_config(session, domain, keypair=None, db_config={}):
         dynamo_cfg = json.load(fh)
     config.add_dynamo_table_from_json("EndpointMetaDB", names.meta, **dynamo_cfg)
 
-    with open(const.DYNAMO_S3_INDEX_SCHEMA , 'r') as s3fh:
+    with open(const.DYNAMO_S3_INDEX_SCHEMA, 'r') as s3fh:
         dynamo_s3_cfg = json.load(s3fh)
     config.add_dynamo_table_from_json('s3Index', names.s3_index, **dynamo_s3_cfg)  # DP XXX
 
-    with open(const.DYNAMO_TILE_INDEX_SCHEMA , 'r') as tilefh:
+    with open(const.DYNAMO_TILE_INDEX_SCHEMA, 'r') as tilefh:
         dynamo_tile_cfg = json.load(tilefh)
     config.add_dynamo_table_from_json('tileIndex', names.tile_index, **dynamo_tile_cfg)  # DP XXX
 
-    with open(const.DYNAMO_ID_INDEX_SCHEMA , 'r') as id_ind_fh:
+    with open(const.DYNAMO_ID_INDEX_SCHEMA, 'r') as id_ind_fh:
         dynamo_id_ind__cfg = json.load(id_ind_fh)
     config.add_dynamo_table_from_json('idIndIndex', names.id_index, **dynamo_id_ind__cfg)  # DP XXX
 
-    with open(const.DYNAMO_ID_COUNT_SCHEMA , 'r') as id_count_fh:
+    with open(const.DYNAMO_ID_COUNT_SCHEMA, 'r') as id_count_fh:
         dynamo_id_count_cfg = json.load(id_count_fh)
     config.add_dynamo_table_from_json('idCountIndex', names.id_count_index, **dynamo_id_count_cfg)  # DP XXX
-
-    # Create the Cache and CacheState Redis Clusters
-    REDIS_PARAMETERS = {
-        "maxmemory-policy": "volatile-lru",
-        "reserved-memory": str(get_scenario(const.REDIS_RESERVED_MEMORY, 0) * 1000000),
-        "maxmemory-samples": "5", # ~ 5 - 10
-    }
-
-    config.add_redis_replication("Cache",
-                                 names.cache,
-                                 az_subnets,
-                                 [sgs[names.internal]],
-                                 type_=const.REDIS_CACHE_TYPE,
-                                 clusters=const.REDIS_CLUSTER_SIZE,
-                                 parameters=REDIS_PARAMETERS)
-
-    config.add_redis_replication("CacheState",
-                                 names.cache_state,
-                                 az_subnets,
-                                 [sgs[names.internal]],
-                                 type_=const.REDIS_TYPE,
-                                 clusters=const.REDIS_CLUSTER_SIZE)
 
     return config
 
@@ -251,6 +238,7 @@ def create(session, domain):
     keypair = aws.keypair_lookup(session)
 
     call = ExternalCalls(session, keypair, domain)
+    names = AWSNames(domain)
 
     db_config = const.ENDPOINT_DB_CONFIG.copy()
     db_config['password'] = utils.generate_password()
@@ -258,6 +246,10 @@ def create(session, domain):
     with call.vault() as vault:
         vault.write(const.VAULT_ENDPOINT, secret_key = str(uuid.uuid4()))
         vault.write(const.VAULT_ENDPOINT_DB, **db_config)
+
+        dns = names.public_dns("api")
+        uri = "https://{}".format(dns)
+        vault.update(const.VAULT_ENDPOINT_AUTH, public_uri = uri)
 
     config = create_config(session, domain, keypair, db_config)
 
@@ -299,9 +291,11 @@ def post_init(session, domain):
     #          machines initially start
     with call.vault() as vault:
         uri = "https://{}".format(dns)
-        vault.update(const.VAULT_ENDPOINT_AUTH, public_uri = uri)
+        #vault.update(const.VAULT_ENDPOINT_AUTH, public_uri = uri)
 
         creds = vault.read("secret/auth")
+        bossadmin = vault.read("secret/auth/realm")
+        auth_uri = vault.read("secret/endpoint/auth")['url']
 
     # Verify Keycloak is accessible
     print("Checking for Keycloak availability")
@@ -314,6 +308,32 @@ def post_init(session, domain):
         with KeyCloakClient(auth_url, **creds) as kc:
             # DP TODO: make add_redirect_uri able to work multiple times without issue
             kc.add_redirect_uri("BOSS","endpoint", uri + "/*")
+
+    # Get the boss admin's bearer token
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+    }
+    params = {
+        'grant_type': 'password',
+        'client_id': bossadmin['client_id'],
+        'username': bossadmin['username'],
+        'password': bossadmin['password'],
+    }
+    auth_uri += '/protocol/openid-connect/token'
+    req = Request(auth_uri,
+                  headers = headers,
+                  data = urlencode(params).encode('utf-8'))
+    resp = json.loads(urlopen(req).read().decode('utf-8'))
+
+    # Make an API call that will log the boss admin into the endpoint
+    call.check_url(uri + '/ping', 60)
+    headers = {
+        'Authorization': 'Bearer {}'.format(resp['access_token']),
+    }
+    api_uri = uri + '/latest/collection'
+    req = Request(api_uri, headers = headers)
+    resp = json.loads(urlopen(req).read().decode('utf-8'))
+    print("Collections: {}".format(resp))
 
     # Tell Scalyr to get CloudWatch metrics for these instances.
     instances = [names.endpoint]
@@ -329,6 +349,7 @@ def update(session, domain):
     with call.vault() as vault:
         db_config = vault.read(const.VAULT_ENDPOINT_DB)
 
+    '''
     try:
         import MySQLdb as mysql
     except:
@@ -369,10 +390,12 @@ def update(session, domain):
 
         cur.close()
         db.close()
+    '''
 
     config = create_config(session, domain, keypair, db_config)
     success = config.update(session)
 
+    '''
     print("Restoring time step data")
     print("Tunneling")
     with call.tunnel(names.endpoint_db, db_config['port'], type_='rds') as local_port:
@@ -411,8 +434,8 @@ def update(session, domain):
 
         cur.close()
         db.close()
+    '''
 
-    
 
     return success
 

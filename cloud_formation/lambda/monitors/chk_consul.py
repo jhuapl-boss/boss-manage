@@ -48,7 +48,7 @@ def lambda_handler(event, context):
         DNSName=vpc_name, MaxItems='1')
     if 'HostedZones' not in zones:
         msg = 'Invalid response from Route53 - no HostedZones!'
-        sns_publish_no_consuls(sns_client, topic_arn, msg)
+        sns_publish_no_consuls(sns_client, topic_arn, msg, vpc_name)
         print(msg)
         return
 
@@ -61,7 +61,7 @@ def lambda_handler(event, context):
 
     if zone_id is None:
         msg = '{} not found in Route53!'.format(vpc_name)
-        sns_publish_no_consuls(sns_client, topic_arn, msg)
+        sns_publish_no_consuls(sns_client, topic_arn, msg, vpc_name)
         print(msg)
         return
 
@@ -75,7 +75,7 @@ def lambda_handler(event, context):
 
     if 'ResourceRecordSets' not in hosts or len(hosts['ResourceRecordSets']) < 1:
         msg = 'Invalid response from Route53 - no ResourceRecordSets!'
-        sns_publish_no_consuls(sns_client, topic_arn, msg)
+        sns_publish_no_consuls(sns_client, topic_arn, msg, vpc_name)
         print(msg)
         return
 
@@ -116,7 +116,7 @@ def lambda_handler(event, context):
         print(raw)
 
         # Publish failure to SNS topic.
-        sns_publish_sick(sns_client, ip, raw, topic_arn)
+        sns_publish_sick(sns_client, ip, raw, topic_arn, vpc_name)
 
         # Set weight in Route53 to 0 so instance gets no traffic.
         update_route53_weight(
@@ -138,6 +138,7 @@ def get_ip_from_host_name(name):
     ip = parts[1] + '.' + parts[2] + '.' + parts[3] + '.' + last_octet
     return ip
 
+
 def get_node_id(ip):
     """A consul's node id is derived from the last two octets of its ip.
 
@@ -149,6 +150,7 @@ def get_node_id(ip):
     """
     octets = ip.split('.')
     return octets[2] + octets[3]
+
 
 def validate(resp):
     """Check health status response from application.
@@ -175,6 +177,7 @@ def validate(resp):
 
     return False
 
+
 def where(xs, predicate):
     """Filter list using given function.
 
@@ -192,6 +195,7 @@ def where(xs, predicate):
             return x
     return None
 
+
 def find_name(xs):
     """Search list of tags for the one with Name as its key.
 
@@ -204,21 +208,24 @@ def find_name(xs):
     tag = where(xs, lambda x: x['Key'] == 'Name')
     return None if tag is None else tag['Value']
 
-def sns_publish_no_consuls(sns_client, topic_arn, msg):
+
+def sns_publish_no_consuls(sns_client, topic_arn, msg, vpc_name):
     """Send notification of NO existing consul instances.
 
     Args:
         sns_client (boto3.SNS.Client): Client for interacting with SNS.
         topic_arn (string): ARN of SNS topic to publish to.
+        msg (string): message to send
         vpc_name (string): Name of VPC.
     """
     sns_client.publish(
         TopicArn=topic_arn,
-        Subject='No consul instances!',
+        Subject='No consul instances in {}!'.format(vpc_name),
         Message=msg
     )
 
-def sns_publish_sick(sns_client, ip, raw_err, topic_arn):
+
+def sns_publish_sick(sns_client, ip, raw_err, topic_arn, vpc_name):
     """Send notification of failed instance to SNS topic.
 
     Args:
@@ -226,14 +233,16 @@ def sns_publish_sick(sns_client, ip, raw_err, topic_arn):
         ip (string): IP address of sick instance.
         raw_err (string): Raw response from urlopen() or 'unreachable'.
         topic_arn (string): ARN of SNS topic to publish to.
+        vpc_name (string): name of the vpc
     """
     sns_client.publish(
         TopicArn=topic_arn,
-        Subject='consul instance not healthy',
-        Message="""consul instance with ip: {0} is failing its health check.
+        Subject='consul instance not healthy in {}'.format(vpc_name),
+        Message="""consul instance with ip: {0} is failing its health check in {2}.
 Raw health check: {1}
-""".format(ip, raw_err)
+""".format(ip, raw_err, vpc_name)
     )
+
 
 def update_route53_weight(route53_client, zone_id, dns_name, private_dns_name, inst_id, weight):
     """Change weight for given instance in Route53 (DNS).

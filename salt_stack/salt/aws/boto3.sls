@@ -4,7 +4,7 @@ include:
 
 boto3:
     pip.installed:
-        - name: boto3==1.2.3
+        - name: boto3>=1.0,<2.0
         - bin_env: /usr/local/bin/pip3
         - require:
             - sls: python.python35

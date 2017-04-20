@@ -101,6 +101,14 @@ def create_config(session, domain, keypair=None, user_data=None):
         ['s3:GetObject', 's3:PutObject'],
         { 'AWS': role})
 
+    delete_bucket_name = names.delete_bucket
+    if not aws.s3_bucket_exists(session, delete_bucket_name):
+        config.add_s3_bucket("deleteBucket", delete_bucket_name)
+    config.add_s3_bucket_policy(
+        "deleteBucketPolicy", delete_bucket_name,
+        ['s3:GetObject', 's3:PutObject'],
+        { 'AWS': role})
+
     creating_tile_bucket = False
     tile_bucket_name = names.tile_bucket
     if not aws.s3_bucket_exists(session, tile_bucket_name):
@@ -159,10 +167,11 @@ def create_config(session, domain, keypair=None, user_data=None):
         )
 
     # Add topic to indicating that the object store has been write locked.
-    config.add_sns_topic('WriteLock',
-                         names.write_lock_topic,
-                         names.write_lock,
-                         []) # TODO: add subscribers
+    # Now using "production mailing list" instead of separate write lock topic.
+    #config.add_sns_topic('WriteLock',
+    #                     names.write_lock_topic,
+    #                     names.write_lock,
+    #                     []) # TODO: add subscribers
 
     return config
 
@@ -194,8 +203,13 @@ def create(session, domain):
     user_data["aws"]["id-index-table"] = names.id_index
     user_data["aws"]["id-count-table"] = names.id_count_index
 
-    # SNS and Lambda names can't have periods.
-    user_data["aws"]["sns-write-locked"] = str(Ref('WriteLock'))
+    #user_data["aws"]["sns-write-locked"] = str(Ref('WriteLock'))
+
+    mailing_list_arn = aws.sns_topic_lookup(session, const.PRODUCTION_MAILING_LIST)
+    if mailing_list_arn is None:
+        msg = "MailingList {} needs to be created before running config".format(const.PRODUCTION_MAILING_LIST)
+        raise Exception(msg)
+    user_data["aws"]["sns-write-locked"] = mailing_list_arn
 
     user_data["lambda"]["flush_function"] = names.multi_lambda
     user_data["lambda"]["page_in_function"] = names.multi_lambda
