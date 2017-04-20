@@ -38,6 +38,13 @@ $ git tag sprint#
 $ git push origin sprint#
 ```
 
+### Updating tags
+If you make any mistakes along the way and need to update where tags are pointing to 
+use these two commands:
+```shell
+git tag -f -a <tagname>
+git push -f --tags
+```
 
 ### Boss-manage Repository
 If you don't have the repository already cloned
@@ -107,27 +114,32 @@ $ cd boss-manage
 
 To create the tag
 ```shell
-$ git fetch # if you didn't need to clone
-$ git checkout master
-$ git merge integration # resolve any conflicts and commit
-$ EDITOR .gitmodules # update referenced branches to master
-$ git add .gitmodules
-$ git submodule foreach "git fetch && git checkout tags/<release#>"
-$ git add salt_stack/salt/boss/files/boss.git
-$ git add salt_stack/salt/boss-tools/files/boss-tools.git
-$ git add salt_stack/salt/proofreader-web/files/proofread.git
-$ git add salt_stack/salt/spdb/files/spdb.git
-$ git add salt_stack/salt/ndingest/files/ndingest.git
-$ git add salt_stack/salt/ingest-client/files/ingest-client.git
+export RELEASE=<release#>
+git fetch # if you didn't need to clone
+git checkout master
+git merge integration # resolve any conflicts and commit
+EDITOR .gitmodules # update referenced branches to master
+git add .gitmodules
+# cut and paste the commands below as it much faster that way.  can't use "foreach" anymore because heaviside doesn't get same release numbers.
+git -C lib/heaviside.git checkout master
+git -C lib/heaviside.git pull
+git -C salt_stack/salt/boss-tools/files/boss-tools.git checkout tags/$RELEASE
+git -C salt_stack/salt/boss/files/boss.git checkout tags/$RELEASE
+git -C salt_stack/salt/ingest-client/files/ingest-client.git checkout tags/$RELEASE
+git -C salt_stack/salt/ndingest/files/ndingest.git checkout tags/$RELEASE
+git -C salt_stack/salt/proofreader-web/files/proofread.git checkout tags/$RELEASE
+git -C salt_stack/salt/spdb/files/spdb.git tags/$RELEASE
+
+git add salt_stack/*
 # Review the SHA hash for each submodule to make sure it correctly points to the
 #   tagged version
-* $ git submodule foreach "git status"
+git submodule foreach "git status"
 # Compare with the actual repos using this command, in actual repo
-* $ git log --pretty=format:'%h' -n 1
-$ git commit -m "Updated submodule references"
-$ git tag <release#>
-$ git push --tags
-$ git push
+git log --pretty=format:'%h' -n 1
+git commit -m "Updated submodule references"
+git tag $RELEASE
+git push --tags
+git push
 ```
 
 ## Building tagged AMIs
