@@ -26,20 +26,19 @@
 #
 ### END INIT INFO
 
-import os
 import bossutils
 
 bossutils.utils.set_excepthook()
 logging = bossutils.logger.BossLogger().logger
+
 
 def django_initialize():
     logging.info("Get migration settings from S3")
     mm = bossutils.migration_manager.MigrationManager()
     migration_success = mm.get_migrations()
     if not migration_success:
-        logging.info("getting migrations from s3 failed.  Skipping makemigrations, migrate")  # and stopping nginx, uwsgi-emeror"
-        #bossutils.utils.execute("sudo service uwsgi-emperor stop")
-        #bossutils.utils.execute("sudo service nginx stop")
+        logging.info("getting migrations from s3 failed.  Skipping makemigrations, migrate")
+        return False
     else:
         logging.info("Finished getting migration settings")
 
@@ -65,10 +64,11 @@ def django_initialize():
                 "At least one migration failed when putting them in s3.")
         else:
             logging.info("Migrations")
+        return True
 
 if __name__ == '__main__':
-    django_initialize()
-
+    sucessful_initialization = django_initialize()
 
     # Since the service is to be run once, disable it
-    bossutils.utils.stop_firstboot()
+    if sucessful_initialization:
+        bossutils.utils.stop_firstboot()
