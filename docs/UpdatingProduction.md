@@ -17,7 +17,8 @@ Integration Stack except for Tag and Merge)
 ## Tag and Merge
 Follow the instructions in  [TagAndMerge.md](TagAndMerge.md) to create 
 AMIs for sprintXX.  These instructions are still valid however I tend build production based off of the latest AMIs and
-only after the process is finished to I copy the latest AMIs and label them sprintXX.
+only after the process is finished to I copy the latest AMIs and label them sprintXX.  It is not unusual to discover an 
+error during the update process that causes a code change and a rebuild of an AMI.
 
 ## AWS Credentials File
 Make sure your:
@@ -264,7 +265,7 @@ sudo nose2
 sudo nose2 -c inttest.cfg
 ```
 
-##### Test the ndingest library.
+##### 
 Test while logged onto the Endpoint VM
 ```shell
 # Manual install for now.  Will likely remove use of pytest in the future.
@@ -276,7 +277,7 @@ pytest -c test_apl.cfg
 ```
 
 ### Cachemanager Integration Tests
-
+Test the ndingest library.
 #### Test While Logged onto the Cachemanager VM
 
 ```shell
@@ -393,7 +394,7 @@ To be filled out
 
 ### Manual Checks
 * https://api.theboss.io/ping/
-* https://api.theboss.io/v0.8/collection/
+* https://api.theboss.io/latest/collection/
 * Login into Scalyr and verify that the new instances appear on the overview page.
 * Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint
 
