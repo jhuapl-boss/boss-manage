@@ -32,7 +32,7 @@ make-domain:
 make-requirements:
     file.managed:
         - name: /home/ec2-user/requirements.txt
-        - source: salt://lambda-dev/files/requirements.txt
+        - source: salt://boss-tools/files/boss-tools.git/lambda/requirements.txt
         - mode: 755
         - user: {{ user }}
         - group: {{ user }}
