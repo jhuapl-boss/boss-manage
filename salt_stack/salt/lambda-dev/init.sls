@@ -29,6 +29,13 @@ make-domain:
         - user: {{ user }}
         - group: {{ user }}
 
+make-requirements:
+    file.managed:
+        - name: /home/ec2-user/requirements.txt
+        - source: salt://lambda-dev/files/requirements.txt
+        - mode: 755
+        - user: {{ user }}
+        - group: {{ user }}
 
 run-base:
     cmd.run:
