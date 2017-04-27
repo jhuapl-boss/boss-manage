@@ -72,7 +72,7 @@ def get_lambda_zip_name(domain):
     Returns:
         (string)
     """
-    return 'multilambda.{}.zip'.format(domain)
+    return 'downsample_volume.{}.zip'.format(domain)
 
 def update_lambda_code(session, domain, bucket):
     names = AWSNames(domain)
@@ -96,28 +96,54 @@ def load_lambdas_on_s3(session, domain, bucket):
         session (Session): boto3.Session
         domain (string): The VPC's domain name such as integration.boss.
     """
+    lambda_name = "downsample_volume"
+
+
     tempname = tempfile.NamedTemporaryFile(delete=True)
     zipname = tempname.name + '.zip'
     tempname.close()
     print('Using temp zip file: ' + zipname)
 
     cwd = os.getcwd()
-    os.chdir(const.repo_path("salt_stack", "salt", "spdb", "files"))
-    zip.write_to_zip('spdb.git', zipname, False)
-    os.chdir(cwd)
+    os.chdir(const.repo_path("salt_stack", "salt", "boss-tools", "files", "boss-tools.git", "lambda"))
+    zip.write_to_zip(lambda_name + '.py', zipname, False) # Create a new zip file
 
-    os.chdir(const.repo_path("salt_stack", "salt", "boss-tools", "files", "boss-tools.git"))
-    zip.write_to_zip('bossutils', zipname)
-    zip.write_to_zip('lambda', zipname)
-    zip.write_to_zip('lambdautils', zipname)
-    os.chdir(cwd)
+    requirements = lambda_name + '.requirements'
+    if os.path.exists(requirements):
+        zip.write_to_zip(requirements, zipname, arcname='requirements.txt')
 
-    with open(NDINGEST_SETTINGS_TEMPLATE, 'r') as tmpl:
-        # Generate settings.ini file for ndingest.
-        create_ndingest_settings(domain, tmpl)
+    packages = lambda_name + '.packages'
+    if os.path.exists(packages):
+        zip.write_to_zip(packages, zipname, arcname='packages.txt')
 
-    os.chdir(const.repo_path("salt_stack", "salt", "ndingest", "files"))
-    zip.write_to_zip('ndingest.git', zipname)
+    boss = lambda_name + '.boss'
+    if os.path.exists(boss):
+        with open(boss, 'r') as fh:
+            boss = [l.strip() for l in fh.read().split('\n')]
+    else:
+        boss = []
+
+    site_pkgs = "lib/python3.5/site-packages/"
+    if 'multidimensional' in boss:
+        os.chdir(const.repo_path("salt_stack", "salt", "boss-tools", "files", "boss-tools.git", "activities"))
+        zip.write_to_zip('multidimensional.py', zipname, arcname=site_pkgs + "multidimensional/__init__.py")
+
+    if 'bossutils' in boss:
+        os.chdir(const.repo_path("salt_stack", "salt", "boss-tools", "files", "boss-tools.git"))
+        zip.write_to_zip('bossutils', zipname, arcname=site_pkgs + 'bossutils')
+
+    if 'spdb' in boss:
+        os.chdir(const.repo_path("salt_stack", "salt", "spdb", "files"))
+        zip.write_to_zip('spdb.git', zipname, arcname=site_pkgs + 'spdb')
+
+    if 'ndingest' in boss:
+        with open(NDINGEST_SETTINGS_TEMPLATE, 'r') as tmpl:
+            # Generate settings.ini file for ndingest.
+            create_ndingest_settings(domain, tmpl)
+
+        os.chdir(const.repo_path("salt_stack", "salt", "ndingest", "files"))
+        zip.write_to_zip('ndingest.git', zipname, arcname=site_pkgs + 'ndingest')
+
     os.chdir(cwd)
 
     print("Copying local modules to lambda-build-server")
@@ -127,7 +153,7 @@ def load_lambdas_on_s3(session, domain, bucket):
     lambda_build_server_key = aws.get_lambda_server_key(session)
     lambda_build_server_key = utils.keypair_to_file(lambda_build_server_key)
     ssh = SSHConnection(lambda_build_server_key, (lambda_build_server, 22, 'ec2-user'))
-    target_file = "sitezips/{}.zip".format(domain)
+    target_file = "sitezips/{}.{}.zip".format(lambda_name, domain)
     ret = ssh.scp(zipname, target_file, upload=True)
     print("scp return code: " + str(ret))
 
@@ -135,7 +161,7 @@ def load_lambdas_on_s3(session, domain, bucket):
 
     # This section will run makedomainenv on lambda-build-server
     print("calling makedomainenv on lambda-build-server")
-    cmd = 'source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {} {}'.format(domain, bucket)
+    cmd = 'source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {}.{} {}'.format(lambda_name, domain, bucket)
     ssh.cmd(cmd)
 
 def create_ndingest_settings(domain, fp):
@@ -188,4 +214,4 @@ if __name__ == '__main__':
     bucket = aws.get_lambda_s3_bucket(session)
 
     load_lambdas_on_s3(session, args.domain, bucket)
-    update_lambda_code(session, args.domain, bucket)
+    #update_lambda_code(session, args.domain, bucket)

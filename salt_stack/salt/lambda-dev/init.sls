@@ -9,15 +9,11 @@
 {% set lambda_home = venv_home + '/local/lib/python3.4/site-packages/lambda' %}
 {% set lambdautils_home = venv_home + '/local/lib/python3.4/site-packages/lambdautils' %}
 
-
 make-base:
     file.managed:
         - name: /home/ec2-user/makebaseenv
         - source: salt://lambda-dev/files/makebaseenv
         - mode: 755
-
-        - user: {{ user }}
-        - group: {{ user }}
         - user: {{ user }}
         - group: {{ user }}
 
@@ -25,6 +21,14 @@ make-domain:
     file.managed:
         - name: /home/ec2-user/makedomainenv
         - source: salt://lambda-dev/files/makedomainenv
+        - mode: 755
+        - user: {{ user }}
+        - group: {{ user }}
+
+make-upload:
+    file.managed:
+        - name: /home/ec2-user/deploy_lambdas.py
+        - source: salt://boss-tools/files/boss-tools.git/lambdautils/deploy_lambdas.py
         - mode: 755
         - user: {{ user }}
         - group: {{ user }}
@@ -37,14 +41,22 @@ make-requirements:
         - user: {{ user }}
         - group: {{ user }}
 
-run-base:
+python35:
+    pkg.installed:
+        - pkgs:
+            - python27-pip.noarch
+            - python35.x86_64
+            - python35-pip.noarch
+            - python35-virtualenv.noarch
     cmd.run:
         - name: |
-            cd /home/ec2-user
-            source ./makebaseenv
-        - require:
-            - file: make-base
+            sudo python3 -m pip install boto3
+            sudo yum groupinstall -y "Development Tools"
+
+environment:
+    file.directory:
+        - name: /home/ec2-user/sitezips
         - user: {{ user }}
         - group: {{ user }}
-
+        - dir_mod: 755
 
