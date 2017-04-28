@@ -1,0 +1,21 @@
+#! /usr/bin/env bash
+# sets up virtualenv
+
+cd /home/ec2-user
+sudo yum groupinstall -y "Development Tools"
+
+# pip and virtualenv had issues when installed with yum.  Had to install using the method below to work correctly.
+#sudo yum install -y python34.x86_64 python34-devel.x86_64
+#curl https://bootstrap.pypa.io/get-pip.py > get-pip.py
+#sudo python3 get-pip.py
+sudo python3 -m pip install virtualenv
+ 
+sudo yum install -y libjpeg-turbo-devel.x86_64 zlib-devel.x86_64 libtiff-devel.x86_64 freetype.x86_64 lcms2-devel.x86_64 libwebp-devel.x86_64 openjpeg-devel.x86_64
+
+# needed for BLAS
+sudo yum install -y atlas atlas-devel lapack-devel blas-devel
+
+mkdir ~/sitezips
+mkdir ~/lambdazips
+mkdir ~/debug
+mkdir ~/virtualenvs

@@ -27,6 +27,9 @@ base:
     'lambda*':
         - lambda-dev
 
+    'build-lambda*':
+        - build-lambda*
+
     'ep-jenkins*':
         - jenkins-microns.endpoint
 
