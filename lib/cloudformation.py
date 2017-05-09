@@ -921,7 +921,7 @@ class CloudFormationConfiguration:
             "Properties" : {
                 "Engine" : "mysql",
                 "LicenseModel" : "general-public-license",
-                "EngineVersion" : "5.6.23",
+                "EngineVersion" : "5.6.34",
                 "DBInstanceClass" : get_scenario(type_, "db.t2.micro"),
                 "MultiAZ" : multi_az,
                 "StorageType" : "standard",
