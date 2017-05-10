@@ -21,16 +21,19 @@ from .constants import repo_path
 sys.path.append(repo_path('lib', 'heaviside.git'))
 import heaviside
 
+
 class BossStateMachine(heaviside.StateMachine):
+
     def __init__(self, name, domain, session):
         super().__init__(name, session=session)
 
         if domain:
             self.domain = domain.replace('.', '-')
+        self.__translate = self._translate
 
-    def _translate(self, type_, function):
-        function = "{}-{}".format(function, self.domain)
-        return super()._translate(type_, function)
+        def _translate(type_, function):
+            return self.__translate(type_, "{}-{}".format(function, self.domain))
+        self._translate = _translate
 
 def create(session, name, domain, sfn_file, role):
     filepath = repo_path('cloud_formation', 'stepfunctions', sfn_file)
