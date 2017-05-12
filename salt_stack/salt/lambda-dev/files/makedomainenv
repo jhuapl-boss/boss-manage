@@ -23,6 +23,8 @@ else
    python3 -m virtualenv ~/virtualenvs/$1 
    source ~/virtualenvs/$1/bin/activate
 
+   pip install --upgrade pip
+
    #workon $1
    env > ~/debug/env-before-${STARTTIME}.txt
    
@@ -32,6 +34,7 @@ else
 
    if [ -f packages.txt ] ; then
        sudo yum install -y `tr '\n' ' ' < packages.txt`
+       # DP TODO: Check return status
 
        # Assume atlas, blas, and lapack are all requested
        grep atlas packages.txt
@@ -50,9 +53,11 @@ else
 
    if [ -f requirements.txt ] ; then
        pip install -r requirements.txt
+       # DP TODO: Check return status
    fi
 
    # set the correct log config
+   pushd lib/python3.5/dist-packages/
    if [ -d bossutils ] ; then
        echo configuring logging
        pushd bossutils
@@ -71,10 +76,17 @@ else
        popd
        popd
    fi
+   popd
 
    # (SH) When virtualenv fails, numpy is not listed in freeze.  This check will help debug the problem when it occurs again.
    pip freeze | grep numpy
-   if [ $? -eq 0 ]
+   READY=$?
+
+   # DP: Done here so that deploy_lambdas.py uses the system environment, not the virtualenv
+   echo deactivating
+   deactivate
+
+   if [ $READY -eq 0 ]
    then
        echo virtualenv installed correctly.
        # removing debug files since virtualenv successfully installed
@@ -90,9 +102,9 @@ else
           rm  ~/lambdazips/${1}.zip
        fi
        cd ~/virtualenvs/${1}
-       zip -r -q ~/lambdazips/${1}.zip ${1}.py
+       zip ~/lambdazips/${1}.zip *.py
 
-       cd ~/virtualenvs/${1}/lib/python3.5/site-packages
+       cd ~/virtualenvs/${1}/lib/python3.5/dist-packages
        zip -r -q ~/lambdazips/${1}.zip .
 
        if [ -d ~/lambdazips/$1 ]; then
@@ -101,8 +113,10 @@ else
        mkdir ~/lambdazips/$1
        cd ~/lambdazips/$1
        unzip -q ~/lambdazips/${1}.zip
-       rm -rf lib64
-       ln -s lib lib64
+       rm -r *.dist-info
+       ls
+       #rm -rf lib64
+       #ln -s lib lib64
        #rm -rf local
        #mkdir local
        #cd local
@@ -123,7 +137,5 @@ else
        env > ~/debug/env-after-failing-${STARTTIME}.txt
        find /usr -print > ~/debug/usr-after-failing-${STARTTIME}.txt
    fi
-   echo deactivating
-   deactivate
 fi
 

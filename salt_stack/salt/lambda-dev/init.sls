@@ -46,10 +46,14 @@ python35:
         - pkgs:
             - python27-pip.noarch
             - python35.x86_64
-            - python35-pip.noarch
-            - python35-virtualenv.noarch
+            - python35-devel.x86_64 # needed to compile C extensions
+            #- python35-pip.noarch
+            #- python35-virtualenv.noarch
     cmd.run:
         - name: |
+            curl https://bootstrap.pypa.io/get-pip.py > /tmp/get-pip.py
+            sudo python3 /tmp/get-pip.py
+            sudo python3 -m pip install virtualenv
             sudo python3 -m pip install boto3
             sudo yum groupinstall -y "Development Tools"
 

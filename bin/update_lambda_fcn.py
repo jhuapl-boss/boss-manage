@@ -123,7 +123,7 @@ def load_lambdas_on_s3(session, domain, bucket):
     else:
         boss = []
 
-    site_pkgs = "lib/python3.5/site-packages/"
+    site_pkgs = "lib/python3.5/dist-packages/"
     if 'multidimensional' in boss:
         os.chdir(const.repo_path("salt_stack", "salt", "boss-tools", "files", "boss-tools.git", "activities"))
         zip.write_to_zip('multidimensional.py', zipname, arcname=site_pkgs + "multidimensional/__init__.py")
