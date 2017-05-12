@@ -60,32 +60,33 @@ NDINGEST_SETTINGS_FOLDER = const.repo_path('salt_stack', 'salt', 'ndingest', 'fi
 # Template used for ndingest settings.ini generation.
 NDINGEST_SETTINGS_TEMPLATE = NDINGEST_SETTINGS_FOLDER + '/settings.ini.apl'
 
-def get_lambda_zip_name(domain):
+def get_lambda_zip_name(lambda_name, domain):
     """Get name of zip file containing lambda.
 
     This must match the name created in the makedomainenv script that runs on
     the lambda build server.
 
     Args:
+        lambda_name (string): Name of the lambda to build
         domain (string): The VPC's domain name such as integration.boss.
 
     Returns:
         (string)
     """
-    return 'downsample_volume.{}.zip'.format(domain)
+    return '{}.{}.zip'.format(lambda_name, domain)
 
-def update_lambda_code(session, domain, bucket):
+def update_lambda_code(session, lambda_name, domain, bucket):
     names = AWSNames(domain)
     client = session.client('lambda')
     resp = client.update_function_code(
-        FunctionName=names.multi_lambda,
+        FunctionName=names.__getattr__(lambda_name),
         S3Bucket=bucket,
-        S3Key=get_lambda_zip_name(domain),
+        S3Key=get_lambda_zip_name(lambda_name, domain),
         Publish=True)
     print(resp)
 
 # DP TODO: Move to a lib/ library
-def load_lambdas_on_s3(session, domain, bucket):
+def load_lambdas_on_s3(session, lambda_name, domain, bucket):
     """Zip up spdb, bossutils, lambda and lambda_utils.  Upload to S3.
 
     Uses the lambda build server (an Amazon Linux AMI) to compile C code and
@@ -94,19 +95,20 @@ def load_lambdas_on_s3(session, domain, bucket):
 
     Args:
         session (Session): boto3.Session
+        lambda_name (string): Name of the lambda to build
         domain (string): The VPC's domain name such as integration.boss.
     """
-    lambda_name = "downsample_volume"
-
-
     tempname = tempfile.NamedTemporaryFile(delete=True)
     zipname = tempname.name + '.zip'
     tempname.close()
     print('Using temp zip file: ' + zipname)
 
+    is_multi = lambda_name == "multi_lambda"
+
     cwd = os.getcwd()
     os.chdir(const.repo_path("salt_stack", "salt", "boss-tools", "files", "boss-tools.git", "lambda"))
-    zip.write_to_zip(lambda_name + '.py', zipname, False) # Create a new zip file
+    if not is_multi:
+        zip.write_to_zip(lambda_name + '.py', zipname, False) # Create a new zip file
 
     requirements = lambda_name + '.requirements'
     if os.path.exists(requirements):
@@ -124,6 +126,14 @@ def load_lambdas_on_s3(session, domain, bucket):
         boss = []
 
     site_pkgs = "lib/python3.5/dist-packages/"
+    if is_multi:
+        os.chdir(const.repo_path("salt_stack", "salt", "boss-tools", "files", "boss-tools.git"))
+        zip.write_to_zip('lambda', zipname, arcname=site_pkgs + "lambda")
+        zip.write_to_zip('lambdautils', zipname, arcname=site_pkgs + "lambdautils")
+
+        os.chdir(const.repo_path("salt_stack", "salt", "boss-tools", "files", "boss-tools.git", "lambda"))
+        zip.write_to_zip('lambda_loader.py', zipname)
+
     if 'multidimensional' in boss:
         os.chdir(const.repo_path("salt_stack", "salt", "boss-tools", "files", "boss-tools.git", "activities"))
         zip.write_to_zip('multidimensional.py', zipname, arcname=site_pkgs + "multidimensional/__init__.py")
@@ -200,6 +210,8 @@ if __name__ == '__main__':
                         default = os.environ.get('AWS_CREDENTIALS'),
                         type = argparse.FileType('r'),
                         help = 'File with credentials for connecting to AWS (default: AWS_CREDENTIALS)')
+    parser.add_argument('name',
+                        help = 'Name of the lambda function to build')
     parser.add_argument('domain',
                         help = 'Domain that lambda functions live in, such as integration.boss.')
 
@@ -213,5 +225,5 @@ if __name__ == '__main__':
     session = aws.create_session(args.aws_credentials)
     bucket = aws.get_lambda_s3_bucket(session)
 
-    load_lambdas_on_s3(session, args.domain, bucket)
-    #update_lambda_code(session, args.domain, bucket)
+    load_lambdas_on_s3(session, args.name, args.domain, bucket)
+    update_lambda_code(session, args.name, args.domain, bucket)

@@ -101,32 +101,51 @@ else
        if [ -e  ~/lambdazips/${1}.zip ]; then
           rm  ~/lambdazips/${1}.zip
        fi
-       cd ~/virtualenvs/${1}
-       zip ~/lambdazips/${1}.zip *.py
 
-       cd ~/virtualenvs/${1}/lib/python3.5/dist-packages
-       zip -r -q ~/lambdazips/${1}.zip .
+       cd ~/virtualenvs/${1}
+
+       chmod -R 775 ./lib/python3.5/dist-packages
+
+       if [[ $1 == multi* ]]; then
+           zip -r -q ~/lambdazips/${1}.zip .
+       else # not multi lambda
+           zip ~/lambdazips/${1}.zip *.py
+
+           cd ~/virtualenvs/${1}/lib/python3.5/dist-packages
+           zip -r -q ~/lambdazips/${1}.zip .
+       fi
 
        if [ -d ~/lambdazips/$1 ]; then
           rm -rf ~/lambdazips/$1
        fi
+
        mkdir ~/lambdazips/$1
        cd ~/lambdazips/$1
        unzip -q ~/lambdazips/${1}.zip
-       rm -r *.dist-info
-       ls
-       #rm -rf lib64
-       #ln -s lib lib64
-       #rm -rf local
-       #mkdir local
-       #cd local
-       #ln -s ../bin bin
-       #ln -s ../include include
-       #ln -s ../lib lib
-       #ln -s ../lib64 lib64
-       #chmod -R 775 ./lib/python3.4/site-packages
-       ## fix put in because aws python2.7 now can't import a path with a period in it. (like python3.4)
-       #cp lib64/python3.4/site-packages/lambda/lambda_loader.py .
+
+       if [[ $1 == multi* ]]; then
+           rm -rf lib64
+           ln -s lib lib64
+           rm -rf local
+           mkdir local
+           cd local
+           ln -s ../bin bin
+           ln -s ../include include
+           ln -s ../lib lib
+           ln -s ../lib64 lib64
+
+           ## fix put in because aws python2.7 now can't import a path with a period in it. (like python3.4)
+           #cp lib64/python3.4/site-packages/lambda/lambda_loader.py .
+           mv ../lambda_loader.py ./
+       else # not multi lambda
+           rm -r *.dist-info
+           rm -r boto*
+           rm -r nose2
+           rm -r __pycache__
+           ls
+           du -bcs
+       fi
+
        cd ~/lambdazips/$1
        rm ~/lambdazips/${1}.zip
        zip --symlinks -r -q  ~/lambdazips/${1}.zip .
