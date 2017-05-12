@@ -92,6 +92,7 @@ class AWSNames(object):
         'ingest_queue_populate': 'Ingest.Populate',
         'ingest_queue_upload': 'Ingest.Upload',
         'ingest_lambda': 'IngestUpload',
+        'downsample_volume': 'DownsampleVolume',
     }
 
     def __getattr__(self, name):
@@ -105,7 +106,7 @@ class AWSNames(object):
         fq_hostname = hostname + self.base_dot
 
         if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'consul_monitor', 'vault_consul_check',
-                    'delete_lambda', 'ingest_lambda']:
+                    'delete_lambda', 'ingest_lambda', 'downsample_volume']:
             fq_hostname = fq_hostname.replace('.','-')
 
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
