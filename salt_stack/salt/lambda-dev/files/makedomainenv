@@ -8,10 +8,14 @@ if [ "$#" -ne 2 ]; then
 else
    STARTTIME=`date +"%Y%m%d-%H%M%S"`
    cd /home/ec2-user
+   #export WORKON_HOME=~/virtualenvs
+   #export VIRTUALENVWRAPPER_PYTHON='/usr/bin/python' # This needs to be placed before the virtualenvwrapper command
+   #source /usr/local/bin/virtualenvwrapper.sh
 
-   if [ ! -d ~/debug ] ; then mkdir ~/debug; fi
-   if [ ! -d ~/virtualenvs ] ; then mkdir ~/virtualenvs; fi
-   if [ ! -d ~/lambdazips ] ; then mkdir ~/lambdazips; fi
+   # needed for BLAS before installing numpy
+   export ATLAS=./usr/lib64/atlas/libatlas.so
+   export BLAS=./usr/lib64/atlas/libptf77blas.so
+   export LAPACK=./usr/lib64/atlas/liblapack.so
 
    # Creating env and usr files to help debug when virtualenv fails to install correctly.
    find /usr -print > ~/debug/usr-before-${STARTTIME}.txt
@@ -23,138 +27,99 @@ else
    python3 -m virtualenv ~/virtualenvs/$1 
    source ~/virtualenvs/$1/bin/activate
 
-   pip install --upgrade pip
+   # copy the BLAS libraries into relative directories
+   mkdir ~/virtualenvs/$1/lib64/atlas
+   cp /usr/lib64/atlas/libatlas.so ~/virtualenvs/$1/lib64/atlas
+   cp /usr/lib64/atlas/libptf77blas.so ~/virtualenvs/$1/lib64/atlas
+   cp /usr/lib64/atlas/liblapack.so ~/virtualenvs/$1/lib64/atlas
 
    #workon $1
    env > ~/debug/env-before-${STARTTIME}.txt
    
-   cd ~/virtualenvs/$1/
+   #pip install --upgrade pip
+
+
+   cd ~/virtualenvs/$1/lib/python3.4/site-packages
    # cloud formation config should have already zipped spdb, lambda, lambda-utils and bossutils from local machine.
-   unzip /home/ec2-user/sitezips/${1}.zip -d .
+   unzip /home/ec2-user/sitezips/${1}.zip -d /home/ec2-user/virtualenvs/$1/lib/python3.4/site-packages
+   #unzip /home/ec2-user/sitezips/${1}.zip -d /home/ec2-user/virtualenvs/$1/local/lib/python3.4/site-packages
 
-   if [ -f packages.txt ] ; then
-       sudo yum install -y `tr '\n' ' ' < packages.txt`
-       # DP TODO: Check return status
+   #cp -r ~/spdb $WORKON_HOME/$1/local/lib/python3.4/site-packages/spdb.git
 
-       # Assume atlas, blas, and lapack are all requested
-       grep atlas packages.txt
-       if [ $? -eq 0 ] ; then
-           mkdir ~/virtualenvs/${1}/lib64/atlas
-
-           export ATLAS=./usr/lib64/atlas/libatlas.so
-           export BLAS=./usr/lib64/atlas/libptf77blas.so
-           export LAPACK=./usr/lib64/atlas/liblapack.so
-
-           cp /usr/lib64/atlas/libatlas.so ~/virtualenvs/${1}/lib64/atlas
-           cp /usr/lib64/atlas/libptf77blas.so ~/virtualenvs/${1}/lib64/atlas
-           cp /usr/lib64/atlas/liblapack.so ~/virtualenvs/${1}/lib64/atlas
-       fi
-   fi
-
-   if [ -f requirements.txt ] ; then
-       pip install -r requirements.txt
-       # DP TODO: Check return status
-   fi
+   #cd ~/virtualenvs/$1/local/lib/python3.4/site-packages
 
    # set the correct log config
-   pushd lib/python3.5/dist-packages/
-   if [ -d bossutils ] ; then
-       echo configuring logging
-       pushd bossutils
-       mv ./lambda_logger_conf.json ./logger_conf.json
-       popd
-   fi
+   echo configuring logging
+   cd ~/virtualenvs/$1/local/lib/python3.4/site-packages/bossutils/
+   mv ./lambda_logger_conf.json ./logger_conf.json
 
-   if [ -d spdb ] ; then
-       # Fix spdb folder name.
-       pushd spdb
-       pip install -r requirements.txt
+   cd ~/virtualenvs/$1/lib/python3.4/site-packages
 
-       pushd c_lib/c_version
-       cp makefile_LINUX makefile
-       make
-       popd
-       popd
-   fi
-   popd
+   # Fix ndingest folder name.
+   mv ndingest.git ndingest
+
+   # Fix spdb folder name.
+   mv spdb.git spdb
+   cd spdb
+   pip install -r requirements.txt
+
+   cd c_lib/c_version
+   cp makefile_LINUX makefile
+   make
 
    # (SH) When virtualenv fails, numpy is not listed in freeze.  This check will help debug the problem when it occurs again.
    pip freeze | grep numpy
-   READY=$?
-
-   # DP: Done here so that deploy_lambdas.py uses the system environment, not the virtualenv
-   echo deactivating
-   deactivate
-
-   if [ $READY -eq 0 ]
+   if [ $? -eq 0 ]
    then
        echo virtualenv installed correctly.
        # removing debug files since virtualenv successfully installed
        rm ~/debug/usr-before-${STARTTIME}.txt
        rm  ~/debug/env-before-${STARTTIME}.txt
        echo zipping up lambda and sending to s3
+       if [ -e ~/lambdazips/lambda.${1}.zip ]
+       then
+          rm ~/lambdazips/lambda.${1}.zip
+       fi
        # we need to create a zip file with external symlinks removed but leave relative simlinks in place. We do 
        # this because there is limit disk space in the lambda environment.  So we zip up virtualenv, which 
        # converts all symlinks to underlying files.  Then we unzip and convert ./local and ./lib64 back to relative 
        # symlinks, like there were originally (saving space), then we zip again with --symlinks option added, this 
        # keeps the symlinks in place.     
-       if [ -e  ~/lambdazips/${1}.zip ]; then
-          rm  ~/lambdazips/${1}.zip
+       if [ -e  ~/lambdazips/multilambda.${1}.zip ]; then
+          rm  ~/lambdazips/multilambda.${1}.zip
        fi
-
        cd ~/virtualenvs/${1}
-
-       chmod -R 775 ./lib/python3.5/dist-packages
-
-       if [[ $1 == multi* ]]; then
-           zip -r -q ~/lambdazips/${1}.zip .
-       else # not multi lambda
-           zip ~/lambdazips/${1}.zip *.py
-
-           cd ~/virtualenvs/${1}/lib/python3.5/dist-packages
-           zip -r -q ~/lambdazips/${1}.zip .
-       fi
+       zip -r -q  ~/lambdazips/multilambda.${1}.zip .
 
        if [ -d ~/lambdazips/$1 ]; then
           rm -rf ~/lambdazips/$1
        fi
-
        mkdir ~/lambdazips/$1
        cd ~/lambdazips/$1
-       unzip -q ~/lambdazips/${1}.zip
-
-       if [[ $1 == multi* ]]; then
-           rm -rf lib64
-           ln -s lib lib64
-           rm -rf local
-           mkdir local
-           cd local
-           ln -s ../bin bin
-           ln -s ../include include
-           ln -s ../lib lib
-           ln -s ../lib64 lib64
-
-           ## fix put in because aws python2.7 now can't import a path with a period in it. (like python3.4)
-           #cp lib64/python3.4/site-packages/lambda/lambda_loader.py .
-           mv ../lambda_loader.py ./
-       else # not multi lambda
-           rm -r *.dist-info
-           rm -r boto*
-           rm -r nose2
-           rm -r __pycache__
-           ls
-           du -bcs
-       fi
-
+       unzip -q ~/lambdazips/multilambda.${1}.zip
+       rm -rf lib64
+       ln -s lib lib64
+       rm -rf local
+       mkdir local
+       cd local
+       ln -s ../bin bin
+       ln -s ../include include
+       ln -s ../lib lib
+       ln -s ../lib64 lib64
+       chmod -R 775 ./lib/python3.4/site-packages
+       # fix put in because aws python2.7 now can't import a path with a period in it. (like python3.4)
+       cp lib64/python3.4/site-packages/lambda/lambda_loader.py .
        cd ~/lambdazips/$1
-       rm ~/lambdazips/${1}.zip
-       zip --symlinks -r -q  ~/lambdazips/${1}.zip .
+       rm ~/lambdazips/multilambda.${1}.zip
+       zip --symlinks -r -q  ~/lambdazips/multilambda.${1}.zip .
 
-       ~/deploy_lambdas.py /home/ec2-user/virtualenvs/$1 ~/lambdazips/${1}.zip $2 --upload-only
+       python ~/virtualenvs/${1}/lib/python3.4/site-packages/lambdautils/deploy_lambdas.py /home/ec2-user/virtualenvs/$1 ~/lambdazips/multilambda.${1}.zip $2 --upload-only
    else
        echo Virtualenv not working correctly.  Not creating lambda zip.
        env > ~/debug/env-after-failing-${STARTTIME}.txt
        find /usr -print > ~/debug/usr-after-failing-${STARTTIME}.txt
    fi
+   echo deactivating
+   deactivate
 fi
 
