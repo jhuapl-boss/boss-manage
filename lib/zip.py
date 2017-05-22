@@ -62,7 +62,11 @@ def write_to_zip(path, zippath, append=True, arcname=None):
     fzip = zipfile.ZipFile(zippath, mode, zipfile.ZIP_DEFLATED)
     if os.path.isdir(path):
         for root, dirs, files in os.walk(path):
-            dst = root.replace(path, arcname)
+            if arcname is not None:
+                dst = root.replace(path, arcname)
+            else:
+                dst = root
+
             if '.git' in dirs:
                 dirs.remove('.git')
             for d in dirs:
