@@ -1591,7 +1591,7 @@ class CloudFormationConfiguration:
         }
 
 
-    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None):
+    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python2.7"):
         """Create a Python Lambda
 
         Args:
@@ -1610,6 +1610,7 @@ class CloudFormationConfiguration:
             subnets (None|list) : List of ids of subnets to grant the lambda access to
             depends_on (None|string|list) : A unique name or list of unique names of resources within the
                                             configuration and is used to determine the launch order of resources
+            runtime (optional[string]) : Lambda runtime to use.  Defaults to "python2.7".
         """
 
         if file is not None:
@@ -1648,7 +1649,7 @@ class CloudFormationConfiguration:
                 "Handler": handler,
                 "MemorySize": memory,
                 "Role": role,
-                "Runtime": "python2.7",
+                "Runtime": runtime,
                 "Timeout": int(timeout)
             }
         }
