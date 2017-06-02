@@ -22,6 +22,7 @@ $ git add salt_stack/salt/proofreader-web/files/proofread.git
 $ git add salt_stack/salt/spdb/files/spdb.git
 $ git add salt_stack/salt/ndingest/files/ndingest.git
 $ git add salt_stack/salt/ingest-client/files/ingest-client.git
+$ git add cloud_formation/lambda/dynamodb-lambda-autoscale
 $ git commit -m "Updated submodule references"
 $ git push
 ```
@@ -115,8 +116,9 @@ Stacks need to be deleted.
 $ cd bin/
 $ source ../config/set_vars.sh
 
-# Deletion of cloudwatch, api, actvities and cachedb can probably
+# Deletion of cloudwatch, api, actvities, cachedb, and dynamolambda can probably
 # be done in parallel.
+$ ./cloudformation.py delete integration.boss dynamolambda
 $ ./cloudformation.py delete integration.boss cloudwatch
 $ ./cloudformation.py delete integration.boss actvities
 $ ./cloudformation.py delete integration.boss cachedb
@@ -162,11 +164,24 @@ If you are building a personal developer domain it should have this:
 
 ### Launching configs
 
-For the *core*, *api*, *cachedb*, *activities*, *cloudwatch* configurations
-run the following command. You have to wait for each command to finish before
-launching the next configuration as they build upon each other.  **Only use the
-*--scenario ha-development* flag** if you are rebuilding integration.  It is not used
-if you are following these instructions to build a developer environment.
+#### dynamolambda Requirements
+
+Building the dynamolambda configuration requires NodeJS.  Install v6.10.x from
+https://nodejs.org/en/download
+
+A `dynamo_config.template` file is required in
+`boss-manage.git/cloud_formation/configs` to set up the Slack integration.
+This file is not under source control and should have been distributed to each
+developer.
+
+#### Launching
+
+For the *core*, *api*, *cachedb*, *activities*, *cloudwatch*, and *dynamolambda*
+configurations run the following command. You have to wait for each command to
+finish before launching the next configuration as they build upon each other.  
+**Only use the *--scenario ha-development* flag** if you are rebuilding
+integration.  It is not used if you are following these instructions to build a
+developer environment.
 ```shell
 $ ./cloudformation.py create integration.boss --scenario ha-development <config>
 ```
@@ -197,7 +212,7 @@ select load balancers on left side
 click the checkbox for the loadbalancer to change
 under attributes
 Set "Idle timeout: 300 seconds"
-save and refresh the page 
+save and refresh the page
 
 ## Run unit tests on Endpoint
 
