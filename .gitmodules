@@ -29,3 +29,4 @@
 [submodule "cloud_formation/lambda/dynamodb-lambda-autoscale"]
 	path = cloud_formation/lambda/dynamodb-lambda-autoscale
 	url = https://github.com/jhuapl-boss/dynamodb-lambda-autoscale
+        branch = custom_tables
