@@ -64,6 +64,12 @@ SLACK_WEBHOOK_PATH_DEV = 'SLACK_WEBHOOK_PATH_DEV'
 # written to SLACK_WEBHOOK_PATH.
 VPC_DOMAIN =  'VPC_DOMAIN'
 
+# Used to override normal autoscale rules when creating a developer's stack.
+# All tables will use the autoscale rules defined by the "default" config to
+# avoid spending too much.  The production autoscale rules have minimums that
+# are way too high for DynamoDB tables for developers.
+DEV_STACK = 'DEV_STACK'
+
 def create_config(session, domain):
     """
     Create the CloudFormationConfiguration object.
@@ -166,6 +172,8 @@ def update_config_file(config_str, domain):
         config_str (str): String representation of config file template.
     """
     parser = configparser.ConfigParser()
+    # Disable default transform to lowercase of keys.
+    parser.optionxform = lambda option: option
     parser.read_string(config_str)
     parser.set('default', VPC_DOMAIN, domain)
 
@@ -176,6 +184,10 @@ def update_config_file(config_str, domain):
         parser.set('default', SLACK_WEBHOOK_PATH, slack_path_prod)
     else:
         parser.set('default', SLACK_WEBHOOK_PATH, slack_path_dev)
+        if domain != 'integration.boss':
+            # Override normal autoscale parameters when deploying to a
+            # developer stack.
+            parser.set('default', DEV_STACK, '')
     slack_path = parser.get('default', SLACK_WEBHOOK_PATH)
 
     # Remove stack specific variables before outputting.
