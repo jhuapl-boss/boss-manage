@@ -95,6 +95,7 @@ config/my_vars.sh
 
 # CloudFormation Templates
 cloud_formation/templates/
+cloud_formation/configs/dynamo_config.template
 
 /config/aws-credentials-prod
 /config/aws-credentials-dev
