@@ -26,3 +26,7 @@
 	path = lib/heaviside.git
 	url = https://github.com/jhuapl-boss/heaviside
 	branch = master
+[submodule "cloud_formation/lambda/dynamodb-lambda-autoscale"]
+	path = cloud_formation/lambda/dynamodb-lambda-autoscale
+	url = https://github.com/jhuapl-boss/dynamodb-lambda-autoscale
+        branch = integration

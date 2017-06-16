@@ -81,6 +81,7 @@ vault/private/
 # Scylr
 config/set_scalyr_vars.sh
 */scalyr-cfg.json
+salt_stack/pillar/scalyr.sls
 
 # Keycloack Stuff
 salt_stack/salt/keycloak/files/keycloak-*Final.tar.gz
@@ -94,6 +95,7 @@ config/my_vars.sh
 
 # CloudFormation Templates
 cloud_formation/templates/
+cloud_formation/configs/dynamo_config.template
 
 /config/aws-credentials-prod
 /config/aws-credentials-dev
