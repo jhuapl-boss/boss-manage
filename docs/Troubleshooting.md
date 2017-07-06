@@ -58,7 +58,7 @@
 * **Redis hitting maximum CPU**.  This causes the endpoints to slow down.  It can cause more endpoints to be created without actually helping elevate the problem.  Solution here is to have poeple start using the new no-cache option when querying. Also future design updates and optimization (like not doing a KEY XXX* operation when checking if a key exists) will help this.
 * **Too much activity** can tip over the system and cause WRITE-LOCKs to occur.  
    * The first sign of this is that lambda during times is not staying 
-constant, it means things could start getting bad.  Look for the bottleneck, is a dynamoDB table hitting capcity of throttling?  If we can not fix the problem, we need to lower the number concurrent nodes performers are using to write.  Sometimes we pause the performers for the system to catch up during heavy use.
+constant, it means things could start getting bad.  Look for the bottleneck, is a dynamoDB table hitting capacity of throttling?  If we can not fix the problem, we need to lower the number concurrent nodes performers are using to write.  Sometimes we pause the performers for the system to catch up during heavy use.
 
 
 
