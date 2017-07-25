@@ -104,6 +104,11 @@ for vpc in VPCS:
     for i in range(LAMBDA_SUBNETS):
         subnets.append('lambda{}'.format(i))
 
+    # New subnets have to be added at the end of the subnet list
+    # Because other subnets already have CIDR Ranges. This avoids conflicts when updating Integration or Production
+    subnets.append("f-internal")
+    subnets.append("f-external")
+
     for subnet in subnets:
         SUBNETS[(vpc, subnet)] = subnets.index(subnet)
 
