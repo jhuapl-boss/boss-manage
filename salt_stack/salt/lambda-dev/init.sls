@@ -4,11 +4,18 @@
 
 {% set user = 'ec2-user' %}
 {% set venv_home = '/home/' + user + '/lambdaenv' %}
-{% set spdb_home = venv_home + '/local/lib/python3.4/site-packages/spdb' %}
-{% set bossutils_home = venv_home + '/local/lib/python3.4/site-packages/bossutils' %}
-{% set lambda_home = venv_home + '/local/lib/python3.4/site-packages/lambda' %}
-{% set lambdautils_home = venv_home + '/local/lib/python3.4/site-packages/lambdautils' %}
+{% set spdb_home = venv_home + '/usr/lib/python3.6/site-packages/spdb' %}
+{% set bossutils_home = venv_home + '/usr/lib/python3.6/site-packages/bossutils' %}
+{% set lambda_home = venv_home + '/usr/lib/python3.6/site-packages/lambda' %}
+{% set lambdautils_home = venv_home + '/usr/lib/python3.6/site-packages/lambdautils' %}
 
+python36:
+    pkg.installed:
+        - name: python36
+
+python36-virtualenv:
+    pkg.installed:
+        - name: python36-virtualenv
 
 make-base:
     file.managed:
