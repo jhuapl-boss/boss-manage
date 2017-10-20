@@ -17,6 +17,10 @@ python36-virtualenv:
     pkg.installed:
         - name: python36-virtualenv
 
+python36-pip:
+    pkg.installed:
+        - name: python36-pip
+
 make-base:
     file.managed:
         - name: /home/ec2-user/makebaseenv
@@ -46,5 +50,3 @@ run-base:
             - file: make-base
         - user: {{ user }}
         - group: {{ user }}
-
-
