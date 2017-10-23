@@ -142,6 +142,7 @@ $ ./cloudformation.py delete integration.boss cloudwatch
 $ ./cloudformation.py delete integration.boss actvities
 $ ./cloudformation.py delete integration.boss cachedb
 $ ./cloudformation.py delete integration.boss api
+$ ./cloudformation.py delete integration.boss redis
 $ ./cloudformation.py delete integration.boss core
 ```
 
@@ -195,12 +196,12 @@ developer.
 
 #### Launching
 
-For the *core*, *api*, *cachedb*, *activities*, *cloudwatch*, and *dynamolambda*
-configurations run the following command. You have to wait for each command to
-finish before launching the next configuration as they build upon each other.  
-**Only use the *--scenario ha-development* flag** if you are rebuilding
-integration.  It is not used if you are following these instructions to build a
-developer environment.
+For the *core*, *redis*, *api*, *cachedb*, *activities*, *cloudwatch*, and
+*dynamolambda* configurations run the following command. You have to wait for
+each command to finish before launching the next configuration as they build
+upon each other. **Only use the *--scenario ha-development* flag** if you are
+rebuilding integration.  It is not used if you are following these instructions
+to build a developer environment.
 ```shell
 $ ./cloudformation.py create integration.boss --scenario ha-development <config>
 ```
