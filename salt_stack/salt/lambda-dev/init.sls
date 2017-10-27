@@ -11,26 +11,29 @@
 
 python36:
     pkg.installed:
-        - name: python36
+        - pkgs:
+            - python36
+            - python36-pip
+            - python36-virtualenv
 
-python36-virtualenv:
+lib-dependencies:
     pkg.installed:
-        - name: python36-virtualenv
+        - pkgs:
+            - libjpeg-turbo-devel.x86_64
+            - zlib-devel.x86_64
+            - libtiff-devel.x86_64
+            - freetype.x86_64
+            - lcms2-devel.x86_64
+            - libwebp-devel.x86_64
+            - openjpeg-devel.x86_64
 
-python36-pip:
+numpy-blosc-dependencies:
     pkg.installed:
-        - name: python36-pip
-
-make-base:
-    file.managed:
-        - name: /home/ec2-user/makebaseenv
-        - source: salt://lambda-dev/files/makebaseenv
-        - mode: 755
-
-        - user: {{ user }}
-        - group: {{ user }}
-        - user: {{ user }}
-        - group: {{ user }}
+        - pkgs:
+            - atlas
+            - atlas-devel
+            - gcc
+            - gcc-c++
 
 make-domain:
     file.managed:
@@ -40,13 +43,23 @@ make-domain:
         - user: {{ user }}
         - group: {{ user }}
 
-
-run-base:
-    cmd.run:
-        - name: |
-            cd /home/ec2-user
-            source ./makebaseenv
-        - require:
-            - file: make-base
+sitezips-dir:
+    file.directory:
+        - name: /home/ec2-user/sitezips
         - user: {{ user }}
         - group: {{ user }}
+        - dir_mode: 755
+
+lambdazips-dir:
+    file.directory:
+        - name: /home/ec2-user/lambdazips
+        - user: {{ user }}
+        - group: {{ user }}
+        - dir_mode: 755
+
+virtualenvs-dir:
+    file.directory:
+        - name: /home/ec2-user/virtualenvs
+        - user: {{ user }}
+        - group: {{ user }}
+        - dir_mode: 755

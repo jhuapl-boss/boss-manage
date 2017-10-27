@@ -64,12 +64,21 @@ LAMBDA_SUBNETS = 16 # TODO merge with constants.py variable of the same name
 PROD_ACCOUNT = "451493790433"
 PROD_DOMAIN = "theboss.io"
 PROD_LAMBDA_BUCKET = "boss-lambda-prod-env"
-PROD_LAMBDA_SERVER = "52.55.121.6"
+PROD_LAMBDA_SERVER = "54.210.116.141"
+
+# Below is the old lambda server that targets Python 3.4 in the lambda
+# deployment package.
+#PROD_LAMBDA_SERVER = "52.55.121.6"
 
 DEV_ACCOUNT = "256215146792"
 DEV_DOMAIN = "thebossdev.io"
 DEV_LAMBDA_BUCKET = "boss-lambda-env"
-DEV_LAMBDA_SERVER = "52.23.27.39"
+DEV_LAMBDA_SERVER = "54.198.232.137"
+
+# Below is the old lambda server that targets Python 3.4 in the lambda
+# deployment package.
+#DEV_LAMBDA_SERVER = "52.23.27.39"
+
 
 # Name and Subnet number (must fit within ROOT_CIDR to VPC_CIDR) of all VPCs
 VPCS = {
