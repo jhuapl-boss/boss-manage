@@ -378,6 +378,24 @@ class Vault(object):
         client = self.connect(VAULT_TOKEN)
         client.revoke_token(token)
 
+    def revoke_secret(self, lease_id):
+        """Revoke a Vault lease
+
+        Args:
+            lease_id (string) : String containing the Vault lease id to revoke
+        """
+        client = self.connect(VAULT_TOKEN)
+        client.revoke_secret(lease_id)
+
+    def revoke_secret_prefix(self, prefix):
+        """Revoke a Vault secret by prefix
+
+        Args:
+            prefix (string) : String containing the Vault secret prefix to revoke
+        """
+        client = self.connect(VAULT_TOKEN)
+        client.revoke_secret_prefix(prefix)
+
     def write(self, path, **kwargs):
         """A generic method for writing data into Vault.
 
