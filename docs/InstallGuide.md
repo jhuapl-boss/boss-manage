@@ -303,7 +303,7 @@ After you receive the certificate approval emails, turn off the mail instance.
 
 ### Launching configs
 
-For the *core*, *api*, *cachedb*, *proofreader*, *cloudwatch* configurations
+For the *core*, *redis*, *api*, *cachedb*, *activities*, *cloudwatch* *dynamolambda* configurations
 run the following command. You have to wait for each command to finish before
 launching the next configuration as they build upon each other.  **Only use the
 *--scenario production* flag** if you are rebuilding integration.  It is not used
