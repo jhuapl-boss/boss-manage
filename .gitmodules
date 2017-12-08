@@ -5,7 +5,7 @@
 [submodule "salt_stack/salt/boss/files/boss.git"]
 	path = salt_stack/salt/boss/files/boss.git
 	url = ../boss.git
-	branch = integration	
+	branch = downsample-fanout	
 [submodule "salt_stack/salt/spdb/files/spdb.git"]
 	path = salt_stack/salt/spdb/files/spdb.git
 	url = ../spdb.git
@@ -17,7 +17,7 @@
 [submodule "salt_stack/salt/ingest-client/files/ingest-client.git"]
     path = salt_stack/salt/ingest-client/files/ingest-client.git
 	url = ../ingest-client.git
-        branch = integration
+    branch = integration
 [submodule "lib/heaviside.git"]
 	path = lib/heaviside.git
 	url = ../heaviside.git
@@ -25,4 +25,4 @@
 [submodule "cloud_formation/lambda/dynamodb-lambda-autoscale"]
 	path = cloud_formation/lambda/dynamodb-lambda-autoscale
 	url = ../dynamodb-lambda-autoscale
-        branch = integration
+    branch = integration
