@@ -1,7 +1,7 @@
 [submodule "salt_stack/salt/boss-tools/files/boss-tools.git"]
 	path = salt_stack/salt/boss-tools/files/boss-tools.git
 	url = ../boss-tools.git
-	branch = integration	
+	branch = downsample-index	
 [submodule "salt_stack/salt/boss/files/boss.git"]
 	path = salt_stack/salt/boss/files/boss.git
 	url = ../boss.git
@@ -9,7 +9,7 @@
 [submodule "salt_stack/salt/spdb/files/spdb.git"]
 	path = salt_stack/salt/spdb/files/spdb.git
 	url = ../spdb.git
-	branch = integration	
+	branch = legacy_object_indices	
 [submodule "salt_stack/salt/ndingest/files/ndingest.git"]
 	path = salt_stack/salt/ndingest/files/ndingest.git
 	url = ../ndingest.git
