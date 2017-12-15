@@ -120,6 +120,10 @@ def load_lambdas_on_s3(session, domain, bucket):
     zip.write_to_zip('ndingest.git', zipname)
     os.chdir(cwd)
 
+    os.chdir(const.repo_path("lib"))
+    zip.write_to_zip('heaviside.git', zipname)
+    os.chdir(cwd)
+
     print("Copying local modules to lambda-build-server")
 
     #copy the zip file to lambda_build_server
