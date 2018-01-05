@@ -70,7 +70,7 @@ $  ./packer.py auth vault consul endpoint cachemanager activities
 ```
 
 *Note: because the packer.py script is running builds in parallel it is redirecting
-the output from each Packer subprocess to `packer/logs/<config>.log`. Because of
+the output from each Packer subprocess to `boss-manage.git/packer/logs/<config>.log`. Because of
 buffering you may not see the file update with every new line. Tailing the log
 does seem to work (`tail -f packer/logs/<config>.log`)*
 
@@ -84,9 +84,9 @@ console to verify the creation of the AMIs.**
 $ grep "artifact" ../packer/log/*.logs
 ```
 
-Success looks like this:
+Success looks like this:<br/>
 ==> Builds finished. The artifacts of successful builds are:
-Failure like this
+Failure like this:
 ==> Builds finished but no artifacts were created.
 
 It can beneficial to check the logs before all the AMIs are completed, when
@@ -394,6 +394,6 @@ To be filled out
 
 ### Manual Checks
 * https://api.theboss.io/ping/
-* https://api.theboss.io/v0.7/collection/
+* https://api.theboss.io/latest/collection/
 * Login into Scalyr and verify that the new instances appear on the overview page.
 * Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint.

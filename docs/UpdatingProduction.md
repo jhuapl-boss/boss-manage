@@ -202,10 +202,10 @@ $ ./cloudformation.py delete production.boss --scenario production cachedb
 $ ./cloudformation.py create production.boss --scenario production cachedb
 $ ./cloudformation.py delete production.boss --scenario production activities
 $ ./cloudformation.py create production.boss --scenario production activities
-$ ./cloudformation.py delete production.boss --scenario production dynamolambda
-$ ./cloudformation.py create production.boss --scenario production dynamolambda
 $ ./cloudformation.py delete production.boss --scenario production cloudwatch
 $ ./cloudformation.py create production.boss --scenario production cloudwatch
+$ ./cloudformation.py delete production.boss --scenario production dynamolambda
+$ ./cloudformation.py create production.boss --scenario production dynamolambda
 ```
 
 ## Get bossadmin password
