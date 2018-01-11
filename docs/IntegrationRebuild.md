@@ -22,6 +22,7 @@ $ git add salt_stack/salt/proofreader-web/files/proofread.git
 $ git add salt_stack/salt/spdb/files/spdb.git
 $ git add salt_stack/salt/ndingest/files/ndingest.git
 $ git add salt_stack/salt/ingest-client/files/ingest-client.git
+$ git add cloud_formation/lambda/dynamodb-lambda-autoscale
 $ git commit -m "Updated submodule references"
 $ git push
 ```
@@ -38,6 +39,25 @@ SSH_KEY=integration-prod-20161009.pem
 Once the boss-manage.git repository submodules are pointed at the latest
 integration code, we need to rebuild the AMIs before we launch them.
 
+## Scalyr Write API Key
+
+Before AMIs can be built, the Scalyr API key needs to be set in the Salt pillar.
+Log into https://scalyr.com and click on the account name in the upper right.
+Select API Keys from the dropdown.  Copy the `Write Logs` key to the clipboard.
+At the time of writing (20Oct2017), there are two `Write Logs` keys.  Use the
+bottom-most one.  The first one will be deleted, soon.
+
+In a text editor, create `boss-manage/salt-stack/pillar/scalyr.sls`:
+
+```
+#  Scalyr API Key - this file has secret data so isn't part of the repo
+scalyr:
+  log_key: <paste key here>
+```
+
+Paste the key from the clipboard so that it replaces `<paste key here>`
+
+
 ### Running Packer
 Make sure that the Packer executable is either in $PATH (you can call it by just
 calling packer) or in the `bin/` directory of the boss-manage repository.
@@ -50,7 +70,7 @@ $  ./packer.py auth vault consul endpoint cachemanager activities
 ```
 
 *Note: because the packer.py script is running builds in parallel it is redirecting
-the output from each Packer subprocess to `packer/logs/<config>.log`. Because of
+the output from each Packer subprocess to `boss-manage.git/packer/logs/<config>.log`. Because of
 buffering you may not see the file update with every new line. Tailing the log
 does seem to work (`tail -f packer/logs/<config>.log`)*
 
@@ -64,9 +84,9 @@ console to verify the creation of the AMIs.**
 $ grep "artifact" ../packer/log/*.logs
 ```
 
-Success looks like this:
+Success looks like this:<br/>
 ==> Builds finished. The artifacts of successful builds are:
-Failure like this
+Failure like this:
 ==> Builds finished but no artifacts were created.
 
 It can beneficial to check the logs before all the AMIs are completed, when
@@ -115,12 +135,14 @@ Stacks need to be deleted.
 $ cd bin/
 $ source ../config/set_vars.sh
 
-# Deletion of cloudwatch, api, actvities and cachedb can probably
+# Deletion of cloudwatch, api, actvities, cachedb, and dynamolambda can probably
 # be done in parallel.
+$ ./cloudformation.py delete integration.boss dynamolambda
 $ ./cloudformation.py delete integration.boss cloudwatch
 $ ./cloudformation.py delete integration.boss actvities
 $ ./cloudformation.py delete integration.boss cachedb
 $ ./cloudformation.py delete integration.boss api
+$ ./cloudformation.py delete integration.boss redis
 $ ./cloudformation.py delete integration.boss core
 ```
 
@@ -162,11 +184,24 @@ If you are building a personal developer domain it should have this:
 
 ### Launching configs
 
-For the *core*, *api*, *cachedb*, *activities*, *cloudwatch* configurations
-run the following command. You have to wait for each command to finish before
-launching the next configuration as they build upon each other.  **Only use the
-*--scenario ha-development* flag** if you are rebuilding integration.  It is not used
-if you are following these instructions to build a developer environment.
+#### dynamolambda Requirements
+
+Building the dynamolambda configuration requires NodeJS.  Install v6.10.x from
+https://nodejs.org/en/download
+
+A `dynamo_config.template` file is required in
+`boss-manage.git/cloud_formation/configs` to set up the Slack integration.
+This file is not under source control and should have been distributed to each
+developer.
+
+#### Launching
+
+For the *core*, *redis*, *api*, *cachedb*, *activities*, *cloudwatch*, and
+*dynamolambda* configurations run the following command. You have to wait for
+each command to finish before launching the next configuration as they build
+upon each other. **Only use the *--scenario ha-development* flag** if you are
+rebuilding integration.  It is not used if you are following these instructions
+to build a developer environment.
 ```shell
 $ ./cloudformation.py create integration.boss --scenario ha-development <config>
 ```
@@ -197,7 +232,7 @@ select load balancers on left side
 click the checkbox for the loadbalancer to change
 under attributes
 Set "Idle timeout: 300 seconds"
-save and refresh the page 
+save and refresh the page
 
 ## Run unit tests on Endpoint
 
@@ -359,6 +394,6 @@ To be filled out
 
 ### Manual Checks
 * https://api.theboss.io/ping/
-* https://api.theboss.io/v0.7/collection/
+* https://api.theboss.io/latest/collection/
 * Login into Scalyr and verify that the new instances appear on the overview page.
 * Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint.

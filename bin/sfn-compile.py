@@ -45,8 +45,7 @@ if __name__ == '__main__':
 
     try:
         machine = heaviside.compile(Path(args.file),
-                                    region=args.region,
-                                    account_id=args.account,
+                                    translate = heaviside.create_translate(args.region, args.account),
                                     indent=3)
         args.output.write(machine)
         sys.exit(0)

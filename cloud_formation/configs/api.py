@@ -102,6 +102,7 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data['sfn']['populate_upload_queue'] = names.ingest_queue_populate
     user_data['sfn']['upload_sfn'] = names.ingest_queue_upload
     user_data['sfn']['downsample_sfn'] = names.resolution_hierarchy
+    user_data['sfn']['downsample_volume_sfn'] = names.downsample_volume
 
     # Prepare user data for parsing by CloudFormation.
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}

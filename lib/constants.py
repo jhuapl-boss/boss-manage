@@ -137,7 +137,7 @@ ACTIVITIES_TYPE = {
 # Machine Cluster Sizes
 AUTH_CLUSTER_SIZE = { # Auth Server Cluster is a fixed size
     "development" : 1,
-    "production": 3, # should be an odd number
+    "production": 1, # should be an odd number
     "ha-development": 1,  # should be an odd number
 }
 

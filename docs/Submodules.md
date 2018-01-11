@@ -10,7 +10,7 @@ above)
 
 ## Cloning the boss-manage repository
 If you are cloning a new copy of the repository:
-`git clone --recursive https://github.com/aplmicrons/boss-manage.git`
+`git clone --recursive https://github.com/jhuapl-boss/boss-manage.git`
 
 If you are updating an existing repository for the first time after submodules
 have been added:

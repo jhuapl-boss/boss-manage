@@ -34,6 +34,7 @@ python35:
         ln -s pip3.5 pip3
         cd /usr/local/lib
         ln -s python3.5 python3
+        sudo pip3 install --upgrade pip
     - cwd: /tmp
     - shell: /bin/bash
     - timeout: 600

@@ -11,7 +11,9 @@ directory of the cloned boss-manage.git repository.*
 ### Workstation
 You will need a Linux machine installed with the following software packages:
 * Python 3.5
-* Packer ([download](https://www.packer.io/))
+* Packer ([download](https://www.packer.io/)) Version 1.1.1 (add it to your path)
+* NodeJS ([download](https://nodejs.org/en/download/)) Version 6.10.X (add it to your path)
+
 * Install Python packages in boss-manage.git requirements.txt.  See *Install Procedures* below to install boss-manage.git then run:
 ```shell
 pip install -r requirements.txt
@@ -77,13 +79,12 @@ Under the main account - (logged in with the email address)
 
 ### Github Repositories
 You will need access to the following code repositories on Github:
-* [boss-manage.git](https://github.com/aplmicrons/boss-manage)
-* [boss-tools.git](https://github.com/aplmicrons/boss-tools)
-* [boss.git](https://github.com/aplmicrons/boss)
-* [proofread.git](https://github.com/aplmicrons/proofread)
-* [spdb.git](https://github.com/aplmicrons/spdb)
-* [ingest.git](https://github.com/theboss/ingest-client)
-* [ndingest.git](https://github.com/theboss/ndingest)
+* [boss-manage.git](https://github.com/jhuapl-boss/boss-manage)
+* [boss-tools.git](https://github.com/jhuapl-boss/boss-tools)
+* [boss.git](https://github.com/jhuapl-boss/boss)
+* [spdb.git](https://github.com/jhuapl-boss/spdb)
+* [ingest.git](https://github.com/jhuapl-boss/ingest-client)
+* [ndingest.git](https://github.com/jhuapl-boss/ndingest)
 
 ## Install Procedures
 
@@ -92,7 +93,7 @@ Before a new copy of the BOSS architecture can be created / instantiated, the
 boss-manage.git repository, and submodules, need to be cloned.
 
 ```shell
-$ git clone --recursive https://github.com/aplmicrons/boss-manage.git
+$ git clone --recursive https://github.com/jhuapl-boss/boss-manage.git
 ```
 
 ### Create AWS credentials file
@@ -139,7 +140,7 @@ In Route53 create a new hosted zone for the theboss.io
 Change the Name Servers within your domain registrar to use the ones listed
 in the newly created hosted zone.
 
- 
+
 ### Create AMIs
 Several AWS Images (AMIs) need to be created. These images are preconfigured for
 specific roles within the architecture. These procedures expect the AWS
@@ -304,7 +305,7 @@ After you receive the certificate approval emails, turn off the mail instance.
 
 ### Launching configs
 
-For the *core*, *api*, *cachedb*, *proofreader*, *cloudwatch* configurations
+For the *core*, *redis*, *api*, *cachedb*, *activities*, *cloudwatch* *dynamolambda* configurations
 run the following command. You have to wait for each command to finish before
 launching the next configuration as they build upon each other.  **Only use the
 *--scenario production* flag** if you are rebuilding integration.  It is not used

@@ -9,8 +9,8 @@
 
         "aws_instance_type": "t2.micro",
 
-        "aws_source_ami": "Amazon Linux AMI 2016.03.3 (HVM), SSD Volume Type",
-        "aws_source_ami": "ami-6869aa05",
+        "aws_source_ami": "Amazon Linux AMI 2017.09.0 (HVM), SSD Volume Type",
+        "aws_source_ami": "ami-8c1be5f6",
 
         "aws_bastion_ip": "IP of the APL bastion server",
         "aws_bastion_ip": "",

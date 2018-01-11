@@ -29,7 +29,7 @@ unpack-jdk-tarball:
     - source_hash: sha256={{ java.source_hash }}
     {%- endif %}
     - archive_format: tar
-    - tar_options: z
+    - options: z
     - user: root
     - group: root
     - if_missing: {{ java.java_real_home }}
@@ -45,6 +45,11 @@ create-java-home:
     - onlyif: test -d {{ java.java_real_home }} && test ! -L {{ java.java_home }}
     - require:
       - archive: unpack-jdk-tarball
+
+update-java-home-symlink:
+  file.symlink:
+    - name: {{ java.java_home }}
+    - target: {{ java.java_real_home }}
 
 remove-jdk-tarball:
   file.absent:
