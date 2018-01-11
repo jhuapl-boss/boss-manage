@@ -158,3 +158,95 @@ $ bin/packer.py auth vault consul endpoint cachemanager activities --name <sprin
 $ cd ../packer
 $ packer build -var-file=../config/aws-credentials -var-file=variables/lambda -var-file=../config/aws-bastion -var 'name_suffix=<sprint#|release#>' -var 'force_deregister=true' lambda.packer
 ```
+
+
+# Updating Public Facing Tools
+
+We use pypi to provide pip-install capability from some of our tools. The packages are published under the username `jhuapl-boss`.
+
+
+## intern
+
+### Build docs
+We use a simple tool called pdoc to generate basic auto-documentation for intern. These docs are hosted on GitHub pages automatically at [https://jhuapl-boss.github.io/intern/](https://jhuapl-boss.github.io/intern/)
+
+To build the docs you need to first install pdoc into your virtualenv. I'm pretty sure this needs to be a 2.7 virtualenv.
+
+```
+deactivate
+mkvirtualenv --python=`which python` intern-pypi
+cd intern.git
+pip install -r docs_requirements.txt
+pip install -r requirements.txt
+```
+
+Then build the new docs
+
+If you don't already have a PYTHONPATH just use this export instead of the line in the box:
+   export PYTHONPATH=/<path to intern>
+Otherwise it will fail with no error because the leading colon:  PYTHONPATH=:<path to intern>
+
+```
+cd intern.git
+export PYTHONPATH=$PYTHONPATH:/<path to intern>
+pdoc intern --html --html-dir="docs" --overwrite --docstring-style=google
+mv ./docs/intern/* ./docs/
+rm -rf ./docs/intern
+```
+
+Then commit the changes. Whenever the changes make it to `master`, the docs will be updated on the hosted GitHub pages site.
+
+### Push to pip
+Once you are ready to update pip you need to change the version, build, and upload.
+
+0) Make sure you have twine installed in your virtualenv
+
+```
+pip install twine
+```
+
+1) Edit `intern.git/intern/__init__.py` and set `__version__` to the desired version
+
+2) Build
+
+```
+cd intern.git
+python setup.py sdist
+python setup.py bdist_wheel
+```
+
+3) Upload to pip. `--skip-existing` is required now and twine will only  push versions that don't already exist in PyPi.
+
+```
+twine upload --skip-existing dist/*
+
+```
+
+
+## ingest-client
+
+### Push to pip
+
+Once you are ready to update pip you need to change the version, build, and upload.
+
+0) Make sure you have twine installed in your virtualenv
+
+```
+pip install twine
+```
+
+1) Edit `ingest-client/ingestclient/__init__.py` and set `__version__` to the desired version
+
+2) Build
+
+```
+cd ingest-client
+python setup.py sdist
+python setup.py bdist_wheel
+```
+
+3) Upload to pip. `--skip-existing` is required now and twine will only  push versions that don't already exist in PyPi.
+
+```
+twine upload --skip-existing dist/*
+```
