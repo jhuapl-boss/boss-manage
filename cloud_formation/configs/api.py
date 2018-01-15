@@ -93,6 +93,7 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["aws"]["id-index-table"] = names.id_index
     user_data["aws"]["id-count-table"] = names.id_count_index
     user_data["aws"]["prod_mailing_list"] = mailing_list_arn
+    user_data["aws"]["id-index-new-chunk-threshold"] = const.DYNAMO_ID_INDEX_NEW_CHUNK_THRESHOLD
 
     user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
     user_data["lambda"]["flush_function"] = names.multi_lambda
