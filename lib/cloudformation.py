@@ -2000,3 +2000,16 @@ class CloudFormationConfiguration:
         if description is not None:
             self.resources[key]["Properties"]["Description"] = description
 
+    def add_data_pipeline(self, key, name, objects, description=""):
+        self.resources[key] = {
+            "Type" : "AWS::DataPipeline::Pipeline",
+            "Properties" : {
+                "Activate" : True,
+                "Description" : description,
+                "Name" : name,
+                "ParameterObjects" : [],
+                "ParameterValues" : [],
+                "PipelineObjects" : objects,
+                "PipelineTags" : [],
+            }
+        }
