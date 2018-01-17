@@ -27,6 +27,16 @@ from lib import utils
 from lib import scalyr
 from lib import constants as const
 
+import os
+
+try:
+    import MySQLdb as mysql
+except ImportError:
+    print("Rquire MySQLdb library to create backup template")
+
+    import sys
+    sys.exit(1)
+
 def rds_copy(pipeline, instance, username, password, db, tables):
     db = db.capitalize()
 
@@ -41,46 +51,47 @@ def ddb_copy(pipeline, **tables):
         pipeline.add_ddb_table(name, table)
         pipeline.add_emr_copy(name+"Copy", Ref(name), Ref("BackupBucket"), Ref("BackupCluster"))
 
+def rds_tables(call, instance, username, password, db):
+    print("Looking up tables in database {}".format(db))
+    with call.tunnel(instance, 3306, type_='rds') as local_port:
+        conn = mysql.connect(host='127.0.0.1',
+                             port=local_port,
+                             user=username,
+                             passwd=password,
+                             db=db)
+
+        cur = conn.cursor()
+        cur.execute("SHOW TABLES")
+        tables = [r[0] for r in cur.fetchall()]
+        cur.close()
+
+        conn.close()
+
+    return tables
+
 def create_config(session, domain):
     """Create the CloudFormationConfiguration object."""
     config = CloudFormationConfiguration('backup', domain, const.REGION)
     names = AWSNames(domain)
 
-    # TODO: lookup endpoint-db credentials
-    endpoint_user = None
-    endpoint_pass = None
+    keypair = aws.keypair_lookup(session)
+    call = ExternalCalls(session, keypair, domain)
 
-    # TODO: lookup auth-db credentials
-    auth_user = None
-    auth_pass = None
+    internal_subnet = aws.subnet_id_lookup(session, names.internal)
 
-    # TODO: query for endpoint-db tables
-    endpoint_tables = []
+    pipeline_role = "DataPipelineDefaultRole"
+    pipeline_resource_role = "DataPipelineDefaultResourceRole"
 
-    # TODO: query for auth-db tables
-    auth_tables = []
-
-    pipeline_role = None
-    pipeline_resource_role = None
-
-    pipeline = DataPipeline(pipeline_role, pipeline_resource_role)
-    pipeline.add_ec2_instance("BackupInstance")
+    pipeline = DataPipeline(pipeline_role, pipeline_resource_role, "s3://backup."+domain+"/logs")
+    pipeline.add_ec2_instance("BackupInstance", subnet=internal_subnet)
     pipeline.add_emr_cluster("BackupCluster")
-    pipeline.add_s3_bucket("BackupBucket", "backup." + domain) # TODO: create bucket in config
+    pipeline.add_s3_bucket("BackupBucket", "backup." + domain)
 
-    rds_copy(pipeline,
-             names.endpoint_db,
-             endpoint_user,
-             endpoint_pass,
-             "Endpoint",
-             endpoint_tables)
-
-    rds_copy(pipeline,
-             names.auth_db,
-             auth_user,
-             auth_pass,
-             "Auth",
-             auth_tables)
+    cmd = "curl -X GET 'http://consul:8500/v1/kv/?recurse' > ${OUTPUT1_STAGING_DIR}/consul_data.json"
+    pipeline.add_shell_command("ConsulBackup",
+                               cmd,
+                               destination = Ref("BackupBucket"),
+                               runs_on = Ref("BackupInstance"))
 
     ddb_copy(pipeline,
              BossMeta = names.meta,
@@ -89,7 +100,39 @@ def create_config(session, domain):
              IdIndex = names.id_index,
              IdCountIndex = names.id_count_index)
 
+    print("Querying Endpoint DB credentials")
+    with call.vault() as vault:
+        db_config = vault.read(const.VAULT_ENDPOINT_DB)
+
+        endpoint_user = db_config['user']
+        endpoint_pass = db_config['password']
+
+    rds_copy(pipeline,
+             names.endpoint_db,
+             endpoint_user,
+             endpoint_pass,
+             "Endpoint",
+             rds_tables(call, names.endpoint_db, endpoint_user, endpoint_pass, 'boss'))
+
+    SCENARIO = os.environ["SCENARIO"]
+    AUTH_DB = SCENARIO in ("production", "ha-development",)
+    if AUTH_DB:
+        auth_user = 'keycloak'
+        auth_pass = 'keycloak'
+
+        rds_copy(pipeline,
+                 names.auth_db,
+                 auth_user,
+                 auth_pass,
+                 "Auth",
+                 rds_tables(call, names.auth_db, auth_user, auth_pass, 'keycloak'))
+
     config.add_data_pipeline("BackupPipeline", "backup."+domain, pipeline.objects)
+    config.add_s3_bucket("BackupBucket", "backup." + domain)
+    #config.add_s3_bucket_policy("BackupBucketPolicy",
+    #                            "backup." + domain,,
+    #                            ['s3:GetObject', 's3:PutObject'],
+    #                            { 'AWS': role})
 
     return config
 
@@ -109,4 +152,10 @@ def create(session, domain):
 def delete(session, domain):
     names = AWSNames(domain)
 
+    resp = input("Delete all backup data [N/y] ")
+    if len(resp) == 0 or resp[0] not in ('y', 'Y'):
+        print("Not deleting stack")
+        return
+
     CloudFormationConfiguration('backup', domain).delete(session)
+    aws.s3_bucket_delete(session, 'backup.' + domain)

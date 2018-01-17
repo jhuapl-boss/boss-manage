@@ -28,42 +28,31 @@ class Ref(object):
     def __str__(self):
         return self.ref
 
-def field_type(field_value):
-    if isinstance(field_value, Ref):
+def field_key(key):
+    if key == "password":
+        return "*password"
+    else:
+        return key
+
+def field_type(value):
+    if isinstance(value, Ref):
         return "RefValue"
     else:
         return "StringValue"
 
-def field_value(field_value):
-    if isinstance(field_value, Ref):
-        return field_value.ref
+def field_value(value):
+    if isinstance(value, Ref):
+        return value.ref
     else:
-        return field_value
+        return value
 
 class DataPipeline(object):
-    def __init__(self, role, resourceRole):
+    def __init__(self, role, resourceRole, backupUri=None):
         self.objects = []
 
-        """
-        {
-            "id": "Default"
-            "name": "Default",
-            "failureAndRerunMode": "CASCADE",
-            "schedule": {
-                "ref": "DefaultSchedule"
-            },
-            "resourceRole": "DataPipelineDefaultResourceRole",
-            "role": "DataPipelineDefaultRole",
-            "scheduleType": "cron",
-        },
-        """
-        self.add_field("Default",
-                       "Default",
-                       failureAndRerunMode = "CASCADE",
-                       schedule = Ref("DefaultSchedule"),
-                       resourceRole = resourceRole,
-                       role = role,
-                       scheduleType = "cron")
+        self.role = role
+        self.resourceRole = resourceRole
+        self.backupUri = backupUri
 
         """
         {
@@ -85,14 +74,17 @@ class DataPipeline(object):
             "Id": id,
             "Name": name,
             "Fields": [
-                {"Key": key, field_type(value): field_value(value)}
-                for key, value in fields.items() if value
+                {"Key": field_key(key), field_type(value): field_value(value)}
+                for key, value in fields.items() if value # not None
             ],
         }
 
+        #if self.backupUri:
+        #    field['Fields'].append({"Key": "pipelineLogUri", "StringValue": self.backupUri})
+
         self.objects.append(field)
 
-    def add_ec2_instance(self, name, type="t1.micro", sgs=None, duration="2 Hours"):
+    def add_ec2_instance(self, name, type="t1.micro", sgs=None, subnet=None, duration="2 Hours"):
         """
         {
             "id": "Ec2Instance",
@@ -106,13 +98,18 @@ class DataPipeline(object):
         """
         self.add_field(name,
                        name,
-                       type = "Ec2Instance",
+                       type = "Ec2Resource",
+                       schedule = Ref("DefaultSchedule"),
+                       #pipelineLogUri = self.backupUri,
                        instanceType = type,
                        actionOnTaskFailure = "terminate",
                        securityGroups = sgs,
-                       terminateAfter = duration)
+                       subnetId = subnet,
+                       terminateAfter = duration,
+                       role = self.role,
+                       resourceRole = self.resourceRole)
 
-    def add_emr_cluster(self, name, type="m3.xlarge", count="1", version="3.9.0", region=None):
+    def add_emr_cluster(self, name, type="m3.xlarge", count="1", version="3.9.0", region=None, duration="2 Hours"):
         """
         {
             "id": "EmrClusterForBackup",
@@ -140,7 +137,7 @@ class DataPipeline(object):
             region = const.REGION
 
         bootstrapArgs = """
-s3:/{}.elasticmapreduce/bootstrap-actions/configure-hadoop, 
+s3://{}.elasticmapreduce/bootstrap-actions/configure-hadoop,
 --yarn-key-value,yarn.nodemanager.resource.memory-mb=11520,
 --yarn-key-value,yarn.scheduler.maximum-allocation-mb=11520,
 --yarn-key-value,yarn.scheduler.minimum-allocation-mb=1440,
@@ -155,12 +152,16 @@ s3:/{}.elasticmapreduce/bootstrap-actions/configure-hadoop,
         self.add_field(name,
                        name,
                        type = "EmrCluster",
+                       schedule = Ref("DefaultSchedule"),
                        bootstrapAction = bootstrapArgs,
                        coreInstanceCount = str(count),
                        coreInstanceType = type,
                        amiVersion = version,
                        masterInstanceType = type,
-                       region = region)
+                       region = region,
+                       terminateAfter = duration,
+                       role = self.role,
+                       resourceRole = self.resourceRole)
 
     def add_rds_database(self, name, instance, username, password):
         """
@@ -198,6 +199,7 @@ s3:/{}.elasticmapreduce/bootstrap-actions/configure-hadoop,
         self.add_field(name,
                        name,
                        type = "SqlDataNode",
+                       schedule = Ref("DefaultSchedule"),
                        database = database,
                        table = table,
                        selectQuery = "select * from #{table}")
@@ -215,6 +217,7 @@ s3:/{}.elasticmapreduce/bootstrap-actions/configure-hadoop,
         self.add_field(name,
                        name,
                        type = "DynamoDBDataNode",
+                       schedule = Ref("DefaultSchedule"),
                        readThroughputPercent = read_percent,
                        tableName = table)
 
@@ -230,6 +233,7 @@ s3:/{}.elasticmapreduce/bootstrap-actions/configure-hadoop,
         self.add_field(name,
                        name,
                        type = "S3DataNode",
+                       schedule = Ref("DefaultSchedule"),
                        directoryPath = "s3://" + bucket + "/#{format(@scheduledStartTime, 'YYY-MM-dd-HH-mm-ss')}")
 
     def add_rds_copy(self, name, source, destination, runs_on=None):
@@ -252,6 +256,7 @@ s3:/{}.elasticmapreduce/bootstrap-actions/configure-hadoop,
         self.add_field(name,
                        name,
                        type = "CopyActivity",
+                       schedule = Ref("DefaultSchedule"),
                        input = source,
                        output = destination,
                        runsOn = runs_on)
@@ -291,10 +296,22 @@ s3:/{}.elasticmapreduce/bootstrap-actions/configure-hadoop,
         self.add_field(name,
                        name,
                        type = "EmrActivity",
+                       schedule = Ref("DefaultSchedule"),
                        input = source,
                        output = destination,
                        runsOn = runs_on,
                        maximumRetries = "2",
                        step = step,
                        resizeClusterBeforeRunning = "true")
+
+    def add_shell_command(self, name, command, source=None, destination=None, runs_on=None):
+        self.add_field(name,
+                       name,
+                       type = "ShellCommandActivity",
+                       schedule = Ref("DefaultSchedule"),
+                       input = source,
+                       output = destination,
+                       runsOn = runs_on,
+                       stage = "true",
+                       command = command)
 

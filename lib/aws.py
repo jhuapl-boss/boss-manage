@@ -1140,6 +1140,19 @@ def s3_bucket_exists(session, name):
 
     return False
 
+def s3_bucket_delete(session, name):
+    """Delete the given S3 bucket
+
+    Args:
+        session (Session): Boto3 session used to lookup information in AWS.
+        name (string): Name of S3 bucket.
+
+    Returns:
+        (None)
+    """
+    client = session.client('s3')
+    client.delete_bucket(Bucket=name)
+
 def get_account_id_from_session(session):
     """
     gets the account id from the session using the iam client.  This method will work even
