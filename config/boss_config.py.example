@@ -1,0 +1,28 @@
+#
+# BOSS Configuration File
+# Defines BOSS instance configuration information
+#
+
+BOSS_NAME = "display name" # Display name used by bin/config
+                           # Used when boss_compose doesn't exist
+EXTERNAL_DOMAIN = ".external.tld"
+INTERNAL_DOMAIN = ".internal.tld"
+SUBNET = "10.0.0.0/16" # Class B Subnet
+
+REGION = "us-east-1"
+AVAILABILITY_ZONE_USAGE = { # Used to limit subnet usage for specific resources where AWS has issues
+    'lambda': ['b', 'c', 'd', 'e', 'f'],
+}
+
+ACCOUNT_ID = 123456789
+ACCESS_KEY = "xxxxxxxx"
+SECRET_KEY = "xxxxxxxx"
+
+OUTBOUND_BASTION = True
+OUTBOUND_IP = "0.0.0.0"
+OUTBOUND_PORT = 22
+OUTBOUND_USER = "ec2-user"
+OUTBOUND_KEY = "bastion-key"
+
+BASTION_INBOUND = "0.0.0.0/32"
+SSH_KEY = "stack-key"
