@@ -89,6 +89,7 @@ else
    zip -g ~/lambdazips/multilambda.${1}.zip lambda_loader.py
    zip -g ~/lambdazips/multilambda.${1}.zip write_s3_index_lambda.py
    zip -g ~/lambdazips/multilambda.${1}.zip fanout_write_id_index_lambda.py
+   zip -g ~/lambdazips/multilambda.${1}.zip write_id_index_lambda.py
 
    python ~/virtualenvs/${1}/lib/python3.6/site-packages/lambdautils/deploy_lambdas.py /home/ec2-user/virtualenvs/$1 ~/lambdazips/multilambda.${1}.zip $2 --upload-only
 

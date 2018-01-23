@@ -1,0 +1,57 @@
+"""State machine that writes to the id index Dynamo table.
+
+It adds a cuboid's morton id to the set of morton ids mapped to an
+annotation id in the id index table.  This table allows fast lookup of all
+cuboids that contain a given annotation id.  Bounding box calculation is a
+typical use case.
+
+This state machine wraps a single lambda function.  If AWS eventually adds
+fanout capabilities to step functions, this lambda can probably be placed in
+the indexSupervisorCuboid step function, directly.
+
+Sample input:
+{
+    "config": {
+      "object_store_config": {
+        "id_count_table": "idCount.domain.boss",
+        "page_in_lambda_function": "multiLambda-domain-boss",
+        "page_out_lambda_function": "multiLambda-domain-boss",
+        "cuboid_bucket": "cuboids.domain.boss",
+        "s3_index_table": "s3index.domain.boss",
+        "id_index_table": "idIndex.domain.boss",
+        "s3_flush_queue": "https://queue.amazonaws.com/256215146792/...",
+        "id_index_new_chunk_threshold": 100
+      },
+      "kv_config": {
+        "cache_host": "cache.domain.boss",
+        "read_timeout": 86400,
+        "cache_db": "0"
+      },
+      "state_config": {
+        "cache_state_db": "0",
+        "cache_state_host": "cache-state.domain.boss"
+      }
+    },
+    "cuboid_object_key": "...",
+    "version": 0,
+    "id": "29"
+}
+"""
+
+version: '1.0'
+
+# lambda timeout: 120
+
+# These values taken from the task's retry below.
+# retry interval: 45
+# num retries: 3
+# backoff rate: 2
+
+# All of the values above should be factored into the timeout setting.
+timeout: 780
+
+Lambda('indexWriteIdLambda')
+    """WriteIdIndex
+    """
+    retry [] 45 3 2.0
+

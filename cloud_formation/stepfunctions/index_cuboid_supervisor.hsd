@@ -1,0 +1,60 @@
+"""State machine responsible for indexing of a single cuboid.
+
+* Writes all unique ids to the id-set attribute in the S3 index table.
+
+* Writes the cuboid's morton id to the cuboid-set attribute of each id in the 
+  id index table.
+
+Sample input:
+{
+    "id_index_step_fcn": "arn:aws:states:us-east-1:...",
+    "cuboid_object_key": "...",
+    "version": 0,
+    "config": {
+      "object_store_config": {
+        "id_count_table": "idCount.domain.boss",
+        "page_in_lambda_function": "multiLambda-domain-boss",
+        "page_out_lambda_function": "multiLambda-domain-boss",
+        "cuboid_bucket": "cuboids.domain.boss",
+        "s3_index_table": "s3index.domain.boss",
+        "id_index_table": "idIndex.domain.boss",
+        "s3_flush_queue": "https://queue.amazonaws.com/...",
+        "id_index_new_chunk_threshold": 100
+      },
+      "kv_config": {
+        "cache_host": "cache.domain.boss",
+        "read_timeout": 86400,
+        "cache_db": "0"
+      },
+      "state_config": {
+        "cache_state_db": "0",
+        "cache_state_host": "cache-state.domain.boss"
+      }
+    }
+}
+"""
+
+version: '1.0'
+
+# Timeout based on lambda timeout (120s), retry settings of the lambda task
+# and the Wait setting of the while loop.
+timeout: 630
+
+Lambda('indexS3WriterLambda')
+    """WriteS3Index
+
+    Write the ids in the cuboid to the S3 index.
+    """
+    retry [] 20 3 2.0
+    catch []:
+        Fail('Exception', 'Failed updating S3 index')
+
+while '$.finished' == False:
+    Lambda('indexFanoutIdWriterLambda')
+        """FanoutAndWriteIdIndex
+
+        Start a separate step function for each annotation id in the cuboid.  
+        Write that cuboid's morton id to each annotation id in the id index.
+        """
+    Wait(seconds=10)
+

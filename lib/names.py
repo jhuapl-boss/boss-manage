@@ -94,7 +94,12 @@ class AWSNames(object):
         'ingest_queue_upload': 'Ingest.Upload',
         'ingest_lambda': 'IngestUpload',
         'dynamo_lambda': 'dynamoLambda',
-        'trigger_dynamo_autoscale': 'triggerDynamoAutoscale'
+        'trigger_dynamo_autoscale': 'triggerDynamoAutoscale',
+        'index_id_writer_sfn': 'Index.IdWriter',
+        'index_cuboid_supervisor_sfn': 'Index.CuboidSupervisor',
+        'index_s3_writer_lambda': 'indexS3WriterLambda',
+        'index_fanout_id_writer_lambda': 'indexFanoutIdWriterLambda',
+        'index_write_id_lambda': 'indexWriteIdLambda'
     }
 
     def __getattr__(self, name):
@@ -108,7 +113,9 @@ class AWSNames(object):
         fq_hostname = hostname + self.base_dot
 
         if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'consul_monitor', 'vault_consul_check',
-                    'delete_lambda', 'ingest_lambda', 'dynamo_lambda']:
+                    'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 
+                    'index_s3_writer_lambda', 'index_fanout_id_writer_lambda',
+                    'index_write_id_lambda']:
             fq_hostname = fq_hostname.replace('.','-')
 
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
