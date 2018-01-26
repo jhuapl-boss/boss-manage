@@ -35,38 +35,54 @@ def create_config(session, domain):
     topic_arn = aws.sns_topic_lookup(session, "ProductionMicronsMailingList")
 
     role = aws.role_arn_lookup(session, "lambda_cache_execution")
-    config.add_arg(Arg.String("LambdaCacheExecutionRole", role,
-                              "IAM role for multilambda." + domain))
+    config.add_arg(Arg.String(
+        "LambdaCacheExecutionRole", role,
+        "IAM role for multilambda." + domain))
+
     lambda_bucket = aws.get_lambda_s3_bucket(session)
-    config.add_lambda("indexS3WriterLambda",
-                      names.index_s3_writer_lambda,
-                      Ref("LambdaCacheExecutionRole"),
-                      s3=(aws.get_lambda_s3_bucket(session),
-                          "multilambda.{}.zip".format(domain),
-                          "write_s3_index_lambda.handler"),
-                      timeout=120,
-                      memory=1024,
-                      runtime='python3.6')
+    config.add_lambda(
+        "indexS3WriterLambda",
+        names.index_s3_writer_lambda,
+        Ref("LambdaCacheExecutionRole"),
+        s3=(aws.get_lambda_s3_bucket(session),
+            "multilambda.{}.zip".format(domain),
+            "write_s3_index_lambda.handler"),
+        timeout=120,
+        memory=1024,
+        runtime='python3.6')
 
-    config.add_lambda("indexFanoutIdWriterLambda",
-                      names.index_fanout_id_writer_lambda,
-                      Ref("LambdaCacheExecutionRole"),
-                      s3=(aws.get_lambda_s3_bucket(session),
-                          "multilambda.{}.zip".format(domain),
-                          "fanout_write_id_index_lambda.handler"),
-                      timeout=120,
-                      memory=256,
-                      runtime='python3.6')
+    config.add_lambda(
+        "indexFanoutIdWriterLambda",
+        names.index_fanout_id_writer_lambda,
+        Ref("LambdaCacheExecutionRole"),
+        s3=(aws.get_lambda_s3_bucket(session),
+            "multilambda.{}.zip".format(domain),
+            "fanout_write_id_index_lambda.handler"),
+        timeout=120,
+        memory=256,
+        runtime='python3.6')
 
-    config.add_lambda("indexWriteIdLambda",
-                      names.index_write_id_lambda,
-                      Ref("LambdaCacheExecutionRole"),
-                      s3=(aws.get_lambda_s3_bucket(session),
-                          "multilambda.{}.zip".format(domain),
-                          "write_id_index_lambda.handler"),
-                      timeout=120,
-                      memory=512,
-                      runtime='python3.6')
+    config.add_lambda(
+        "indexWriteIdLambda",
+        names.index_write_id_lambda,
+        Ref("LambdaCacheExecutionRole"),
+        s3=(aws.get_lambda_s3_bucket(session),
+            "multilambda.{}.zip".format(domain),
+            "write_id_index_lambda.handler"),
+        timeout=120,
+        memory=512,
+        runtime='python3.6')
+
+    config.add_lambda(
+        "indexWriteFailedLambda",
+        names.index_write_failed_lambda,
+        Ref("LambdaCacheExecutionRole"),
+        s3=(aws.get_lambda_s3_bucket(session),
+            "multilambda.{}.zip".format(domain),
+            "write_index_failed_lambda.handler"),
+        timeout=60,
+        memory=128,
+        runtime='python3.6')
 
     return config
 

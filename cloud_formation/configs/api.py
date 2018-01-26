@@ -93,7 +93,8 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["aws"]["id-index-table"] = names.id_index
     user_data["aws"]["id-count-table"] = names.id_count_index
     user_data["aws"]["prod_mailing_list"] = mailing_list_arn
-    user_data["aws"]["id-index-new-chunk-threshold"] = const.DYNAMO_ID_INDEX_NEW_CHUNK_THRESHOLD
+    user_data["aws"]["id-index-new-chunk-threshold"] = str(const.DYNAMO_ID_INDEX_NEW_CHUNK_THRESHOLD)
+    user_data["aws"]["index-deadletter-queue"] = str(Ref(names.index_deadletter_queue))
 
     user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
     user_data["lambda"]["flush_function"] = names.multi_lambda
@@ -119,7 +120,14 @@ def create_config(session, domain, keypair=None, db_config={}):
     config.add_security_group('AllHTTPSSecurityGroup', 'https.' + domain, [('tcp', '443', '443', '0.0.0.0/0')])
     sgs[names.https] = Ref('AllHTTPSSecurityGroup')
 
+
     # Create SQS queues and apply access control policies.
+
+    # Deadletter queue for indexing operations.  This one is populated
+    # manually by states in the indexing step functions.
+    config.add_sqs_queue(
+        names.index_deadletter_queue, names.index_deadletter_queue, 30, 20160)
+
     #config.add_sqs_queue("DeadLetterQueue", names.deadletter_queue, 30, 20160) DP XXX
     config.add_sqs_queue(names.deadletter_queue, names.deadletter_queue, 30, 20160)
 

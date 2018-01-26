@@ -86,7 +86,8 @@ def update_lambda_code(session, domain, bucket):
     names = AWSNames(domain)
     uses_multilambda = [
         names.multi_lambda, names.index_s3_writer_lambda, 
-        names.index_fanout_id_writer_lambda, names.index_write_id_lambda
+        names.index_fanout_id_writer_lambda, names.index_write_id_lambda,
+        names.index_write_failed_lambda
     ]
     client = session.client('lambda')
     for lambda_name in uses_multilambda:

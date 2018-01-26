@@ -20,7 +20,8 @@ Sample input:
         "s3_index_table": "s3index.domain.boss",
         "id_index_table": "idIndex.domain.boss",
         "s3_flush_queue": "https://queue.amazonaws.com/256215146792/...",
-        "id_index_new_chunk_threshold": 100
+        "id_index_new_chunk_threshold": 100,
+        "index_deadletter_queue": "https://queue.amazonaws.com/256215146792/..."
       },
       "kv_config": {
         "cache_host": "cache.domain.boss",
@@ -40,18 +41,23 @@ Sample input:
 
 version: '1.0'
 
-# lambda timeout: 120
+# indexWriteIdLambda timeout: 120
+# indexWriteIdFailedLambda timeout: 45
 
-# These values taken from the task's retry below.
-# retry interval: 45
-# num retries: 3
-# backoff rate: 2
+# Check tasks' retry values below.
 
 # All of the values above should be factored into the timeout setting.
-timeout: 780
+timeout: 950
 
 Lambda('indexWriteIdLambda')
     """WriteIdIndex
     """
     retry [] 45 3 2.0
-
+    catch []: '$.result'
+        Lambda('indexWriteFailedLambda')
+            """WriteIdFailed
+            """
+            retry [] 10 2 2.0
+            catch []:
+                Fail('Exception', 'Failed to write to dead letter queue')
+        Fail('Exception', 'Failed to update id index')

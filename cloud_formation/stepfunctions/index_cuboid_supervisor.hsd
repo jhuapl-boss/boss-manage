@@ -19,7 +19,8 @@ Sample input:
         "s3_index_table": "s3index.domain.boss",
         "id_index_table": "idIndex.domain.boss",
         "s3_flush_queue": "https://queue.amazonaws.com/...",
-        "id_index_new_chunk_threshold": 100
+        "id_index_new_chunk_threshold": 100,
+        "index_deadletter_queue": "https://queue.amazonaws.com/..."
       },
       "kv_config": {
         "cache_host": "cache.domain.boss",
@@ -46,8 +47,23 @@ Lambda('indexS3WriterLambda')
     Write the ids in the cuboid to the S3 index.
     """
     retry [] 20 3 2.0
-    catch []:
+    catch []: '$.result'
+        Lambda('indexWriteFailedLambda')
+            """S3WriteFailed
+            """
+            retry [] 10 2 2.0
+            catch []:
+                Fail('Exception', 'Failed to write to dead letter queue')
         Fail('Exception', 'Failed updating S3 index')
+
+Pass()
+    """UpdateOperationField
+    Simply adds the name of the operation so it can be logged properly in the
+    deadletter queue in case of a failure when fanning out.
+    """
+    result: '$.operation'
+    data: 
+        ['FanoutIdIndexWriters']
 
 while '$.finished' == False:
     Lambda('indexFanoutIdWriterLambda')
@@ -56,5 +72,13 @@ while '$.finished' == False:
         Start a separate step function for each annotation id in the cuboid.  
         Write that cuboid's morton id to each annotation id in the id index.
         """
+        catch []: '$.result'
+            Lambda('indexWriteFailedLambda')
+                """FanoutFailed
+                """
+                retry [] 10 2 2.0
+                catch []:
+                    Fail('Exception', 'Failed to write to dead letter queue')
+            Fail('Exception', 'Failed fanning out write id index step functions')
     Wait(seconds=10)
 

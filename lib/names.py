@@ -99,7 +99,9 @@ class AWSNames(object):
         'index_cuboid_supervisor_sfn': 'Index.CuboidSupervisor',
         'index_s3_writer_lambda': 'indexS3WriterLambda',
         'index_fanout_id_writer_lambda': 'indexFanoutIdWriterLambda',
-        'index_write_id_lambda': 'indexWriteIdLambda'
+        'index_write_id_lambda': 'indexWriteIdLambda',
+        'index_deadletter_queue': 'indexDeadLetter',
+        'index_write_failed_lambda': 'indexWriteFailedLambda'
     }
 
     def __getattr__(self, name):
@@ -115,12 +117,13 @@ class AWSNames(object):
         if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'consul_monitor', 'vault_consul_check',
                     'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 
                     'index_s3_writer_lambda', 'index_fanout_id_writer_lambda',
-                    'index_write_id_lambda']:
+                    'index_write_id_lambda', 'index_write_failed_lambda']:
             fq_hostname = fq_hostname.replace('.','-')
 
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
                     'ingest_queue_populate', 'ingest_queue_upload', 'resolution_hierarchy',
-                    'downsample_volume', 'delete_experiment', 'delete_collection', 'delete_coord_frame']:
+                    'downsample_volume', 'delete_experiment', 'delete_collection', 'delete_coord_frame',
+                    'index_deadletter_queue']:
             fq_hostname = "".join(map(lambda x: x.capitalize(), fq_hostname.split('.')))
 
         return fq_hostname
