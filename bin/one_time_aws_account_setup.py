@@ -45,7 +45,7 @@ def create_billing_alarms(session):
         'ComparisonOperator': 'GreaterThanOrEqualToThreshold'
     }
 
-    for num in range(1, MAX_ALARM_DOLLAR + 1):
+    for num in range(1, const.MAX_ALARM_DOLLAR + 1):
         print("   {}k".format(str(num)))
         alarm_parms['AlarmName'] = "Billing_{}k".format(str(num))
         alarm_parms['AlarmDescription'] = "Alarm when spending reaches {}k".format(str(num))
