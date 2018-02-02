@@ -37,19 +37,23 @@ except ImportError:
     import sys
     sys.exit(1)
 
-def rds_copy(pipeline, instance, username, password, db, tables):
-    db = db.capitalize()
+def rds_copy(call, component, rds_name, db_name, db_user, db_pass, subnet, s3_logs, s3_backup):
+    tables = rds_tables(call, rds_name, db_user, db_pass, db_name)
 
-    pipeline.add_rds_database(db+"DB", instance, username, password)
+    pipeline = DataPipeline(log_uri = s3_logs)
+    pipeline.add_ec2_instance(component + "Instance", subnet=subnet)
+    pipeline.add_rds_database(component + "DB",
+                              rds_name.replace('.', '-'), # The instance name is the DNS name without '.',
+                              db_user,
+                              db_pass)
     for table in tables:
-        name = db  + "-" + table.capitalize()
-        pipeline.add_rds_table(name, Ref(db+"DB"), table)
-        pipeline.add_rds_copy(name+"Copy", Ref(name), Ref("BackupBucket"), Ref("BackupInstance"))
+        name = component + "-" + table.capitalize()
+        pipeline.add_s3_bucket(name + "Bucket", s3_backup + "/RDS/" + db_name + "/" + table)
 
-def ddb_copy(pipeline, **tables):
-    for name, table in tables.items():
-        pipeline.add_ddb_table(name, table)
-        pipeline.add_emr_copy(name+"Copy", Ref(name), Ref("BackupBucket"), Ref("BackupCluster"))
+        pipeline.add_rds_table(name, Ref(component + "DB"), table)
+        pipeline.add_rds_copy(name+"Copy", Ref(name), Ref(name+"Bucket"), Ref(component + "Instance"))
+
+    return pipeline
 
 def rds_tables(call, instance, username, password, db):
     print("Looking up tables in database {}".format(db))
@@ -79,27 +83,50 @@ def create_config(session, domain):
 
     internal_subnet = aws.subnet_id_lookup(session, names.internal)
 
-    pipeline_role = "DataPipelineDefaultRole"
-    pipeline_resource_role = "DataPipelineDefaultResourceRole"
+    s3_backup = "s3://backup." + domain + "/#{format(@scheduledStartTime, 'YYYY-ww')}"
+    s3_logs = s3_base + "/logs"
 
-    pipeline = DataPipeline(pipeline_role, pipeline_resource_role, "s3://backup."+domain+"/logs")
-    pipeline.add_ec2_instance("BackupInstance", subnet=internal_subnet)
-    pipeline.add_emr_cluster("BackupCluster")
-    pipeline.add_s3_bucket("BackupBucket", "backup." + domain)
+    config.add_s3_bucket("BackupBucket", "backup." + domain)
+    #config.add_s3_bucket_policy("BackupBucketPolicy",
+    #                            "backup." + domain,,
+    #                            ['s3:GetObject', 's3:PutObject'],
+    #                            { 'AWS': role})
 
-    cmd = "curl -X GET 'http://consul:8500/v1/kv/?recurse' > ${OUTPUT1_STAGING_DIR}/consul_data.json"
+
+    # Consul Backup
+    cmd = "curl -X GET 'http://consul.{}:8500/v1/kv/?recurse' > ${{OUTPUT1_STAGING_DIR}}/export.json".format(domain)
+    pipeline = DataPipeline(log_uri = s3_logs)
     pipeline.add_shell_command("ConsulBackup",
                                cmd,
-                               destination = Ref("BackupBucket"),
-                               runs_on = Ref("BackupInstance"))
+                               destination = Ref("ConsulBucket"),
+                               runs_on = Ref("ConsulInstance"))
+    pipeline.add_ec2_instance("ConsulInstance", subnet=internal_subnet)
+    pipeline.add_s3_bucket("ConsulBucket", s3_backup + "/consul")
+    config.add_data_pipeline("ConsulBackupPipeline", "consul-backup."+domain, pipeline.objects)
 
-    ddb_copy(pipeline,
-             BossMeta = names.meta,
-             S3Index = names.s3_index,
-             TileIndex = names.tile_index,
-             IdIndex = names.id_index,
-             IdCountIndex = names.id_count_index)
 
+    # DynamoDB Backup
+    tables = {
+        "BossMeta": names.meta,
+        "S3Index": names.s3_index,
+        "TileIndex": names.tile_index,
+        "IdIndex": names.id_index,
+        "IdCountIndex": names.id_count_index,
+    }
+
+    pipeline = DataPipeline(log_uri = s3_logs)
+    pipeline.add_emr_cluster("BackupCluster")
+
+    for name in tables:
+        table = tables[name]
+        pipeline.add_s3_bucket(name + "Bucket", s3_backup + "/DDB/" + table)
+        pipeline.add_ddb_table(name, table)
+        pipeline.add_emr_copy(name+"Copy", Ref(name), Ref(name + "Bucket"), Ref("BackupCluster"))
+
+    config.add_data_pipeline("DDBPipeline", "dynamo-backup."+domain, pipeline.objects)
+
+
+    # Endpoint RDS Backup
     print("Querying Endpoint DB credentials")
     with call.vault() as vault:
         db_config = vault.read(const.VAULT_ENDPOINT_DB)
@@ -107,32 +134,17 @@ def create_config(session, domain):
         endpoint_user = db_config['user']
         endpoint_pass = db_config['password']
 
-    rds_copy(pipeline,
-             names.endpoint_db,
-             endpoint_user,
-             endpoint_pass,
-             "Endpoint",
-             rds_tables(call, names.endpoint_db, endpoint_user, endpoint_pass, 'boss'))
+    pipeline = rds_copy(call, "Endpoint", names.endpoint_db, 'boss', endpoint_user, endpoint_pass, internal_subnet, s3_logs, s3_backup)
+    config.add_data_pipeline("EndpointPipeline", "endpoint-backup."+domain, pipeline.objects)
 
+
+    # Auth RDS Backup
     SCENARIO = os.environ["SCENARIO"]
     AUTH_DB = SCENARIO in ("production", "ha-development",)
     if AUTH_DB:
-        auth_user = 'keycloak'
-        auth_pass = 'keycloak'
+        pipeline = rds_copy(call, "Auth", names.auth_db, 'keycloak', 'keycloak', 'keycloak', internal_subnet, s3_logs, s3_backup)
+        config.add_data_pipeline("AuthPipeline", "auth-backup."+domain, pipeline.objects)
 
-        rds_copy(pipeline,
-                 names.auth_db,
-                 auth_user,
-                 auth_pass,
-                 "Auth",
-                 rds_tables(call, names.auth_db, auth_user, auth_pass, 'keycloak'))
-
-    config.add_data_pipeline("BackupPipeline", "backup."+domain, pipeline.objects)
-    config.add_s3_bucket("BackupBucket", "backup." + domain)
-    #config.add_s3_bucket_policy("BackupBucketPolicy",
-    #                            "backup." + domain,,
-    #                            ['s3:GetObject', 's3:PutObject'],
-    #                            { 'AWS': role})
 
     return config
 
@@ -149,6 +161,12 @@ def create(session, domain):
     if success:
         pass
 
+def update(session, domain):
+    config = create_config(session, domain)
+    success = config.update(session)
+
+    return success
+
 def delete(session, domain):
     names = AWSNames(domain)
 
@@ -158,4 +176,4 @@ def delete(session, domain):
         return
 
     CloudFormationConfiguration('backup', domain).delete(session)
-    aws.s3_bucket_delete(session, 'backup.' + domain)
+    aws.s3_bucket_delete(session, 'backup.' + domain, empty=True)

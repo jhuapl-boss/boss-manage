@@ -1140,7 +1140,7 @@ def s3_bucket_exists(session, name):
 
     return False
 
-def s3_bucket_delete(session, name):
+def s3_bucket_delete(session, name, empty=False):
     """Delete the given S3 bucket
 
     Args:
@@ -1150,8 +1150,13 @@ def s3_bucket_delete(session, name):
     Returns:
         (None)
     """
-    client = session.client('s3')
-    client.delete_bucket(Bucket=name)
+    s3 = session.resource('s3')
+    bucket = s3.Bucket(name)
+
+    if empty:
+        bucket.objects.all().delete()
+
+    bucket.delete()
 
 def get_account_id_from_session(session):
     """
