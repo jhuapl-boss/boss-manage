@@ -47,7 +47,8 @@ def field_value(value):
         return value
 
 class DataPipeline(object):
-    def __init__(self, role="DataPipelineDefaultRole", resource_role="DataPipelineDefaultResourceRole", log_uri=None):
+    def __init__(self, role="DataPipelineDefaultRole", resource_role="DataPipelineDefaultResourceRole", log_uri=None, fmt="CF"):
+        self.fmt = fmt
         self.objects = []
 
         """
@@ -89,18 +90,24 @@ class DataPipeline(object):
                        scheduleType = "cron")
 
     def add_field(self, id, name, **fields):
+        def key_(k):
+            if self.fmt != "CF":
+                k = k[0].lower() + k[1:]
+            return k
+
         field = {
-            "Id": id,
-            "Name": name,
-            "Fields": [
-                {"Key": field_key(key), field_type(value): field_value(value)}
+            key_("Id"): id,
+            key_("Name"): name,
+            key_("Fields"): [
+                { key_("Key"): field_key(key),
+                  key_(field_type(value)): field_value(value)}
                 for key, value in fields.items() if value # not None
             ],
         }
 
         self.objects.append(field)
 
-    def add_ec2_instance(self, name, type="t1.micro", sgs=None, subnet=None, duration="2 Hours"):
+    def add_ec2_instance(self, name, type="t1.micro", sgs=None, subnet=None, duration="2 Hours", image=None):
         """
         {
             "id": "Ec2Instance",
@@ -112,6 +119,10 @@ class DataPipeline(object):
             "terminateAfter": "2 Hours"
         },
         """
+        user = "ec2-user"
+        if image is not None:
+            user = "ubuntu"
+
         self.add_field(name,
                        name,
                        type = "Ec2Resource",
@@ -119,6 +130,8 @@ class DataPipeline(object):
                        actionOnTaskFailure = "terminate",
                        securityGroups = sgs,
                        subnetId = subnet,
+                       imageId = image,
+                       runAsUser = user,
                        terminateAfter = duration)
 
     def add_emr_cluster(self, name, type="m3.xlarge", count="1", version="3.9.0", region=None, duration="2 Hours"):
@@ -212,7 +225,7 @@ s3://{}.elasticmapreduce/bootstrap-actions/configure-hadoop,
                        table = table,
                        selectQuery = "select * from #{table}")
 
-    def add_ddb_table(self, name, table, read_percent = "0.25"):
+    def add_ddb_table(self, name, table, read_percent="0.25", write_percent="0.25"):
         """
         {
             "id": "DDBSourceTable",
@@ -226,6 +239,7 @@ s3://{}.elasticmapreduce/bootstrap-actions/configure-hadoop,
                        name,
                        type = "DynamoDBDataNode",
                        readThroughputPercent = read_percent,
+                       writeThroughputPercent = write_percent,
                        tableName = table)
 
     def add_s3_bucket(self, name, s3_directory):
@@ -266,7 +280,7 @@ s3://{}.elasticmapreduce/bootstrap-actions/configure-hadoop,
                        output = destination,
                        runsOn = runs_on)
 
-    def add_emr_copy(self, name, source, destination, runs_on=None, region=None):
+    def add_emr_copy(self, name, source, destination, runs_on=None, region=None, export=True):
         """
         {
             "id": "TableBackupActivity",
@@ -295,8 +309,15 @@ s3://{}.elasticmapreduce/bootstrap-actions/configure-hadoop,
         if region is None:
             region = const.REGION
 
+        
 
-        step = "s3://dynamodb-emr-" + region + "/emr-ddb-storage-handler/2.1.0/emr-ddb-2.1.0.jar,org.apache.hadoop.dynamodb.tools.DynamoDbExport,#{output.directoryPath},#{input.tableName},#{input.readThroughputPercent}"
+        step = "s3://dynamodb-emr-{region}/emr-ddb-storage-handler/2.1.0/emr-ddb-2.1.0.jar,org.apache.hadoop.dynamodb.tools.DynamoDb{port},#{{{dir_type}.directoryPath}},#{{{tbl_type}.tableName}},#{{{rate}ThroughputPercent}}".format(
+            region = region,
+            port = "Export" if export else "Import",
+            dir_type = "output" if export else "input",
+            tbl_type = "input" if export else "output",
+            rate = "input.read" if export else "output.write",
+        )
 
         self.add_field(name,
                        name,
