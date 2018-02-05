@@ -150,9 +150,9 @@ if __name__ == '__main__':
     pipeline_args = (session, args.domain_name, args.backup_date)
     print("Creating and activating restoration data pipelines")
     for name, pipeline in [('consul', consul_pipeline(*pipeline_args)),
-                           ('dynamo', ddb_pipeline(*pipeline_args)),
-                           ('endpoint', endpoint_rds_pipeline(*pipeline_args)),
-                           ('auth', auth_rds_pipeline(*pipeline_args))]:
+                           ('dynamo', ddb_pipeline(*pipeline_args)),]:
+                           #('endpoint', endpoint_rds_pipeline(*pipeline_args)),
+                           #('auth', auth_rds_pipeline(*pipeline_args))]:
         if pipeline is None:
             continue
 
