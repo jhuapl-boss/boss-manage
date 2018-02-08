@@ -1,0 +1,67 @@
+"""State machine that enqueues up to 10 cuboid object keys to the index cuboids
+keys queue.
+
+Sample input:
+{
+    "config": {
+      "object_store_config": {
+        "id_count_table": "idCount.domain.boss",
+        "page_in_lambda_function": "multiLambda-domain-boss",
+        "page_out_lambda_function": "multiLambda-domain-boss",
+        "cuboid_bucket": "cuboids.domain.boss",
+        "s3_index_table": "s3index.domain.boss",
+        "id_index_table": "idIndex.domain.boss",
+        "s3_flush_queue": "https://queue.amazonaws.com/...",
+        "id_index_new_chunk_threshold": 100,
+        "index_deadletter_queue": "https://queue.amazonaws.com/..."
+      },
+      "kv_config": {
+        "cache_host": "cache.domain.boss",
+        "read_timeout": 86400,
+        "cache_db": "0"
+      },
+      "state_config": {
+        "cache_state_db": "0",
+        "cache_state_host": "cache-state.domain.boss"
+      }
+    },
+    "cuboid_msgs": [],      # Array of SQS messages.
+    "operation": "batch_enqueue_cuboids",
+    "enqueue_done": false
+}
+"""
+
+version: '1.0'
+timeout: 300
+
+while '$.enqueue_done' == False:
+    """WhileStillEnqueuing
+    """
+    Lambda('indexBatchEnqueueCuboidsLambda')
+        """BatchEnqueueCuboids
+        """
+        retry [
+            'QueueDoesNotExist',
+            'UnsupportedOperation',
+            'InvalidAttributeName'
+        ] 1 0 1.0
+        retry [] 45 3 2.0
+        catch []: '$.result'
+            Lambda('indexWriteFailedLambda')
+                """WriteIdFailed
+
+                Send inputs to the deadletter queue.
+                """
+                retry [] 10 2 2.0
+                catch []:
+                    Fail('Exception', 'Failed to write to dead letter queue')
+                        """FailedSendingToDeadLetterQueue
+                        """
+            Fail('Exception', 'Failed to batch enqueue cuboid object keys')
+                """FailedBatchEnqueuing
+                """
+
+Success()
+    """Success
+    """
+

@@ -87,7 +87,15 @@ def update_lambda_code(session, domain, bucket):
     uses_multilambda = [
         names.multi_lambda, names.index_s3_writer_lambda, 
         names.index_fanout_id_writer_lambda, names.index_write_id_lambda,
-        names.index_write_failed_lambda
+        names.index_write_failed_lambda, names.index_find_cuboids_lambda,
+        names.index_fanout_enqueue_cuboid_keys_lambda,
+        names.index_batch_enqueue_cuboids_lambda,
+        names.index_fanout_dequeue_cuboid_keys_lambda,
+        names.index_dequeue_cuboid_keys_lambda,
+        names.index_get_num_cuboid_keys_msgs_lambda,
+        names.index_check_for_write_throttling_lambda,
+        names.index_invoke_index_supervisor_lambda,
+        names.start_sfn_lambda
     ]
     client = session.client('lambda')
     for lambda_name in uses_multilambda:

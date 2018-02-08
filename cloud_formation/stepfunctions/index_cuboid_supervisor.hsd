@@ -44,17 +44,24 @@ timeout: 630
 Lambda('indexS3WriterLambda')
     """WriteS3Index
 
+    write_s3_lambda.py
+
     Write the ids in the cuboid to the S3 index.
     """
+    retry ['NoSuchKey'] 1 0 1.0    # Object doesn't exist in S3 bucket.
     retry [] 20 3 2.0
     catch []: '$.result'
         Lambda('indexWriteFailedLambda')
             """S3WriteFailed
             """
             retry [] 10 2 2.0
-            catch []:
+            catch []: '$.dlqresult'
                 Fail('Exception', 'Failed to write to dead letter queue')
+                    """FailedSendingS3UpdateToDeadLetterQueue
+                    """
         Fail('Exception', 'Failed updating S3 index')
+            """FailedUpdatingS3Index
+            """
 
 Pass()
     """UpdateOperationField
@@ -66,8 +73,12 @@ Pass()
         ['FanoutIdIndexWriters']
 
 while '$.finished' == False:
+    """WhileStillFanningOut
+    """
     Lambda('indexFanoutIdWriterLambda')
         """FanoutAndWriteIdIndex
+
+        fanout_write_id_index_lambda.py
 
         Start a separate step function for each annotation id in the cuboid.  
         Write that cuboid's morton id to each annotation id in the id index.
@@ -77,8 +88,19 @@ while '$.finished' == False:
                 """FanoutFailed
                 """
                 retry [] 10 2 2.0
-                catch []:
+                catch []: '$.dlqresult'
                     Fail('Exception', 'Failed to write to dead letter queue')
+                        """FailedSendingFanoutToDeadLetterQueue
+                        """
             Fail('Exception', 'Failed fanning out write id index step functions')
+                """FailedFanningOut
+                """
+
     Wait(seconds=10)
+        """Wait10Seconds
+        """
+
+Success()
+    """Success
+    """
 

@@ -75,11 +75,11 @@ else
    fi
 
    cd ~/virtualenvs/${1}/local/lib/python3.6/dist-packages
-   chmod -R 077 *
+   chmod -R 0777 *
    zip -r9 ~/lambdazips/multilambda.${1}.zip *
 
    cd ~/virtualenvs/${1}/local/lib/python3.6/site-packages
-   chmod -R 077 *
+   chmod -R 0777 *
    zip -r9 ~/lambdazips/multilambda.${1}.zip *
 
    cd ~/virtualenvs/${1}/lib64/atlas
@@ -91,6 +91,15 @@ else
    zip -g ~/lambdazips/multilambda.${1}.zip fanout_write_id_index_lambda.py
    zip -g ~/lambdazips/multilambda.${1}.zip write_id_index_lambda.py
    zip -g ~/lambdazips/multilambda.${1}.zip write_index_failed_lambda.py
+   zip -g ~/lambdazips/multilambda.${1}.zip fanout_enqueue_cuboid_keys_lambda.py
+   zip -g ~/lambdazips/multilambda.${1}.zip index_find_cuboids_lambda.py
+   zip -g ~/lambdazips/multilambda.${1}.zip batch_enqueue_cuboid_lambda.py
+   zip -g ~/lambdazips/multilambda.${1}.zip fanout_dequeue_cuboid_keys_lambda.py
+   zip -g ~/lambdazips/multilambda.${1}.zip dequeue_cuboid_keys_lambda.py
+   zip -g ~/lambdazips/multilambda.${1}.zip get_num_msgs_cuboid_keys_queue_lambda.py
+   zip -g ~/lambdazips/multilambda.${1}.zip check_for_index_write_throttling_lambda.py
+   zip -g ~/lambdazips/multilambda.${1}.zip invoke_index_supervisor_lambda.py
+   zip -g ~/lambdazips/multilambda.${1}.zip start_sfn_lambda.py
 
    python ~/virtualenvs/${1}/lib/python3.6/site-packages/lambdautils/deploy_lambdas.py /home/ec2-user/virtualenvs/$1 ~/lambdazips/multilambda.${1}.zip $2 --upload-only
 

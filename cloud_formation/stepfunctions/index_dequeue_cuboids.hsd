@@ -1,0 +1,54 @@
+"""Step function that dequeues up to 10 messages from the cuboids keys queue
+and starts the index_cuboid_supervisor step function for each key taken from
+the queue.
+
+Inputs:
+{
+    "config": {
+      "object_store_config": {
+        "id_count_table": "idCount.domain.boss",
+        "page_in_lambda_function": "multiLambda-domain-boss",
+        "page_out_lambda_function": "multiLambda-domain-boss",
+        "cuboid_bucket": "cuboids.domain.boss",
+        "s3_index_table": "s3index.domain.boss",
+        "id_index_table": "idIndex.domain.boss",
+        "s3_flush_queue": "https://queue.amazonaws.com/...",
+        "id_index_new_chunk_threshold": 100,
+        "index_deadletter_queue": "https://queue.amazonaws.com/...",
+        "index_cuboids_keys_queue": "https://queue.amazonaws.com/..."
+      },
+      "kv_config": {
+        "cache_host": "cache.domain.boss",
+        "read_timeout": 86400,
+        "cache_db": "0"
+      },
+      "state_config": {
+        "cache_state_db": "0",
+        "cache_state_host": "cache-state.domain.boss"
+      }
+    },
+    "id_index_step_fcn": "arn:aws:states:...",
+    "id_cuboid_supervisor_step_fcn": "arn:aws:states:..."
+}
+
+
+"""
+
+version: '1.0'
+timeout: 300
+
+Lambda('indexDequeueCuboidsLambda')
+    """DequeueKeysAndStartIndexing
+    """
+    retry [
+        'QueueDoesNotExist',
+        'UnsupportedOperation',
+        'InvalidAttributeName',
+        'KeyError' 
+    ] 1 0 1.0
+    retry [] 30 3 2.0
+    catch []: '$.result'
+        Fail('Exception', 'Failed dequeue and start step function')
+            """FailedDequeuingAndStartingSfn
+            """
+

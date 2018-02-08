@@ -19,7 +19,7 @@ from lib.names import AWSNames
 from lib import aws
 from lib import constants as const
 from lib import stepfunctions as sfn
-from update_lambda_fcn import load_lambdas_on_s3
+from update_lambda_fcn import load_lambdas_on_s3, update_lambda_code
 
 """
 This CloudFormation config file creates the step functions and lambdas used
@@ -84,6 +84,105 @@ def create_config(session, domain):
         memory=128,
         runtime='python3.6')
 
+    config.add_lambda(
+        "indexFindCuboidsLambda",
+        names.index_find_cuboids_lambda,
+        Ref("LambdaCacheExecutionRole"),
+        s3=(aws.get_lambda_s3_bucket(session),
+            "multilambda.{}.zip".format(domain),
+            "index_find_cuboids_lambda.handler"),
+        timeout=120,
+        memory=256,
+        runtime='python3.6')
+
+    config.add_lambda(
+        "indexFanoutEnqueueCuboidsKeysLambda",
+        names.index_fanout_enqueue_cuboid_keys_lambda,
+        Ref("LambdaCacheExecutionRole"),
+        s3=(aws.get_lambda_s3_bucket(session),
+            "multilambda.{}.zip".format(domain),
+            "fanout_enqueue_cuboid_keys_lambda.handler"),
+        timeout=120,
+        memory=256,
+        runtime='python3.6')
+
+    config.add_lambda(
+        "indexBatchEnqueueCuboidsLambda",
+        names.index_batch_enqueue_cuboids_lambda,
+        Ref("LambdaCacheExecutionRole"),
+        s3=(aws.get_lambda_s3_bucket(session),
+            "multilambda.{}.zip".format(domain),
+            "batch_enqueue_cuboids_lambda.handler"),
+        timeout=60,
+        memory=128,
+        runtime='python3.6')
+
+    config.add_lambda(
+        "startSfnLambda",
+        names.start_sfn_lambda,
+        Ref("LambdaCacheExecutionRole"),
+        s3=(aws.get_lambda_s3_bucket(session),
+            "multilambda.{}.zip".format(domain),
+            "start_sfn_lambda.handler"),
+        timeout=60,
+        memory=128,
+        runtime='python3.6')
+
+    config.add_lambda(
+        "indexFanoutDequeueCuboidKeysLambda",
+        names.index_fanout_dequeue_cuboid_keys_lambda,
+        Ref("LambdaCacheExecutionRole"),
+        s3=(aws.get_lambda_s3_bucket(session),
+            "multilambda.{}.zip".format(domain),
+            "fanout_dequeue_cuboid_keys_lambda.handler"),
+        timeout=60,
+        memory=128,
+        runtime='python3.6')
+
+    config.add_lambda(
+        "indexDequeueCuboidKeysLambda",
+        names.index_dequeue_cuboid_keys_lambda,
+        Ref("LambdaCacheExecutionRole"),
+        s3=(aws.get_lambda_s3_bucket(session),
+            "multilambda.{}.zip".format(domain),
+            "dequeue_cuboid_keys_lambda.handler"),
+        timeout=60,
+        memory=128,
+        runtime='python3.6')
+
+    config.add_lambda(
+        "indexGetNumCuboidKeysMsgsLambda",
+        names.index_get_num_cuboid_keys_msgs_lambda,
+        Ref("LambdaCacheExecutionRole"),
+        s3=(aws.get_lambda_s3_bucket(session),
+            "multilambda.{}.zip".format(domain),
+            "get_num_msgs_cuboid_keys_queue_lambda.handler"),
+        timeout=60,
+        memory=128,
+        runtime='python3.6')
+
+    config.add_lambda(
+        "indexCheckForWriteThrottlingLambda",
+        names.index_check_for_write_throttling_lambda,
+        Ref("LambdaCacheExecutionRole"),
+        s3=(aws.get_lambda_s3_bucket(session),
+            "multilambda.{}.zip".format(domain),
+            "check_for_index_write_throttling_lambda.handler"),
+        timeout=60,
+        memory=128,
+        runtime='python3.6')
+
+    config.add_lambda(
+        "indexInvokeIndexSupervisorLambda",
+        names.index_invoke_index_supervisor_lambda,
+        Ref("LambdaCacheExecutionRole"),
+        s3=(aws.get_lambda_s3_bucket(session),
+            "multilambda.{}.zip".format(domain),
+            "invoke_index_supervisor_lambda.handler"),
+        timeout=60,
+        memory=128,
+        runtime='python3.6')
+
     return config
 
 
@@ -117,17 +216,61 @@ def post_init(session, domain):
     names = AWSNames(domain)
 
     sfn.create(
+        session, names.index_supervisor_sfn, domain, 
+        'index_supervisor.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(
         session, names.index_cuboid_supervisor_sfn, domain, 
         'index_cuboid_supervisor.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
         session, names.index_id_writer_sfn, domain, 
         'index_id_writer.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(
+        session, names.index_find_cuboids_sfn, domain, 
+        'index_find_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(
+        session, names.index_enqueue_cuboids_sfn, domain, 
+        'index_enqueue_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(
+        session, names.index_fanout_enqueue_cuboids_sfn, domain, 
+        'index_fanout_enqueue_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(
+        session, names.index_dequeue_cuboids_sfn, domain, 
+        'index_dequeue_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
+
+
+def update(session, domain):
+    resp = input('Rebuild multilambda: [Y/n]:')
+    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
+        pre_init(session, domain)
+        bucket = aws.get_lambda_s3_bucket(session)
+        update_lambda_code(session, domain, bucket)
+
+    config = create_config(session, domain)
+    success = config.update(session)
+
+    if not success:
+        return False
+
+    resp = input('Replace step functions: [Y/n]:')
+    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
+        delete_sfns(session, domain)
+        post_init(session, domain)
+
+    return True
 
 
 def delete(session, domain):
-    names = AWSNames(domain)
     CloudFormationConfiguration('idindexing', domain).delete(session)
+    delete_sfns(session, domain)
 
+
+def delete_sfns(session, domain):
+    names = AWSNames(domain)
+    sfn.delete(session, names.index_dequeue_cuboids_sfn)
+    sfn.delete(session, names.index_fanout_enqueue_cuboids_sfn)
+    sfn.delete(session, names.index_enqueue_cuboids_sfn)
+    sfn.delete(session, names.index_find_cuboids_sfn)
     sfn.delete(session, names.index_id_writer_sfn)
     sfn.delete(session, names.index_cuboid_supervisor_sfn)
+    sfn.delete(session, names.index_supervisor_sfn)
 

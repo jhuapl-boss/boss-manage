@@ -95,13 +95,29 @@ class AWSNames(object):
         'ingest_lambda': 'IngestUpload',
         'dynamo_lambda': 'dynamoLambda',
         'trigger_dynamo_autoscale': 'triggerDynamoAutoscale',
+        'start_sfn_lambda': 'startSfnLambda',
         'index_id_writer_sfn': 'Index.IdWriter',
         'index_cuboid_supervisor_sfn': 'Index.CuboidSupervisor',
+        'index_find_cuboids_sfn': 'Index.FindCuboids',
+        'index_supervisor_sfn': 'Index.Supervisor',
+        'index_enqueue_cuboids_sfn': 'Index.EnqueueCuboids',
+        'index_fanout_enqueue_cuboids_sfn': 'Index.FanoutEnqueueCuboids',
+        'index_dequeue_cuboids_sfn': 'Index.DequeueCuboids',
+        'index_fanout_dequeue_cuboids_sfn': 'Index.FanoutDequeueCuboids',
         'index_s3_writer_lambda': 'indexS3WriterLambda',
         'index_fanout_id_writer_lambda': 'indexFanoutIdWriterLambda',
         'index_write_id_lambda': 'indexWriteIdLambda',
         'index_deadletter_queue': 'indexDeadLetter',
-        'index_write_failed_lambda': 'indexWriteFailedLambda'
+        'index_write_failed_lambda': 'indexWriteFailedLambda',
+        'index_find_cuboids_lambda': 'indexFindCuboidsLambda',
+        'index_fanout_enqueue_cuboid_keys_lambda': 'indexFanoutEnqueueCuboidsKeysLambda',
+        'index_batch_enqueue_cuboids_lambda': 'indexBatchEnqueueCuboidsLambda',
+        'index_fanout_dequeue_cuboid_keys_lambda': 'indexFanoutDequeueCuboidsKeysLambda',
+        'index_dequeue_cuboid_keys_lambda': 'indexDequeueCuboidsLambda',
+        'index_get_num_cuboid_keys_msgs_lambda': 'indexGetNumCuboidKeysMsgsLambda',
+        'index_check_for_write_throttling_lambda': 'indexCheckForWriteThrottlingLambda',
+        'index_invoke_index_supervisor_lambda': 'indexInvokeIndexSupervisorLambda',
+        'index_cuboids_keys_queue': 'cuboidsKeys'
     }
 
     def __getattr__(self, name):
@@ -117,13 +133,22 @@ class AWSNames(object):
         if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'consul_monitor', 'vault_consul_check',
                     'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 
                     'index_s3_writer_lambda', 'index_fanout_id_writer_lambda',
-                    'index_write_id_lambda', 'index_write_failed_lambda']:
+                    'index_write_id_lambda', 'index_write_failed_lambda',
+                    'index_find_cuboids_lambda', 
+                    'index_fanout_enqueue_cuboid_keys_lambda',
+                    'index_batch_enqueue_cuboids_lambda', 
+                    'index_fanout_dequeue_cuboid_keys_lambda',
+                    'index_dequeue_cuboid_keys_lambda',
+                    'index_get_num_cuboid_keys_msgs_lambda',
+                    'index_check_for_write_throttling_lambda',
+                    'index_invoke_index_supervisor_lambda',
+                    'start_sfn_lambda']:
             fq_hostname = fq_hostname.replace('.','-')
 
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
                     'ingest_queue_populate', 'ingest_queue_upload', 'resolution_hierarchy',
                     'downsample_volume', 'delete_experiment', 'delete_collection', 'delete_coord_frame',
-                    'index_deadletter_queue']:
+                    'index_deadletter_queue', 'index_cuboids_keys_queue']:
             fq_hostname = "".join(map(lambda x: x.capitalize(), fq_hostname.split('.')))
 
         return fq_hostname
