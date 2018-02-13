@@ -13,7 +13,8 @@ Inputs:
         "id_index_table": "idIndex.domain.boss",
         "s3_flush_queue": "https://queue.amazonaws.com/...",
         "id_index_new_chunk_threshold": 100,
-        "index_deadletter_queue": "https://queue.amazonaws.com/..."
+        "index_deadletter_queue": "https://queue.amazonaws.com/...",
+        "index_cuboids_keys_queue": "https://queue.amazonaws.com/..."
       },
       "kv_config": {
         "cache_host": "cache.domain.boss",
@@ -25,10 +26,14 @@ Inputs:
         "cache_state_host": "cache-state.domain.boss"
       }
     },
+    "id_supervisor_step_fcn": "arn:aws:states:...",
+    "id_cuboid_supervisor_step_fcn": "arn:aws:states:...",
+    "index_dequeue_cuboids_step_fcn": "arn:aws:states:...",
     "id_index_step_fcn": "arn:aws:states:...",
     "batch_enqueue_cuboids_step_fcn": "arn:aws:states:...",
     "fanout_enqueue_cuboids_step_fcn": "arn:aws:states:...",
-    "max_items": int,
+    "max_cuboid_fanout": int,           # Max number of Index.CuboidSupervisors to fanout at a time.
+    "max_items": int,                   # Max items to retrieve from Dynamo at a time.
     "index_enqueue_cuboids_step_fcn": "arn:...",
     "lookup_key": "...",            # collection&exp&chan&res
     "exclusive_start_key": "",      # Should be empty string.
@@ -61,6 +66,7 @@ while '$.first_time' == True or '$.exclusive_start_key' != '':
             Lambda('indexWriteFailedLambda')
                 """S3ReadFailed
                 """
+                retry ['KeyError'] 1 0 1.0
                 retry [] 10 2 2.0
                 catch []: '$.dlqresult'
                     Fail('Exception', 'Failed to write to dead letter queue')
@@ -99,6 +105,7 @@ while '$.first_time' == True or '$.exclusive_start_key' != '':
             Lambda('indexWriteFailedLambda')
                 """FanoutEnqueueFailed
                 """
+                retry ['KeyError'] 1 0 1.0
                 retry [] 10 2 2.0
                 catch []: '$.dlqresult'
                     Fail('Exception', 'Failed to write to dead letter queue')

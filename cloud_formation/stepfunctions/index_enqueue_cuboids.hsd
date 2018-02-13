@@ -39,6 +39,8 @@ while '$.enqueue_done' == False:
     """
     Lambda('indexBatchEnqueueCuboidsLambda')
         """BatchEnqueueCuboids
+
+        batch_enqueue_cuboids_lambda.py
         """
         retry [
             'QueueDoesNotExist',
@@ -52,6 +54,7 @@ while '$.enqueue_done' == False:
 
                 Send inputs to the deadletter queue.
                 """
+                retry ['KeyError'] 1 0 1.0
                 retry [] 10 2 2.0
                 catch []:
                     Fail('Exception', 'Failed to write to dead letter queue')

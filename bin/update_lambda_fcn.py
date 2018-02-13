@@ -93,7 +93,7 @@ def update_lambda_code(session, domain, bucket):
         names.index_fanout_dequeue_cuboid_keys_lambda,
         names.index_dequeue_cuboid_keys_lambda,
         names.index_get_num_cuboid_keys_msgs_lambda,
-        names.index_check_for_write_throttling_lambda,
+        names.index_check_for_throttling_lambda,
         names.index_invoke_index_supervisor_lambda,
         names.start_sfn_lambda
     ]

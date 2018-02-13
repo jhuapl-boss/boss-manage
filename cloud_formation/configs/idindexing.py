@@ -162,12 +162,12 @@ def create_config(session, domain):
         runtime='python3.6')
 
     config.add_lambda(
-        "indexCheckForWriteThrottlingLambda",
-        names.index_check_for_write_throttling_lambda,
+        "indexCheckForThrottlingLambda",
+        names.index_check_for_throttling_lambda,
         Ref("LambdaCacheExecutionRole"),
         s3=(aws.get_lambda_s3_bucket(session),
             "multilambda.{}.zip".format(domain),
-            "check_for_index_write_throttling_lambda.handler"),
+            "check_for_index_throttling_lambda.handler"),
         timeout=60,
         memory=128,
         runtime='python3.6')

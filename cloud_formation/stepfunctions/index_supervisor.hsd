@@ -41,10 +41,10 @@ timeout: 86400      # 1 day
 while '$.queue_empty' == False:
     """WhileQueueNotEmpty
     """
-    Lambda('indexCheckForWriteThrottlingLambda')
-        """CheckForWriteThrottling
+    Lambda('indexCheckForThrottlingLambda')
+        """CheckForDynamoThrottling
 
-        check_for_index_write_throttling_lambda.py
+        check_for_index_throttling_lambda.py
         """
         retry [
             'InvalideParameterValueException', 
@@ -59,7 +59,7 @@ while '$.queue_empty' == False:
                 """FailedThrottlingCheck
                 """
 
-    if '$.write_throttled' == True:
+    if '$.write_throttled' == True or '$.read_throttled' == True:
         """IfWriteThrottled
         """
         Wait(seconds=60)
@@ -85,6 +85,19 @@ while '$.queue_empty' == False:
         if '$.ApproximateNumberOfMessages' > 0:
             """IfHaveMessages
             """
+
+            Pass()
+                """SetFanoutParameters
+                """
+                result: '$.fanout_params'
+                data:
+                    {
+                        "max_concurrent": 5,
+                        "rampup_delay": 10,
+                        "rampup_backoff": 0.8,
+                        "status_delay": 2
+                    }
+
             while '$.finished' == False:
                 """WhileStillSpawningCuboidIndexers
                 """

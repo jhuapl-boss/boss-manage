@@ -39,6 +39,8 @@ timeout: 300
 
 Lambda('indexDequeueCuboidsLambda')
     """DequeueKeysAndStartIndexing
+
+    dequeue_cuboid_keys_lambda.py
     """
     retry [
         'QueueDoesNotExist',

@@ -39,7 +39,7 @@ version: '1.0'
 
 # Timeout based on lambda timeout (120s), retry settings of the lambda task
 # and the Wait setting of the while loop.
-timeout: 630
+timeout: 3600
 
 Lambda('indexS3WriterLambda')
     """WriteS3Index
@@ -54,6 +54,7 @@ Lambda('indexS3WriterLambda')
         Lambda('indexWriteFailedLambda')
             """S3WriteFailed
             """
+            retry ['KeyError'] 1 0 1.0
             retry [] 10 2 2.0
             catch []: '$.dlqresult'
                 Fail('Exception', 'Failed to write to dead letter queue')
@@ -72,6 +73,18 @@ Pass()
     data: 
         ['FanoutIdIndexWriters']
 
+Pass()
+    """SetFanoutParameters
+    """
+    result: '$.fanout_params'
+    data:
+        {
+            "max_concurrent": 4,
+            "rampup_delay": 4,
+            "rampup_backoff": 0.5,
+            "status_delay": 1
+        }
+
 while '$.finished' == False:
     """WhileStillFanningOut
     """
@@ -83,10 +96,17 @@ while '$.finished' == False:
         Start a separate step function for each annotation id in the cuboid.  
         Write that cuboid's morton id to each annotation id in the id index.
         """
+        retry [
+            'ClientError',
+            'Lambda.ThrottlingException', 
+            'Lambda.TooManyRequestsException',
+            'Lambda.ServiceException'
+        ] 30 4 3.0
         catch []: '$.result'
             Lambda('indexWriteFailedLambda')
                 """FanoutFailed
                 """
+                retry ['KeyError'] 1 0 1.0
                 retry [] 10 2 2.0
                 catch []: '$.dlqresult'
                     Fail('Exception', 'Failed to write to dead letter queue')
@@ -96,9 +116,10 @@ while '$.finished' == False:
                 """FailedFanningOut
                 """
 
-    Wait(seconds=10)
-        """Wait10Seconds
-        """
+    if '$.finished' == False:
+        Wait(seconds_path='$.wait_secs')
+            """WaitAtLeast10Seconds
+            """
 
 Success()
     """Success

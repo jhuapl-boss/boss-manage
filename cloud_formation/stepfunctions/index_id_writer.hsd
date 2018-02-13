@@ -47,17 +47,25 @@ version: '1.0'
 # Check tasks' retry values below.
 
 # All of the values above should be factored into the timeout setting.
-timeout: 950
+timeout: 3600
 
 Lambda('indexWriteIdLambda')
     """WriteIdIndex
     """
-    retry [] 45 3 2.0
+    retry ['ResourceNotFoundException'] 1 0 1.0
+    retry [] 45 4 2.5
     catch []: '$.result'
         Lambda('indexWriteFailedLambda')
             """WriteIdFailed
+
+            write_id_index_lambda.py
             """
+            retry ['KeyError'] 1 0 1.0
             retry [] 10 2 2.0
             catch []:
                 Fail('Exception', 'Failed to write to dead letter queue')
+                    """FailedSendingToDeadletterQueue
+                    """
         Fail('Exception', 'Failed to update id index')
+            """FailedUpdatingIdIndex
+            """

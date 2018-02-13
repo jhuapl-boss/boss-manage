@@ -49,16 +49,31 @@ Pass()
     data: 
         ['FanoutEnqueueCuboidsKeys']
 
+Pass()
+    """SetFanoutParameters
+    """
+    result: '$.fanout_params'
+    data:
+        {
+            "max_concurrent": 3,
+            "rampup_delay": 4,
+            "rampup_backoff": 0.5,
+            "status_delay": 1
+        }
+
 while '$.finished' == False:
     """WhileStillFanningOut
     """
     Lambda('indexFanoutEnqueueCuboidsKeysLambda')
         """FanoutEnqueueCuboidsKeys
+
+        fanout_enqueue_cuboid_keys_lambda.py
         """
         catch []: '$.result'
             Lambda('indexWriteFailedLambda')
                 """FanoutEnqueueFailed
                 """
+                retry ['KeyError'] 1 0 1.0
                 retry [] 10 2 2.0
                 catch []: '$.dlqresult'
                     Fail('Exception', 'Failed to write to dead letter queue')
