@@ -89,6 +89,7 @@ class AWSNames(object):
         'delete_event_rule': 'deleteEventRule',
         'delete_lambda': "deleteLambda",
         'resolution_hierarchy': 'Resolution.Hierarchy',
+        'downsample_volume': 'Downsample.Volume',
         'ingest_queue_populate': 'Ingest.Populate',
         'ingest_queue_upload': 'Ingest.Upload',
         'ingest_lambda': 'IngestUpload',
@@ -112,7 +113,7 @@ class AWSNames(object):
 
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
                     'ingest_queue_populate', 'ingest_queue_upload', 'resolution_hierarchy',
-                    'delete_experiment', 'delete_collection', 'delete_coord_frame']:
+                    'downsample_volume', 'delete_experiment', 'delete_collection', 'delete_coord_frame']:
             fq_hostname = "".join(map(lambda x: x.capitalize(), fq_hostname.split('.')))
 
         return fq_hostname

@@ -78,6 +78,13 @@ if __name__ == "__main__":
                         action='store_true',
                         default=False,
                         help = "add this flag to type in a private IP address in internal command instead of a DNS name which is looked up")
+    parser.add_argument("--user", "-u",
+                        default='ubuntu',
+                        help = "Username of the internal machine")
+    parser.add_argument("--port",
+                        default=22,
+                        type=int,
+                        help = "Port to connect to on the internal machine")
     parser.add_argument("--ssh-key", "-s",
                         metavar = "<file>",
                         default = os.environ.get("SSH_KEY"),
@@ -124,7 +131,7 @@ if __name__ == "__main__":
     else:
         private = aws.machine_lookup(session, args.internal, public_ip=False)
 
-    ssh = SSHConnection(args.ssh_key, private, bastion)
+    ssh = SSHConnection(args.ssh_key, (private, args.port, args.user), bastion)
 
     if args.command in ("ssh",):
         ssh.shell()

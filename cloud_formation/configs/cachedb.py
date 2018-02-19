@@ -145,11 +145,12 @@ def create_config(session, domain, keypair=None, user_data=None):
                       Ref("LambdaCacheExecutionRole"),
                       s3=(aws.get_lambda_s3_bucket(session),
                           "multilambda.{}.zip".format(domain),
-                          "local/lambda_loader.handler"),
+                          "lambda_loader.handler"),
                       timeout=120,
                       memory=1024,
                       security_groups=[Ref('InternalSecurityGroup')],
-                      subnets=lambda_subnets)
+                      subnets=lambda_subnets,
+                      runtime='python3.6')
 
     if creating_tile_bucket:
         config.add_lambda_permission(
