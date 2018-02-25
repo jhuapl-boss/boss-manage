@@ -43,20 +43,24 @@ def consul_pipeline(session, domain, directory):
     internal_subnet = aws.subnet_id_lookup(session, names.internal)
 
     s3_backup = "s3://backup." + domain + "/" + directory
+    s3_log = "s3://backup." + domain + "/restore-logs/"
 
-    pipeline = DataPipeline(fmt="DP")
+    pipeline = DataPipeline(fmt="DP", log_uri = s3_log)
     pipeline.add_shell_command("ConsulBackup",
                                "python -c \"import json, requests; [requests.put('http://consul.{}:8500/v1/kv'+i['Key'], i['Value'])  for i in json.load(open('${{INPUT1_STAGING_DIR}}/export.json'))]\"".format(domain),
                                source = Ref("ConsulBucket"),
                                runs_on = Ref("ConsulInstance"))
-    pipeline.add_ec2_instance("ConsulInstance", subnet=internal_subnet)
+    pipeline.add_ec2_instance("ConsulInstance",
+                              subnet = internal_subnet,
+                              image = aws.ami_lookup(session, "backup.boss-test")[0])
     pipeline.add_s3_bucket("ConsulBucket", s3_backup + "/consul")
     return pipeline
 
 def ddb_pipeline(session, domain, directory):
     s3_backup = "s3://backup." + domain + "/" + directory
+    s3_log = "s3://backup." + domain + "/restore-logs/"
 
-    pipeline = DataPipeline(fmt="DP")
+    pipeline = DataPipeline(fmt="DP", log_uri = s3_log)
     pipeline.add_emr_cluster("BackupCluster")
 
     tables = list_s3_bucket(session, "backup." + domain, directory + "/DDB")
@@ -73,12 +77,27 @@ def rds_pipeline(session, domain, directory, component, rds_name, db_name, db_us
     subnet = aws.subnet_id_lookup(session, names.internal)
 
     s3_backup = "s3://backup." + domain + "/" + directory
+    s3_log = "s3://backup." + domain + "/restore-logs/"
+
+
     tables = list_s3_bucket(session, "backup." + domain, directory + "/RDS/" + db_name)
     if len(tables) == 0:
         print("No {} tables backed up on {}, skipping restore".format(component, directory))
-        return None
+        #return None
 
-    pipeline = DataPipeline(fmt="DP")
+    cmd = "mysql --host {} --user {} --password={} {} < ${{INPUT1_STAGING_DIR}}/{}.sql"
+    cmd = cmd.format(rds_name, db_user, db_pass, db_name, db_name)
+
+    pipeline = DataPipeline(fmt="DP", log_uri = s3_log)
+    pipeline.add_shell_command("RDSBackup",
+                               cmd,
+                               source = Ref("RDSBucket"),
+                               runs_on = Ref("RDSInstance"))
+    pipeline.add_ec2_instance("RDSInstance",
+                              subnet = subnet,
+                              image = aws.ami_lookup(session, "backup.boss-test")[0])
+    pipeline.add_s3_bucket("RDSBucket", s3_backup + "/RDS/" + db_name)
+    """
     pipeline.add_ec2_instance(component + "Instance", subnet=subnet)
     pipeline.add_rds_database(component + "DB",
                               # The instance name is the DNS name without '.',
@@ -91,6 +110,7 @@ def rds_pipeline(session, domain, directory, component, rds_name, db_name, db_us
 
         pipeline.add_rds_table(name, Ref(component + "DB"), table)
         pipeline.add_rds_copy(name+"Copy", Ref(name+"Bucket"), Ref(name), Ref(component + "Instance"))
+    """
 
     return pipeline
 
@@ -150,9 +170,9 @@ if __name__ == '__main__':
     pipeline_args = (session, args.domain_name, args.backup_date)
     print("Creating and activating restoration data pipelines")
     for name, pipeline in [('consul', consul_pipeline(*pipeline_args)),
-                           ('dynamo', ddb_pipeline(*pipeline_args)),]:
-                           #('endpoint', endpoint_rds_pipeline(*pipeline_args)),
-                           #('auth', auth_rds_pipeline(*pipeline_args))]:
+                           ('dynamo', ddb_pipeline(*pipeline_args)),
+                           ('endpoint', endpoint_rds_pipeline(*pipeline_args)),
+                           ('auth', auth_rds_pipeline(*pipeline_args))]:
         if pipeline is None:
             continue
 

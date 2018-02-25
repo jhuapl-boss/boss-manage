@@ -37,11 +37,24 @@ except ImportError:
     import sys
     sys.exit(1)
 
-def rds_copy(call, component, rds_name, db_name, db_user, db_pass, subnet, s3_logs, s3_backup):
+def rds_copy(call, rds_name, db_name, db_user, db_pass, subnet, image, s3_logs, s3_backup):
     tables = rds_tables(call, rds_name, db_user, db_pass, db_name)
 
+    # DP TODO: Update the image to read connection information from Vault
+    cmd = "mysqldump --opt --host {} --user {} --password={} {} > ${{OUTPUT1_STAGING_DIR}}/{}.sql"
+    cmd = cmd.format(rds_name, db_user, db_pass, db_name, db_name)
+
     pipeline = DataPipeline(log_uri = s3_logs)
-    pipeline.add_ec2_instance(component + "Instance", subnet=subnet)
+    pipeline.add_ec2_instance("RDSInstance",
+                              subnet = subnet,
+                              image = image)
+    pipeline.add_s3_bucket("RDSBucket", s3_backup + "/RDS/" + db_name)
+    pipeline.add_shell_command("RDSBackup",
+                               cmd,
+                               destination = Ref("RDSBucket"),
+                               runs_on = Ref("RDSInstance"))
+                               
+    """
     pipeline.add_rds_database(component + "DB",
                               rds_name.replace('.', '-'), # The instance name is the DNS name without '.',
                               db_user,
@@ -52,6 +65,7 @@ def rds_copy(call, component, rds_name, db_name, db_user, db_pass, subnet, s3_lo
 
         pipeline.add_rds_table(name, Ref(component + "DB"), table)
         pipeline.add_rds_copy(name+"Copy", Ref(name), Ref(name+"Bucket"), Ref(component + "Instance"))
+    """
 
     return pipeline
 
@@ -82,9 +96,10 @@ def create_config(session, domain):
     call = ExternalCalls(session, keypair, domain)
 
     internal_subnet = aws.subnet_id_lookup(session, names.internal)
+    backup_image = aws.ami_lookup(session, 'backup.boss-test')[0]
 
     s3_backup = "s3://backup." + domain + "/#{format(@scheduledStartTime, 'YYYY-ww')}"
-    s3_logs = s3_base + "/logs"
+    s3_logs = "s3://backup." + domain + "/logs"
 
     config.add_s3_bucket("BackupBucket", "backup." + domain)
     #config.add_s3_bucket_policy("BackupBucketPolicy",
@@ -134,7 +149,7 @@ def create_config(session, domain):
         endpoint_user = db_config['user']
         endpoint_pass = db_config['password']
 
-    pipeline = rds_copy(call, "Endpoint", names.endpoint_db, 'boss', endpoint_user, endpoint_pass, internal_subnet, s3_logs, s3_backup)
+    pipeline = rds_copy(call, names.endpoint_db, 'boss', endpoint_user, endpoint_pass, internal_subnet, backup_image, s3_logs, s3_backup)
     config.add_data_pipeline("EndpointPipeline", "endpoint-backup."+domain, pipeline.objects)
 
 
@@ -142,7 +157,7 @@ def create_config(session, domain):
     SCENARIO = os.environ["SCENARIO"]
     AUTH_DB = SCENARIO in ("production", "ha-development",)
     if AUTH_DB:
-        pipeline = rds_copy(call, "Auth", names.auth_db, 'keycloak', 'keycloak', 'keycloak', internal_subnet, s3_logs, s3_backup)
+        pipeline = rds_copy(call, names.auth_db, 'keycloak', 'keycloak', 'keycloak', internal_subnet, backup_image, s3_logs, s3_backup)
         config.add_data_pipeline("AuthPipeline", "auth-backup."+domain, pipeline.objects)
 
 

@@ -119,19 +119,16 @@ class DataPipeline(object):
             "terminateAfter": "2 Hours"
         },
         """
-        user = "ec2-user"
-        if image is not None:
-            user = "ubuntu"
 
         self.add_field(name,
                        name,
                        type = "Ec2Resource",
                        instanceType = type,
                        actionOnTaskFailure = "terminate",
-                       securityGroups = sgs,
+                       securityGroupIds = sgs,
                        subnetId = subnet,
                        imageId = image,
-                       runAsUser = user,
+                       keyPair = "pryordm1-test",
                        terminateAfter = duration)
 
     def add_emr_cluster(self, name, type="m3.xlarge", count="1", version="3.9.0", region=None, duration="2 Hours"):

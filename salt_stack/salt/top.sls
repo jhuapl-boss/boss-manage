@@ -70,3 +70,10 @@ base:
         # Resolution hierarchy
         - spdb
         - scipy
+
+    'backup*':
+        - mysql.client
+        - sun-java
+        - sun-java.env
+        - unzip
+        - users.ec2-user
