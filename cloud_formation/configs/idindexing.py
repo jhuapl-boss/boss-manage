@@ -27,17 +27,45 @@ for annotation (object) id indexing.  When building from scratch, it should
 be run after the CloudFormation cachedb config.
 """
 
+def get_bucket_life_cycle_rules():
+    """
+    Generate the expiration policy for the cuboid_ids bucket.  This bucket
+    is a temporary holding place for cuboid ids passed between step function
+    states.  Because data passed between states is limited to 32K, the bucket
+    is used, instead, to ensure data limits aren't exceeded.
+    """
+    return {
+        'Rules': [
+            {
+                'ExpirationInDays': 2,
+                'Status': 'Enabled'
+            }
+        ]
+    }
+
 def create_config(session, domain):
     """Create the CloudFormationConfiguration object."""
     config = CloudFormationConfiguration('idindexing', domain, const.REGION)
     names = AWSNames(domain)
 
-    topic_arn = aws.sns_topic_lookup(session, "ProductionMicronsMailingList")
+    #topic_arn = aws.sns_topic_lookup(session, "ProductionMicronsMailingList")
 
     role = aws.role_arn_lookup(session, "lambda_cache_execution")
     config.add_arg(Arg.String(
         "LambdaCacheExecutionRole", role,
         "IAM role for multilambda." + domain))
+
+    cuboid_ids_bucket_name = names.cuboid_ids_bucket
+    if not aws.s3_bucket_exists(session, cuboid_ids_bucket_name):
+        life_cycle_cfg = get_bucket_life_cycle_rules()
+        config.add_s3_bucket(
+            'cuboidIdsBucket', cuboid_ids_bucket_name, 
+            life_cycle_config=life_cycle_cfg)
+
+    config.add_s3_bucket_policy(
+        "cuboidBucketPolicy", cuboid_ids_bucket_name,
+        ['s3:GetObject', 's3:PutObject'],
+        { 'AWS': role})
 
     lambda_bucket = aws.get_lambda_s3_bucket(session)
     config.add_lambda(
@@ -183,6 +211,28 @@ def create_config(session, domain):
         memory=128,
         runtime='python3.6')
 
+    config.add_lambda(
+        "indexSplitCuboidsLambda",
+        names.index_split_cuboids_lambda,
+        Ref("LambdaCacheExecutionRole"),
+        s3=(aws.get_lambda_s3_bucket(session),
+            "multilambda.{}.zip".format(domain),
+            "split_cuboids_lambda.handler"),
+        timeout=120,
+        memory=128,
+        runtime='python3.6')
+
+    config.add_lambda(
+        "indexLoadIdsFromS3Lambda",
+        names.index_load_ids_from_s3_lambda,
+        Ref("LambdaCacheExecutionRole"),
+        s3=(aws.get_lambda_s3_bucket(session),
+            "multilambda.{}.zip".format(domain),
+            "load_ids_from_s3_lambda.handler"),
+        timeout=120,
+        memory=128,
+        runtime='python3.6')
+
     return config
 
 
@@ -236,6 +286,9 @@ def post_init(session, domain):
     sfn.create(
         session, names.index_dequeue_cuboids_sfn, domain, 
         'index_dequeue_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(
+        session, names.index_fanout_id_writers_sfn, domain, 
+        'index_fanout_id_writers.hsd', 'StatesExecutionRole-us-east-1 ')
 
 
 def update(session, domain):
@@ -260,12 +313,13 @@ def update(session, domain):
 
 
 def delete(session, domain):
-    CloudFormationConfiguration('idindexing', domain).delete(session)
+    #CloudFormationConfiguration('idindexing', domain).delete(session)
     delete_sfns(session, domain)
 
 
 def delete_sfns(session, domain):
     names = AWSNames(domain)
+    sfn.delete(session, names.index_fanout_id_writers_sfn)
     sfn.delete(session, names.index_dequeue_cuboids_sfn)
     sfn.delete(session, names.index_fanout_enqueue_cuboids_sfn)
     sfn.delete(session, names.index_enqueue_cuboids_sfn)

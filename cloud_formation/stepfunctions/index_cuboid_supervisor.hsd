@@ -49,6 +49,7 @@ Lambda('indexS3WriterLambda')
     Write the ids in the cuboid to the S3 index.
     """
     retry ['NoSuchKey'] 1 0 1.0    # Object doesn't exist in S3 bucket.
+    retry ['KeyError'] 1 0 1.0
     retry [] 20 3 2.0
     catch []: '$.result'
         Lambda('indexWriteFailedLambda')
@@ -71,10 +72,10 @@ Pass()
     """
     result: '$.operation'
     data: 
-        ['FanoutIdIndexWriters']
+        ['split_cuboid']
 
 Pass()
-    """SetFanoutParameters
+    """SetSplitCuboidFanoutParameters
     """
     result: '$.fanout_params'
     data:
@@ -86,22 +87,18 @@ Pass()
         }
 
 while '$.finished' == False:
-    """WhileStillFanningOut
+    """WhileNotDone
     """
-    Lambda('indexFanoutIdWriterLambda')
-        """FanoutAndWriteIdIndex
+    Lambda('indexSplitCuboidsLambda')
+        """SplitCuboid
 
-        fanout_write_id_index_lambda.py
+        split_cuboids_lambda.py
 
-        Start a separate step function for each annotation id in the cuboid.  
-        Write that cuboid's morton id to each annotation id in the id index.
+        Split job of writing cuboid's ids into n step functions to ensure data
+        volume stays within step function limits when passing between states.
         """
-        retry [
-            'ClientError',
-            'Lambda.ThrottlingException', 
-            'Lambda.TooManyRequestsException',
-            'Lambda.ServiceException'
-        ] 30 4 3.0
+        retry ['KeyError', 'Lambda.ResourceNotFoundException'] 1 0 1.0
+        retry [] 30 4 3.0
         catch []: '$.result'
             Lambda('indexWriteFailedLambda')
                 """FanoutFailed
@@ -116,7 +113,13 @@ while '$.finished' == False:
                 """FailedFanningOut
                 """
 
+
     if '$.finished' == False:
+        """IfNotFinished
+
+        This state exists because wait_secs may not be present when finished
+        set to True.
+        """
         Wait(seconds_path='$.wait_secs')
             """WaitAtLeast10Seconds
             """

@@ -1,0 +1,96 @@
+"""Fanouts Index.IdWriter step functions.  Invoked by the 
+Index.CuboidSupervisor step function.
+"""
+
+version: '1.0'
+timeout: 1800
+
+Lambda('indexLoadIdsFromS3Lambda')
+    """LoadIdsFromS3
+
+    Get the cuboid's ids from S3.
+
+    load_ids_from_s3_lambda.py
+    """
+    retry ['NoSuchKey'] 1 0 1.0    # Object doesn't exist in S3 bucket.
+    retry [] 40 2 2.5
+    catch []: '$.result'
+        Lambda('indexWriteFailedLambda')
+            """LoadIdsFailed
+            """
+            retry ['KeyError'] 1 0 1.0
+            retry [] 10 2 2.0
+            catch []: '$.dlqresult'
+                Fail('Exception', 'Failed to write to dead letter queue')
+                    """FailedLoadIdsFailedToDeadLetterQueue
+                    """
+        Fail('Exception', 'Failed loading ids from S3')
+            """FailedLoadingFromS3
+            """
+
+Pass()
+    """UpdateOperationField
+    Simply adds the name of the operation so it can be logged properly in the
+    deadletter queue in case of a failure when fanning out.
+    """
+    result: '$.operation'
+    data: 
+        ['FanoutIdIndexWriters']
+
+Pass()
+    """SetFanoutParameters
+    """
+    result: '$.fanout_params'
+    data:
+        {
+            "max_concurrent": 4,
+            "rampup_delay": 4,
+            "rampup_backoff": 0.5,
+            "status_delay": 1
+        }
+
+while '$.finished' == False:
+    """WhileStillFanningOut
+    """
+    Lambda('indexFanoutIdWriterLambda')
+        """FanoutAndWriteIdIndex
+
+        fanout_write_id_index_lambda.py
+
+        Start a separate step function for each annotation id in the cuboid.  
+        Write that cuboid's morton id to each annotation id in the id index.
+        """
+        retry [
+            'ClientError',
+            'Lambda.ThrottlingException', 
+            'Lambda.TooManyRequestsException',
+            'Lambda.ServiceException'
+        ] 30 4 3.0
+        catch []: '$.result'
+            Lambda('indexWriteFailedLambda')
+                """FanoutFailed
+                """
+                retry ['KeyError'] 1 0 1.0
+                retry [] 10 2 2.0
+                catch []: '$.dlqresult'
+                    Fail('Exception', 'Failed to write to dead letter queue')
+                        """FailedSendingFanoutToDeadLetterQueue
+                        """
+            Fail('Exception', 'Failed fanning out write id index step functions')
+                """FailedFanningOut
+                """
+
+    if '$.finished' == False:
+        """IfNotFinished
+
+        This state exists because wait_secs may not be present when finished
+        set to True.
+        """
+        Wait(seconds_path='$.wait_secs')
+            """WaitAtLeast10Seconds
+            """
+
+Success()
+    """Success
+    """
+

@@ -99,6 +99,8 @@ else
    zip -g ~/lambdazips/multilambda.${1}.zip get_num_msgs_cuboid_keys_queue_lambda.py
    zip -g ~/lambdazips/multilambda.${1}.zip check_for_index_throttling_lambda.py
    zip -g ~/lambdazips/multilambda.${1}.zip invoke_index_supervisor_lambda.py
+   zip -g ~/lambdazips/multilambda.${1}.zip split_cuboids_lambda.py
+   zip -g ~/lambdazips/multilambda.${1}.zip load_ids_from_s3_lambda.py
    zip -g ~/lambdazips/multilambda.${1}.zip start_sfn_lambda.py
 
    python ~/virtualenvs/${1}/lib/python3.6/site-packages/lambdautils/deploy_lambdas.py /home/ec2-user/virtualenvs/$1 ~/lambdazips/multilambda.${1}.zip $2 --upload-only

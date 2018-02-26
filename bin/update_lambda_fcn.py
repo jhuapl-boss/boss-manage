@@ -95,6 +95,7 @@ def update_lambda_code(session, domain, bucket):
         names.index_get_num_cuboid_keys_msgs_lambda,
         names.index_check_for_throttling_lambda,
         names.index_invoke_index_supervisor_lambda,
+        names.index_split_cuboids_lambda,
         names.start_sfn_lambda
     ]
     client = session.client('lambda')
@@ -134,6 +135,7 @@ def load_lambdas_on_s3(session, domain, bucket):
 
     os.chdir(const.repo_path("salt_stack", "salt", "boss-tools", "files", "boss-tools.git"))
     zip.write_to_zip('bossutils', zipname)
+    zip.write_to_zip('cloudwatchwrapper', zipname)
     zip.write_to_zip('lambda', zipname)
     zip.write_to_zip('lambdautils', zipname)
     os.chdir(cwd)

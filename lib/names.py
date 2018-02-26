@@ -70,6 +70,7 @@ class AWSNames(object):
         "ingest_bucket": "ingest",
         "tile_bucket": "tiles",
         "tile_index": "tileindex",
+        "cuboid_ids_bucket": "cuboid-ids",
         "id_index": "idIndex",
         "id_count_index": "idCount",
         "s3flush_queue": "S3flush",
@@ -104,19 +105,22 @@ class AWSNames(object):
         'index_fanout_enqueue_cuboids_sfn': 'Index.FanoutEnqueueCuboids',
         'index_dequeue_cuboids_sfn': 'Index.DequeueCuboids',
         'index_fanout_dequeue_cuboids_sfn': 'Index.FanoutDequeueCuboids',
+        'index_fanout_id_writers_sfn': 'Index.FanoutIdWriters',
         'index_s3_writer_lambda': 'indexS3WriterLambda',
         'index_fanout_id_writer_lambda': 'indexFanoutIdWriterLambda',
         'index_write_id_lambda': 'indexWriteIdLambda',
         'index_deadletter_queue': 'indexDeadLetter',
         'index_write_failed_lambda': 'indexWriteFailedLambda',
         'index_find_cuboids_lambda': 'indexFindCuboidsLambda',
+        'index_split_cuboids_lambda': 'indexSplitCuboidsLambda',
         'index_fanout_enqueue_cuboid_keys_lambda': 'indexFanoutEnqueueCuboidsKeysLambda',
         'index_batch_enqueue_cuboids_lambda': 'indexBatchEnqueueCuboidsLambda',
         'index_fanout_dequeue_cuboid_keys_lambda': 'indexFanoutDequeueCuboidsKeysLambda',
         'index_dequeue_cuboid_keys_lambda': 'indexDequeueCuboidsLambda',
         'index_get_num_cuboid_keys_msgs_lambda': 'indexGetNumCuboidKeysMsgsLambda',
-        'index_check_for_write_throttling_lambda': 'indexCheckForWriteThrottlingLambda',
+        'index_check_for_throttling_lambda': 'indexCheckForThrottlingLambda',
         'index_invoke_index_supervisor_lambda': 'indexInvokeIndexSupervisorLambda',
+        'index_load_ids_from_s3_lambda': 'indexLoadIdsFromS3Lambda',
         'index_cuboids_keys_queue': 'cuboidsKeys'
     }
 
@@ -130,6 +134,7 @@ class AWSNames(object):
 
         fq_hostname = hostname + self.base_dot
 
+        # Lambda names cannot have periods, so we use dashes, instead.
         if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'consul_monitor', 'vault_consul_check',
                     'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 
                     'index_s3_writer_lambda', 'index_fanout_id_writer_lambda',
@@ -140,11 +145,14 @@ class AWSNames(object):
                     'index_fanout_dequeue_cuboid_keys_lambda',
                     'index_dequeue_cuboid_keys_lambda',
                     'index_get_num_cuboid_keys_msgs_lambda',
-                    'index_check_for_write_throttling_lambda',
+                    'index_check_for_throttling_lambda',
                     'index_invoke_index_supervisor_lambda',
+                    'index_split_cuboids_lambda',
+                    'index_load_ids_from_s3_lambda',
                     'start_sfn_lambda']:
             fq_hostname = fq_hostname.replace('.','-')
 
+        # Queue names cannot have periods, so we capitalize each word, instead.
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
                     'ingest_queue_populate', 'ingest_queue_upload', 'resolution_hierarchy',
                     'downsample_volume', 'delete_experiment', 'delete_collection', 'delete_coord_frame',
