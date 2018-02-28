@@ -64,7 +64,8 @@ while '$.finished' == False:
             'ClientError',
             'Lambda.ThrottlingException', 
             'Lambda.TooManyRequestsException',
-            'Lambda.ServiceException'
+            'Lambda.ServiceException',
+            'States.TaskFailed'
         ] 30 4 3.0
         catch []: '$.result'
             Lambda('indexWriteFailedLambda')
