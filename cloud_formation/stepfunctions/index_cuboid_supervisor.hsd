@@ -44,7 +44,7 @@ timeout: 3600
 Lambda('indexS3WriterLambda')
     """WriteS3Index
 
-    write_s3_lambda.py
+    write_s3_lambda_index.py
 
     Write the ids in the cuboid to the S3 index.
     """
