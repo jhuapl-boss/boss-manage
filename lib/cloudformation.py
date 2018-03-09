@@ -2000,7 +2000,7 @@ class CloudFormationConfiguration:
         if description is not None:
             self.resources[key]["Properties"]["Description"] = description
 
-    def add_data_pipeline(self, key, name, objects, description=""):
+    def add_data_pipeline(self, key, name, objects, description="", depends_on=None):
         self.resources[key] = {
             "Type" : "AWS::DataPipeline::Pipeline",
             "Properties" : {
@@ -2013,3 +2013,6 @@ class CloudFormationConfiguration:
                 "PipelineTags" : [],
             }
         }
+
+        if depends_on is not None:
+            self.resources[key]['DependsOn'] = depends_on

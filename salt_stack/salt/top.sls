@@ -77,3 +77,6 @@ base:
         - sun-java.env
         - unzip
         - users.ec2-user
+        - backup
+        - python.python35
+        - boss-tools.bossutils

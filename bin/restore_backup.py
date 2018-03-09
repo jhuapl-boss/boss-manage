@@ -34,6 +34,8 @@ def list_s3_bucket(session, bucket, prefix):
     resp = client.list_objects_v2(Bucket = bucket, Prefix = prefix, Delimiter = '/')
     dirs = [cp['Prefix'].replace(prefix, '', 1)[:-1] for cp in resp.get('CommonPrefixes',[])]
     print(dirs)
+    files = [c['Key'] for c in resp['Contents']]
+    print(files)
     return dirs
     #for content in resp['Contents']:
     #    print(content['Key'])
@@ -72,7 +74,7 @@ def ddb_pipeline(session, domain, directory):
 
     return pipeline
 
-def rds_pipeline(session, domain, directory, component, rds_name, db_name, db_user, db_pass):
+def rds_pipeline(session, domain, directory, component, rds_name):
     names = AWSNames(domain)
     subnet = aws.subnet_id_lookup(session, names.internal)
 
@@ -83,57 +85,28 @@ def rds_pipeline(session, domain, directory, component, rds_name, db_name, db_us
     tables = list_s3_bucket(session, "backup." + domain, directory + "/RDS/" + db_name)
     if len(tables) == 0:
         print("No {} tables backed up on {}, skipping restore".format(component, directory))
-        #return None
-
-    cmd = "mysql --host {} --user {} --password={} {} < ${{INPUT1_STAGING_DIR}}/{}.sql"
-    cmd = cmd.format(rds_name, db_user, db_pass, db_name, db_name)
+        return None
 
     pipeline = DataPipeline(fmt="DP", log_uri = s3_log)
     pipeline.add_shell_command("RDSBackup",
-                               cmd,
+                               "bash ~/rds.sh restore {}".format(rds_name),
                                source = Ref("RDSBucket"),
                                runs_on = Ref("RDSInstance"))
     pipeline.add_ec2_instance("RDSInstance",
                               subnet = subnet,
-                              image = aws.ami_lookup(session, "backup.boss-test")[0])
+                              image = aws.ami_lookup(session, "backup.boss")[0])
     pipeline.add_s3_bucket("RDSBucket", s3_backup + "/RDS/" + db_name)
-    """
-    pipeline.add_ec2_instance(component + "Instance", subnet=subnet)
-    pipeline.add_rds_database(component + "DB",
-                              # The instance name is the DNS name without '.',
-                              rds_name.replace('.', '-'),
-                              db_user,
-                              db_pass)
-    for table in tables:
-        name = component + "-" + table.capitalize()
-        pipeline.add_s3_bucket(name + "Bucket", s3_backup + "/RDS/" + db_name + "/" + table)
-
-        pipeline.add_rds_table(name, Ref(component + "DB"), table)
-        pipeline.add_rds_copy(name+"Copy", Ref(name+"Bucket"), Ref(name), Ref(component + "Instance"))
-    """
 
     return pipeline
 
 def endpoint_rds_pipeline(session, domain, directory):
     names = AWSNames(domain)
-    keypair = aws.keypair_lookup(session)
-    call = ExternalCalls(session, keypair, domain)
-
-    print("Querying Endpoint DB credentials")
-    with call.vault() as vault:
-        db_config = vault.read(const.VAULT_ENDPOINT_DB)
-
-        endpoint_user = db_config['user']
-        endpoint_pass = db_config['password']
 
     return rds_pipeline(session,
                         domain,
                         directory,
                         "Endpoint",
-                        names.endpoint_db,
-                        'boss',
-                        endpoint_user,
-                        endpoint_pass)
+                        names.endpoint_db)
 
 def auth_rds_pipeline(session, domain, directory):
     names = AWSNames(domain)
@@ -142,10 +115,7 @@ def auth_rds_pipeline(session, domain, directory):
                         domain,
                         directory,
                         "Auth",
-                        names.auth_db,
-                        'keycloak',
-                        'keycloak',
-                        'keycloak')
+                        names.auth_db)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Script the restoration of a backup")

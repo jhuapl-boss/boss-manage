@@ -253,6 +253,15 @@ class Vault(object):
                     client.write("aws/roles/" + name, **keys)
         """
 
+    def set_policy(self, name, policy):
+        """Create or Update a policy
+
+        Used by processes to add or update policies after Vault has been
+        initially configured.
+        """
+        client = self.connect(VAULT_TOKEN)
+        client.set_policy(name, policy)
+
     def unseal(self):
         """Unseal a sealed Vault. Connect using get_client() and if the Vault is
         not sealed read all of the keys defined by VAULT_KEY and unseal.
