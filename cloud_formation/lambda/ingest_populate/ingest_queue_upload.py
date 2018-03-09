@@ -9,7 +9,6 @@ class FailedToSendMessages(Exception):
 
 SQS_BATCH_SIZE = 10
 SQS_RETRY_TIMEOUT = 15
-MAX_NUM_TILES_PER_LAMBDA = 30000  # This number has to match the boss-tools/activites/ingest_queue_populate.py
 
 def handler(args, context):
     """Populate the ingest upload SQS Queue with tile information
@@ -40,8 +39,10 @@ def handler(args, context):
 
             'z_start': 0,
             'z_stop': 0
-            'z_tile_size': 16,
-            'final_z_stop': 0, The full extent of the Z dimension
+            'z_tile_size': 0,
+
+            'z_chunk_size': 16,
+            'MAX_NUM_TILES_PER_LAMBDA': 30000
         }
 
     Returns:
@@ -122,23 +123,20 @@ def create_messages(args):
     count_in_offset = 0
 
     for t in range_('t'):
-        for z in range_('z'):
+        for z in range(args['z_start'], args['z_stop'], args['z_chunk_size']):
             for y in range_('y'):
                 for x in range_('x'):
                     if tiles_to_skip > 0:
-                        tiles_to_skip -= 1
+                        tiles_to_skip -= args["z_tile_size"]
                         continue
                     if count_in_offset == 0:
                         print("Finished skipping tiles")
-                    count_in_offset += 1
-                    if count_in_offset > MAX_NUM_TILES_PER_LAMBDA:
-                        return  # end the generator
 
                     chunk_x = int(x/tile_size('x'))
                     chunk_y = int(y/tile_size('y'))
-                    chunk_z = int(z/tile_size('z'))
+                    chunk_z = int(z/args['z_chunk_size'])
 
-                    num_of_tiles = min(tile_size('z'), args['z_stop'] - z)  #  was final_z_stop? is this right with just z_stop, check with Derek
+                    num_of_tiles = min(tile_size('z'), args['z_stop'] - z)
 
                     chunk_key = hashed_key(num_of_tiles,
                                            args['project_info'][0],
@@ -151,6 +149,11 @@ def create_messages(args):
                                            t)
 
                     for tile in range(z, z + num_of_tiles):
+                        count_in_offset += 1
+                        if count_in_offset % 999 == 0:
+                            print("count_in_offset: " + str(count_in_offset))
+                        if count_in_offset > args['MAX_NUM_TILES_PER_LAMBDA']:
+                            return  # end the generator
                         tile_key = hashed_key(args['project_info'][0],
                                               args['project_info'][1],
                                               args['project_info'][2],
