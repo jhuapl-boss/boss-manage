@@ -2,12 +2,14 @@ import boto3
 import json
 import time
 import hashlib
+import pprint
 
 class FailedToSendMessages(Exception):
     pass
 
 SQS_BATCH_SIZE = 10
 SQS_RETRY_TIMEOUT = 15
+MAX_NUM_TILES_PER_LAMBDA = 30000  # This number has to match the boss-tools/activites/ingest_queue_populate.py
 
 def handler(args, context):
     """Populate the ingest upload SQS Queue with tile information
@@ -46,6 +48,7 @@ def handler(args, context):
         int: Number of messages put into the queue
     """
     print("Starting to populate upload queue")
+    pprint.pprint(args)
 
     queue = boto3.resource('sqs').Queue(args['upload_queue'])
 
@@ -115,15 +118,27 @@ def create_messages(args):
 
         return '&'.join([digest, base])
 
+    tiles_to_skip = args['tiles_to_skip']
+    count_in_offset = 0
+
     for t in range_('t'):
         for z in range_('z'):
             for y in range_('y'):
                 for x in range_('x'):
+                    if tiles_to_skip > 0:
+                        tiles_to_skip -= 1
+                        continue
+                    if count_in_offset == 0:
+                        print("Finished skipping tiles")
+                    count_in_offset += 1
+                    if count_in_offset > MAX_NUM_TILES_PER_LAMBDA:
+                        return  # end the generator
+
                     chunk_x = int(x/tile_size('x'))
                     chunk_y = int(y/tile_size('y'))
                     chunk_z = int(z/tile_size('z'))
 
-                    num_of_tiles = min(tile_size('z'), args['final_z_stop'] - z)
+                    num_of_tiles = min(tile_size('z'), args['z_stop'] - z)  #  was final_z_stop? is this right with just z_stop, check with Derek
 
                     chunk_key = hashed_key(num_of_tiles,
                                            args['project_info'][0],
