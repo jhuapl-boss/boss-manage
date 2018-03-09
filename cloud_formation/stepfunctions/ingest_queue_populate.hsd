@@ -1,6 +1,10 @@
 """Populate an ingest upload queue with message for each tile to be processed"""
 
 Activity('IngestPopulate')
+    """IngestPopulate
+    Code: boss-tools.git/activities/ingest_queue_populate.py
+    Calls: boss-manage.git/cloud_formation/stepfunctions/ingest_queue_upload.hsd
+    """
     # Automatically purges the queue so retry works correctly
     retry [] 60 3 1.0
     catch []:
