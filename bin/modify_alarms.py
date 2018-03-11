@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2016 The Johns Hopkins University Applied Physics Laboratory
+# Copyright 2018 The Johns Hopkins University Applied Physics Laboratory
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,16 +13,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Script to perform one time initialization on a new AWS Account to be use for TheBoss"""
+"""Script to modify the billing alarms for TheBoss changing them to have a period of 60s"""
 
 import argparse
 import sys
 import os
-import iam_utils
+#import iam_utils
+import pprint
 
 import alter_path
 from lib import aws
 from lib import constants as const
+
 
 def create_billing_alarms(session):
     print("creating billing alarms")
@@ -39,12 +41,11 @@ def create_billing_alarms(session):
         'Namespace': 'AWS/Billing',
         'Statistic': 'Maximum',
         'Dimensions': [{'Name': 'Currency', 'Value': 'USD'}],
-        'Period': 10,
+        'Period': 60,
         'EvaluationPeriods': 1,
         'Threshold': 1000.0,
         'ComparisonOperator': 'GreaterThanOrEqualToThreshold'
     }
-
     for num in range(1, const.MAX_ALARM_DOLLAR + 1):
         print("   {}k".format(str(num)))
         alarm_parms['AlarmName'] = "Billing_{}k".format(str(num))
@@ -52,23 +53,17 @@ def create_billing_alarms(session):
         alarm_parms['Threshold'] = float(num * 1000)
         response = client.put_metric_alarm(**alarm_parms)
 
+
+
 def create_initial_sns_accounts(session):
     print("Creating SNS Topics.")
     topic_arn = aws.sns_create_topic(session, const.PRODUCTION_MAILING_LIST)
-    if topic_arn == None:
+    if topic_arn is None:
         print("Failed to create {} topic".format(const.PRODUCTION_MAILING_LIST))
 
     topic_arn = aws.sns_create_topic(session, const.PRODUCTION_BILLING_TOPIC)
-    if topic_arn == None:
+    if topic_arn is None:
         print("Failed to create {} topic".format(const.PRODUCTION_BILLING_TOPIC))
-
-
-def import_iam_details_from_files(session):
-    iam = iam_utils.IamUtils(session)
-    iam.get_iam_details_from_aws()
-    iam.load_from_files()
-    print("Importing iam details to aws..")
-    iam.import_to_aws()
 
 
 if __name__ == '__main__':
@@ -93,6 +88,6 @@ if __name__ == '__main__':
 
     session = aws.create_session(args.aws_credentials)
 
-    create_initial_sns_accounts(session)
+    #create_initial_sns_accounts(session)
     create_billing_alarms(session)
-    import_iam_details_from_files(session)
+
