@@ -458,9 +458,9 @@ class IamUtils:
         self.save_groups(DEFAULT_GROUP_FILE)
 
     def change_account_memory(self):
-        self.policies = iam.to_sessions_account(self.policies)
-        self.roles = iam.to_sessions_account(self.roles)
-        self.groups = iam.to_sessions_account(self.groups)
+        self.policies = self.to_sessions_account(self.policies)
+        self.roles = self.to_sessions_account(self.roles)
+        self.groups = self.to_sessions_account(self.groups)
 
     def load_from_files(self):
         self.load_policies_from_file(DEFAULT_POLICY_FILE)
