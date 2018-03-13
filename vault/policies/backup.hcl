@@ -4,7 +4,7 @@ path "auth/token/lookup-self" {
 }
 
 # Handle Endpoint server credentials
-path "secret/endpoint/db" {
+path "secret/endpoint/django/db" {
     policy = "read"
 }
 

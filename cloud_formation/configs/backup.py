@@ -48,7 +48,8 @@ def create_config(session, domain):
     config = CloudFormationConfiguration('backup', domain, const.REGION)
     names = AWSNames(domain)
 
-    internal_subnet = aws.subnet_id_lookup(session, names.internal)
+    # XXX: AZ `E` is incompatible with T2.Micro instances (used by backup)
+    internal_subnet = aws.subnet_id_lookup(session, 'a-' + names.internal)
     backup_image = aws.ami_lookup(session, 'backup.boss')[0]
 
     s3_backup = "s3://backup." + domain + "/#{format(@scheduledStartTime, 'YYYY-ww')}"
