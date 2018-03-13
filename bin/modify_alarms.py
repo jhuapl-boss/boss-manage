@@ -41,11 +41,14 @@ def create_billing_alarms(session):
         'Namespace': 'AWS/Billing',
         'Statistic': 'Maximum',
         'Dimensions': [{'Name': 'Currency', 'Value': 'USD'}],
-        'Period': 60,
+        'Period': 21600,
         'EvaluationPeriods': 1,
         'Threshold': 1000.0,
         'ComparisonOperator': 'GreaterThanOrEqualToThreshold'
     }
+    # Alarm Period should be 21600 or larger.  See
+    # https://forums.aws.amazon.com/thread.jspa?threadID=135955
+
     for num in range(1, const.MAX_ALARM_DOLLAR + 1):
         print("   {}k".format(str(num)))
         alarm_parms['AlarmName'] = "Billing_{}k".format(str(num))
