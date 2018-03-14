@@ -19,9 +19,9 @@ Sample input:
         "cuboid_bucket": "cuboids.domain.boss",
         "s3_index_table": "s3index.domain.boss",
         "id_index_table": "idIndex.domain.boss",
-        "s3_flush_queue": "https://queue.amazonaws.com/256215146792/...",
+        "s3_flush_queue": "https://queue.amazonaws.com/...",
         "id_index_new_chunk_threshold": 100,
-        "index_deadletter_queue": "https://queue.amazonaws.com/256215146792/..."
+        "index_deadletter_queue": "https://queue.amazonaws.com/..."
       },
       "kv_config": {
         "cache_host": "cache.domain.boss",
@@ -58,23 +58,66 @@ Wait(seconds_path='$.wait_secs')
     the deadletter queue.
     """
 
-Lambda('indexWriteIdLambda')
-    """WriteIdIndex
-    """
-    retry ['ResourceNotFoundException'] 1 0 1.0
-    retry [] 45 4 2.5
-    catch []: '$.result'
-        Lambda('indexWriteFailedLambda')
-            """WriteIdFailed
+Pass()
+    """InitStatus
 
-            write_id_index_lambda.py
+    Set initial status params that control retries/done.
+    """
+    result: '$.write_id_index_status'
+    data:
+        {"done": False, "delay": 0, "retries": 0}
+
+
+while '$.write_id_index_status.retries' < 3:
+    """WhileRetriesLessThan3
+    """
+    Wait(seconds_path='$.write_id_index_status.delay')
+        """BackoffDelay
+
+        Pause if this is a retry.
+        """
+
+
+    Lambda('indexWriteIdLambda')
+        """WriteIdIndex
+        """
+        #retry ['ResourceNotFoundException'] 1 0 1.0
+        #retry [] 45 4 2.5
+        catch []: '$.result'
+            Lambda('indexWriteFailedLambda')
+                """WriteIdFailed
+
+                write_id_index_lambda.py
+                """
+                retry ['KeyError'] 1 0 1.0
+                retry [] 10 2 2.0
+                catch []:
+                    Fail('Exception', 'Failed to write to dead letter queue')
+                        """FailedSendingToDeadletterQueue
+                        """
+            Fail('Exception', 'Failed to update id index')
+                """FailedUpdatingIdIndex
+                """
+
+    if '$.write_id_index_status.done' == True:
+        """IfDone
+        """
+        Success()
+            """Success
             """
-            retry ['KeyError'] 1 0 1.0
-            retry [] 10 2 2.0
-            catch []:
-                Fail('Exception', 'Failed to write to dead letter queue')
-                    """FailedSendingToDeadletterQueue
-                    """
-        Fail('Exception', 'Failed to update id index')
-            """FailedUpdatingIdIndex
+
+
+Lambda('indexWriteFailedLambda')
+    """WriteIdFailedAfterRetries
+
+    write_id_index_lambda.py
+    """
+    retry ['KeyError'] 1 0 1.0
+    retry [] 10 2 2.0
+    catch []:
+        Fail('Exception', 'Failed to write to dead letter queue')
+            """FailedSendingToDeadletterQueue2
             """
+Fail('Exception', 'Failed to update id index')
+    """FailedUpdatingIdIndex2
+    """
