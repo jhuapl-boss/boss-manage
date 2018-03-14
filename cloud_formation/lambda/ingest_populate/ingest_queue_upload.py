@@ -155,7 +155,7 @@ def create_messages(args):
                             print("count_in_offset: " + str(count_in_offset))
                         if count_in_offset > args['MAX_NUM_TILES_PER_LAMBDA']:
                             return  # end the generator
-                        tile_key = "tile{: >5}{: >5}{: >5}{: >5}".format(x,y,z,t)
+                        tile_key = "tile{: >5}{: >5}{: >5}{: >5}".format(x,y,tile,t)
 
                         msg = {
                             #'job_id': args['job_id'],
