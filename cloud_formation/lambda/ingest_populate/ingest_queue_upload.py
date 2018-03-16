@@ -42,7 +42,7 @@ def handler(args, context):
             'z_tile_size': 0,
 
             'z_chunk_size': 16,
-            'MAX_NUM_TILES_PER_LAMBDA': 30000
+            'MAX_NUM_TILES_PER_LAMBDA': 20000
         }
 
     Returns:
@@ -94,6 +94,7 @@ def handler(args, context):
 
     return sent
 
+
 def create_messages(args):
     """Create all of the tile messages to be enqueued
 
@@ -131,16 +132,16 @@ def create_messages(args):
                     chunk_z = int(z/args['z_chunk_size'])
 
                     num_of_tiles = min(args['z_chunk_size'], args['z_stop'] - z)
-                    print("num_of_tiles:" + str(num_of_tiles))
 
-#------------------
-# Commented out the code below and modified it above to help debug
-# TODO SH put back uncommented verion of code after done debugging.
-                    chunk_key = "chunk{: >3}{: >3}{: >3}{: >3}".format(
-                        chunk_x,
-                        chunk_y,
-                        chunk_z,
-                        t)
+                    chunk_key = hashed_key(num_of_tiles,
+                                           args['project_info'][0],
+                                           args['project_info'][1],
+                                           args['project_info'][2],
+                                           args['resolution'],
+                                           chunk_x,
+                                           chunk_y,
+                                           chunk_z,
+                                           t)
 
                     for tile in range(z, z + num_of_tiles):
                         if tiles_to_skip > 0:
@@ -151,54 +152,25 @@ def create_messages(args):
                             print("Finished skipping tiles")
 
                         count_in_offset += 1
-                        if count_in_offset % 999 == 0:
+                        if count_in_offset % 1000 == 0:
                             print("count_in_offset: " + str(count_in_offset))
                         if count_in_offset > args['MAX_NUM_TILES_PER_LAMBDA']:
                             return  # end the generator
-                        tile_key = "tile{: >5}{: >5}{: >5}{: >5}".format(x,y,tile,t)
+                        tile_key = hashed_key(args['project_info'][0],
+                                              args['project_info'][1],
+                                              args['project_info'][2],
+                                              args['resolution'],
+                                              chunk_x,
+                                              chunk_y,
+                                              tile,
+                                              t)
 
                         msg = {
-                            #'job_id': args['job_id'],
-                            #'upload_queue_arn': args['upload_queue'],
-                            #'ingest_queue_arn': args['ingest_queue'],
+                            'job_id': args['job_id'],
+                            'upload_queue_arn': args['upload_queue'],
+                            'ingest_queue_arn': args['ingest_queue'],
                             'chunk_key': chunk_key,
                             'tile_key': tile_key,
                         }
 
-                    # chunk_key = hashed_key(num_of_tiles,
-                    #                        args['project_info'][0],
-                    #                        args['project_info'][1],
-                    #                        args['project_info'][2],
-                    #                        args['resolution'],
-                    #                        chunk_x,
-                    #                        chunk_y,
-                    #                        chunk_z,
-                    #                        t)
-                    #
-                    # for tile in range(z, z + num_of_tiles):
-                    #     count_in_offset += 1
-                    #     if count_in_offset % 999 == 0:
-                    #         print("count_in_offset: " + str(count_in_offset))
-                    #     if count_in_offset > args['MAX_NUM_TILES_PER_LAMBDA']:
-                    #         return  # end the generator
-                    #     tile_key = hashed_key(args['project_info'][0],
-                    #                           args['project_info'][1],
-                    #                           args['project_info'][2],
-                    #                           args['resolution'],
-                    #                           chunk_x,
-                    #                           chunk_y,
-                    #                           tile,
-                    #                           t)
-                    #
-                    #     msg = {
-                    #         'job_id': args['job_id'],
-                    #         'upload_queue_arn': args['upload_queue'],
-                    #         'ingest_queue_arn': args['ingest_queue'],
-                    #         'chunk_key': chunk_key,
-                    #         'tile_key': tile_key,
-                    #     }
-
-# ------------------
-
                         yield json.dumps(msg)
-
