@@ -1,6 +1,8 @@
 """State machine that finds all cuboids in a given channel and enqueues their
 S3 object keys in SQS.
 
+Index.FindCuboids
+
 Inputs:
 {
     "config": {
@@ -35,16 +37,21 @@ Inputs:
     "max_cuboid_fanout": int,           # Max number of Index.CuboidSupervisors to fanout at a time.
     "max_items": int,                   # Max items to retrieve from Dynamo at a time.
     "index_enqueue_cuboids_step_fcn": "arn:...",
-    "lookup_key": "...",            # collection&exp&chan&res
-    "exclusive_start_key": "",      # Should be empty string.
-    "first_time": True
+    "lookup_key": "..."             # collection&exp&chan&res
 }
 """
 
 version: '1.0'
 timeout: 86400      # 1 day
 
-while '$.first_time' == True or '$.exclusive_start_key' != '':
+Pass()
+    """Init
+    """
+    result: '$.status'
+    data:
+        {'done': False, 'lookup_key_n': 0}
+
+while '$.status.done' == False:
     """WhileStillTraversingLookupKeyIndex
     """
     Pass()

@@ -222,9 +222,7 @@ def get_args(domain, account, region, lookup_key):
         "max_write_id_index_lambdas": 599,
         "max_cuboid_fanout": 30,
         "max_items": 100,
-        "lookup_key": lookup_key,
-        "exclusive_start_key": "",
-        "first_time": True
+        "lookup_key": lookup_key
     }
 
     return arn, json.dumps(find_cuboid_args)
