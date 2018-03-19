@@ -15,8 +15,11 @@
 # limitations under the License.
 
 """
-Start the annotation indexing of a channel.  Invokes the Index.FindCuboids
-step function on the given channel.
+By default, start the annotation indexing of a channel.  Invokes the 
+Index.FindCuboids step function on the given channel.
+
+Can also stop a running indexing process or resume one that's been stopped via
+the --stop and --resume flags, respectively.
 """
 
 import alter_path
@@ -38,6 +41,9 @@ NEW_CHUNK_THRESHOLD = 100
 
 DB_HOST_NAME = 'endpoint-db'
 RESOLUTION = 0
+
+# Format string for building the first part of step function's arn.
+SFN_ARN_PREFIX_FORMAT = 'arn:aws:states:{}:{}:stateMachine:'
 
 #   "lookup_key": "4&4&24&0",   # This is the 192 cuboid test dataset with 249 ids per cuboid.
 #   "lookup_key": "8&8&26&0",   # This is the annotation regression test data.
@@ -170,9 +176,9 @@ def get_lookup_key_from_db(session, domain, db_params, channel_params):
         coll_set[0][0], exp_set[0][0], chan_set[0][0], RESOLUTION)
 
 
-def get_args(domain, account, region, lookup_key):
+def get_common_args(domain, account, region):
     """
-    Get all arguments needed to start Index.FindCuboids.
+    Get common arguments for starting step functions related to indexing.
 
     Args:
         domain (str): VPC such as integration.boss.
@@ -180,14 +186,11 @@ def get_args(domain, account, region, lookup_key):
         region (str): AWS region.
 
     Returns:
-        (str, str): [0] is the ARN of Index.FindCuboids; [1] are the step function arguments as a JSON string.
+        (dict): Arguments.
     """
-
     names = AWSNames(domain)
-    sfn_arn_prefix = 'arn:aws:states:{}:{}:stateMachine:'.format(region, account)
-    arn = '{}{}'.format(sfn_arn_prefix, names.index_find_cuboids_sfn)
-
-    find_cuboid_args = {
+    sfn_arn_prefix = SFN_ARN_PREFIX_FORMAT.format(region, account)
+    common_args = {
         "id_supervisor_step_fcn": '{}{}'.format(sfn_arn_prefix, names.index_supervisor_sfn),
         "id_cuboid_supervisor_step_fcn": '{}{}'.format(sfn_arn_prefix, names.index_cuboid_supervisor_sfn),
         "index_dequeue_cuboids_step_fcn":'{}{}'.format(sfn_arn_prefix, names.index_dequeue_cuboids_sfn),
@@ -221,11 +224,167 @@ def get_args(domain, account, region, lookup_key):
         },
         "max_write_id_index_lambdas": 599,
         "max_cuboid_fanout": 30,
-        "max_items": 100,
-        "lookup_key": lookup_key
+        "max_items": 100
     }
 
+    return common_args
+
+
+def get_find_cuboid_args(domain, account, region, lookup_key):
+    """
+    Get all arguments needed to start Index.FindCuboids.
+
+    Args:
+        domain (str): VPC such as integration.boss.
+        account (str): AWS account number.
+        region (str): AWS region.
+
+    Returns:
+        (str, str): [0] is the ARN of Index.FindCuboids; [1] are the step function arguments as a JSON string.
+    """
+
+    names = AWSNames(domain)
+    sfn_arn_prefix = SFN_ARN_PREFIX_FORMAT.format(region, account)
+    arn = '{}{}'.format(sfn_arn_prefix, names.index_find_cuboids_sfn)
+
+    find_cuboid_args = get_common_args(domain, account, region)
+    find_cuboid_args['lookup_key'] = lookup_key
     return arn, json.dumps(find_cuboid_args)
+
+
+def get_running_step_fcns(arn):
+    """
+    Retrive execution arns of running step functions.
+
+    Args:
+        arn (str): Specifies step function of interest.
+
+    Yields:
+        (str): Execution arn of running step function.
+    """
+    sfn = boto3.client('stepfunctions')
+    list_args = dict(
+        stateMachineArn=arn, statusFilter='RUNNING', maxResults=100)
+
+    resp = sfn.list_executions(**list_args)
+
+    for exe in resp['executions']:
+        yield exe['executionArn']
+
+    while 'nextToken' in resp:
+        list_args['nextToken'] = resp['nextToken']
+        resp = sfn.list_executions(**list_args)
+        for exe in resp['executions']:
+            yield exe['executionArn']
+
+
+def run_find_cuboids(session, args, account):
+    """
+    Start Index.FindCuboids.  This step function kicks off the entire indexing
+    process from the beginning.
+
+    Args:
+        session (Session): An open boto3 Session.
+        args (Namespace): Parsed command line arguments.
+        account (str): AWS account id.
+    """
+    channel_params = ChannelParams(
+        args.collection, args.experiment, args.channel)
+
+    if args.lookup_key is not None:
+        lookup_key = args.lookup_key 
+    else:
+        # Get DB params from Vault and tunnel to the DB and get lookup_key.
+        # Slow!
+        mysql_params = get_mysql_params(session, args.domain)
+        #print(mysql_params)
+
+        lookup_key = get_lookup_key_from_db(
+            session, args.domain, mysql_params, channel_params) 
+        print('lookup_key is: {}'.format(lookup_key))
+
+        find_cuboid_args = get_find_cuboid_args(
+            args.domain, account, args.region, lookup_key)
+        #print(find_cuboid_args[1])
+
+    print('Starting Index.FindCuboids . . .')
+    sfn = session.client('stepfunctions')
+    resp = sfn.start_execution(
+        stateMachineArn=find_cuboid_args[0],
+        input=find_cuboid_args[1]
+    )
+    print(resp)
+
+
+def resume_indexing(session, region, account, domain):
+    """
+    Resume indexing a channel or channels.  If the CuboidsKeys queue is not
+    empty, indexing will resume on those cuboids identified in that queue.
+
+    Args:
+        session (Session): An open boto3 Session.
+        region (str): AWS region such as us-east-1.
+        account (str): AWS account id.
+        domain (str): VPC domain such as production.boss.
+    """
+    names = AWSNames(domain)
+
+    resume_args = get_common_args(domain, account, region)
+    resume_args['queue_empty'] = False
+    arn = resume_args['id_supervisor_step_fcn']
+
+    print('Resuming indexing (starting Index.Supervisor) . . .')
+    sfn = session.client('stepfunctions')
+    resp = sfn.start_execution(
+        stateMachineArn=arn,
+        input=json.dumps(resume_args)
+    )
+    print(resp)
+
+
+def stop_indexing(session, region, account, domain):
+    """
+    Stop the indexing process, gracefully.  Index.CuboidSupervisors will not
+    be stopped, so the entire index process will not terminate, immediately.
+    Only the Index.Supervisor and any running Index.DequeueCuboid step 
+    functions will be halted.  This allows the indexing process to be resumed.
+
+    Args:
+        session (Session): An open boto3 Session.
+        region (str): AWS region such as us-east-1.
+        account (str): AWS account id.
+        domain (str): VPC domain such as production.boss.
+    """
+    names = AWSNames(domain)
+    sfn_arn_prefix = 'arn:aws:states:{}:{}:stateMachine:'.format(region, account)
+    stop_args = get_common_args(domain, account, region)
+
+    # This error could optionally be caught inside a step function if special
+    # shutdown behavior required.
+    error = 'ManualAbort'
+    cause = 'User initiated abort'
+
+    supe_arn = stop_args['id_supervisor_step_fcn']
+    sfn = session.client('stepfunctions')
+
+    print('Stopping Index.Supervisor . . .')
+    for arn in get_running_step_fcns(supe_arn):
+        print('\tStopping {}'.format(arn))
+        sfn.stop_execution(
+            executionArn=arn,
+            error=error,
+            cause=cause)
+
+    print('Stopping Index.DequeueCuboids . . .')
+    deque_arn = stop_args['index_dequeue_cuboids_step_fcn']
+    for arn in get_running_step_fcns(deque_arn):
+        print('\tStopping {}'.format(arn))
+        sfn.stop_execution(
+            executionArn=arn,
+            error=error,
+            cause=cause)
+
+    print('Done.')
 
 
 def parse_args():
@@ -254,8 +413,16 @@ def parse_args():
         default=None,
         help='Lookup key of channel (supply this to avoid slow tunneling to DB)')
     parser.add_argument(
+        '--stop',
+        action='store_true',
+        help='Stop indexing operation (will leave CuboidKeys queue untouched so indexing may be resumed)')
+    parser.add_argument(
+        '--resume',
+        action='store_true',
+        help='Resume indexing operation (if CuboidKeys queue still has messages, indexing will resume)')
+    parser.add_argument(
         'domain',
-        help='Domain that lambda functions live in, such as integration.boss.')
+        help='Domain that lambda functions live in, such as integration.boss')
     parser.add_argument(
         'collection',
         nargs='?',
@@ -279,7 +446,12 @@ def parse_args():
         parser.exit(
             1, 'Error: AWS credentials not provided and AWS_CREDENTIALS is not defined')
 
-    if (args.lookup_key is None and 
+    if args.stop and args.resume:
+        parser.print_usage()
+        parser.exit(
+            1, 'Error: cannot specify --stop and --resume simultaneously')
+
+    if (args.lookup_key is None and not args.stop and not args.resume and
         (args.collection is None or args.experiment is None or args.channel is None)
     ):
         parser.print_usage()
@@ -296,31 +468,13 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
 
-    channel_params = ChannelParams(
-        args.collection, args.experiment, args.channel)
-
     session = aws.create_session(args.aws_credentials)
-
-    if args.lookup_key is not None:
-        lookup_key = args.lookup_key 
-    else:
-        # Get DB params from Vault and tunnel to the DB and get lookup_key.
-        # Slow!
-        mysql_params = get_mysql_params(session, args.domain)
-        #print(mysql_params)
-
-        lookup_key = get_lookup_key_from_db(
-            session, args.domain, mysql_params, channel_params) 
-        print('lookup_key is: {}'.format(lookup_key))
-
     account = get_account(args.domain)
-    find_cuboid_args = get_args(args.domain, account, args.region, lookup_key)
-    #print(find_cuboid_args[1])
 
-    print('Starting Index.FindCuboids . . .')
-    sfn = session.client('stepfunctions')
-    resp = sfn.start_execution(
-        stateMachineArn=find_cuboid_args[0],
-        input=find_cuboid_args[1]
-    )
-    print(resp)
+    if args.stop:
+        stop_indexing(session, args.region, account, args.domain)
+    elif args.resume:
+        resume_indexing(session, args.region, account, args.domain)
+    else:
+        run_find_cuboids(session, args, account)
+
