@@ -3,20 +3,23 @@
 # Defines BOSS instance configuration information
 #
 
-BOSS_NAME = "display name" # Display name used by bin/config
-                           # Used when boss_compose doesn't exist
 EXTERNAL_DOMAIN = ".external.tld"
 INTERNAL_DOMAIN = ".internal.tld"
 SUBNET = "10.0.0.0/16" # Class B Subnet
 
+AMI_SUFFIX = ".tld"
+
+# Lambda build server variables
+
 REGION = "us-east-1"
 AVAILABILITY_ZONE_USAGE = { # Used to limit subnet usage for specific resources where AWS has issues
-    'lambda': ['b', 'c', 'd', 'e', 'f'],
+    'lambda': ['b', 'c', 'd', 'e', 'f'], # NOTE: AZ labels are not static across accounts in the same region
 }
 
 ACCOUNT_ID = 123456789
-ACCESS_KEY = "xxxxxxxx"
-SECRET_KEY = "xxxxxxxx"
+# Keep in seperate file (use existing AWS config file with names keys)
+#ACCESS_KEY = "xxxxxxxx"
+#SECRET_KEY = "xxxxxxxx"
 
 OUTBOUND_BASTION = True
 OUTBOUND_IP = "0.0.0.0"
@@ -26,3 +29,11 @@ OUTBOUND_KEY = "bastion-key"
 
 BASTION_INBOUND = "0.0.0.0/32"
 SSH_KEY = "stack-key"
+
+# Allow user to overlay custom constants for scenarios
+# Allow user to define new scenarios
+# How to handle checks against production scenario
+
+# cloudformation configs - add verify command for post create / update
+# cloudformation.py allow passing multiple configs
+# dependency graph for parallel operations?
