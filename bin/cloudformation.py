@@ -26,6 +26,8 @@ import alter_path
 from lib import exceptions
 from lib import aws
 from lib import utils
+from lib import configuration
+from lib import constants
 from lib.cloudformation import CloudFormationConfiguration
 from lib.stepfunctions import heaviside
 
@@ -34,16 +36,17 @@ cur_dir = os.path.dirname(os.path.realpath(__file__))
 cf_dir = os.path.normpath(os.path.join(cur_dir, '..', 'cloud_formation'))
 sys.path.append(cf_dir) # Needed for importing CF configs
 
-def call_config(session, domain, config, func_name):
+def call_config(bosslet_config, config, func_name):
     """Import 'configs.<config>' and then call the requested function with
-    <session> and <domain>.
+    <session> and <bosslet>.
     """
     module = importlib.import_module("configs." + config)
 
     if func_name in module.__dict__:
-        module.__dict__[func_name](session, domain)
+        module.__dict__[func_name](bosslet_config)
     elif func_name == 'delete':
-        CloudFormationConfiguration(config, domain).delete(session)
+        # TODO load stack name
+        CloudFormationConfiguration(config, bosslet_config).delete()
     else:
         print("Configuration '{}' doesn't implement function '{}'".format(config, func_name))
 
@@ -61,7 +64,7 @@ if __name__ == '__main__':
     actions = ["create", "update", "delete", "post-init", "pre-init", "generate"]
     actions_help = create_help("action supports the following:", actions)
 
-    scenarios = ["development", "production", "ha-development"]
+    scenarios = [x.split('/')[1].split('.')[0] for x in glob.glob("scenarios/*.json")]
     scenario_help = create_help("scenario supports the following:", scenarios)
 
     parser = argparse.ArgumentParser(description = "Script the creation and provisioning of CloudFormation Stacks",
@@ -88,7 +91,7 @@ if __name__ == '__main__':
                         choices = actions,
                         metavar = "action",
                         help = "Action to execute")
-    parser.add_argument("domain_name", help="Domain in which to execute the configuration (example: subnet.vpc.boss)")
+    parser.add_argument("bosslet_name", help="Bosslet in which to execute the configuration")
     parser.add_argument("config_name",
                         choices = config_names,
                         metavar = "config_name",
@@ -101,15 +104,26 @@ if __name__ == '__main__':
         print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
         sys.exit(1)
 
+    if not configuration.valid_bosslet(args.bosslet_name):
+        parser.print_usage()
+        print("Error: Bosslet name '{}' doesn't exist in configs file ({})".format(args.bosslet_name, configuration.CONFIGS_PATH))
+        sys.exit(1)
+
     os.environ["AMI_VERSION"] = args.ami_version
     os.environ["SCENARIO"] = args.scenario
     os.environ["DISABLE_PREVIEW"] = str(args.disable_preview)
 
-    session = aws.create_session(args.aws_credentials)
+    constants.load_scenario()
+
+    bosslet_config = configuration.BossConfiguration(args.bosslet_name,
+                                                     ami_version = args.ami_version,
+                                                     disable_preview = args.disable_preview,
+                                                     aws_credentials = args.aws_credentials
+                                                     )
 
     try:
         func = args.action.replace('-','_')
-        ret = call_config(session, args.domain_name, args.config_name, func)
+        ret = call_config(bosslet_config, args.config_name, func)
         if ret == False:
             sys.exit(1)
         else:

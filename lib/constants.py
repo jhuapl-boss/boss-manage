@@ -13,13 +13,15 @@
 # limitations under the License.
 
 import os
+import sys
+import json
 
 from .cloudformation import get_scenario
 
 # Region api is created in.  Later versions of boto3 should allow us to
 # extract this from the session variable.  Hard coding for now.
 REGION = 'us-east-1'
-INCOMING_SUBNET = "52.3.13.189/32"  # microns-bastion elastic IP
+#INCOMING_SUBNET = "52.3.13.189/32"  # microns-bastion elastic IP
 
 PRODUCTION_MAILING_LIST = "ProductionMicronsMailingList"
 PRODUCTION_BILLING_TOPIC = "ProductionBillingList"
@@ -96,80 +98,74 @@ TIMEOUT_KEYCLOAK = 150
 
 ########################
 # Machine Instance Types
-ENDPOINT_TYPE = {
-    "development": "t2.medium",
-    "production": "m4.2xlarge",
-    "ha-development": "t2.medium",
-}
-
-RDS_TYPE = {
-    "development": "db.t2.micro",
-    "production": "db.t2.medium",
-    "ha-development": "db.t2.micro",
-}
-
-REDIS_CACHE_TYPE = {
-    "development": "cache.t2.small",
-    "production": "cache.m4.10xlarge",
-    "ha-development": "cache.t2.small",
-}
-
-REDIS_TYPE = {
-    "development": "cache.t2.small",
-    "production": "cache.m4.xlarge",
-    "ha-development": "cache.t2.small",
-}
-
-CACHE_MANAGER_TYPE = {
-    "development": "t2.micro",
-    "production": "t2.medium",
-    "ha-development": "t2.micro",
-}
-
-ACTIVITIES_TYPE = {
-    "development": "m4.large",
-    "production": "m4.xlarge",
-    "ha-development": "m4.large",
-}
+ENDPOINT_TYPE = "t2.micro"
+RDS_TYPE = "db.t2.micro"
+REDIS_CACHE_TYPE = "cache.t2.small"
+REDIS_TYPE = "cache.t2.small"
+CACHE_MANAGER_TYPE = "t2.micro"
+ACTIVITIES_TYPE = "t2.micro"
 
 
 ########################
 # Machine Cluster Sizes
-AUTH_CLUSTER_SIZE = { # Auth Server Cluster is a fixed size
-    "development" : 1,
-    "production": 1, # should be an odd number
-    "ha-development": 1,  # should be an odd number
-}
+AUTH_CLUSTER_SIZE = 1
+CONSUL_CLUSTER_SIZE = 1
+VAULT_CLUSTER_SIZE = 1
+ENDPOINT_CLUSTER_MIN = 1
+ENDPOINT_CLUSTER_MAX = 1
+REDIS_CLUSTER_SIZE = 1
 
-CONSUL_CLUSTER_SIZE = { # Consul Cluster is a fixed size
-    "development" : 1,
-    "production": 5, # can tolerate 2 failures
-    "ha-development": 3,  # can tolerate 1 failures
-}
 
-VAULT_CLUSTER_SIZE = { # Vault Cluster is a fixed size
-    "development" : 1,
-    "production": 3, # should be an odd number
-    "ha-development": 1,  # should be an odd number
-}
+#################
+# Resource Memory
+REDIS_RESERVED_MEMORY = 387
 
-ENDPOINT_CLUSTER_MIN = { # Minimum and Default size of the ASG
-    "development": 1,
-    "production": 1,
-    "ha-development": 1,
-}
 
-ENDPOINT_CLUSTER_MAX = { # Maximum number of instances in the ASG
-    "development": 1,
-    "production": 20,
-    "ha-development": 3,
-}
+##################
+# Scenario Support
+def load(type_, key, default=None):
+    file = "{}.json".format(os.environ['SCENARIO'])
+    path = repo_path("cloud_formation", "scenarios", file)
+    with open(path, 'r') as fh:
+        file = json.load(fh)
+        return file.get(type_, {}).get(key, default)
 
-REDIS_CLUSTER_SIZE = {
-    "development": 1,
-    "production": 2,
-    "ha-development": 1,
-}
+def load_scenario():
+    # Locate the imported module so code can reference global
+    # variables without using the 'global' keyword
+    d = sys.modules['lib.constants'].__dict__
+
+    # Variables to update
+    # Format is either
+    # (variable, [type, key]) or
+    # variable (if variable is in the format 'key_type')
+    keys = [
+        'ENDPOINT_TYPE',
+        'RDS_TYPE',
+        'REDIS_CACHE_TYPE',
+        'REDIS_TYPE',
+        'CACHE_MANAGER_TYPE',
+        'ACTIVITIES_TYPE',
+
+        'AUTH_CLUSTER_SIZE',
+        'CONSUL_CLUSTER_SIZE',
+        'VAULT_CLUSTER_SIZE',
+        ('ENDPOINT_CLUSTER_MIN', ['SIZE', 'ENDPOINT_CLUSTER_MIN']),
+        ('ENDPOINT_CLUSTER_MAX', ['SIZE', 'ENDPOINT_CLUSTER_MAX']),
+        'REDIS_CLUSTER_SIZE',
+
+        ('REDIS_RESERVED_MEMORY', ['MEM', 'REDIS_RESERVED']),
+    ]
+
+    for key in keys:
+        if type(key) == tuple:
+            key, args = key
+        else:
+            a, b = key.rsplit('_', 1)
+            args = [b, a]
+
+        default = d[key]
+        d[key] = load(*args, default=default)
 
 
 ########################
@@ -179,13 +175,6 @@ ENDPOINT_DB_CONFIG = {
     "user":"testuser", # DP ???: Why is the name testuser? should we generate the username too?
     "password": "",
     "port": "3306"
-}
-
-REDIS_RESERVED_MEMORY = {
-    # Size in MB, should be 75% of total.
-    "development": 387,
-    "production": 38500,
-    "ha-development": 387,
 }
 
 BASTION_AMI = "amzn-ami-vpc-nat-hvm-2015.03.0.x86_64-ebs"

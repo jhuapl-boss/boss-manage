@@ -52,154 +52,59 @@ Author:
 #          10.0.0.255: Network broadcast address. We do not support broadcast in a VPC, therefore we reserve this address.
 ##
 
-TLD = "boss"
-BASE_IP = "10.0.0.0"
-ROOT_CIDR = 8
-VPC_CIDR = 16 # make sure VPC_CIDR is greater than ROOT_CIDR
 SUBNET_CIDR = 24 # make sure SUBNET_CIDR is greater than VPC_CIDR
 
 LAMBDA_SUBNETS = 16 # TODO merge with constants.py variable of the same name
 
-# DP TODO: Migrate to constants.py
-PROD_ACCOUNT = "451493790433"
-PROD_DOMAIN = "theboss.io"
-PROD_LAMBDA_BUCKET = "boss-lambda-prod-env"
-PROD_LAMBDA_SERVER = "54.210.116.141"
+SUBNETS = [
+    'internal',
+    'external',
+    'a-internal',
+    'b-internal',
+    'c-internal',
+    'd-internal',
+    'e-internal',
+    'a-external',
+    'b-external',
+    'c-external',
+    'd-external',
+    'e-external',
+    'lambda0',
+    'lambda1',
+    'lambda2',
+    'lambda3',
+    'lambda4',
+    'lambda5',
+    'lambda6',
+    'lambda7',
+    'lambda8',
+    'lambda9',
+    'lambda10',
+    'lambda11',
+    'lambda12',
+    'lambda13',
+    'lambda14',
+    'lambda15',
+    'f-internal',
+    'f-external',
+]
 
-# Below is the old lambda server that targets Python 3.4 in the lambda
-# deployment package.
-#PROD_LAMBDA_SERVER = "52.55.121.6"
-
-DEV_ACCOUNT = "256215146792"
-DEV_DOMAIN = "thebossdev.io"
-DEV_LAMBDA_BUCKET = "boss-lambda-env"
-DEV_LAMBDA_SERVER = "52.23.27.39"
-
-# Below is the old lambda server that targets Python 3.4 in the lambda
-# deployment package. 
-#DEV_LAMBDA_SERVER = "54.91.22.179"
-
-
-# Name and Subnet number (must fit within ROOT_CIDR to VPC_CIDR) of all VPCs
-VPCS = {
-    "production" : 0,
-
-    "integration" : 20,
-
-    "test" : 40,
-
-    "pryordm1" : 100,
-    "breinmw1" : 101,
-    "drenkng1" : 102,
-    "giontc1"  : 103,
-    "hiderrt1" : 104,
-    "kleisdm1" : 105,
-    "leea1"    : 106,
-    "manavpj1" : 107,
-    "davismj1" : 108,
-
-}
-
-# Name of the VPC, Name of the Subnet and the Subnet's Subnet number (must fit within VPC_CIDR to SUBNET_CIDR) for all Subnets
-SUBNETS = {
-}
-
-# Dynamically add the following subnets to all VPCs
-for vpc in VPCS:
-    # not all regions have all availability zones, but reserve them
-    subnets = ["internal", "external",
-               "a-internal", "b-internal", "c-internal", "d-internal", "e-internal",
-               "a-external", "b-external", "c-external", "d-external", "e-external"]
-    for i in range(LAMBDA_SUBNETS):
-        subnets.append('lambda{}'.format(i))
-
-    # New subnets have to be added at the end of the subnet list
-    # Because other subnets already have CIDR Ranges. This avoids conflicts when updating Integration or Production
-    subnets.append("f-internal")
-    subnets.append("f-external")
-
-    for subnet in subnets:
-        SUBNETS[(vpc, subnet)] = subnets.index(subnet)
-
-# domains listed in this dictionary have certificates for the auth and api loadbalancers to use.
-BASE_DOMAIN_CERTS = {"production.boss": PROD_DOMAIN,
-                      "integration.boss": "integration.{}".format(PROD_DOMAIN)}
-
-
-##
-# Generation Code
-##
-
-import sys
 from ipaddress import IPv4Network
 
-def get_subnet(network, subnet_cidr, subnet_id):
-    """Lookup the specific subnet from the current network.
+class Hosts(object):
+    def __init__(self, config, boss_config):
+        self.domain = boss_config[config].INTERNAL_DOMAIN
+        self.subnet_cidr = boss_config[config].SUBNET
 
-    Args:
-        network (IPv4Network|string) : Starting network to derive the subnet from
-        subnet_cidr (int) : The CIDR used to divide network into
-        subnet_id (int) : Which of the subnet_cidr divided network subnets to select
+    def lookup(self, subnet):
+        subnet, domain = subnet.split('.', 1)
+        if domain != self.domain:
+            raise ValueError("Subnet '{}' isn't part of the '{}' domain".format(subnet, self.domain))
 
-    Returns:
-        (IPv4Network) : The select subnet
-    """
-    if type(network) != IPv4Network:
-        network = IPv4Network(network)
+        if subnet not in SUBNETS:
+            raise ValueError("Subnet '{}' isn't a valid subnet".format(subnet))
 
-    return list(network.subnets(new_prefix=subnet_cidr))[subnet_id]
-
-def lookup(domain):
-    """Lookup the subnet of the given domain name.
-
-        Note: domain should be in the format of vpc.boss or subnet.vpc.boss
-
-    Args:
-        domain (string) : domain name to locate the subnet of
-
-    Returns:
-        (string|None) : String containing the subnet in CIDR format or None if
-                        the domain is not a valid BOSS vpc or subnet domain name
-    """
-
-    parts = domain.split(".")
-
-    get_next = lambda: parts.pop() if len(parts) > 0 else None
-
-    tld = get_next()
-    if tld !=  TLD:
-        print("ERROR: '{}' is not the valid TLD".format(tld))
-        return None
-    else:
-        base_net = IPv4Network(BASE_IP + "/" + str(ROOT_CIDR))
-        if len(parts) == 0:
-            return str(base_net)
-
-    vpc_name = get_next()
-    if vpc_name not in VPCS:
-        print("ERROR: '%s' is not a valid VPC name".format(vpc_name))
-        return None
-    else:
-        vpc_net = get_subnet(base_net, VPC_CIDR, VPCS[vpc_name])
-        if len(parts) == 0:
-            return str(vpc_net)
-
-    subnet_name = get_next()
-    subnet_key = (vpc_name, subnet_name)
-    if subnet_key not in SUBNETS:
-        print("ERROR: '{}' is not a valid Subnet name for VPC '{}'".format(subnet_name, vpc_name))
-        return None
-    else:
-        subnet_net = get_subnet(vpc_net, SUBNET_CIDR, SUBNETS[subnet_key])
-        if len(parts) == 0:
-            return str(subnet_net)
-
-    print("ERROR: domain contains extra information beyond Subnet and VPC")
-    return None
-
-if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print("Usage: {} domain".format(sys.argv[0]))
-        sys.exit(1)
-
-    print(lookup(sys.argv[1]))
+        subnet_id = SUBNETS.index(subnet)
+        vpc_net = IPv4Network(self.subnet_cidr)
+        return str(list(vpc_net.subnets(new_prefix=SUBNET_CIDR))[subnet_id])
+        

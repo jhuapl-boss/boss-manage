@@ -13,33 +13,62 @@
 # limitations under the License.
 
 import sys
+import json
 import importlib
 
-__LOADED_CONFIGS = {}
+from . import constants as const
+from . import aws
 
-def load_config(cf_config):
-    if cf_config not in __LOADED_CONFIGS:
+# DP TODO: Add caching
+
+CONFIGS_JSON = "configs.json"
+CONFIGS_PATH = const.repo_path("config", CONFIGS_JSON)
+
+def load_configs():
+    with open(CONFIGS_PATH, "r") as fh:
         try:
-            compose = importlib.import_module("config.boss_compose")
-            print("imported config.boss_compose")
-        except ImportError:
-            try:
-                # Use the default for config for every cf_config
-                config = importlib.import_module("config.boss_config")
-                print("imported config.boss_config")
-            except ImportError:
-                print("No config/boss_config.py or config/boss_compose.py located")
-                print("Cannot load configurations, exiting")
-                sys.exit(1) # TODO: raise exception caught by cloudformation.py script
-        else:
-            default = compose.BOSS_CONFIGS.get("default")
-            print("Default compose config: {}".format(default))
-            config = compose.BOSS_CONFIGS.get(cf_config, default)
-            print("imported config.{}".format(config))
-            config = importlib.import_module("config." + config)
+            return json.load(fh)
+        except:
+            print("ERROR: invalid json file '{}'".format(CONFIGS_PATH))
+            return {}
 
-        #config.session = aws.create_session(config)
-        __LOADED_CONFIGS[cf_config] = config
 
-    return __LOADED_CONFIGS[cf_config]
+def load_config(bosslet, cf_config = None):
+    config = load_configs().get(bosslet)
+    if config is None:
+        return None
 
+    if type(config) == type({}):
+        # composed config
+
+        if cf_config is None:
+            raise ValueError("cf_config argument must not be None when using a composed boss_config")
+        default = config.get('default')
+        config = config.get(cf_config, default)
+        if config is None:
+            return None
+
+    try:
+        return importlib.import_module("config." + config)
+    except ImportError:
+        print("Could not import file 'config/{}'".format(config))
+        return None
+
+def valid_bosslet(bosslet):
+    return load_configs().get(bosslet) is not None
+
+class BossConfiguration(object):
+    def __init__(self, bosslet, **kwargs):
+        self.bosslet = bosslet
+
+        self.ami_version = kwargs.get('ami_version')
+        self.disable_preview = kwargs.get('disable_preview')
+
+        self.aws_credentials = kwargs.get('aws_credentials')
+        self.session = None
+        if self.aws_credentials:
+            # TODO: figure out how to handle sessions that are specific to a cf_config
+            self.session = aws.create_session(self.aws_credentials, 'us-east-1')
+
+    def __getitem__(self, cf_config):
+        return load_config(self.bosslet, cf_config)

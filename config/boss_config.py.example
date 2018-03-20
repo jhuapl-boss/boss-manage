@@ -3,21 +3,29 @@
 # Defines BOSS instance configuration information
 #
 
-EXTERNAL_DOMAIN = ".external.tld"
-INTERNAL_DOMAIN = ".internal.tld"
+EXTERNAL_DOMAIN = ".external.tld" # Leading '.' (or other character) as this will be
+                                  # the external DNS suffix (allowing names like
+                                  # api-integration.external.tld or api.external.tld)
+INTERNAL_DOMAIN = "internal.tld" # No leading '.' as this will be the VPC name
 SUBNET = "10.0.0.0/16" # Class B Subnet
 
 AMI_SUFFIX = ".tld"
+AUTH_RDS = False # Optional value, defaults to ???
 
 # Lambda build server variables
+LAMBDA_BUCKET = None
+LAMBDA_SERVER = None
 
 REGION = "us-east-1"
 AVAILABILITY_ZONE_USAGE = { # Used to limit subnet usage for specific resources where AWS has issues
     'lambda': ['b', 'c', 'd', 'e', 'f'], # NOTE: AZ labels are not static across accounts in the same region
+    # Dev dont' use 'a'
+    # Prod don't use 'c'
 }
 
 ACCOUNT_ID = 123456789
 # Keep in seperate file (use existing AWS config file with names keys)
+PROFILE = None
 #ACCESS_KEY = "xxxxxxxx"
 #SECRET_KEY = "xxxxxxxx"
 
@@ -27,7 +35,8 @@ OUTBOUND_PORT = 22
 OUTBOUND_USER = "ec2-user"
 OUTBOUND_KEY = "bastion-key"
 
-BASTION_INBOUND = "0.0.0.0/32"
+HTTPS_INBOUND = "0.0.0.0/0"
+SSH_INBOUND = "0.0.0.0/32"
 SSH_KEY = "stack-key"
 
 # Allow user to overlay custom constants for scenarios

@@ -14,6 +14,80 @@
 
 from . import hosts
 
+def format_capitalize(fqdn):
+    return "".join([x.capitalize() for x in fqdn.split('.')])
+
+def format_dash(fqdn):
+    return fqdn.replace('.', '-')
+
+class AWSNameAccumulator(object):
+    def __init__(self, initial_value, callback):
+        self.acc = [initial_value]
+        self.cb = callback
+
+    def __getattr__(self, key):
+        self.acc.append(key)
+
+        if len(self.acc) == 3:
+            return self.cb(*self.acc)
+        else:
+            return self
+
+class AWSNames(object):
+    def __init__(self, boss_config):
+        self.boss_config = boss_config
+
+    def public_dns(self, cf_config, name):
+        domain = self.boss_config[cf_config].EXTERNAL_DOMAIN
+        return name + domain
+
+    def __getattr__(self, key):
+        return AWSNameAccumulator(key, self.build)
+
+    TYPES = {
+        'stack': format_capitalize,
+        'subnet': None,
+        'dns': None, # Internal DNS name
+        'lambda_': None, # Need '_' as lambda is a keyword
+        'sns': None,
+        'sg': None, # Security Group
+        'rt': None, # Route Table
+        'gw': None, # Gateway
+    }
+
+    RESOURCES = {
+        'core': 'core',
+        'internal': 'internal',
+        'external': 'external',
+        'bastion': 'bastion',
+        'consul': 'consul',
+        'vault': 'vault',
+        'auth': 'auth',
+        'auth_db': 'auth-db',
+        'dns': 'dns',
+        'ssh': 'ssh',
+        'internet': 'internet',
+    }
+
+    def build(self, cf_config, resource_type, name):
+        if resource_type not in self.TYPES:
+            raise AttributeError("'{}' is not a valide resource type".format(resource_type))
+
+        if name not in self.RESOURCES:
+            raise AttributeError("'{}' is not a valid resource name".format(name))
+
+        domain = self.boss_config[cf_config].INTERNAL_DOMAIN
+        fqdn = self.RESOURCES[name] + '.' + domain
+
+        transform = self.TYPES[resource_type]
+        if transform:
+            fqdn = transform(fqdn)
+
+        return fqdn
+
+
+
+'''
 class AWSNames(object):
     """
     All names are returned as dotted names (containg '.' between each component).
@@ -117,4 +191,4 @@ class AWSNames(object):
             fq_hostname = "".join(map(lambda x: x.capitalize(), fq_hostname.split('.')))
 
         return fq_hostname
-
+'''

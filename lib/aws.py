@@ -31,10 +31,9 @@ import re
 import sys
 from boto3.session import Session
 
-from . import constants as const
 from . import hosts
 
-def create_session(credentials):
+def create_session(credentials, region):
     """Read the AWS from the credentials dictionary and then create a boto3
     connection to AWS with those credentials.
     """
@@ -47,7 +46,7 @@ def create_session(credentials):
 
     session = Session(aws_access_key_id = credentials["aws_access_key"],
                       aws_secret_access_key = credentials["aws_secret_key"],
-                      region_name = credentials.get('aws_region', const.REGION))
+                      region_name = region)
     return session
 
 def machine_lookup_all(session, hostname, public_ip = True):
@@ -260,7 +259,7 @@ def subnet_id_lookup(session, subnet_domain):
     else:
         return response['Subnets'][0]['SubnetId']
 
-def azs_lookup(session, lambda_compatible_only=False):
+def azs_lookup(boss_config, cf_config, lambda_compatible_only=False):
     """Lookup all of the Availablity Zones for the connected region.
 
     Args:
@@ -270,10 +269,7 @@ def azs_lookup(session, lambda_compatible_only=False):
     Returns:
         (list) : List of tuples (availability zone, zone letter)
     """
-    if session is None:
-        return []
-
-    client = session.client('ec2')
+    client = boss_config.session.client('ec2')
     response = client.describe_availability_zones()
     # SH Removing Hack as subnet A is already in Production and causes issues trying to delete
     #    We will strip out subnets A and C when creating the lambdas.
@@ -281,12 +277,15 @@ def azs_lookup(session, lambda_compatible_only=False):
     rtn = [(z["ZoneName"], z["ZoneName"][-1]) for z in response["AvailabilityZones"]]
 
     if lambda_compatible_only:
-        current_account = get_account_id_from_session(session)
-        for az in rtn.copy():
-            if az[1] == 'c' and current_account == hosts.PROD_ACCOUNT:
-                rtn.remove(az)
-            if az[1] == 'a' and current_account == hosts.DEV_ACCOUNT:
-                rtn.remove(az)
+        try:
+            limits = boss_config[cf_config].AVAILABILITY_ZONE_USAGE['lambda']
+        except:
+            pass # Don't do anything
+        else:
+            for az in rtn.copy():
+                if az[1] not in limits:
+                    rtn.remove(az)
+
     return rtn
 
 def ami_lookup(session, ami_name, version = None):

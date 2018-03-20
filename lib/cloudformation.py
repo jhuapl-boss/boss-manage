@@ -380,9 +380,7 @@ class CloudFormationConfiguration:
     and launching them.
     """
 
-    # TODO DP: figure out if we can extract the region from the session used to
-    #          create the stack and use a template argument
-    def __init__(self, config, domain, region = "us-east-1"):
+    def __init__(self, config, boss_config):
         """CloudFormationConfiguration constructor
 
         A domain name is in either <vpc>.<tld> or <subnet>.<vpc>.<tld> format and
@@ -397,15 +395,19 @@ class CloudFormationConfiguration:
         self.resources = {}
         self.parameters = {}
         self.arguments = []
-        self.region = region
+        self.region = boss_config[config].REGION
         self.keypairs = {}
+
+        domain = boss_config[config].INTERNAL_DOMAIN
         self.stack_name = "".join([x.capitalize() for x in [config, *domain.split('.')]])
 
-        self.vpc_domain = domain
-        self.vpc_subnet = hosts.lookup(domain)
+        self.boss_config = boss_config
+        self.session = boss_config.session
+        self.hosts = hosts.Hosts(config, boss_config)
 
-        if self.vpc_subnet is None:
-            raise Exception("'{}' is not a valid stack domain".format(domain))
+        self.vpc_domain = domain
+        self.vpc_subnet = boss_config[config].SUBNET
+
 
     def _create_template(self, description="", indent=None):
         """Create the JSON CloudFormation template from the resources that have
@@ -448,7 +450,7 @@ class CloudFormationConfiguration:
 
             return get_status(response)
 
-    def create(self, session, wait = True):
+    def create(self, wait = True):
         """Launch the template this object represents in CloudFormation.
 
         Args:
@@ -464,7 +466,7 @@ class CloudFormationConfiguration:
             if argument["ParameterValue"] is None:
                 raise Exception("Could not determine argument '{}'".format(argument["ParameterKey"]))
 
-        client = session.client('cloudformation')
+        client = self.session.client('cloudformation')
         response = client.create_stack(
             StackName = self.stack_name,
             TemplateBody = self._create_template(),
@@ -488,7 +490,7 @@ class CloudFormationConfiguration:
                 rtn = False
         return rtn
 
-    def update(self, session, wait = True):
+    def update(self, wait = True):
         """Update the template this object represents in CloudFormation.
 
         Args:
@@ -504,7 +506,7 @@ class CloudFormationConfiguration:
             if argument["ParameterValue"] is None:
                 raise Exception("Could not determine argument '{}'".format(argument["ParameterKey"]))
 
-        client = session.client('cloudformation')
+        client = self.session.client('cloudformation')
 
         disable_preview = str(os.environ.get("DISABLE_PREVIEW"))
         disable_preview = disable_preview.lower() in ('yes', 'true', 'y', 't')
@@ -599,7 +601,7 @@ class CloudFormationConfiguration:
                 rtn = False
         return rtn
 
-    def delete(self, session, wait = True):
+    def delete(self, wait = True):
         """Deletes the given stack from CloudFormation.
 
         Initiates the stack delete and waits for it to finish.  config and domain
@@ -616,7 +618,7 @@ class CloudFormationConfiguration:
                           else None
         """
 
-        client = session.client("cloudformation")
+        client = self.session.client("cloudformation")
         client.delete_stack(StackName = self.stack_name)
 
         rtn = None
@@ -683,7 +685,7 @@ class CloudFormationConfiguration:
             }
         }
 
-    def find_vpc(self, session, key="VPC"):
+    def find_vpc(self, key="VPC"):
         """Lookup a VPC's ID and add it to the configuration as an argument
 
         VPC name is derived fromt he domain given to the constructor
@@ -693,7 +695,7 @@ class CloudFormationConfiguration:
             key (string) : Unique name for the resource in the template
         """
 
-        vpc_id = aws.vpc_id_lookup(session, self.vpc_domain)
+        vpc_id = aws.vpc_id_lookup(self.session, self.vpc_domain)
         vpc = Arg.VPC(key, vpc_id, "ID of the VPC")
         self.add_arg(vpc)
         return vpc_id
@@ -715,7 +717,7 @@ class CloudFormationConfiguration:
             "Type" : "AWS::EC2::Subnet",
             "Properties" : {
                 "VpcId" : vpc,
-                "CidrBlock" : hosts.lookup(name),
+                "CidrBlock" : self.hosts.lookup(name),
                 "Tags" : [
                     {"Key" : "Stack", "Value" : Ref("AWS::StackName") },
                     {"Key" : "Name", "Value" : name }
@@ -726,7 +728,7 @@ class CloudFormationConfiguration:
         if az is not None:
             self.resources[key]["Properties"]["AvailabilityZone"] = az
 
-    def add_all_azs(self, session, lambda_compatible_only=False):
+    def add_all_azs(self, lambda_compatible_only=False):
         """Add Internal and External subnets for each availability zone.
 
         For each availability zone in the connected region, create an Internal
@@ -743,7 +745,7 @@ class CloudFormationConfiguration:
         """
         internal = []
         external = []
-        for az, sub in aws.azs_lookup(session, lambda_compatible_only):
+        for az, sub in aws.azs_lookup(self.boss_config, 'core', lambda_compatible_only):
             name = sub.capitalize() + "InternalSubnet"
             self.add_subnet(name, sub + "-internal." + self.vpc_domain, az = az)
             internal.append(Ref(name))
@@ -754,7 +756,7 @@ class CloudFormationConfiguration:
 
         return (internal, external)
 
-    def find_all_availability_zones(self, session, lambda_compatible_only=False):
+    def find_all_availability_zones(self, lambda_compatible_only=False):
         """Add template arguments for each internal/external availability zone subnet.
 
         A companion method to add_all_azs(), that will add to the current template
@@ -771,10 +773,10 @@ class CloudFormationConfiguration:
         internal = []
         external = []
 
-        for az, sub in aws.azs_lookup(session, lambda_compatible_only):
+        for az, sub in aws.azs_lookup(self.boss_config, 'core', lambda_compatible_only):
             name = sub.capitalize() + "InternalSubnet"
             domain = sub + "-internal." + self.vpc_domain
-            id = aws.subnet_id_lookup(session, domain)
+            id = aws.subnet_id_lookup(self.session, domain)
             if id is None:
                 print("Subnet {} doesn't exist, not using.".format(domain))
             else:
@@ -783,7 +785,7 @@ class CloudFormationConfiguration:
 
             name = sub.capitalize() + "ExternalSubnet"
             domain = sub + "-external." + self.vpc_domain
-            id = aws.subnet_id_lookup(session, domain)
+            id = aws.subnet_id_lookup(self.session, domain)
             if id is None:
                 print("Subnet {} doesn't exist, not using.".format(domain))
             else:

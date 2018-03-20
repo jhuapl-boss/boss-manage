@@ -23,7 +23,7 @@ the other production resources to function. In the furture this may include
 other servers for services like Authentication.
 """
 
-from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, get_scenario
+from lib.cloudformation import CloudFormationConfiguration, Ref, Arn
 from lib.userdata import UserData
 from lib.names import AWSNames
 from lib.keycloak import KeyCloakClient
@@ -32,6 +32,7 @@ from lib import aws
 from lib import utils
 from lib import scalyr
 from lib import constants as const
+from lib import configuration
 
 import os
 import json
@@ -66,26 +67,27 @@ def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnet
                             public = public,
                             depends_on = depends_on)
 
-def create_config(session, domain):
+def create_config(boss_config):
     """Create the CloudFormationConfiguration object."""
-    config = CloudFormationConfiguration('core', domain, const.REGION)
-    names = AWSNames(domain)
+    names = AWSNames(boss_config)
+
+    config = CloudFormationConfiguration('core', boss_config)
 
     global keypair
-    keypair = aws.keypair_lookup(session)
+    keypair = aws.keypair_lookup(boss_config.session)
 
     config.add_vpc()
 
     # Create the internal and external subnets
-    config.add_subnet('InternalSubnet', names.subnet('internal'))
-    config.add_subnet('ExternalSubnet', names.subnet('external'))
-    internal_subnets, external_subnets = config.add_all_azs(session)
+    config.add_subnet('InternalSubnet', names.core.subnet.internal)
+    config.add_subnet('ExternalSubnet', names.core.subnet.external)
+    internal_subnets, external_subnets = config.add_all_azs()
     # it seems that both Lambdas and ASGs needs lambda_compatible_only subnets.
-    internal_subnets_lambda, external_subnets_lambda = config.add_all_azs(session, lambda_compatible_only=True)
+    internal_subnets_lambda, external_subnets_lambda = config.add_all_azs(lambda_compatible_only=True)
 
     config.add_ec2_instance("Bastion",
-                            names.bastion,
-                            aws.ami_lookup(session, const.BASTION_AMI),
+                            names.core.dns.bastion,
+                            aws.ami_lookup(boss_config.session, const.BASTION_AMI),
                             keypair,
                             subnet = Ref("ExternalSubnet"),
                             public_ip = True,
@@ -94,12 +96,12 @@ def create_config(session, domain):
                             depends_on = "AttachInternetGateway")
 
     user_data = UserData()
-    user_data["system"]["fqdn"] = names.consul
+    user_data["system"]["fqdn"] = names.core.dns.consul
     user_data["system"]["type"] = "consul"
-    user_data["consul"]["cluster"] = str(get_scenario(const.CONSUL_CLUSTER_SIZE))
+    user_data["consul"]["cluster"] = str(const.CONSUL_CLUSTER_SIZE)
     config.add_autoscale_group("Consul",
-                               names.consul,
-                               aws.ami_lookup(session, "consul.boss"),
+                               names.core.dns.consul,
+                               aws.ami_lookup(boss_config.session, "consul.boss"),
                                keypair,
                                subnets = internal_subnets_lambda,
                                security_groups = [Ref("InternalSecurityGroup")],
@@ -107,16 +109,16 @@ def create_config(session, domain):
                                min = const.CONSUL_CLUSTER_SIZE,
                                max = const.CONSUL_CLUSTER_SIZE,
                                notifications = Ref("DNSSNS"),
-                               role = aws.instance_profile_arn_lookup(session, 'consul'),
+                               role = aws.instance_profile_arn_lookup(boss_config.session, 'consul'),
                                support_update = False, # Update will restart the instances manually
                                depends_on = ["DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
     user_data = UserData()
-    user_data["system"]["fqdn"] = names.vault
+    user_data["system"]["fqdn"] = names.core.dns.vault
     user_data["system"]["type"] = "vault"
     config.add_autoscale_group("Vault",
-                               names.vault,
-                               aws.ami_lookup(session, "vault.boss"),
+                               names.core.dns.vault,
+                               aws.ami_lookup(boss_config.session, "vault.boss"),
                                keypair,
                                subnets = internal_subnets_lambda,
                                security_groups = [Ref("InternalSecurityGroup")],
@@ -128,7 +130,7 @@ def create_config(session, domain):
 
 
     user_data = UserData()
-    user_data["system"]["fqdn"] = names.auth
+    user_data["system"]["fqdn"] = names.core.dns.auth
     user_data["system"]["type"] = "auth"
     deps = ["AuthSecurityGroup",
             "AttachInternetGateway",
@@ -136,22 +138,21 @@ def create_config(session, domain):
             "DNSSNS",
             "DNSLambdaExecute"]
 
-    SCENARIO = os.environ["SCENARIO"]
-    USE_DB = SCENARIO in ("production", "ha-development",)
     # Problem: If development scenario uses a local DB. If the auth server crashes
     #          and is auto restarted by the autoscale group then the new auth server
     #          will not have any of the previous configuration, because the old DB
     #          was lost. Using an RDS for development fixes this at the cost of having
     #          the core config taking longer to launch.
+    USE_DB = boss_config['core'].AUTH_RDS
     if USE_DB:
         deps.append("AuthDB")
         user_data["aws"]["db"] = "keycloak" # flag for init script for which config to use
 
-    cert = aws.cert_arn_lookup(session, names.public_dns('auth'))
+    cert = aws.cert_arn_lookup(boss_config.session, names.public_dns('core', 'auth'))
     create_asg_elb(config,
                    "Auth",
-                   names.auth,
-                   aws.ami_lookup(session, "auth.boss"),
+                   names.core.dns.auth,
+                   aws.ami_lookup(boss_config.session, "auth.boss"),
                    keypair,
                    str(user_data),
                    const.AUTH_CLUSTER_SIZE,
@@ -164,7 +165,7 @@ def create_config(session, domain):
 
     if USE_DB:
         config.add_rds_db("AuthDB",
-                          names.auth_db,
+                          names.core.dns.auth_db,
                           "3306",
                           "keycloak",
                           "keycloak",
@@ -175,8 +176,8 @@ def create_config(session, domain):
 
 
     config.add_lambda("DNSLambda",
-                      names.dns,
-                      aws.role_arn_lookup(session, 'UpdateRoute53'),
+                      names.core.lambda_.dns,
+                      aws.role_arn_lookup(boss_config.session, 'UpdateRoute53'),
                       const.DNS_LAMBDA,
                       handler="index.handler",
                       timeout=10,
@@ -185,30 +186,32 @@ def create_config(session, domain):
     config.add_lambda_permission("DNSLambdaExecute", Ref("DNSLambda"))
 
     config.add_sns_topic("DNSSNS",
-                         names.dns,
-                         names.dns,
+                         names.core.sns.dns,
+                         names.core.sns.dns,
                          [("lambda", Arn("DNSLambda"))])
 
 
     config.add_security_group("InternalSecurityGroup",
-                              names.internal,
+                              names.core.sg.internal,
                               [("-1", "-1", "-1", "10.0.0.0/8")])
 
     # Allow SSH access to bastion from anywhere
+    incoming_subnet = boss_config['core'].SSH_INBOUND
     config.add_security_group("BastionSecurityGroup",
-                              names.ssh,
-                              [("tcp", "22", "22", const.INCOMING_SUBNET)])
+                              names.core.sg.ssh,
+                              [("tcp", "22", "22", incoming_subnet)])
 
+    incoming_subnet = boss_config['core'].HTTPS_INBOUND
     config.add_security_group("AuthSecurityGroup",
-                              #names.https, DP XXX: hack until we can get production updated correctly
-                              names.auth,
-                              [("tcp", "443", "443", "0.0.0.0/0")])
+                              #names.core.sg.https, DP XXX: hack until we can get production updated correctly
+                              names.core.sg.auth,
+                              [("tcp", "443", "443", incoming_subnet)])
 
     # Create the internal route table to route traffic to the NAT Bastion
     all_internal_subnets = internal_subnets.copy()
     all_internal_subnets.append(Ref("InternalSubnet"))
     config.add_route_table("InternalRouteTable",
-                           names.internal,
+                           names.core.rt.internal,
                            subnets = all_internal_subnets)
 
     config.add_route_table_route("InternalNatRoute",
@@ -220,7 +223,7 @@ def create_config(session, domain):
     all_external_subnets = external_subnets.copy()
     all_external_subnets.append(Ref("ExternalSubnet"))
     config.add_route_table("InternetRouteTable",
-                           names.internet,
+                           names.core.rt.internet,
                            subnets = all_external_subnets)
 
     config.add_route_table_route("InternetRoute",
@@ -228,22 +231,22 @@ def create_config(session, domain):
                                  gateway = Ref("InternetGateway"),
                                  depends_on = "AttachInternetGateway")
 
-    config.add_internet_gateway("InternetGateway", names.internet)
+    config.add_internet_gateway("InternetGateway", names.core.gw.internet)
     config.add_endpoint("S3Endpoint", "s3", [Ref("InternalRouteTable")])
     config.add_nat("NAT", Ref("ExternalSubnet"), depends_on="AttachInternetGateway")
 
     return config
 
-def generate(session, domain):
+def generate(boss_config):
     """Create the configuration and save it to disk"""
-    config = create_config(session, domain)
+    config = create_config(boss_config)
     config.generate()
 
-def create(session, domain):
+def create(boss_config):
     """Create the configuration, launch it, and initialize Vault"""
-    config = create_config(session, domain)
+    config = create_config(boss_config)
 
-    success = config.create(session)
+    success = config.create()
     if success:
         vpc_id = aws.vpc_id_lookup(session, domain)
         aws.rt_name_default(session, vpc_id, "default." + domain)
@@ -367,7 +370,7 @@ def update(session, domain):
         return None
 
     consul_update_timeout = 5 # minutes
-    consul_size = int(get_scenario(const.CONSUL_CLUSTER_SIZE))
+    consul_size = int(const.CONSUL_CLUSTER_SIZE)
     min_time = consul_update_timeout * consul_size
     max_time = min_time + 5 # add some time to allow the CF update to happen
 

@@ -1,0 +1,7 @@
+{
+    "bosslet_name": "boss_config",
+    "bosslet_name": {
+        "cf_config": "boss_config",
+        "default": "boss_config"
+    }
+}
