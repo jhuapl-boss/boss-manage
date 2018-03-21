@@ -313,7 +313,7 @@ def update(session, domain):
 
 
 def delete(session, domain):
-    #CloudFormationConfiguration('idindexing', domain).delete(session)
+    CloudFormationConfiguration('idindexing', domain).delete(session)
     delete_sfns(session, domain)
 
 
