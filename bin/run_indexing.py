@@ -303,9 +303,9 @@ def run_find_cuboids(session, args, account):
             session, args.domain, mysql_params, channel_params) 
         print('lookup_key is: {}'.format(lookup_key))
 
-        find_cuboid_args = get_find_cuboid_args(
-            args.domain, account, args.region, lookup_key)
-        #print(find_cuboid_args[1])
+    find_cuboid_args = get_find_cuboid_args(
+        args.domain, account, args.region, lookup_key)
+    #print(find_cuboid_args[1])
 
     print('Starting Index.FindCuboids . . .')
     sfn = session.client('stepfunctions')
