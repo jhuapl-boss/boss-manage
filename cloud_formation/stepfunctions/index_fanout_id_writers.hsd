@@ -6,13 +6,12 @@ version: '1.0'
 timeout: 1800
 
 Lambda('indexLoadIdsFromS3Lambda')
-    """LoadIdsFromS3
+    """LoadIdsFromS3Index
 
-    Get the cuboid's ids from S3.
+    Get the cuboid's ids from the S3 index.
 
     load_ids_from_s3_lambda.py
     """
-    retry ['NoSuchKey'] 1 0 1.0    # Object doesn't exist in S3 bucket.
     retry [] 40 2 2.5
     catch []: '$.result'
         Lambda('indexWriteFailedLambda')

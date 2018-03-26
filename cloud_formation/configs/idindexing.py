@@ -27,22 +27,6 @@ for annotation (object) id indexing.  When building from scratch, it should
 be run after the CloudFormation cachedb config.
 """
 
-def get_bucket_life_cycle_rules():
-    """
-    Generate the expiration policy for the cuboid_ids bucket.  This bucket
-    is a temporary holding place for cuboid ids passed between step function
-    states.  Because data passed between states is limited to 32K, the bucket
-    is used, instead, to ensure data limits aren't exceeded.
-    """
-    return {
-        'Rules': [
-            {
-                'ExpirationInDays': 2,
-                'Status': 'Enabled'
-            }
-        ]
-    }
-
 def create_config(session, domain):
     """Create the CloudFormationConfiguration object."""
     config = CloudFormationConfiguration('idindexing', domain, const.REGION)
@@ -54,18 +38,6 @@ def create_config(session, domain):
     config.add_arg(Arg.String(
         "LambdaCacheExecutionRole", role,
         "IAM role for multilambda." + domain))
-
-    cuboid_ids_bucket_name = names.cuboid_ids_bucket
-    if not aws.s3_bucket_exists(session, cuboid_ids_bucket_name):
-        life_cycle_cfg = get_bucket_life_cycle_rules()
-        config.add_s3_bucket(
-            'cuboidIdsBucket', cuboid_ids_bucket_name, 
-            life_cycle_config=life_cycle_cfg)
-
-    config.add_s3_bucket_policy(
-        "cuboidBucketPolicy", cuboid_ids_bucket_name,
-        ['s3:GetObject', 's3:PutObject'],
-        { 'AWS': role})
 
     lambda_bucket = aws.get_lambda_s3_bucket(session)
     config.add_lambda(
