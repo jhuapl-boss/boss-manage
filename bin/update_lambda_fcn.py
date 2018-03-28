@@ -35,6 +35,7 @@ from lib import constants as const
 from lib import zip
 
 import argparse
+import botocore
 import configparser
 import os
 import sys
@@ -67,22 +68,48 @@ def get_lambda_zip_name(domain):
     the lambda build server.
 
     Args:
-        domain (string): The VPC's domain name such as integration.boss.
+        domain (str): The VPC's domain name such as integration.boss.
 
     Returns:
-        (string)
+        (str)
     """
     return 'multilambda.{}.zip'.format(domain)
 
 def update_lambda_code(session, domain, bucket):
+    """Update all lambdas that use the multilambda zip file.
+
+    Args:
+        session (Session): Boto3 session.
+        domain (str): VPC's domain name such as integration.boss.
+        bucket (str): Name of bucket that contains the lambda zip file.
+    """
     names = AWSNames(domain)
+    uses_multilambda = [
+        names.multi_lambda, names.index_s3_writer_lambda, 
+        names.index_fanout_id_writer_lambda, names.index_write_id_lambda,
+        names.index_write_failed_lambda, names.index_find_cuboids_lambda,
+        names.index_fanout_enqueue_cuboid_keys_lambda,
+        names.index_batch_enqueue_cuboids_lambda,
+        names.index_fanout_dequeue_cuboid_keys_lambda,
+        names.index_dequeue_cuboid_keys_lambda,
+        names.index_get_num_cuboid_keys_msgs_lambda,
+        names.index_check_for_throttling_lambda,
+        names.index_invoke_index_supervisor_lambda,
+        names.index_split_cuboids_lambda,
+        names.start_sfn_lambda,
+        names.downsample_volume_lambda
+    ]
     client = session.client('lambda')
-    resp = client.update_function_code(
-        FunctionName=names.multi_lambda,
-        S3Bucket=bucket,
-        S3Key=get_lambda_zip_name(domain),
-        Publish=True)
-    print(resp)
+    for lambda_name in uses_multilambda:
+        try:
+            resp = client.update_function_code(
+                FunctionName=lambda_name,
+                S3Bucket=bucket,
+                S3Key=get_lambda_zip_name(domain),
+                Publish=True)
+            print(resp)
+        except botocore.exceptions.ClientError as ex:
+            print('Error updating {}: {}'.format(lambda_name, ex))
 
 # DP TODO: Move to a lib/ library
 def load_lambdas_on_s3(session, domain, bucket):
@@ -94,7 +121,8 @@ def load_lambdas_on_s3(session, domain, bucket):
 
     Args:
         session (Session): boto3.Session
-        domain (string): The VPC's domain name such as integration.boss.
+        domain (str): The VPC's domain name such as integration.boss.
+        bucket (str): Name of bucket that contains the lambda zip file.
     """
     tempname = tempfile.NamedTemporaryFile(delete=True)
     zipname = tempname.name + '.zip'
@@ -108,6 +136,7 @@ def load_lambdas_on_s3(session, domain, bucket):
 
     os.chdir(const.repo_path("salt_stack", "salt", "boss-tools", "files", "boss-tools.git"))
     zip.write_to_zip('bossutils', zipname)
+    zip.write_to_zip('cloudwatchwrapper', zipname)
     zip.write_to_zip('lambda', zipname)
     zip.write_to_zip('lambdautils', zipname)
     os.chdir(cwd)
@@ -118,6 +147,10 @@ def load_lambdas_on_s3(session, domain, bucket):
 
     os.chdir(const.repo_path("salt_stack", "salt", "ndingest", "files"))
     zip.write_to_zip('ndingest.git', zipname)
+    os.chdir(cwd)
+
+    os.chdir(const.repo_path("lib"))
+    zip.write_to_zip('heaviside.git', zipname)
     os.chdir(cwd)
 
     print("Copying local modules to lambda-build-server")
@@ -141,10 +174,10 @@ def load_lambdas_on_s3(session, domain, bucket):
 def create_ndingest_settings(domain, fp):
     """Create the settings.ini file for ndingest.
 
-    The file is placed in ndingest's settings folder.j
+    The file is placed in ndingest's settings folder.
 
     Args:
-        domain (string): The VPC's domain name such as integration.boss.
+        domain (str): The VPC's domain name such as integration.boss.
         fp (file-like object): File like object to read settings.ini template from.
     """
     names = AWSNames(domain)

@@ -3,5 +3,9 @@
 Downloads cubes from S3 and uploads the results
 """
 
-Lambda("multiLambda") # function-name is set by caller
+Lambda("downsampleVolumeLambda")
+    """downsampleVolumeLambda
+
+    downsample_volume.py
+    """
     retry [] 1 3 1.0

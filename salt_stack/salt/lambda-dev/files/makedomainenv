@@ -57,6 +57,13 @@ else
    cp makefile_LINUX makefile
    make
 
+   cd ~/virtualenvs/$1/lib/python3.6/site-packages
+   cd heaviside.git
+   pip install -t ~/virtualenvs/$1/local/lib/python3.6/dist-packages -r requirements.txt
+   # Make the source folder a child of site-packages.
+   mv heaviside ..
+
+
    echo zipping up lambda and sending to s3
    if [ -e ~/lambdazips/lambda.${1}.zip ]
    then
@@ -68,18 +75,18 @@ else
    fi
 
    cd ~/virtualenvs/${1}/local/lib/python3.6/dist-packages
-   chmod -R 077 *
+   chmod -R 0777 *
    zip -r9 ~/lambdazips/multilambda.${1}.zip *
 
    cd ~/virtualenvs/${1}/local/lib/python3.6/site-packages
-   chmod -R 077 *
+   chmod -R 0777 *
    zip -r9 ~/lambdazips/multilambda.${1}.zip *
 
    cd ~/virtualenvs/${1}/lib64/atlas
    zip -r9 ~/lambdazips/multilambda.${1}.zip *
 
    cd ~/virtualenvs/${1}/local/lib/python3.6/site-packages/lambda
-   zip -g ~/lambdazips/multilambda.${1}.zip lambda_loader.py
+   zip -g ~/lambdazips/multilambda.${1}.zip *.py
 
    python ~/virtualenvs/${1}/lib/python3.6/site-packages/lambdautils/deploy_lambdas.py /home/ec2-user/virtualenvs/$1 ~/lambdazips/multilambda.${1}.zip $2 --upload-only
 
