@@ -57,6 +57,9 @@ if __name__ == "__main__":
     parser.add_argument("--cmd", "-c",
                         default=None,
                         help="command to run in ssh, if you want to run a command.")
+    parser.add_argument("--scp",
+                        default=None,
+                        help="Copy file. (Format: 'remote:path local:path' or 'local:path remote:path')")
     parser.add_argument("hostname", help="Hostname of the EC2 instance to create SSH Tunnels on")
     parser.add_argument("--user", "-u",
                         default=None,
@@ -96,6 +99,16 @@ if __name__ == "__main__":
     ssh = SSHConnection(args.ssh_key, (ip, 22, user))
     if args.cmd:
         ret = ssh.cmd(args.cmd)
+    if args.scp:
+        a,b = args.scp.split()
+        t_a, a = a.split(":")
+        t_b, b = b.split(":")
+        scp_args = {
+            t_a.lower() + '_file': a,
+            t_b.lower() + '_file': b,
+            'upload': t_a.lower() == "local"
+        }
+        ret = ssh.scp(**scp_args)
     else:
         ret = ssh.shell()
     sys.exit(ret)

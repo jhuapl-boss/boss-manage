@@ -11,7 +11,9 @@ directory of the cloned boss-manage.git repository.*
 ### Workstation
 You will need a Linux machine installed with the following software packages:
 * Python 3.5
-* Packer ([download](https://www.packer.io/))
+* Packer ([download](https://www.packer.io/)) Version 1.1.1 (add it to your path)
+* NodeJS ([download](https://nodejs.org/en/download/)) Version 6.10.X (add it to your path)
+
 * Install Python packages in boss-manage.git requirements.txt.  See *Install Procedures* below to install boss-manage.git then run:
 ```shell
 pip install -r requirements.txt

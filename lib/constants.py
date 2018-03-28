@@ -69,6 +69,10 @@ DYNAMO_ID_INDEX_SCHEMA = SALT_DIR + '/spdb/files/spdb.git/spatialdb/dynamo/id_in
 # Annotation id count table (allows for reserving the next id in a channel).
 DYNAMO_ID_COUNT_SCHEMA = SALT_DIR + '/spdb/files/spdb.git/spatialdb/dynamo/id_count_schema.json'
 
+# Threshold when a new chunk should be added to the partition key of the id
+# index.  If the consumed write capacity is >= this number, write new
+# morton ids to a new key.
+DYNAMO_ID_INDEX_NEW_CHUNK_THRESHOLD = 100
 
 ########################
 # Other Salt Files
@@ -137,7 +141,7 @@ ACTIVITIES_TYPE = {
 # Machine Cluster Sizes
 AUTH_CLUSTER_SIZE = { # Auth Server Cluster is a fixed size
     "development" : 1,
-    "production": 3, # should be an odd number
+    "production": 1, # should be an odd number
     "ha-development": 1,  # should be an odd number
 }
 

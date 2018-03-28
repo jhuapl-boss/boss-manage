@@ -1,0 +1,111 @@
+"""State machine that writes to the id index Dynamo table.
+
+It adds a cuboid's morton id to the set of morton ids mapped to an
+annotation id in the id index table.  This table allows fast lookup of all
+cuboids that contain a given annotation id.  Bounding box calculation is a
+typical use case.
+
+This state machine wraps a single lambda function.  If AWS eventually adds
+fanout capabilities to step functions, this lambda can probably be placed in
+the indexSupervisorCuboid step function, directly.
+
+Sample input:
+{
+    "id_count_table": "idCount.domain.boss",
+    "cuboid_bucket": "cuboids.domain.boss",
+    "s3_index_table": "s3index.domain.boss",
+    "id_index_table": "idIndex.domain.boss",
+    "id_index_new_chunk_threshold": 100,
+    "index_deadletter_queue": "https://queue.amazonaws.com/..."
+    "cuboid_object_key": "...",
+    "version": 0,
+    "id": "29",
+    "wait_secs": 0
+}
+"""
+
+version: '1.0'
+
+# indexWriteIdLambda timeout: 120
+# indexWriteIdFailedLambda timeout: 45
+
+# Check tasks' retry values below.
+
+# All of the values above should be factored into the timeout setting.
+timeout: 3600
+
+Wait(seconds_path='$.wait_secs')
+    """StartUpPause
+    
+    This will normally be a 0s wait.  This exists so that we can allow
+    Dynamo to scale up when starting this step function with the contents of
+    the deadletter queue.
+    """
+
+Pass()
+    """InitStatus
+
+    Set initial status params that control retries/done.
+    """
+    result: '$.write_id_index_status'
+    data:
+        {"done": False, "delay": 0, "retries_left": 3}
+
+
+while '$.write_id_index_status.done' == False:
+    """WhileNotDone
+    """
+    Wait(seconds_path='$.write_id_index_status.delay')
+        """BackoffDelay
+
+        Pause if this is a retry.
+        """
+
+
+    Lambda('indexWriteIdLambda')
+        """WriteIdIndex
+
+        write_id_index_lambda.py
+        """
+        retry ['KeyError'] 1 0 1.0
+        # Known exceptions that inherit from ClientError that might be 
+        # re-raised by the lambda after retries_left == 0.
+        retry [
+            'ClientError', 
+            'ConditionalCheckFailedException',
+            'GlobalTableNotFoundException',
+            'InternalServerError',
+            'ItemCollectionSizeLimitExceededException',
+            'LimitExceededException',
+            'ProvisionedThroughputExceededException',
+            'ReplicaAlreadyExistsException',
+            'ReplicaNotFoundException',
+            'ResourceInUseException',
+            'ResourceNotFoundException',
+            'TableNotFoundException'
+        ] 1 0 1.0
+        # DynamoClientError will only be raised after retries_left == 0 and
+        # the exception is not contained in the list above.
+        retry ['DynamoClientError'] 1 0 1.0
+        # Allow step function managed retries of other errors.
+        retry [] 45 2 2.5
+        catch []: '$.result'
+            Lambda('indexWriteFailedLambda')
+                """WriteIdFailed
+
+                write_id_index_lambda.py
+                """
+                retry ['KeyError'] 1 0 1.0
+                retry [] 10 2 2.0
+                catch []:
+                    Fail('Exception', 'Failed to write to dead letter queue')
+                        """FailedSendingToDeadletterQueue
+                        """
+            Fail('Exception', 'Failed to update id index')
+                """FailedUpdatingIdIndex
+                """
+
+Success()
+    """Success
+    """
+
