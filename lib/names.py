@@ -91,6 +91,7 @@ class AWSNames(object):
         'delete_lambda': "deleteLambda",
         'resolution_hierarchy': 'Resolution.Hierarchy',
         'downsample_volume': 'Downsample.Volume',
+        'downsample_volume_lambda': 'downsampleVolumeLambda',
         'ingest_queue_populate': 'Ingest.Populate',
         'ingest_queue_upload': 'Ingest.Upload',
         'ingest_lambda': 'IngestUpload',
@@ -149,7 +150,8 @@ class AWSNames(object):
                     'index_invoke_index_supervisor_lambda',
                     'index_split_cuboids_lambda',
                     'index_load_ids_from_s3_lambda',
-                    'start_sfn_lambda']:
+                    'start_sfn_lambda',
+                    'downsample_volume_lambda']:
             fq_hostname = fq_hostname.replace('.','-')
 
         # Queue names cannot have periods, so we capitalize each word, instead.
