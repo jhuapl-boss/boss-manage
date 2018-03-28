@@ -61,7 +61,7 @@ def consul_pipeline(session, domain, directory):
         return None
 
     pipeline = DataPipeline(fmt="DP", log_uri = s3_log, resource_role="backup")
-    pipeline.add_shell_command("ConsulBackup",
+    pipeline.add_shell_command("ConsulRestore",
                                cmd,
                                source = Ref("ConsulBucket"),
                                runs_on = Ref("ConsulInstance"))
@@ -86,7 +86,7 @@ def vault_pipeline(session, domain, directory):
         return None
 
     pipeline = DataPipeline(fmt="DP", log_uri = s3_log, resource_role="backup")
-    pipeline.add_shell_command("VaultBackup",
+    pipeline.add_shell_command("VaultRestore",
                                cmd,
                                source = Ref("VaultBucket"),
                                runs_on = Ref("VaultInstance"))
@@ -123,14 +123,18 @@ def ddb_pipeline(session, domain, directory):
     s3_log = "s3://backup." + domain + "/restore-logs/"
 
     pipeline = DataPipeline(fmt="DP", log_uri = s3_log)
-    pipeline.add_emr_cluster("BackupCluster")
+    pipeline.add_emr_cluster("RestoreCluster")
 
     tables, _ = list_s3_bucket(session, "backup." + domain, directory + "/DDB")
     for table in tables:
         name = table.split('.', 1)[0]
         pipeline.add_s3_bucket(name + "Bucket", s3_backup + "/DDB/" + table)
         pipeline.add_ddb_table(name, table)
-        pipeline.add_emr_copy(name+"Copy", Ref(name + "Bucket"), Ref(name), Ref("BackupCluster"), export=False)
+        pipeline.add_emr_copy(name+"Copy",
+                              Ref(name + "Bucket"),
+                              Ref(name),
+                              Ref("RestoreCluster"),
+                              export=False)
 
     for table in tables:
         name = table.split('.', 1)[0]
@@ -155,7 +159,7 @@ def rds_pipeline(session, domain, directory, component, rds_name):
         return None
 
     pipeline = DataPipeline(fmt="DP", log_uri = s3_log, resource_role="backup")
-    pipeline.add_shell_command("RDSBackup",
+    pipeline.add_shell_command("RDSRestore",
                                "bash ~/rds.sh restore {}".format(rds_name),
                                source = Ref("RDSBucket"),
                                runs_on = Ref("RDSInstance"))
