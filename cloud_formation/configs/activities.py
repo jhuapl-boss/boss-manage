@@ -192,7 +192,7 @@ def post_init(session, domain):
 
 def delete(session, domain):
     # DP TODO: delete activities
-    #CloudFormationConfiguration('activities', domain).delete(session)
+    CloudFormationConfiguration('activities', domain).delete(session)
     delete_sfns(session, domain)
 
 

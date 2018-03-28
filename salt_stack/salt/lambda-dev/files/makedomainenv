@@ -86,7 +86,7 @@ else
    zip -r9 ~/lambdazips/multilambda.${1}.zip *
 
    cd ~/virtualenvs/${1}/local/lib/python3.6/site-packages/lambda
-   zip -g ~/lambdazips/multilambda.${1}.zip lambda_loader.*
+   zip -g ~/lambdazips/multilambda.${1}.zip *.py
 
    python ~/virtualenvs/${1}/lib/python3.6/site-packages/lambdautils/deploy_lambdas.py /home/ec2-user/virtualenvs/$1 ~/lambdazips/multilambda.${1}.zip $2 --upload-only
 
