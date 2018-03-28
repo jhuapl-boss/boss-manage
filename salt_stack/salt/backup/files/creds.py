@@ -8,6 +8,7 @@ import sys
 from bossutils.vault import Vault
 
 if __name__ == '__main__':
+    # Usage: creds.py vault/path key
     v = Vault()
     p = sys.argv[1]
     k = sys.argv[2]

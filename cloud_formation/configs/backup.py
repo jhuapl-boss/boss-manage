@@ -49,32 +49,61 @@ def create_config(session, domain):
     names = AWSNames(domain)
 
     # XXX: AZ `E` is incompatible with T2.Micro instances (used by backup)
-    internal_subnet = aws.subnet_id_lookup(session, 'a-' + names.internal)
+    internal_subnet = aws.subnet_id_lookup(session, 'b-' + names.internal)
     backup_image = aws.ami_lookup(session, 'backup.boss')[0]
 
     s3_backup = "s3://backup." + domain + "/#{format(@scheduledStartTime, 'YYYY-ww')}"
     s3_logs = "s3://backup." + domain + "/logs"
 
-    config.add_s3_bucket("BackupBucket", "backup." + domain)
-    #config.add_s3_bucket_policy("BackupBucketPolicy",
-    #                            "backup." + domain,,
-    #                            ['s3:GetObject', 's3:PutObject'],
-    #                            { 'AWS': role})
-
+    # DP TODO: Create all BOSS S3 buckets as part of the account setup
+    #          as the Cloud Formation delete doesn't delete the bucket,
+    #          making this a conditional add
+    BUCKET_DEPENDENCY = None # Needed as the pipelines try to execute when launched
+    if not aws.s3_bucket_exists(session, "backup." + domain):
+        life_cycle = {
+            'Rules': [{
+                'Id': 'Delete Data',
+                'Status': 'Enabled',
+                'ExpirationInDays': 180, # ~6 Months
+            }]
+        }
+        config.add_s3_bucket("BackupBucket",
+                             "backup." + domain,
+                             life_cycle_config=life_cycle)
+        BUCKET_DEPENDENCY = "BackupBucket"
 
     # Consul Backup
-    cmd = "curl -X GET 'http://consul.{}:8500/v1/kv/?recurse' > ${{OUTPUT1_STAGING_DIR}}/export.json".format(domain)
-    pipeline = DataPipeline(log_uri = s3_logs)
+    # DP NOTE: Currently having issue with Consul restore, hence both Consul and Vault backups
+    cmd = "/usr/local/bin/consulate --api-host consul.{} kv backup -b -f ${{OUTPUT1_STAGING_DIR}}/export.json".format(domain)
+    pipeline = DataPipeline(log_uri = s3_logs, resource_role="backup")
     pipeline.add_shell_command("ConsulBackup",
                                cmd,
                                destination = Ref("ConsulBucket"),
                                runs_on = Ref("ConsulInstance"))
-    pipeline.add_ec2_instance("ConsulInstance", subnet=internal_subnet)
     pipeline.add_s3_bucket("ConsulBucket", s3_backup + "/consul")
+    pipeline.add_ec2_instance("ConsulInstance",
+                              subnet=internal_subnet,
+                              image = backup_image)
     config.add_data_pipeline("ConsulBackupPipeline",
                              "consul-backup."+domain,
                              pipeline.objects,
-                             depends_on = "BackupBucket")
+                             depends_on = BUCKET_DEPENDENCY)
+
+    # Vault Backup
+    cmd = "/usr/local/bin/python3 ~/vault.py backup {}".format(domain)
+    pipeline = DataPipeline(log_uri = s3_logs, resource_role="backup")
+    pipeline.add_shell_command("VaultBackup",
+                               cmd,
+                               destination = Ref("VaultBucket"),
+                               runs_on = Ref("VaultInstance"))
+    pipeline.add_s3_bucket("VaultBucket", s3_backup + "/vault")
+    pipeline.add_ec2_instance("VaultInstance",
+                              subnet=internal_subnet,
+                              image = backup_image)
+    config.add_data_pipeline("VaultBackupPipeline",
+                             "vault-backup."+domain,
+                             pipeline.objects,
+                             depends_on = BUCKET_DEPENDENCY)
 
 
     # DynamoDB Backup
@@ -98,7 +127,7 @@ def create_config(session, domain):
     config.add_data_pipeline("DDBPipeline",
                              "dynamo-backup."+domain,
                              pipeline.objects,
-                             depends_on = "BackupBucket")
+                             depends_on = BUCKET_DEPENDENCY)
 
 
     # Endpoint RDS Backup
@@ -106,7 +135,7 @@ def create_config(session, domain):
     config.add_data_pipeline("EndpointPipeline",
                              "endpoint-backup."+domain,
                              pipeline.objects,
-                             depends_on = "BackupBucket")
+                             depends_on = BUCKET_DEPENDENCY)
 
 
     # Auth RDS Backup
@@ -117,7 +146,7 @@ def create_config(session, domain):
         config.add_data_pipeline("AuthPipeline",
                                  "auth-backup."+domain,
                                  pipeline.objects,
-                                 depends_on = "BackupBucket")
+                                 depends_on = BUCKET_DEPENDENCY)
 
 
     return config
@@ -141,15 +170,17 @@ def post_init(session, domain):
 
     with call.vault() as vault:
         name = "backup"
-        #if name not in vault.list_policies():
-        policy = "{}/{}.hcl".format(VAULT_POLICY_DIR, name)
-        account_id = aws.get_account_id_from_session(session)
-        policy_arn = 'arn:aws:iam::{}:instance-profile/{}'.format(account_id, name)
-        with open(policy, 'r') as fh:
-            vault.set_policy(name, fh.read())
-            vault.write("/auth/aws-ec2/role/" + name,
-                        policies = name,
-                        bound_iam_role_arn = policy_arn)
+        if name not in vault.list_policies():
+            policy = "{}/{}.hcl".format(VAULT_POLICY_DIR, name)
+            account_id = aws.get_account_id_from_session(session)
+            policy_arn = 'arn:aws:iam::{}:instance-profile/{}'.format(account_id, name)
+            with open(policy, 'r') as fh:
+                vault.set_policy(name, fh.read())
+                vault.write("/auth/aws-ec2/role/" + name,
+                            policies = name,
+                            bound_iam_role_arn = policy_arn)
+        else:
+            print("Vault already configured to provide AWS credentials for backup/restore")
 
 def update(session, domain):
     config = create_config(session, domain)
@@ -158,12 +189,4 @@ def update(session, domain):
     return success
 
 def delete(session, domain):
-    names = AWSNames(domain)
-
-    resp = input("Delete all backup data [N/y] ")
-    if len(resp) == 0 or resp[0] not in ('y', 'Y'):
-        print("Not deleting stack")
-        return
-
     CloudFormationConfiguration('backup', domain).delete(session)
-    aws.s3_bucket_delete(session, 'backup.' + domain, empty=True)

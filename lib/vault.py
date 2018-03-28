@@ -262,6 +262,15 @@ class Vault(object):
         client = self.connect(VAULT_TOKEN)
         client.set_policy(name, policy)
 
+    def list_policies(self):
+        """List all policies
+
+        Used by processes to add or update policies after Vault has been
+        initially configured.
+        """
+        client = self.connect(VAULT_TOKEN)
+        return client.list_policies()
+
     def unseal(self):
         """Unseal a sealed Vault. Connect using get_client() and if the Vault is
         not sealed read all of the keys defined by VAULT_KEY and unseal.
