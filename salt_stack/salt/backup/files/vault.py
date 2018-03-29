@@ -1,9 +1,36 @@
+# Copyright 2018 The Johns Hopkins University Applied Physics Laboratory
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# A script to backup and restore data from Vault
+# Currently backs up and restores
+# * KV data under secret/
+# * Vault policies
+# * AWS-EC2 Authentication configuration
+# * AWS secret backend configuration
+#
+# NOTE: Restore doesn't restore AWS credentials (the credentials Vault uses to
+#       communicate with AWS). Restore expects to restore into a Vault that has
+#       already been configured (using lib/vault.py:Vault.configure) so that
+#       the different backends are ready for data
+
 from bossutils.vault import Vault
 import sys
 import os
 import json
 
 def export(v, path):
+    """Recursive function for exporting all paths and data"""
     # DP NOTE: Taken from lib/vault.py:Vault.export
     if path[-1] != '/':
         path += '/'
@@ -81,6 +108,9 @@ token =
         f = os.path.join(os.environ['INPUT1_STAGING_DIR'], 'export.json')
         with open(f, 'r') as fh:
             data = json.load(fh)
+
+        # DP NOTE: The print statements in the restore are here to help
+        #          understand the input data if a call fails to restore
 
         # Restore policies
         existing = v.client.list_policies()

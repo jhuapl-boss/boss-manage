@@ -303,6 +303,17 @@ def post_init(session, domain, startup_wait=False):
             print("Updating {}".format(const.VAULT_KEYCLOAK))
             vault.update(const.VAULT_KEYCLOAK, password = password, username = username, client_id = "admin-cli", realm = "master")
 
+        if not vault.read(const.VAULT_KEYCLOAK_DB):
+            print("Writing {}".format(const.VAULT_KEYCLOAK_DB))
+            # Values are hardcodded both here and in the add_rds
+            # as the values are also hardcodded in the Keycloak config
+            #
+            # These values are for use by the backup / restore process
+            vault.write(const.VAULT_KEYCLOAK_DB,
+                        name = "keycloak",
+                        user = "keycloak",
+                        password = "keycloak")
+
         if not vault.read(const.VAULT_ENDPOINT_AUTH):
             # DP TODO: Move this update call into the api config
             print("Updating {}".format(const.VAULT_ENDPOINT_AUTH))

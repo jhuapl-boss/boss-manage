@@ -14,7 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""A driver script for creating AWS CloudFormation Stacks."""
+"""
+A script that manually creates Data Pipelines to restore a backup
+"""
 
 import argparse
 import sys

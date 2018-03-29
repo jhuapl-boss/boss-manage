@@ -84,6 +84,7 @@ KEYCLOAK_REALM = SALT_DIR + '/keycloak/files/BOSS.realm'
 VAULT_AUTH = "secret/auth"
 VAULT_REALM = "secret/auth/realm"
 VAULT_KEYCLOAK = "secret/keycloak"
+VAULT_KEYCLOAK_DB = "secret/keycloak/db"
 VAULT_ENDPOINT = "secret/endpoint/django"
 VAULT_ENDPOINT_DB = "secret/endpoint/django/db"
 VAULT_ENDPOINT_AUTH = "secret/endpoint/auth"

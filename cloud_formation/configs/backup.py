@@ -168,17 +168,29 @@ def post_init(session, domain):
     keypair = aws.keypair_lookup(session)
     call = ExternalCalls(session, keypair, domain)
 
+    # DP NOTE: For an existing stack the backup policy,
+    #          aws-ec2 login, and keycloak RDS credentials
+    #          need to be configured in Vault
+    #
+    #          At some point this code can be deprecated and eventually removed
     with call.vault() as vault:
         name = "backup"
-        if name not in vault.list_policies():
+        if name not in vault.list_policies(): # only update if needed
             policy = "{}/{}.hcl".format(VAULT_POLICY_DIR, name)
             account_id = aws.get_account_id_from_session(session)
             policy_arn = 'arn:aws:iam::{}:instance-profile/{}'.format(account_id, name)
+
             with open(policy, 'r') as fh:
-                vault.set_policy(name, fh.read())
-                vault.write("/auth/aws-ec2/role/" + name,
-                            policies = name,
-                            bound_iam_role_arn = policy_arn)
+                vault.set_policy(name, fh.read()) # Create Vault Policy
+
+            vault.write("/auth/aws-ec2/role/" + name, # Create AWS-EC2 login
+                        policies = name,
+                        bound_iam_role_arn = policy_arn)
+
+            vault.write(const.VAULT_KEYCLOAK_DB,  # Create Keycloak RDS credentials
+                        name = "keycloak",
+                        user = "keycloak",
+                        password = "keycloak")
         else:
             print("Vault already configured to provide AWS credentials for backup/restore")
 
