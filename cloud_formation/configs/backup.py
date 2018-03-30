@@ -67,9 +67,17 @@ def create_config(session, domain):
                 'ExpirationInDays': 180, # ~6 Months
             }]
         }
+        encryption = {
+            'ServerSideEncryptionConfiguration': [{
+                'ServerSideEncryptionByDefault': {
+                    'SSEAlgorithm': 'AES256'
+                }
+            }]
+        }
         config.add_s3_bucket("BackupBucket",
                              "backup." + domain,
-                             life_cycle_config=life_cycle)
+                             life_cycle_config=life_cycle,
+                             encryption=encryption)
         BUCKET_DEPENDENCY = "BackupBucket"
 
     # Consul Backup

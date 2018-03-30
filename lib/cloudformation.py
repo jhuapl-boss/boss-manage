@@ -1526,7 +1526,7 @@ class CloudFormationConfiguration:
                                       period = period,
                                       namespace = "AWS/EC2")
 
-    def add_s3_bucket(self, key, name, access_control=None, life_cycle_config=None, notification_config=None, tags=None, depends_on=None):
+    def add_s3_bucket(self, key, name, access_control=None, life_cycle_config=None, notification_config=None, encryption=None, tags=None, depends_on=None):
         """Create or configure a S3 bucket.
 
         Bucket is configured to never be deleted for safety reasons.
@@ -1560,6 +1560,9 @@ class CloudFormationConfiguration:
 
         if notification_config is not None:
             self.resources[key]['Properties']['NotificationConfiguration'] = notification_config
+
+        if encryption is not None:
+            self.resources[key]['Properties']['BucketEncryption'] = encryption
 
         if tags is not None:
             self.resources[key]['Properties']['Tags'] = tags
