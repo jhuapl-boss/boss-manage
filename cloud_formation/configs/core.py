@@ -101,7 +101,7 @@ def create_config(boss_config):
     user_data["consul"]["cluster"] = str(const.CONSUL_CLUSTER_SIZE)
     config.add_autoscale_group("Consul",
                                names.core.dns.consul,
-                               aws.ami_lookup(boss_config.session, "consul.boss"),
+                               aws.ami_lookup(boss_config.session, names.core.ami.consul),
                                keypair,
                                subnets = internal_subnets_lambda,
                                security_groups = [Ref("InternalSecurityGroup")],
@@ -118,7 +118,7 @@ def create_config(boss_config):
     user_data["system"]["type"] = "vault"
     config.add_autoscale_group("Vault",
                                names.core.dns.vault,
-                               aws.ami_lookup(boss_config.session, "vault.boss"),
+                               aws.ami_lookup(boss_config.session, names.core.ami.vault),
                                keypair,
                                subnets = internal_subnets_lambda,
                                security_groups = [Ref("InternalSecurityGroup")],
@@ -152,7 +152,7 @@ def create_config(boss_config):
     create_asg_elb(config,
                    "Auth",
                    names.core.dns.auth,
-                   aws.ami_lookup(boss_config.session, "auth.boss"),
+                   aws.ami_lookup(boss_config.session, names.core.ami.auth),
                    keypair,
                    str(user_data),
                    const.AUTH_CLUSTER_SIZE,

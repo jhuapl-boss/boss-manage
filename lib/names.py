@@ -53,6 +53,7 @@ class AWSNames(object):
         'sg': None, # Security Group
         'rt': None, # Route Table
         'gw': None, # Gateway
+        'ami': None,
     }
 
     RESOURCES = {
@@ -75,6 +76,10 @@ class AWSNames(object):
 
         if name not in self.RESOURCES:
             raise AttributeError("'{}' is not a valid resource name".format(name))
+
+        if resource_type == 'ami':
+            suffix = self.boss_config[cf_config].AMI_SUFFIX
+            return self.RESOURCES[name] + '.' + suffix
 
         domain = self.boss_config[cf_config].INTERNAL_DOMAIN
         fqdn = self.RESOURCES[name] + '.' + domain
