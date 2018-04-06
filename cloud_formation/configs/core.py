@@ -365,7 +365,10 @@ def post_init(session, domain, startup_wait=False):
 
 def update(session, domain):
     # Only in the production scenario will data be preserved over the update
-    if os.environ["SCENARIO"] not in ("production", "ha-development",):
+    # TODO Check to see if AUTH has a RDS instance
+    # TODO Check to see if Consul has more than 1 instance (or 3+ instances)
+    #if os.environ["SCENARIO"] not in ("production", "ha-development",):
+    if True:
         print("Can only update the production and ha-development scenario")
         return None
 

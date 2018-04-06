@@ -1,4 +1,4 @@
-# Copyright 2016 The Johns Hopkins University Applied Physics Laboratory
+# Copyright 2018 The Johns Hopkins University Applied Physics Laboratory
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,9 +14,7 @@
 
 import os
 import sys
-import json
-
-from .cloudformation import get_scenario
+import yaml
 
 # Region api is created in.  Later versions of boto3 should allow us to
 # extract this from the session variable.  Hard coding for now.
@@ -32,6 +30,32 @@ MAX_ALARM_DOLLAR = 30  # Maximum size of alarms in $1,000s
 # Lambda Build Server
 PROD_LAMBDA_KEY = 'microns-bastion20151117'
 DEV_LAMBDA_KEY = 'microns-bastion20151117'
+
+
+##################
+# Scenario Support
+def load_scenario(scenario):
+    # Locate the imported module so code can reference global
+    # variables without using the 'global' keyword
+    d = sys.modules['lib.constants'].__dict__
+
+    if scenario is not None
+        file = "{}.yml".format(scenario)
+        path = repo_path("cloud_formation", "scenarios", file)
+
+        if not os.path.exists(path):
+            print("Scenario file '{}' doesn't exist".format(path))
+            return
+
+        try:
+            with open(path, 'r') as fh:
+                config = yaml.load(fh.read())
+        except Exception as ex:
+            print("Problem loading scenario file")
+            print(ex)
+
+        for key in config:
+            d[key] = config[key]
 
 
 ########################
@@ -119,53 +143,6 @@ REDIS_CLUSTER_SIZE = 1
 #################
 # Resource Memory
 REDIS_RESERVED_MEMORY = 387
-
-
-##################
-# Scenario Support
-def load(type_, key, default=None):
-    file = "{}.json".format(os.environ['SCENARIO'])
-    path = repo_path("cloud_formation", "scenarios", file)
-    with open(path, 'r') as fh:
-        file = json.load(fh)
-        return file.get(type_, {}).get(key, default)
-
-def load_scenario():
-    # Locate the imported module so code can reference global
-    # variables without using the 'global' keyword
-    d = sys.modules['lib.constants'].__dict__
-
-    # Variables to update
-    # Format is either
-    # (variable, [type, key]) or
-    # variable (if variable is in the format 'key_type')
-    keys = [
-        'ENDPOINT_TYPE',
-        'RDS_TYPE',
-        'REDIS_CACHE_TYPE',
-        'REDIS_TYPE',
-        'CACHE_MANAGER_TYPE',
-        'ACTIVITIES_TYPE',
-
-        'AUTH_CLUSTER_SIZE',
-        'CONSUL_CLUSTER_SIZE',
-        'VAULT_CLUSTER_SIZE',
-        ('ENDPOINT_CLUSTER_MIN', ['SIZE', 'ENDPOINT_CLUSTER_MIN']),
-        ('ENDPOINT_CLUSTER_MAX', ['SIZE', 'ENDPOINT_CLUSTER_MAX']),
-        'REDIS_CLUSTER_SIZE',
-
-        ('REDIS_RESERVED_MEMORY', ['MEM', 'REDIS_RESERVED']),
-    ]
-
-    for key in keys:
-        if type(key) == tuple:
-            key, args = key
-        else:
-            a, b = key.rsplit('_', 1)
-            args = [b, a]
-
-        default = d[key]
-        d[key] = load(*args, default=default)
 
 
 ########################

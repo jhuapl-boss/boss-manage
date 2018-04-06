@@ -64,7 +64,7 @@ if __name__ == '__main__':
     actions = ["create", "update", "delete", "post-init", "pre-init", "generate"]
     actions_help = create_help("action supports the following:", actions)
 
-    scenarios = [x.split('/')[1].split('.')[0] for x in glob.glob("scenarios/*.json")]
+    scenarios = [x.split('/')[1].split('.')[0] for x in glob.glob("scenarios/*.yml")]
     scenario_help = create_help("scenario supports the following:", scenarios)
 
     parser = argparse.ArgumentParser(description = "Script the creation and provisioning of CloudFormation Stacks",
@@ -81,7 +81,6 @@ if __name__ == '__main__':
                         help = "The AMI version to use when selecting images (default: latest)")
     parser.add_argument("--scenario",
                         metavar = "<scenario>",
-                        default = "development",
                         choices = scenarios,
                         help = "The deployment configuration to use when creating the stack (instance size, autoscale group size, etc) (default: development)")
     parser.add_argument("--disable-preview",
@@ -110,10 +109,9 @@ if __name__ == '__main__':
         sys.exit(1)
 
     os.environ["AMI_VERSION"] = args.ami_version
-    os.environ["SCENARIO"] = args.scenario
     os.environ["DISABLE_PREVIEW"] = str(args.disable_preview)
 
-    constants.load_scenario()
+    constants.load_scenario(args.scenario)
 
     bosslet_config = configuration.BossConfiguration(args.bosslet_name,
                                                      ami_version = args.ami_version,
