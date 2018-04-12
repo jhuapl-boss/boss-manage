@@ -27,11 +27,10 @@
 
         "name": "The hostname and minion ID of the VM",
         "name": null,
-        "name_suffix": "An optional suffix for the build name",
-        "name_suffix": "",
-
-        "role": "What type of role is the VM filling (web|db|etc)",
-        "role": null,
+        "ami_suffix": "Common suffix for all AMI images",
+        "ami_suffix": null,
+        "ami_version": "An optional suffix for the build name",
+        "ami_version": "",
 
         "commit": "Commit hash of the repository version being built from",
         "commit": "unknown",
@@ -56,15 +55,14 @@
         "access_key": "{{user `aws_access_key`}}",
         "secret_key": "{{user `aws_secret_key`}}",
         "ssh_username": "ubuntu",
-        "ami_name": "Using the '.boss' suffix to make sure our names are unique in AWS",
-        "ami_name": "{{user `name`}}.boss{{user `name_suffix`}}",
-        "ami_description": "AMI configured for running as a / the {{user `role`}} server",
+        "ami_name": "Using the 'ami_suffix' to make sure our names are unique in AWS",
+        "ami_name": "{{user `name`}}{{user `ami_suffix`}}{{user `ami_version`}}",
+        "ami_description": "AMI configured for running as a / the {{user `name`}} server",
         "source_ami": "{{user `aws_source_ami`}}",
         "force_deregister": "{{user `aws_force`}}",
         "instance_type": "{{user `aws_instance_type`}}",
         "region": "{{user `aws_region`}}",
         "tags": {
-            "Role": "{{user `role`}}",
             "Commit": "{{user `commit`}}",
             "Base AMI": "{{user `aws_source_ami`}}"
         },

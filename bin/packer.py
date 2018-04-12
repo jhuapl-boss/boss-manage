@@ -29,11 +29,24 @@ import glob
 import json
 import shlex
 import subprocess
+import configparser
 from distutils.spawn import find_executable
 from boto3.session import Session
 
 import alter_path
 from lib.constants import repo_path
+from lib import configuration
+from lib import utils
+
+CONFIGS = [
+    "activities",
+    "auth",
+    "backup",
+    "cachemanager",
+    "consul",
+    "endpoint",
+    "vault",
+]
 
 os.environ["PATH"] += ":" + repo_path("bin") # allow executing Packer from the bin/ directory
 
@@ -57,40 +70,34 @@ def execute(cmd, output_file):
     """
     return subprocess.Popen(shlex.split(cmd), stderr=subprocess.STDOUT, stdout=open(output_file, "w"))
 
-def locate_ami(aws_config):
+def locate_ami(session):
     def contains(x, ys):
         for y in ys:
             if y not in x:
                 return False
         return True
 
-    with open(aws_config) as fh:
-        cred = json.load(fh)
-        session = Session(aws_access_key_id = cred["aws_access_key"],
-                          aws_secret_access_key = cred["aws_secret_key"],
-                          region_name = 'us-east-1')
+    client = session.client('ec2')
+    response = client.describe_images(Filters=[
+                    {"Name": "owner-id", "Values": ["099720109477"]},
+                    {"Name": "virtualization-type", "Values": ["hvm"]},
+                    {"Name": "root-device-type", "Values": ["ebs"]},
+                    {"Name": "architecture", "Values": ["x86_64"]},
+                    #{"Name": "platform", "Values": ["Ubuntu"]},
+                    #{"Name": "name", "Values": ["hvm-ssd"]},
+                    #{"Name": "name", "Values": ["14.04"]},
+               ])
 
-        client = session.client('ec2')
-        response = client.describe_images(Filters=[
-                        {"Name": "owner-id", "Values": ["099720109477"]},
-                        {"Name": "virtualization-type", "Values": ["hvm"]},
-                        {"Name": "root-device-type", "Values": ["ebs"]},
-                        {"Name": "architecture", "Values": ["x86_64"]},
-                        #{"Name": "platform", "Values": ["Ubuntu"]},
-                        #{"Name": "name", "Values": ["hvm-ssd"]},
-                        #{"Name": "name", "Values": ["14.04"]},
-                   ])
+    images = response['Images']
+    images = [i for i in images if contains(i['Name'], ('hvm-ssd', '14.04', 'server'))]
+    images.sort(key=lambda x: x["CreationDate"], reverse=True)
 
-        images = response['Images']
-        images = [i for i in images if contains(i['Name'], ('hvm-ssd', '14.04', 'server'))]
-        images.sort(key=lambda x: x["CreationDate"], reverse=True)
+    if len(images) == 0:
+        print("Error: could not locate base AMI, exiting ....")
+        sys.exit(1)
 
-        if len(images) == 0:
-            print("Error: could not locate base AMI, exiting ....")
-            sys.exit(1)
-
-        print("Using {}".format(images[0]['Name']))
-        return images[0]['ImageId']
+    print("Using {}".format(images[0]['Name']))
+    return images[0]['ImageId']
 
 if __name__ == '__main__':
     for cmd in ("git", "packer"):
@@ -108,8 +115,7 @@ if __name__ == '__main__':
                "\n".join(map(lambda x: "  " + x, options)) + "\n"
 
     config_glob = repo_path("packer", "variables", "*")
-    config_names = [x.split(os.path.sep)[-1] for x in glob.glob(config_glob)]
-    config_help_names = list(config_names)
+    config_help_names = list(CONFIGS)
     config_help_names.append("all")
     config_help = create_help("config is on of the following:", config_help_names)
 
@@ -124,15 +130,16 @@ if __name__ == '__main__':
                         metavar = "<packer-builder>",
                         default = "amazon-ebs",
                         help = "Which Packer building to use. (default: amazon-ebs)")
-    parser.add_argument("--name",
-                        metavar = "<build name>",
+    parser.add_argument("--force", "-f",
+                        action = "store_true",
+                        default = False,
+                        help = "Override any existing AMI with the same name")
+    parser.add_argument("--ami-version",
+                        metavar = "<ami-version>",
                         default = 'h' + git_hash[:8],
-                        help = "The build name for the machine image(s). (default: First 8 characters of the git SHA1 hash)")
-    parser.add_argument("--no-bastion",
-                        action = "store_false",
-                        default = True,
-                        dest="bastion",
-                        help = "Don't use the aws-bastion file when building. (default: Use the bastion)")
+                        help = "The AMI version for the machine image(s). (default: First 8 characters of the git SHA1 hash)")
+    parser.add_argument("bosslet_name",
+                        help="Bosslet in which to execute the build")
     parser.add_argument("config",
                         choices = config_help_names,
                         metavar = "<config>",
@@ -141,38 +148,59 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if "all" in args.config:
-        args.config = config_names
-
-    bastion_config = "-var-file=" + repo_path("config", "aws-bastion")
-    credentials_config = repo_path("config", "aws-credentials")
-    packer_file = repo_path("packer", "vm.packer")
-
-    if not os.path.exists(credentials_config):
-        print("Could not locate AWS credentials file at '{}', required...".format(credentials_config))
+    if not configuration.valid_bosslet(args.bosslet_name):
+        parser.print_usage()
+        print("Error: Bosslet name '{}' doesn't exist in configs file ({})".format(args.bosslet_name, configuration.CONFIGS_PATH))
         sys.exit(1)
+
+    bosslet_config = configuration.BossConfiguration(args.bosslet_name)
+
+    if "all" in args.config:
+        args.config = CONFIGS
+
+    if bosslet_config.OUTBOUND_BASTION:
+        bastion_config = """-var 'aws_bastion_ip={}'
+                            -var 'aws_bastion_user{}'
+                            -var 'aws_bastion_priv_key_file={}'
+                         """.format(bosslet_config.OUTBOUND_IP,
+                                    bosslet_config.OUTBOUND_USER,
+                                    utils.keypair_to_file(bosslet_config.OUTBOUND_KEY))
+    else:
+        bastion_config = ""
+
+    aws_creds = bosslet_config.session.get_credentials()
+    credentials_config = repo_path("config", "aws-credentials")
+    credentials_config = """-var 'aws_access_key={}'
+                            -var 'aws_secret_key={}'
+                         """.format(aws_creds.access_key,
+                                    aws_creds.secret_key)
+
+    packer_file = repo_path("packer", "vm.packer")
 
     packer_logs = repo_path("packer", "logs")
     if not os.path.isdir(packer_logs):
         os.mkdir(packer_logs)
 
-    ami = locate_ami(credentials_config)
+    ami = locate_ami(bosslet_config.session)
 
     cmd = """{packer} build
-             {bastion} -var-file={credentials}
-             -var-file={machine} -var 'name_suffix={name}'
+             {bastion} {credentials}
+             -var 'name={machine}' -var 'ami_version={ami_version}'
+             -var 'ami_suffix={ami_suffix}' -var 'aws_region={region}'
              -var 'commit={commit}' -var 'force_deregister={deregister}'
              -var 'aws_source_ami={ami}' -only={only} {packer_file}"""
     cmd_args = {
         "packer" : "packer",
-        "bastion" : bastion_config if args.bastion else "",
+        "bastion" : bastion_config,
         "credentials" : credentials_config,
         "only" : args.only,
         "packer_file" : packer_file,
-        "name" : "-" + args.name,
+        "region": bosslet_config.REGION,
+        "ami_suffix": bosslet_config.AMI_SUFFIX,
+        "ami_version" : "-" + args.ami_version,
         "commit" : git_hash,
         "ami" : ami,
-        "deregister" : "true" if args.name in ["test", "sandy", "dean"] else "false",
+        "deregister" : "true" if args.force else "false",
         "machine" : "" # replace for each call
     }
 
@@ -180,7 +208,7 @@ if __name__ == '__main__':
     for config in args.config:
         print("Launching {} configuration".format(config))
         log_file = os.path.join(packer_logs, config + ".log")
-        cmd_args["machine"] = repo_path("packer", "variables", config)
+        cmd_args["machine"] = config
         proc = execute(cmd.format(**cmd_args), log_file)
 
         if args.single_thread:
