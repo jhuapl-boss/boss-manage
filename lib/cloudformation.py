@@ -380,7 +380,7 @@ class CloudFormationConfiguration:
     and launching them.
     """
 
-    def __init__(self, config, boss_config):
+    def __init__(self, config, bosslet_config):
         """CloudFormationConfiguration constructor
 
         A domain name is in either <vpc>.<tld> or <subnet>.<vpc>.<tld> format and
@@ -395,18 +395,18 @@ class CloudFormationConfiguration:
         self.resources = {}
         self.parameters = {}
         self.arguments = []
-        self.region = boss_config[config].REGION
+        self.region = bosslet_config.REGION
         self.keypairs = {}
 
-        domain = boss_config[config].INTERNAL_DOMAIN
+        domain = bosslet_config.INTERNAL_DOMAIN
         self.stack_name = "".join([x.capitalize() for x in [config, *domain.split('.')]])
 
-        self.boss_config = boss_config
-        self.session = boss_config[config].session
-        self.hosts = hosts.Hosts(config, boss_config)
+        self.bosslet_config = bosslet_config
+        self.session = bosslet_config.session
+        self.hosts = hosts.Hosts(bosslet_config)
 
         self.vpc_domain = domain
-        self.vpc_subnet = boss_config[config].SUBNET
+        self.vpc_subnet = bosslet_config.SUBNET
 
 
     def _create_template(self, description="", indent=None):
@@ -744,7 +744,7 @@ class CloudFormationConfiguration:
         """
         internal = []
         external = []
-        for az, sub in aws.azs_lookup(self.boss_config):
+        for az, sub in aws.azs_lookup(self.bosslet_config):
             name = sub.capitalize() + "InternalSubnet"
             self.add_subnet(name, sub + "-internal." + self.vpc_domain, az = az)
             internal.append(Ref(name))
@@ -772,7 +772,7 @@ class CloudFormationConfiguration:
         internal = []
 
         # transforms [(AZ_Name, AZ_Letter)] -> ([AZ_Name], [AZ_Letter])
-        azs = list(zip(*aws.azs_lookup(self.boss_config, compatibility='lambda')))[1]
+        azs = list(zip(*aws.azs_lookup(self.bosslet_config, compatibility='lambda')))[1]
         print("Lambda AZs: {}".format(azs))
         subnets = [x for x in hosts.SUBNETS if x.startswith('lambda')]
 
@@ -800,7 +800,7 @@ class CloudFormationConfiguration:
         internal = []
         external = []
 
-        for az, sub in aws.azs_lookup(self.boss_config, compatibility):
+        for az, sub in aws.azs_lookup(self.bosslet_config, compatibility):
             name = sub.capitalize() + "InternalSubnet"
             if name in self.resources:
                 internal.append(Ref(name))
@@ -814,7 +814,7 @@ class CloudFormationConfiguration:
                     internal.append(Ref(name))
 
             name = sub.capitalize() + "ExternalSubnet"
-            if name in self.resource:
+            if name in self.resources:
                 external.append(Ref(name))
             else:
                 domain = sub + "-external." + self.vpc_domain

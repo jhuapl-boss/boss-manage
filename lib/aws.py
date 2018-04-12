@@ -253,14 +253,14 @@ def azs_lookup(bosslet_config, compatibility=None):
     Returns:
         (list) : List of tuples (availability zone, zone letter)
     """
-    client = boss_config[cf_config].session.client('ec2')
+    client = bosslet_config.session.client('ec2')
     response = client.describe_availability_zones()
 
     rtn = [(z["ZoneName"], z["ZoneName"][-1]) for z in response["AvailabilityZones"]]
 
     if compatibility:
         try:
-            limits = boss_config.AVAILABILITY_ZONE_USAGE['lambda']
+            limits = bosslet_config.AVAILABILITY_ZONE_USAGE[compatibility]
         except:
             pass # Don't do anything
         else:

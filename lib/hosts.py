@@ -90,9 +90,9 @@ SUBNETS = [
 from ipaddress import IPv4Network
 
 class Hosts(object):
-    def __init__(self, config, boss_config):
-        self.domain = boss_config[config].INTERNAL_DOMAIN
-        self.subnet_cidr = boss_config[config].SUBNET
+    def __init__(self, bosslet_config):
+        self.domain = bosslet_config.INTERNAL_DOMAIN
+        self.subnet_cidr = bosslet_config.SUBNET
 
     def lookup(self, subnet):
         subnet, domain = subnet.split('.', 1)

@@ -37,12 +37,16 @@ class AWSNameAccumulator(object):
         return self.__getattr__(key)
 
 class AWSNames(object):
-    def __init__(self, boss_config):
-        self.boss_config = boss_config
+    def __init__(self, bosslet_config):
+        self.bosslet_config = bosslet_config
 
-    def public_dns(self, cf_config, name):
-        domain = self.boss_config[cf_config].EXTERNAL_DOMAIN
-        return name + domain
+    def public_dns(self, name):
+        try:
+            name = self.bosslet_config.EXTERNAL_FORMAT.format(machine = name)
+        except:
+            pass
+
+        return name + '.' + self.bosslet_config.EXTERNAL_DOMAIN
 
     def __getattr__(self, key):
         return AWSNameAccumulator(key, self.build)
@@ -84,10 +88,10 @@ class AWSNames(object):
             raise AttributeError("'{}' is not a valid resource name".format(name))
 
         if resource_type == 'ami':
-            suffix = self.boss_config.AMI_SUFFIX
+            suffix = self.bosslet_config.AMI_SUFFIX
             return self.RESOURCES[name] + suffix
 
-        domain = self.boss_config.INTERNAL_DOMAIN
+        domain = self.bosslet_config.INTERNAL_DOMAIN
         fqdn = self.RESOURCES[name] + '.' + domain
 
         transform = self.TYPES[resource_type]

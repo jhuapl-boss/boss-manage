@@ -47,8 +47,7 @@ class ExternalCalls:
     """Class that helps with forming connections from the local machine to machines
     within a VPC through the VPC's bastion machine.
     """
-    #def __init__(self, session, keypair, domain):
-    def __init__(self, boss_config):
+    def __init__(self, bosslet_config):
         """ExternalCalls constructor
 
         Args:
@@ -59,26 +58,22 @@ class ExternalCalls:
                                Keypair is converted to file on disk using keypair_to_file()
             domain (string) : BOSS internal VPC domain name
         """
-        self.names = AWSNames(boss_config)
+        self.names = AWSNames(bosslet_config)
 
-        self.session = boss_config[cf_config].session
-        self.keypair_file = keypair_to_file(boss_config[cf_config].SSH_KEY)
+        self.session = bosslet_config.session
+        self.keypair_file = keypair_to_file(bosslet_config.SSH_KEY)
 
-        bastion_ip = aws.machine_lookup(session, self.names.core.dns.bastion)
+        bastion_ip = aws.machine_lookup(self.session, self.names.dns.bastion)
 
         self.bastions = [ SSHTarget(self.keypair_file, bastion_ip) ]
 
-        if boss_config[cf_config].outbound_bastion:
-            self.bastions.insert(0, boss_config[cf_config].outbound_bastion)
-        #if boss_config[cf_config].OUTBOUND_BASTION:
-        #    outbound = SSHTarget(keypair_to_file(boss_config[cf_config].OUTBOUND_KEY),
-        #                         boss_config[cf_config].OUTBOUND_IP,
-        #                         boss_config[cf_config].OUTBOUND_PORT,
-        #                         boss_config[cf_config].OUTBOUND_USER)
-        #    self.bastions.insert(0, outbound)
+        if bosslet_config.outbound_bastion:
+            self.bastions.insert(0, bosslet_config.outbound_bastion)
 
-        vault_hostname = self.names.core.dns.vault
-        ips = aws.machine_lookup_all(session, self.vault_hostname, public_ip=False)
+        self.vault_hostname = self.names.dns.vault
+        ips = aws.machine_lookup_all(self.session,
+                                     self.vault_hostname,
+                                     public_ip=False)
         self.vaults = [Vault(self.vault_hostname, ip) for ip in ips]
 
         # keep track of previous connections to limit the need for looking up IP addresses
@@ -195,7 +190,7 @@ class ExternalCalls:
         time.sleep(30)
 
         # TODO Handle if there is an error with establishing the tunnel
-        with self.tunnel("auth", 8080) as port:
+        with self.tunnel(self.names.dns.auth, 8080) as port:
             # Could move to connecting through the ELB, but then KC will have to be healthy
             URL = "http://localhost:{}/auth/".format(port)
 

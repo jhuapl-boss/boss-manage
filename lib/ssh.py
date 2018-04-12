@@ -351,7 +351,6 @@ class SSHConnection(object):
             scp(local_file, remote_file, upload=True)
         """
         with self._connect() as target:
-            host, port = host_port
             def scp(local_file, remote_file, upload=False):
                 first = local_file if upload else ""
                 second = "" if upload else local_file
@@ -420,7 +419,6 @@ class SSHConnection(object):
             cmd("command to execute")
         """
         with self._connect() as target:
-            host, port = host_port
             def cmd(command):
                 ssh_cmd_str = "ssh -i {} {} -p {} {}@{} '{}'" \
                                     .format(target.key, SSH_OPTIONS, target.port, target.user, target.ip, command)

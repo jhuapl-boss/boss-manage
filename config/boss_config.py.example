@@ -3,16 +3,15 @@
 # Defines BOSS instance configuration information
 #
 
-EXTERNAL_DOMAIN = ".external.tld" # Leading '.' (or other character) as this will be
-                                  # the external DNS suffix (allowing names like
-                                  # api-integration.external.tld or api.external.tld)
-INTERNAL_DOMAIN = "internal.tld" # No leading '.' as this will be the VPC name
+EXTERNAL_DOMAIN = "external.tld" # External domain and Route53 Hosted Zone
+EXTERNAL_FORMAT = "{machine}" # (Optional) allows names like api-integration.external.tld
+INTERNAL_DOMAIN = "internal.tld"
 SUBNET = "10.0.0.0/16" # Class B Subnet
 
 AMI_SUFFIX = ".tld"
-SCENARIO = ""
+SCENARIO = "" # (Optional) Uses internal defaults if not --scenario provided
 
-AUTH_RDS = False # Optional value, defaults to ???
+AUTH_RDS = False # If Keycloak will use an external database. Cannot update unless True
 
 # Lambda build server variables
 LAMBDA_BUCKET = None
@@ -28,10 +27,7 @@ AVAILABILITY_ZONE_USAGE = { # Used to limit subnet usage for specific resources 
 }
 
 ACCOUNT_ID = 123456789
-# Keep in seperate file (use existing AWS config file with names keys)
 PROFILE = None
-#ACCESS_KEY = "xxxxxxxx"
-#SECRET_KEY = "xxxxxxxx"
 
 OUTBOUND_BASTION = True
 OUTBOUND_IP = "0.0.0.0"
@@ -42,10 +38,6 @@ OUTBOUND_KEY = "bastion-key" # only keypair name
 HTTPS_INBOUND = "0.0.0.0/0"
 SSH_INBOUND = "0.0.0.0/32"
 SSH_KEY = "stack-key" # only keypair name
-
-# Allow user to overlay custom constants for scenarios
-# Allow user to define new scenarios
-# How to handle checks against production scenario
 
 # cloudformation configs - add verify command for post create / update
 # cloudformation.py allow passing multiple configs
