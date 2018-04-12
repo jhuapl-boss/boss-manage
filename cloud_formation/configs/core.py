@@ -39,8 +39,6 @@ import json
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-keypair = None
-
 def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, public=True, depends_on=None):
     security_groups = [Ref("InternalSecurityGroup")]
     config.add_autoscale_group(key,
@@ -72,26 +70,25 @@ def create_config(boss_config):
     names = AWSNames(boss_config)
 
     config = CloudFormationConfiguration('core', boss_config)
-
-    global keypair
-    keypair = aws.keypair_lookup(boss_config.session)
+    session = boss_config['core'].session
+    keypair = boss_config['core'].SSH_KEY
 
     config.add_vpc()
 
     # Create the internal and external subnets
     config.add_subnet('InternalSubnet', names.core.subnet.internal)
     config.add_subnet('ExternalSubnet', names.core.subnet.external)
-    internal_subnets, external_subnets = config.add_all_azs()
-    # it seems that both Lambdas and ASGs needs lambda_compatible_only subnets.
-    internal_subnets_lambda, external_subnets_lambda = config.add_all_azs(lambda_compatible_only=True)
+    internal_subnets, external_subnets = config.add_all_subnets()
+    internal_subnets_asg, external_subnets_asg = config.find_all_subnets('asg')
 
+    user_data = const.BASTION_USER_DATA.format(bosslet_config.SUBNET)
     config.add_ec2_instance("Bastion",
                             names.core.dns.bastion,
-                            aws.ami_lookup(boss_config.session, const.BASTION_AMI),
+                            aws.ami_lookup(boss_config, const.BASTION_AMI),
                             keypair,
                             subnet = Ref("ExternalSubnet"),
                             public_ip = True,
-                            user_data = const.BASTION_USER_DATA,
+                            user_data = user_data,
                             security_groups = [Ref("InternalSecurityGroup"), Ref("BastionSecurityGroup")],
                             depends_on = "AttachInternetGateway")
 
@@ -101,15 +98,15 @@ def create_config(boss_config):
     user_data["consul"]["cluster"] = str(const.CONSUL_CLUSTER_SIZE)
     config.add_autoscale_group("Consul",
                                names.core.dns.consul,
-                               aws.ami_lookup(boss_config.session, names.core.ami.consul),
+                               aws.ami_lookup(boss_config, names.core.ami.consul),
                                keypair,
-                               subnets = internal_subnets_lambda,
+                               subnets = internal_subnets_asg,
                                security_groups = [Ref("InternalSecurityGroup")],
                                user_data = str(user_data),
                                min = const.CONSUL_CLUSTER_SIZE,
                                max = const.CONSUL_CLUSTER_SIZE,
                                notifications = Ref("DNSSNS"),
-                               role = aws.instance_profile_arn_lookup(boss_config.session, 'consul'),
+                               role = aws.instance_profile_arn_lookup(session, 'consul'),
                                support_update = False, # Update will restart the instances manually
                                depends_on = ["DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
@@ -118,9 +115,9 @@ def create_config(boss_config):
     user_data["system"]["type"] = "vault"
     config.add_autoscale_group("Vault",
                                names.core.dns.vault,
-                               aws.ami_lookup(boss_config.session, names.core.ami.vault),
+                               aws.ami_lookup(boss_config, names.core.ami.vault),
                                keypair,
-                               subnets = internal_subnets_lambda,
+                               subnets = internal_subnets_asg,
                                security_groups = [Ref("InternalSecurityGroup")],
                                user_data = str(user_data),
                                min = const.VAULT_CLUSTER_SIZE,
@@ -148,16 +145,16 @@ def create_config(boss_config):
         deps.append("AuthDB")
         user_data["aws"]["db"] = "keycloak" # flag for init script for which config to use
 
-    cert = aws.cert_arn_lookup(boss_config.session, names.public_dns('core', 'auth'))
+    cert = aws.cert_arn_lookup(session, names.public_dns('core', 'auth'))
     create_asg_elb(config,
                    "Auth",
                    names.core.dns.auth,
-                   aws.ami_lookup(boss_config.session, names.core.ami.auth),
+                   aws.ami_lookup(boss_config, names.core.ami.auth),
                    keypair,
                    str(user_data),
                    const.AUTH_CLUSTER_SIZE,
-                   internal_subnets_lambda,
-                   external_subnets_lambda,
+                   internal_subnets_asg,
+                   external_subnets_asg,
                    [("443", "8080", "HTTPS", cert)],
                    "HTTP:8080/index.html",
                    sgs = [Ref("AuthSecurityGroup")],
@@ -177,7 +174,7 @@ def create_config(boss_config):
 
     config.add_lambda("DNSLambda",
                       names.core.lambda_.dns,
-                      aws.role_arn_lookup(boss_config.session, 'UpdateRoute53'),
+                      aws.role_arn_lookup(session, 'UpdateRoute53'),
                       const.DNS_LAMBDA,
                       handler="index.handler",
                       timeout=10,
@@ -248,28 +245,32 @@ def create(boss_config):
 
     success = config.create()
     if success:
+        session = boss_config['core'].session
+        domain = boss_config['core'].INTERNAL_DOMAIN
         vpc_id = aws.vpc_id_lookup(session, domain)
         aws.rt_name_default(session, vpc_id, "default." + domain)
 
-        post_init(session, domain)
+        post_init(boss_config)
 
-def post_init(session, domain, startup_wait=False):
-    # Keypair is needed by ExternalCalls
-    global keypair
-    if keypair is None:
-        keypair = aws.keypair_lookup(session)
+def post_init(boss_config):
+    session = boss_config['core'].session
+    keypair = boss_config['core'].SSH_KEY
+    domain = boss_config['core'].INTERNAL_DOMAIN
+
     call = ExternalCalls(session, keypair, domain)
-    names = AWSNames(domain)
+    names = AWSNames(boss_config)
 
     # Figure out the external domain name of the auth server(s), matching the SSL cert
-    auth_domain = names.public_dns("auth")
+    auth_domain = names.public_dns("core", "auth")
 
     # OIDC Discovery URL
     auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_domain)
 
     # Configure external DNS
-    auth_elb = aws.elb_public_lookup(session, names.auth)
-    aws.set_domain_to_dns_name(session, auth_domain, auth_elb, aws.get_hosted_zone(session))
+    auth_elb = aws.elb_public_lookup(session, names.core.dns.auth)
+    # TODO: create common method
+    hosted_zone = boss_config['core'].EXTERNAL_DOMAIN.split('.', 1)[1]
+    aws.set_domain_to_dns_name(session, auth_domain, auth_elb, hosted_zone)
 
     # Generate initial user accounts
     username = "admin"
@@ -325,7 +326,7 @@ def post_init(session, domain, startup_wait=False):
     ##          Also need to guard the writes to vault with the admin password
     #######
 
-    with call.ssh(names.auth) as ssh:
+    with call.ssh(names.core.dns.auth) as ssh:
         print("Creating initial Keycloak admin user")
         ssh("/srv/keycloak/bin/add-user.sh -r master -u {} -p {}".format(username, password))
 
@@ -340,7 +341,7 @@ def post_init(session, domain, startup_wait=False):
     print("Waiting for Keycloak to restart")
     call.check_keycloak(const.TIMEOUT_KEYCLOAK)
 
-    with call.tunnel(names.auth, 8080) as port:
+    with call.tunnel(names.core.dns.auth, 8080) as port:
         URL = "http://localhost:{}".format(port) # TODO move out of tunnel and use public address
 
         with KeyCloakClient(URL, username, password) as kc:
@@ -360,8 +361,8 @@ def post_init(session, domain, startup_wait=False):
             kc.create_realm(realm)
 
     # Tell Scalyr to get CloudWatch metrics for these instances.
-    instances = [ names.vault ]
-    scalyr.add_instances_to_scalyr(session, const.REGION, instances)
+    instances = [ names.core.dns.vault ]
+    scalyr.add_instances_to_scalyr(session, boss_config['core'].REGION, instances)
 
 def update(session, domain):
     # Only in the production scenario will data be preserved over the update
@@ -418,11 +419,16 @@ def update(session, domain):
 
     return success
 
-def delete(session, domain):
+def delete(boss_config):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
-    names = AWSNames(domain)
-    aws.route53_delete_records(session, domain, names.auth)
-    aws.route53_delete_records(session, domain, names.consul)
-    aws.route53_delete_records(session, domain, names.vault)
-    aws.sns_unsubscribe_all(session, names.dns)
-    CloudFormationConfiguration('core', domain).delete(session)
+    session = boss_config['core'].session
+    domain = boss_config['core'].INTERNAL_DOMAIN
+    names = AWSNames(boss_config)
+
+    aws.route53_delete_records(session, domain, names.core.dns.auth)
+    aws.route53_delete_records(session, domain, names.core.dns.consul)
+    aws.route53_delete_records(session, domain, names.core.dns.vault)
+
+    aws.sns_unsubscribe_all(session, names.core.sns.dns)
+
+    CloudFormationConfiguration('core', boss_config).delete()

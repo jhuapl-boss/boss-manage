@@ -27,8 +27,9 @@ update_lambda_code() tells AWS to point the existing lambda function at the
 new zip in S3.
 """
 import alter_path
-from lib.ssh import SSHConnection
+from lib.ssh import SSHConnection, SSHTarget
 from lib.names import AWSNames
+from lib import configuration
 from lib import aws
 from lib import utils
 from lib import constants as const
@@ -60,32 +61,18 @@ NDINGEST_SETTINGS_FOLDER = const.repo_path('salt_stack', 'salt', 'ndingest', 'fi
 # Template used for ndingest settings.ini generation.
 NDINGEST_SETTINGS_TEMPLATE = NDINGEST_SETTINGS_FOLDER + '/settings.ini.apl'
 
-def get_lambda_zip_name(domain):
-    """Get name of zip file containing lambda.
-
-    This must match the name created in the makedomainenv script that runs on
-    the lambda build server.
-
-    Args:
-        domain (string): The VPC's domain name such as integration.boss.
-
-    Returns:
-        (string)
-    """
-    return 'multilambda.{}.zip'.format(domain)
-
-def update_lambda_code(session, domain, bucket):
-    names = AWSNames(domain)
+def update_lambda_code(bosslet_config):
+    names = AWSNames(bosslet_config))
     client = session.client('lambda')
     resp = client.update_function_code(
-        FunctionName=names.multi_lambda,
-        S3Bucket=bucket,
-        S3Key=get_lambda_zip_name(domain),
+        FunctionName=names.lambda_.multi,
+        S3Bucket=bosslet_config.LAMBDA_BUCKET,
+        S3Key=names.zip.multi,
         Publish=True)
     print(resp)
 
 # DP TODO: Move to a lib/ library
-def load_lambdas_on_s3(session, domain, bucket):
+def load_lambdas_on_s3(bosslet_config):
     """Zip up spdb, bossutils, lambda and lambda_utils.  Upload to S3.
 
     Uses the lambda build server (an Amazon Linux AMI) to compile C code and
@@ -96,6 +83,7 @@ def load_lambdas_on_s3(session, domain, bucket):
         session (Session): boto3.Session
         domain (string): The VPC's domain name such as integration.boss.
     """
+    domain = bosslet_config.INTERNAL_DOMAIN
     tempname = tempfile.NamedTemporaryFile(delete=True)
     zipname = tempname.name + '.zip'
     tempname.close()
@@ -114,7 +102,7 @@ def load_lambdas_on_s3(session, domain, bucket):
 
     with open(NDINGEST_SETTINGS_TEMPLATE, 'r') as tmpl:
         # Generate settings.ini file for ndingest.
-        create_ndingest_settings(domain, tmpl)
+        create_ndingest_settings(bosslet_config, tmpl)
 
     os.chdir(const.repo_path("salt_stack", "salt", "ndingest", "files"))
     zip.write_to_zip('ndingest.git', zipname)
@@ -123,10 +111,13 @@ def load_lambdas_on_s3(session, domain, bucket):
     print("Copying local modules to lambda-build-server")
 
     #copy the zip file to lambda_build_server
-    lambda_build_server = aws.get_lambda_server(session)
-    lambda_build_server_key = aws.get_lambda_server_key(session)
+    lambda_bucket = bosslet_config.LAMBDA_BUCKET
+    lambda_build_server = bosslet_config.LAMBDA_SERVER
+    lambda_build_server_key = bosslet_config.LAMBDA_SERVER_KEY
     lambda_build_server_key = utils.keypair_to_file(lambda_build_server_key)
-    ssh = SSHConnection(lambda_build_server_key, (lambda_build_server, 22, 'ec2-user'))
+    ssh_target = SSHTarget(lambda_build_server_key, lambda_build_server, 22, 'ec2-user')
+    bastions = [bosslet_config.outbound_bastion] if bosslet_config.outbound_bastion else []
+    ssh = SSHConnection(ssh_target, bastions)
     target_file = "sitezips/{}.zip".format(domain)
     ret = ssh.scp(zipname, target_file, upload=True)
     print("scp return code: " + str(ret))
@@ -135,10 +126,10 @@ def load_lambdas_on_s3(session, domain, bucket):
 
     # This section will run makedomainenv on lambda-build-server
     print("calling makedomainenv on lambda-build-server")
-    cmd = 'source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {} {}'.format(domain, bucket)
+    cmd = 'source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {} {}'.format(domain, lambda_bucket)
     ssh.cmd(cmd)
 
-def create_ndingest_settings(domain, fp):
+def create_ndingest_settings(bosslet_config, fp):
     """Create the settings.ini file for ndingest.
 
     The file is placed in ndingest's settings folder.j
@@ -147,9 +138,11 @@ def create_ndingest_settings(domain, fp):
         domain (string): The VPC's domain name such as integration.boss.
         fp (file-like object): File like object to read settings.ini template from.
     """
-    names = AWSNames(domain)
+    names = AWSNames(bosslet_config)
     parser = configparser.ConfigParser()
     parser.read_file(fp)
+
+    raise Exception("populate with correct calls to AWSNames")
 
     parser['boss']['domain'] = domain
 
@@ -169,23 +162,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Script for updating lambda function code. ' + 
                                      'To supply arguments from a file, provide the filename prepended with an `@`.',
                                      fromfile_prefix_chars = '@')
-    parser.add_argument('--aws-credentials', '-a',
-                        metavar = '<file>',
-                        default = os.environ.get('AWS_CREDENTIALS'),
-                        type = argparse.FileType('r'),
-                        help = 'File with credentials for connecting to AWS (default: AWS_CREDENTIALS)')
-    parser.add_argument('domain',
-                        help = 'Domain that lambda functions live in, such as integration.boss.')
+    parser.add_argument("bosslet_name", help="Bosslet in which to execute the configuration")
 
     args = parser.parse_args()
 
-    if args.aws_credentials is None:
+    if not configuration.valid_bosslet(args.bosslet_name):
         parser.print_usage()
-        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
+        print("Error: Bosslet name '{}' doesn't exist in configs file ({})".format(args.bosslet_name, configuration.CONFIGS_PATH))
         sys.exit(1)
 
-    session = aws.create_session(args.aws_credentials)
-    bucket = aws.get_lambda_s3_bucket(session)
+    bosslet_config = configuration.BossConfiguration(args.bosslet_name)
 
-    load_lambdas_on_s3(session, args.domain, bucket)
-    update_lambda_code(session, args.domain, bucket)
+    load_lambdas_on_s3(bosslet_config)
+    update_lambda_code(bosslet_config)

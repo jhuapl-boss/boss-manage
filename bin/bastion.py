@@ -51,7 +51,10 @@ import vault
 
 import alter_path
 from lib import aws
-from lib.ssh import SSHConnection, vault_tunnel
+from lib import utils
+from lib import configuration
+from lib.ssh import SSHConnection, SSHTarget, vault_tunnel
+from lib.names import AWSNames
 from lib.vault import Vault
 
 if __name__ == "__main__":
@@ -69,11 +72,6 @@ if __name__ == "__main__":
                                      epilog=commands_help)
 
 
-    parser.add_argument("--aws-credentials", "-a",
-                        metavar = "<file>",
-                        default = os.environ.get("AWS_CREDENTIALS"),
-                        type = argparse.FileType('r'),
-                        help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
     parser.add_argument("--private-ip", "-p",
                         action='store_true',
                         default=False,
@@ -85,11 +83,9 @@ if __name__ == "__main__":
                         default=22,
                         type=int,
                         help = "Port to connect to on the internal machine")
-    parser.add_argument("--ssh-key", "-s",
-                        metavar = "<file>",
-                        default = os.environ.get("SSH_KEY"),
-                        help = "SSH private key to use when connecting to AWS instances (default: SSH_KEY)")
-    parser.add_argument("--bastion","-b",  help="Hostname of the EC2 bastion server to create SSH Tunnels on")
+    parser.add_argument("--bosslet",
+                        default=None,
+                        help="Bosslet in which the machine and bastion are running")
     parser.add_argument("internal", help="Hostname of the EC2 internal server to create the SSH Tunnels to")
     parser.add_argument("command",
                         choices = commands,
@@ -101,37 +97,54 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.aws_credentials is None:
+    if args.private_ip and not args.bosslet:
         parser.print_usage()
-        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
-        sys.exit(1)
-    if args.ssh_key is None:
-        parser.print_usage()
-        print("Error: SSH key not provided and SSH_KEY is not defined")
-        sys.exit(1)
-    if not os.path.exists(args.ssh_key):
-        parser.print_usage()
-        print("Error: SSH key '{}' does not exist".format(args.ssh_key))
+        print("Error: --bosslet required if --private-ip is used")
         sys.exit(1)
 
-    session = aws.create_session(args.aws_credentials)
+    if not args.private_ip:
+        idx, machine, bosslet_name = utils.parse_hostname(args.internal)
 
-    # This next step will make bastion work with 1.consul or 1.vault internal names.
-    boss_position = 1
-    try:
-        int(args.internal.split(".", 1)[0])
-        boss_position = 2
-    except ValueError:
-        pass
+        if not bosslet_name and not args.bosslet:
+            parser.print_usage()
+            print("Error: could nto parse out bosslet name, use --bosslet")
+            sys.exit(1)
 
-    bastion_host = args.bastion if args.bastion else "bastion." + args.internal.split(".", boss_position)[boss_position]
-    bastion = aws.machine_lookup(session, bastion_host)
-    if args.private_ip:
-        private = args.internal
+        if args.bosslet:
+            bosslet_name = args.bosslet
+
+        if not configuration.valid_bosslet(bosslet_name):
+            parser.print_usage()
+            print("Error: Bosslet name '{}' doesn't exist in configs file ({})".format(bosslet_name, configuration.CONFIGS_PATH))
+            sys.exit(1)
+
+        bosslet_config = configuration.BossConfiguration(bosslet_name)
+        names = AWSNames(bosslet_config)
+        hostname = names.dns[machine]
+        if idx is not None:
+            hostname = str(idx) + "." + hostname
+        ip = aws.machine_lookup(bosslet_config.session, hostname, public_ip=False)
+        if not ip:
+            sys.exit(1)
     else:
-        private = aws.machine_lookup(session, args.internal, public_ip=False)
+        ip = args.internal
+        bosslet_name = args.bosslet
 
-    ssh = SSHConnection(args.ssh_key, (private, args.port, args.user), bastion)
+        if not configuration.valid_bosslet(bosslet_name):
+            parser.print_usage()
+            print("Error: Bosslet name '{}' doesn't exist in configs file ({})".format(bosslet_name, configuration.CONFIGS_PATH))
+            sys.exit(1)
+
+        bosslet_config = configuration.BossConfiguration(bosslet_name)
+        names = AWSNames(bosslet_config)
+
+    bastion = aws.machine_lookup(bosslet_config.session, names.dns.bastion) 
+
+    ssh_target = SSHTarget(bosslet_config.ssh_key, ip, args.port, args.user)
+    bastions = [SSHTarget(bosslet_config.ssh_key, bastion, 22, 'ec2-user')]
+    if bosslet_config.outbound_bastion:
+        bastions.insert(0, bosslet_config.outbound_bastion)
+    ssh = SSHConnection(ssh_target, bastions)
 
     if args.command in ("ssh",):
         ssh.shell()
@@ -144,14 +157,15 @@ if __name__ == "__main__":
     elif args.command in ("ssh-tunnel",):
         ssh.external_tunnel(*args.arguments)
     elif args.command in ("ssh-all",):
-        addrs = aws.machine_lookup_all(session, args.internal, public_ip=False)
+        addrs = aws.machine_lookup_all(bosslet_config.session, hostname, public_ip=False)
         for addr in addrs:
-            print("{} at {}".format(args.internal, addr))
-            ssh = SSHConnection(args.ssh_key, addr, bastion)
+            print("{} at {}".format(hostname, addr))
+            ssh_target = SSHTarget(bosslet_config.ssh_key, ip, args.port, args.user)
+            ssh = SSHConnection(ssh_target, bastions)
             ssh.cmd(*args.arguments)
             print()
     elif args.command in vault.COMMANDS:
-        with vault_tunnel(args.ssh_key, bastion):
+        with vault_tunnel(bosslet_config.ssh_key, bastions):
             vault.COMMANDS[args.command](Vault(args.internal, private), *args.arguments)
     else:
         parser.print_usage()

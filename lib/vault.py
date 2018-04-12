@@ -19,6 +19,8 @@ import json
 from pprint import pprint
 import traceback
 
+from .utils import deprecated
+
 VAULT_TOKEN = "vault_token"
 VAULT_KEY = "vault_key."
 
@@ -186,6 +188,7 @@ class Vault(object):
             provisioner_policies.append(name)
 
         # Read AWS credentials file
+        deprecated("Update Vault to use IAM role for AWS credentials")
         vault_aws_creds = os.path.join(PRIVATE_DIR, "vault_aws_credentials")
         if os.path.exists(vault_aws_creds):
             with open(vault_aws_creds, "r") as fh:
@@ -204,6 +207,7 @@ class Vault(object):
             client.write('auth/aws-ec2/config/client', access_key = aws_creds["aws_access_key"],
                                                        secret_key = aws_creds["aws_secret_key"])
 
+            deprecated("Update to use boss_config['core'].ACCOUNT_ID")
             arn_prefix = 'arn:aws:iam::{}:instance-profile/'.format(aws_creds["aws_account"])
             policies = [p for p in provisioner_policies if p not in ('provisioner',)]
             for policy in policies:

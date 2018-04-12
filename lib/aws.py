@@ -29,25 +29,9 @@ import time
 import json
 import re
 import sys
-from boto3.session import Session
 
 from . import hosts
-
-def create_session(credentials, region):
-    """Read the AWS from the credentials dictionary and then create a boto3
-    connection to AWS with those credentials.
-    """
-    if type(credentials) == dict:
-        pass
-    elif type(credentials) == str:
-        credentials = json.loads(credentials)
-    else:
-        credentials = json.load(credentials)
-
-    session = Session(aws_access_key_id = credentials["aws_access_key"],
-                      aws_secret_access_key = credentials["aws_secret_key"],
-                      region_name = region)
-    return session
+from .utils import deprecated
 
 def machine_lookup_all(session, hostname, public_ip = True):
     """Lookup all of the IP addresses for a given AWS instance name.
@@ -243,6 +227,7 @@ def subnet_id_lookup(session, subnet_domain):
 
     Args:
         session (Session|None) : Boto3 session used to lookup information in AWS
+
                                  If session is None no lookup is performed
         subnet_domain (string) : Name of Subnet to lookup
 
@@ -259,26 +244,23 @@ def subnet_id_lookup(session, subnet_domain):
     else:
         return response['Subnets'][0]['SubnetId']
 
-def azs_lookup(boss_config, cf_config, lambda_compatible_only=False):
+def azs_lookup(bosslet_config, compatibility=None):
     """Lookup all of the Availablity Zones for the connected region.
 
     Args:
-        session (Session|None) : Boto3 session used to lookup information in AWS
-                                 If session is None no lookup is performed
-        lambda_compatible_only(bool): only return AZs that work with Lambda.
+        bosslet_config (BossConfiguration) : Bosslet configuration
+        compatiblity (str|None) : AVAILABILITY_ZONE_USAGE key to apply
     Returns:
         (list) : List of tuples (availability zone, zone letter)
     """
-    client = boss_config.session.client('ec2')
+    client = boss_config[cf_config].session.client('ec2')
     response = client.describe_availability_zones()
-    # SH Removing Hack as subnet A is already in Production and causes issues trying to delete
-    #    We will strip out subnets A and C when creating the lambdas.
-    #rtn = [(z["ZoneName"], z["ZoneName"][-1]) for z in response["AvailabilityZones"] if z['ZoneName'] != 'us-east-1a']
+
     rtn = [(z["ZoneName"], z["ZoneName"][-1]) for z in response["AvailabilityZones"]]
 
-    if lambda_compatible_only:
+    if compatibility:
         try:
-            limits = boss_config[cf_config].AVAILABILITY_ZONE_USAGE['lambda']
+            limits = boss_config.AVAILABILITY_ZONE_USAGE['lambda']
         except:
             pass # Don't do anything
         else:
@@ -288,7 +270,7 @@ def azs_lookup(boss_config, cf_config, lambda_compatible_only=False):
 
     return rtn
 
-def ami_lookup(session, ami_name, version = None):
+def ami_lookup(bosslet_config, ami_name, version = None):
     """Lookup the Id for the AMI with the given name.
 
     If ami_name ends with '.boss', the AMI_VERSION environmental variable is used
@@ -296,7 +278,7 @@ def ami_lookup(session, ami_name, version = None):
     for the AMI with the specific tag ('.boss-<AMI_VERSION>').
 
     Args:
-        session (Session|None) : Boto3 session used to lookup information in AWS
+        bosslet_config (BossConfiguration) : Boto3 session used to lookup information in AWS
                                  If session is None no lookup is performed
         ami_name (string) : Name of AMI to lookup
         version (string|None) : Overrides the AMI_VERSION environment variable
@@ -306,12 +288,9 @@ def ami_lookup(session, ami_name, version = None):
         (tuple|None) : Tuple of strings (AMI ID, Commit hash of AMI build) or None
                        if AMI could not be located
     """
-    if session is None:
-        return None
-
     specific = False
-    if ami_name.endswith(".boss"):
-        ami_version = os.environ["AMI_VERSION"] if version is None else version
+    if ami_name.endswith(bosslet_config.AMI_SUFFIX):
+        ami_version = bosslet_config.ami_version if version is None else version
         if ami_version == "latest":
             # limit latest searching to only versions tagged with hash information
             ami_search = ami_name + "-h*"
@@ -321,13 +300,14 @@ def ami_lookup(session, ami_name, version = None):
     else:
         ami_search = ami_name
 
-    client = session.client('ec2')
+    client = bosslet_config.session.client('ec2')
     response = client.describe_images(Filters=[{"Name": "name", "Values": [ami_search]}])
     if len(response['Images']) == 0:
         if specific:
             print("Could not locate AMI '{}', trying to find the latest '{}' AMI".format(ami_search, ami_name))
-            return ami_lookup(session, ami_name, version = "latest")
+            return ami_lookup(bosslet_config, ami_name, version = "latest")
         else:
+            print("Could not locate AMI '{}'".format(ami_name))
             return None
     else:
         response['Images'].sort(key=lambda x: x["CreationDate"], reverse=True)
@@ -810,24 +790,6 @@ def request_cert(session, domain_name, validation_domain):
                                           DomainValidationOptions=validation_options)
     return response
 
-def get_hosted_zone(session):
-    """
-    Get hosted zone by looking up account name and using that to tell which
-     zone to return.
-    Args:
-        session: Boto3 Session
-
-    Returns:
-        Hosted zone name.
-    """
-    account = get_account_id_from_session(session)
-    if account == hosts.PROD_ACCOUNT:
-        return hosts.PROD_DOMAIN
-    elif account == hosts.DEV_ACCOUNT:
-        return hosts.DEV_DOMAIN
-    else:
-        return None
-
 def get_hosted_zone_id(session, hosted_zone):
     """Look up Hosted Zone ID by DNS Name
 
@@ -1153,58 +1115,6 @@ def get_account_id_from_session(session):
         return None
 
     return session.client('iam').list_users(MaxItems=1)["Users"][0]["Arn"].split(':')[4]
-
-# DP TODO: refactor all lambda server functions into some common entity so it is easy to handle multiple accounts
-def get_lambda_s3_bucket(session):
-    '''
-    returns the lambda bucket based on the session
-    Args:
-        session:
-
-    Returns:
-        (str) bucket name to store lambdas
-    '''
-    account = get_account_id_from_session(session)
-    if account == hosts.PROD_ACCOUNT:
-        return hosts.PROD_LAMBDA_BUCKET
-    elif account == hosts.DEV_ACCOUNT:
-        return hosts.DEV_LAMBDA_BUCKET
-    else:
-        raise NameError("Unknown session account used, {}, S3_BUCKET for Lambda unknown.".format(account))
-
-def get_lambda_server(session):
-    '''
-    returns the lambda server based on the session
-    Args:
-        session:
-
-    Returns:
-        (str) build server for lambdas
-    '''
-    account = get_account_id_from_session(session)
-    if account == hosts.PROD_ACCOUNT:
-        return hosts.PROD_LAMBDA_SERVER
-    elif account == hosts.DEV_ACCOUNT:
-        return hosts.DEV_LAMBDA_SERVER
-    else:
-        raise NameError("Unknown session account used, {}, lambda_build_server for this session is unknown.".format(account))
-
-def get_lambda_server_key(session):
-    '''
-    returns the lambda server based on the session
-    Args:
-        session:
-
-    Returns:
-        (str) build server for lambdas
-    '''
-    account = get_account_id_from_session(session)
-    if account == hosts.PROD_ACCOUNT:
-        return const.PROD_LAMBDA_KEY
-    elif account == hosts.DEV_ACCOUNT:
-        return const.DEV_LAMBDA_KEY
-    else:
-        raise NameError("Unknown session account used, {}, lambda_build_server for this session is unknown.".format(account))
 
 
 def lambda_arn_lookup(session, lambda_name):

@@ -54,8 +54,6 @@ Author:
 
 SUBNET_CIDR = 24 # make sure SUBNET_CIDR is greater than VPC_CIDR
 
-LAMBDA_SUBNETS = 16 # TODO merge with constants.py variable of the same name
-
 SUBNETS = [
     'internal',
     'external',

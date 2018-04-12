@@ -49,8 +49,8 @@ def get_scenario(var, default = None):
     Returns
         object : The variable or the SCENARIO version of the variable
     """
-    scenario = os.environ["SCENARIO"]
     if type(var) == dict:
+        scenario = os.environ["SCENARIO"]
         var_ = var.get(scenario, None)
         if var_ is None:
             var_ = var.get("default", default)
@@ -402,7 +402,7 @@ class CloudFormationConfiguration:
         self.stack_name = "".join([x.capitalize() for x in [config, *domain.split('.')]])
 
         self.boss_config = boss_config
-        self.session = boss_config.session
+        self.session = boss_config[config].session
         self.hosts = hosts.Hosts(config, boss_config)
 
         self.vpc_domain = domain
@@ -695,6 +695,7 @@ class CloudFormationConfiguration:
             key (string) : Unique name for the resource in the template
         """
 
+        print("CloudFormationConfiguration.find_vpc(): Not using the correct sesion object")
         vpc_id = aws.vpc_id_lookup(self.session, self.vpc_domain)
         vpc = Arg.VPC(key, vpc_id, "ID of the VPC")
         self.add_arg(vpc)
@@ -728,7 +729,7 @@ class CloudFormationConfiguration:
         if az is not None:
             self.resources[key]["Properties"]["AvailabilityZone"] = az
 
-    def add_all_azs(self, lambda_compatible_only=False):
+    def add_all_subnets(self):
         """Add Internal and External subnets for each availability zone.
 
         For each availability zone in the connected region, create an Internal
@@ -736,8 +737,6 @@ class CloudFormationConfiguration:
         run across all zones within the region.
 
         Args:
-            session (Session) : Boto3 session used to lookup availability zones
-            lambda_compatible_only (bool): only return AZs that work with Lambda.
 
         Returns:
             (tuple) : Tuple of two lists (internal, external) that contain the
@@ -745,7 +744,7 @@ class CloudFormationConfiguration:
         """
         internal = []
         external = []
-        for az, sub in aws.azs_lookup(self.boss_config, 'core', lambda_compatible_only):
+        for az, sub in aws.azs_lookup(self.boss_config):
             name = sub.capitalize() + "InternalSubnet"
             self.add_subnet(name, sub + "-internal." + self.vpc_domain, az = az)
             internal.append(Ref(name))
@@ -756,16 +755,44 @@ class CloudFormationConfiguration:
 
         return (internal, external)
 
-    def find_all_availability_zones(self, lambda_compatible_only=False):
-        """Add template arguments for each internal/external availability zone subnet.
+    def add_all_lambda_subnets(self):
+        """Add Lambda specific internal subnets.
 
-        A companion method to add_all_azs(), that will add to the current template
-        configuration arguments for each internal and external subnet that exist
-        in the current region.
+        Needed as the large number of Lambda executions can quickly use up all
+        of the IP address in the regular internal subnets.
+
+        For each lambda subnet allocated in lib.hosts create a subnet, distributed
+        evenly over the lambda compatible availability zones
 
         Args:
-            session (Session) : Boto3 session used to lookup availability zones
-            lambda_compatible_only (bool): only return AZs that work with Lambda.
+
+        Returns:
+            (list) : List of template references for each of the added subnets
+        """
+        internal = []
+
+        # transforms [(AZ_Name, AZ_Letter)] -> ([AZ_Name], [AZ_Letter])
+        azs = list(zip(*aws.azs_lookup(self.boss_config, compatibility='lambda')))[1]
+        print("Lambda AZs: {}".format(azs))
+        subnets = [x for x in hosts.SUBNETS if x.startswith('lambda')]
+
+        for i in range(len(subnets)):
+            key = "LambdaSubnet{}".format(i)
+            self.add_subnet(key, subnets[i] + "." + self.vpc_domain, az = azs[i % len(azs)])
+            internal.append(Ref(key))
+
+        return internal
+
+
+    def find_all_subnets(self, compatibility=None):
+        """Add template arguments for each internal/external availability zone subnet.
+
+        A companion method to add_all_subnets(), that will either add a reference to
+        the subnets currently in the configuration or lookup the subnet ids and add an
+        argument for each subnet that exists in the current region.
+
+        Args:
+            compatibility (str|None): Availibility Zone usage down selection
         Returns:
             (tuple) : Tuple of two lists (internal, external) that contain the
                       template argument names for each of the added subnet arguments
@@ -773,26 +800,64 @@ class CloudFormationConfiguration:
         internal = []
         external = []
 
-        for az, sub in aws.azs_lookup(self.boss_config, 'core', lambda_compatible_only):
+        for az, sub in aws.azs_lookup(self.boss_config, compatibility):
             name = sub.capitalize() + "InternalSubnet"
-            domain = sub + "-internal." + self.vpc_domain
-            id = aws.subnet_id_lookup(self.session, domain)
-            if id is None:
-                print("Subnet {} doesn't exist, not using.".format(domain))
-            else:
-                self.add_arg(Arg.Subnet(name, id))
+            if name in self.resources:
                 internal.append(Ref(name))
+            else:
+                domain = sub + "-internal." + self.vpc_domain
+                id = aws.subnet_id_lookup(self.session, domain)
+                if id is None:
+                    print("Subnet {} doesn't exist, not using.".format(domain))
+                else:
+                    self.add_arg(Arg.Subnet(name, id))
+                    internal.append(Ref(name))
 
             name = sub.capitalize() + "ExternalSubnet"
-            domain = sub + "-external." + self.vpc_domain
-            id = aws.subnet_id_lookup(self.session, domain)
-            if id is None:
-                print("Subnet {} doesn't exist, not using.".format(domain))
-            else:
-                self.add_arg(Arg.Subnet(name, id))
+            if name in self.resource:
                 external.append(Ref(name))
+            else:
+                domain = sub + "-external." + self.vpc_domain
+                id = aws.subnet_id_lookup(self.session, domain)
+                if id is None:
+                    print("Subnet {} doesn't exist, not using.".format(domain))
+                else:
+                    self.add_arg(Arg.Subnet(name, id))
+                    external.append(Ref(name))
 
         return (internal, external)
+
+    def find_all_lambda_subnets(self):
+        """Add template arguments for each internal lambda subnet.
+
+        A companion method to add_all_lambda_subnets(), that will either add a reference
+        to the subnets currently in the configuration or lookup the subnet ids and add an
+        argument for each subnet that exists in the current region.
+
+        Args:
+            compatibility (str|None): Availibility Zone usage down selection
+        Returns:
+            (tuple) : Tuple of two lists (internal, external) that contain the
+                      template argument names for each of the added subnet arguments
+        """
+        internal = []
+
+        subnets = [x for x in hosts.SUBNETS if x.startswith('lambda')]
+
+        for i in range(len(subnets)):
+            key = "LambdaSubnet{}".format(i)
+            if key in self.resources:
+                internal.append(Ref(key))
+            else:
+                domain = subnets[i] + "." + self.vpc_domain
+                id = aws.subnet_id_lookup(self.session, domain)
+                if id is None:
+                    print("Subnet {} doesn't exist, not using.".format(domain))
+                else:
+                    self.add_arg(Arg.Subnet(key, id))
+                    internal.append(Ref(key))
+
+        return internal
 
     def add_endpoint(self, key, service, route_tables, vpc="VPC"):
         self.resources[key] = {

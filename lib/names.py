@@ -28,10 +28,13 @@ class AWSNameAccumulator(object):
     def __getattr__(self, key):
         self.acc.append(key)
 
-        if len(self.acc) == 3:
+        if len(self.acc) == 2:
             return self.cb(*self.acc)
         else:
             return self
+
+    def __getitem__(self, key):
+        return self.__getattr__(key)
 
 class AWSNames(object):
     def __init__(self, boss_config):
@@ -43,6 +46,9 @@ class AWSNames(object):
 
     def __getattr__(self, key):
         return AWSNameAccumulator(key, self.build)
+
+    def __getitem__(self, key): # For dynamically building names from input
+        return self.__getattr__(key)
 
     TYPES = {
         'stack': format_capitalize,
@@ -70,7 +76,7 @@ class AWSNames(object):
         'internet': 'internet',
     }
 
-    def build(self, cf_config, resource_type, name):
+    def build(self, resource_type, name):
         if resource_type not in self.TYPES:
             raise AttributeError("'{}' is not a valide resource type".format(resource_type))
 
@@ -78,10 +84,10 @@ class AWSNames(object):
             raise AttributeError("'{}' is not a valid resource name".format(name))
 
         if resource_type == 'ami':
-            suffix = self.boss_config[cf_config].AMI_SUFFIX
-            return self.RESOURCES[name] + '.' + suffix
+            suffix = self.boss_config.AMI_SUFFIX
+            return self.RESOURCES[name] + suffix
 
-        domain = self.boss_config[cf_config].INTERNAL_DOMAIN
+        domain = self.boss_config.INTERNAL_DOMAIN
         fqdn = self.RESOURCES[name] + '.' + domain
 
         transform = self.TYPES[resource_type]

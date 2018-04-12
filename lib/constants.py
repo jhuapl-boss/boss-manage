@@ -16,20 +16,9 @@ import os
 import sys
 import yaml
 
-# Region api is created in.  Later versions of boto3 should allow us to
-# extract this from the session variable.  Hard coding for now.
-REGION = 'us-east-1'
-#INCOMING_SUBNET = "52.3.13.189/32"  # microns-bastion elastic IP
-
 PRODUCTION_MAILING_LIST = "ProductionMicronsMailingList"
 PRODUCTION_BILLING_TOPIC = "ProductionBillingList"
 MAX_ALARM_DOLLAR = 30  # Maximum size of alarms in $1,000s
-
-
-########################
-# Lambda Build Server
-PROD_LAMBDA_KEY = 'microns-bastion20151117'
-DEV_LAMBDA_KEY = 'microns-bastion20151117'
 
 
 ##################
@@ -39,7 +28,7 @@ def load_scenario(scenario):
     # variables without using the 'global' keyword
     d = sys.modules['lib.constants'].__dict__
 
-    if scenario is not None
+    if scenario is not None:
         file = "{}.yml".format(scenario)
         path = repo_path("cloud_formation", "scenarios", file)
 
@@ -74,6 +63,7 @@ def repo_path(*args):
 
 
 LAMBDA_SUBNETS = 16
+
 ########################
 # Lambda Files
 LAMBDA_DIR = repo_path('cloud_formation', 'lambda')
@@ -164,7 +154,7 @@ write_files:
     - content: |
             acl localhost src 127.0.0.1/32 ::1
             acl to_localhost dst 127.0.0.0/8 0.0.0.0/32 ::1
-            acl localnet dst 10.0.0.0/8
+            acl localnet dst {}
             acl Safe_ports port 8200
 
             http_access deny !Safe_ports

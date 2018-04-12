@@ -19,8 +19,10 @@ from contextlib import contextmanager
 from . import exceptions
 from . import aws
 from .utils import keypair_to_file
-from .ssh import SSHConnection, vault_tunnel
+from .ssh import SSHConnection, SSHTarget, vault_tunnel
 from .vault import Vault
+from .exceptions import SSHError
+from .names import AWSNames
 
 
 def gen_timeout(total, step):
@@ -45,7 +47,8 @@ class ExternalCalls:
     """Class that helps with forming connections from the local machine to machines
     within a VPC through the VPC's bastion machine.
     """
-    def __init__(self, session, keypair, domain):
+    #def __init__(self, session, keypair, domain):
+    def __init__(self, boss_config):
         """ExternalCalls constructor
 
         Args:
@@ -56,14 +59,25 @@ class ExternalCalls:
                                Keypair is converted to file on disk using keypair_to_file()
             domain (string) : BOSS internal VPC domain name
         """
-        self.session = session
-        self.keypair_file = keypair_to_file(keypair)
-        self.domain = domain
+        self.names = AWSNames(boss_config)
 
-        self.bastion_hostname = "bastion." + domain
-        self.bastion_ip = aws.machine_lookup(session, self.bastion_hostname)
+        self.session = boss_config[cf_config].session
+        self.keypair_file = keypair_to_file(boss_config[cf_config].SSH_KEY)
 
-        self.vault_hostname = "vault." + domain
+        bastion_ip = aws.machine_lookup(session, self.names.core.dns.bastion)
+
+        self.bastions = [ SSHTarget(self.keypair_file, bastion_ip) ]
+
+        if boss_config[cf_config].outbound_bastion:
+            self.bastions.insert(0, boss_config[cf_config].outbound_bastion)
+        #if boss_config[cf_config].OUTBOUND_BASTION:
+        #    outbound = SSHTarget(keypair_to_file(boss_config[cf_config].OUTBOUND_KEY),
+        #                         boss_config[cf_config].OUTBOUND_IP,
+        #                         boss_config[cf_config].OUTBOUND_PORT,
+        #                         boss_config[cf_config].OUTBOUND_USER)
+        #    self.bastions.insert(0, outbound)
+
+        vault_hostname = self.names.core.dns.vault
         ips = aws.machine_lookup_all(session, self.vault_hostname, public_ip=False)
         self.vaults = [Vault(self.vault_hostname, ip) for ip in ips]
 
@@ -106,19 +120,20 @@ class ExternalCalls:
             provision = self.vaults[0].provision
             revoke = self.vaults[0].revoke
 
-        with vault_tunnel(self.keypair_file, self.bastion_ip):
+        with vault_tunnel(self.keypair_file, self.bastions):
             yield ContextVault()
 
     def ssh(self, target):
         """Open a SSH connection to the target machine (AWS instance name) and return a method
         that can be used to execute commands on the remote machines.
         """
+        # DP ???: Should cf_config be passed so we can lookup the full hostname
+        #         and use the correct session object
         if target not in self.connections:
-            hostname = target
-            if not hostname.endswith("." + self.domain):
-                hostname += "." + self.domain
-            target_ip = aws.machine_lookup(self.session, hostname, public_ip=False)
-            self.connections[target] = SSHConnection(self.keypair_file, target_ip, self.bastion_ip)
+            target_ip = aws.machine_lookup(self.session, target, public_ip=False)
+
+            ssh_target = SSHTarget(self.keypair_file, target_ip, 22, 'ubuntu')
+            self.connections[target] = SSHConnection(ssh_target, self.bastions)
 
         return self.connections[target].cmds()
 
@@ -126,18 +141,18 @@ class ExternalCalls:
         """Open a SSH connectio to the target machine (AWS instance name) / port and return the local
         port of the tunnel to connect to.
         """
+        # DP ???: Should cf_config be passed so we can lookup the full hostname
+        #         and use the correct session object
         key = (target, port)
         if key not in self.connections:
-            hostname = target
-            if not hostname.endswith("." + self.domain):
-                hostname += "." + self.domain
             if type_ == 'ec2':
-                target_ip = aws.machine_lookup(self.session, hostname, public_ip=False)
+                target_ip = aws.machine_lookup(self.session, target, public_ip=False)
             elif type_ == 'rds':
-                target_ip = aws.rds_lookup(self.session, hostname.replace('.', '-'))
+                target_ip = aws.rds_lookup(self.session, target.replace('.', '-'))
             else:
                 raise Exception("Unsupported: tunnelling to machine type {}".format(type_))
-            self.connections[key] = SSHConnection(self.keypair_file, (target_ip, port), self.bastion_ip)
+            ssh_target = SSHTarget(self.keypair_file, target_ip, port, 'ubuntu')
+            self.connections[key] = SSHConnection(ssh_target, self.bastions)
 
         return self.connections[key].tunnel()
 
@@ -145,17 +160,29 @@ class ExternalCalls:
     def check_vault(self, timeout, exception=True):
         """Vault status check to see if Vault is accessible
         """
-        with vault_tunnel(self.keypair_file, self.bastion_ip):
-            for sleep in gen_timeout(timeout, 15): # 15 second sleep
-                if self.vaults[0].status_check():
-                    return True
-                time.sleep(sleep)
+        ssh_errors = 8
+        error_sleep = 30 # seconds
+        while True:
+            try:
+                with vault_tunnel(self.keypair_file, self.bastions):
+                    for sleep in gen_timeout(timeout, 15): # 15 second sleep
+                        if self.vaults[0].status_check():
+                            return True
+                        time.sleep(sleep)
 
-            if exception:
-                msg = "Cannot connect to Vault after {} seconds".format(timeout)
-                raise exceptions.StatusCheckError(msg, self.vault_hostname)
-            else:
-                return False
+                    if exception:
+                        msg = "Cannot connect to Vault after {} seconds".format(timeout)
+                        raise exceptions.StatusCheckError(msg, self.vault_hostname)
+                    else:
+                        return False
+            except SSHError:
+                ssh_errors -= 1
+                if ssh_errors == 0:
+                    raise
+                else:
+                    print("Error establishing SSH tunnel to Vault, waiting")
+                    time.sleep(error_sleep)
+
 
     def check_keycloak(self, timeout, exception=True):
         """Keycloak status check to see if Keycloak is accessible
@@ -167,6 +194,7 @@ class ExternalCalls:
         #    Have seen tunnel timeout a few times now before the URL returns OK.
         time.sleep(30)
 
+        # TODO Handle if there is an error with establishing the tunnel
         with self.tunnel("auth", 8080) as port:
             # Could move to connecting through the ELB, but then KC will have to be healthy
             URL = "http://localhost:{}/auth/".format(port)
@@ -176,7 +204,7 @@ class ExternalCalls:
                     res = urlopen(URL)
                     if res.getcode() == 200:
                         return True
-                except HTTPError:
+                except:# HTTPError: Also seeing RemoteDisconnected
                     pass
                 time.sleep(sleep)
 

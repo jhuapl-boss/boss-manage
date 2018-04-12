@@ -12,12 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import sys
 import json
 import importlib
+import warnings
+
+from boto3.session import Session
 
 from . import constants as const
-from . import aws
+from .external import ExternalCalls
+from .ssh import SSHTarget
+from .utils import keypair_to_file
 
 # DP TODO: Add caching
 
@@ -40,6 +46,7 @@ def load_config(bosslet, cf_config = None):
 
     if type(config) == type({}):
         # composed config
+        raise ValueError("multiple configuration setups not currently supported")
 
         if cf_config is None:
             raise ValueError("cf_config argument must not be None when using a composed boss_config")
@@ -49,7 +56,40 @@ def load_config(bosslet, cf_config = None):
             return None
 
     try:
-        return importlib.import_module("config." + config)
+        # Import the module / configuration file
+        module = importlib.import_module("config." + config)
+
+        # Create the session object
+        if module.PROFILE:
+            module.session = Session(profile_name = module.PROFILE,
+                                     region_name = module.REGION)
+        else:
+            module.session = None
+
+        # Load outbound bastion information in one location
+        if module.OUTBOUND_BASTION:
+            keyfile = keypair_to_file(module.OUTBOUND_KEY)
+            if not os.path.exists(keyfile):
+                raise ValueError("OUTBOUND_KEY '{}' doesn't exist".format(keyfile))
+            module.outbound_bastion = SSHTarget(keyfile,
+                                                module.OUTBOUND_IP,
+                                                module.OUTBOUND_PORT,
+                                                module.OUTBOUND_USER)
+        else:
+            module.outbound_bastion = None
+
+        if module.SSH_KEY:
+            keyfile = keypair_to_file(module.SSH_KEY)
+            if not os.path.exists(keyfile):
+                raise ValueError("SSH_KEY '{}' doesn't exist".format(keyfile))
+            module.ssh_key = keyfile
+        else:
+            module.ssh_key = None
+        #if module.session and module.SSH_KEY:
+        #    module.call = ExternalCalls(module)
+        #else:
+        #    module.call = None
+        return module
     except ImportError:
         print("Could not import file 'config/{}'".format(config))
         return None
@@ -61,14 +101,14 @@ class BossConfiguration(object):
     def __init__(self, bosslet, **kwargs):
         self.bosslet = bosslet
 
-        self.ami_version = kwargs.get('ami_version')
+        self.cf_config = kwargs.get('cf_config')
+        self.ami_version = kwargs.get('ami_version', 'latest')
         self.disable_preview = kwargs.get('disable_preview')
 
-        self.aws_credentials = kwargs.get('aws_credentials')
-        self.session = None
-        if self.aws_credentials:
-            # TODO: figure out how to handle sessions that are specific to a cf_config
-            self.session = aws.create_session(self.aws_credentials, 'us-east-1')
+    def __getattr__(self, attr):
+        return  getattr(self[self.cf_config], attr)
 
     def __getitem__(self, cf_config):
+        if cf_config:
+            warnings.warn("Use of cf_config is unsupported at this time")
         return load_config(self.bosslet, cf_config)

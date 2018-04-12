@@ -63,19 +63,21 @@ def create_config(session, domain, keypair=None, user_data=None):
 
     vpc_id = config.find_vpc(session)
 
+    #####
+    # TODO: When CF config files are refactored for multi-account support
+    #       the creation of _all_ subnets should be moved into core.
+    #       AWS doesn't charge for the VPC or subnets, so it doesn't
+    #       increase cost and cleans up subnet creation
+
     # Create several subnets for all the lambdas to use.
-    lambda_azs = aws.azs_lookup(session, lambda_compatible_only=True)
     internal_route_table_id = aws.rt_lookup(session, vpc_id, names.internal)
 
-    print("AZs for lambda: " + str(lambda_azs))
-    lambda_subnets = []
-    for i in range(const.LAMBDA_SUBNETS):
-        key = 'LambdaSubnet{}'.format(i)
-        lambda_subnets.append(Ref(key))
-        config.add_subnet(key, names.subnet('lambda{}'.format(i)), az=lambda_azs[i % len(lambda_azs)][0])
+    lambda_subnets = config.add_all_lambda_subnets()
+    for lambda_subnet in lambda_subnets:
+        key = lambda_subnet['Ref']
         config.add_route_table_association(key + "RTA",
                                            internal_route_table_id,
-                                           Ref(key))
+                                           lambda_subnet)
 
     # Lookup the External Subnet, Internal Security Group IDs that are
     # needed by other resources

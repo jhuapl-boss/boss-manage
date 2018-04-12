@@ -70,11 +70,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Script the creation and provisioning of CloudFormation Stacks",
                                      formatter_class=argparse.RawDescriptionHelpFormatter,
                                      epilog=actions_help + config_help + scenario_help)
-    parser.add_argument("--aws-credentials", "-a",
-                        metavar = "<file>",
-                        default = os.environ.get("AWS_CREDENTIALS"),
-                        type = argparse.FileType('r'),
-                        help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
     parser.add_argument("--ami-version",
                         metavar = "<ami-version>",
                         default = "latest",
@@ -90,18 +85,14 @@ if __name__ == '__main__':
                         choices = actions,
                         metavar = "action",
                         help = "Action to execute")
-    parser.add_argument("bosslet_name", help="Bosslet in which to execute the configuration")
+    parser.add_argument("bosslet_name",
+                        help="Bosslet in which to execute the configuration")
     parser.add_argument("config_name",
                         choices = config_names,
                         metavar = "config_name",
                         help="Configuration to act upon (imported from configs/)")
 
     args = parser.parse_args()
-
-    if args.aws_credentials is None:
-        parser.print_usage()
-        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
-        sys.exit(1)
 
     if not configuration.valid_bosslet(args.bosslet_name):
         parser.print_usage()
@@ -114,10 +105,9 @@ if __name__ == '__main__':
     constants.load_scenario(args.scenario)
 
     bosslet_config = configuration.BossConfiguration(args.bosslet_name,
+                                                     #cf_config = args.config_name,
                                                      ami_version = args.ami_version,
-                                                     disable_preview = args.disable_preview,
-                                                     aws_credentials = args.aws_credentials
-                                                     )
+                                                     disable_preview = args.disable_preview)
 
     try:
         func = args.action.replace('-','_')
