@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+DEPENDENCIES = ['api'] # No actual dependency in config,
+                       # but lambda targets DynamoDB tables from api config
+
 """
 Create the DynamoDB lambda configuration which consists of:
 

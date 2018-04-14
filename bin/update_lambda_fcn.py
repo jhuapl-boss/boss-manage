@@ -62,7 +62,7 @@ NDINGEST_SETTINGS_FOLDER = const.repo_path('salt_stack', 'salt', 'ndingest', 'fi
 NDINGEST_SETTINGS_TEMPLATE = NDINGEST_SETTINGS_FOLDER + '/settings.ini.apl'
 
 def update_lambda_code(bosslet_config):
-    names = AWSNames(bosslet_config))
+    names = AWSNames(bosslet_config)
     client = session.client('lambda')
     resp = client.update_function_code(
         FunctionName=names.lambda_.multi,

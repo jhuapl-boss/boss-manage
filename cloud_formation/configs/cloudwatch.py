@@ -18,6 +18,8 @@ Create the cloudwatch alarms for the load balancer on top of a loadbalancer stac
 
 """
 
+DEPENDENCIES = ['core', 'api']
+
 from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, Arn
 from lib.userdata import UserData
 from lib.names import AWSNames

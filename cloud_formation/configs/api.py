@@ -23,6 +23,9 @@ in a VPC created by the core configuration. It also expects for the user to
 select the same KeyPair used when creating the core configuration.
 """
 
+DEPENDENCIES = ['core', 'redis'] # also depends on activities for step functions
+                                 # this forms a circular dependency
+
 from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, Arn
 from lib.userdata import UserData
 from lib.names import AWSNames

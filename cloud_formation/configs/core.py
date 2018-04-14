@@ -23,6 +23,8 @@ the other production resources to function. In the furture this may include
 other servers for services like Authentication.
 """
 
+DEPENDENCIES = None
+
 from lib.cloudformation import CloudFormationConfiguration, Ref, Arn
 from lib.userdata import UserData
 from lib.names import AWSNames

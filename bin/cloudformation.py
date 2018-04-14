@@ -36,19 +36,120 @@ cur_dir = os.path.dirname(os.path.realpath(__file__))
 cf_dir = os.path.normpath(os.path.join(cur_dir, '..', 'cloud_formation'))
 sys.path.append(cf_dir) # Needed for importing CF configs
 
-def call_config(bosslet_config, config, func_name):
+def build_dependency_graph(bosslet_config, modules):
+    class Node(object):
+        """Directed Dependency Graph Node"""
+        def __init__(self, name):
+            self.name = name
+            self.edges = []
+
+        def __repr__(self):
+            return "<Node: {}>".format(self.name)
+
+        def depends_on(self, node):
+            self.edges.append(node)
+
+    def resolve(node, resolved, seen=None):
+        """From a root node, add all sub elements and then the root"""
+        if seen is None:
+            seen = []
+        seen.append(node)
+        for edge in node.edges:
+            if edge not in resolved:
+                if edge in seen:
+                    raise exceptions.CircularDependencyError(node.name, edge.name)
+                resolve(edge, resolved, seen)
+        resolved.append(node)
+
+    nums = {} # Mapping of config to index in modules list
+    nodes = {} # Mapping of config to Node
+    no_deps = [] # List of configs that are not the target of a dependency
+                 # meaning that they are the root of a dependency tree
+    # Populate variables
+    for i in range(len(modules)):
+        config = modules[i][0]
+        nums[config] = i
+        nodes[config] = Node(config)
+        no_deps.append(config)
+
+    # lookup the existing stacks to so we can verify that all dependencies will
+    # be satisfied (by either existing or being launched)
+    client = bosslet_config.session.client('cloudformation')
+    suffix = "".join([x.capitalize() for x in bosslet_config.INTERNAL_DOMAIN.split('.')])
+    valid_status = ('UPDATE_COMPLETE', 'CREATE_COMPLETE')
+    existing = [
+        stack['StackName'][:-len(suffix)].lower()
+        for stack in client.list_stacks()['StackSummaries']
+        if stack['StackName'].endswith(suffix) and stack['StackStatus'] in valid_status
+    ]
+
+    # Create dependency graph and locate root nodes
+    for config, module in modules:
+        deps = module.__dict__.get('DEPENDENCIES')
+        if deps is None:
+            continue
+        if type(deps) == str:
+            deps = [deps]
+
+        for dep in deps:
+            if dep not in nodes:
+                # dependency not part of configs to launch
+                if dep not in existing:
+                    raise exceptions.MissingDependencyError(config, dep)
+            else:
+                nodes[config].depends_on(nodes[dep])
+                try:
+                    no_deps.remove(dep)
+                except:
+                    pass # Doesn't exist in no_deps list
+
+    # Resolve dependency graph
+    resolved = []
+    for no_dep in no_deps: # Don't have any dependencies
+        resolve(nodes[no_dep], resolved)
+
+    # Reorder input
+    reordered = [ modules[nums[node.name]] for node in resolved ]
+
+    # Extra check
+    if len(reordered) != len(modules):
+        raise exceptions.CircularDependencyError()
+
+    return reordered
+
+
+def call_configs(bosslet_config, configs, func_name):
     """Import 'configs.<config>' and then call the requested function with
     <session> and <bosslet>.
     """
-    module = importlib.import_module("configs." + config)
+    modules = [(config, importlib.import_module("configs." + config)) for config in configs]
 
-    if func_name in module.__dict__:
-        module.__dict__[func_name](bosslet_config)
-    elif func_name == 'delete':
-        # TODO load stack name
-        CloudFormationConfiguration(config, bosslet_config).delete()
-    else:
-        print("Configuration '{}' doesn't implement function '{}'".format(config, func_name))
+    modules = build_dependency_graph(bosslet_config, modules)
+    if func_name == 'delete':
+        modules.reverse()
+
+    for config, module in modules:
+        try:
+            if func_name in module.__dict__:
+                resp = module.__dict__[func_name](bosslet_config)
+            elif func_name == 'delete':
+                resp = CloudFormationConfiguration(config, bosslet_config).delete()
+            else:
+                print("Configuration '{}' doesn't implement function '{}', skipping".format(config, func_name))
+                resp = True
+
+            if resp is False:
+                print("Problem with {} {}, exiting early".format(config, func_name))
+                return False
+        except:
+            msg = "== Error with {} {} ==".format(config, func_name)
+            bar = "=" * len(msg)
+            print(bar)
+            print(msg)
+            print(bar)
+            raise
+
+    return True
 
 if __name__ == '__main__':
     os.chdir(os.path.join(cur_dir, "..", "cloud_formation"))
@@ -88,8 +189,9 @@ if __name__ == '__main__':
     parser.add_argument("bosslet_name",
                         help="Bosslet in which to execute the configuration")
     parser.add_argument("config_name",
-                        choices = config_names,
+                        choices = ['all', *config_names],
                         metavar = "config_name",
+                        nargs = "+",
                         help="Configuration to act upon (imported from configs/)")
 
     args = parser.parse_args()
@@ -109,9 +211,14 @@ if __name__ == '__main__':
                                                      ami_version = args.ami_version,
                                                      disable_preview = args.disable_preview)
 
+    if args.config_name == ['all']:
+        configs = config_names
+    else:
+        configs = args.config_name
+
     try:
         func = args.action.replace('-','_')
-        ret = call_config(bosslet_config, args.config_name, func)
+        ret = call_configs(bosslet_config, configs, func)
         if ret == False:
             sys.exit(1)
         else:
@@ -147,4 +254,8 @@ if __name__ == '__main__':
         print("Heaviside Error: {}".format(ex))
         print("Fix the problem, then run the following command:")
         print("\t" + utils.get_command("post-init"))
+        sys.exit(2)
+    except exceptions.BossManageError as ex:
+        print()
+        print("Boss Manage Error: {}".format(ex))
         sys.exit(2)

@@ -15,6 +15,21 @@
 class BossManageError(Exception):
     pass
 
+class CircularDependencyError(BossManageError):
+    def __init__(self, a=None, b=None):
+        msg = "Circular dependency"
+        if a and b:
+            msg += " '{}' <--> '{}'".format(a, b)
+        else:
+            msg += " in configurations"
+        super(CircularDependencyError, self).__init__(msg)
+
+class MissingDependencyError(BossManageError):
+    def __init__(self, config, dependency):
+        msg = "Dependency '{}' for config '{}' is not being launched and doesn't exist"
+        msg = msg.format(dependency, config)
+        super(MissingDependencyError, self).__init__(msg)
+
 class SSHError(BossManageError):
     pass
 
