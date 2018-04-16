@@ -32,20 +32,21 @@ from lib import constants as const
 
 import json
 
-def create_config(session, domain):
+def create_config(bosslet_config):
     """Create the CloudFormationConfiguration object.
     :arg session used to perform lookups
     :arg domain DNS name of vpc
     """
-    config = CloudFormationConfiguration('cloudwatch', domain)
-    names = AWSNames(domain)
+    config = CloudFormationConfiguration('cloudwatch', bosslet_config)
+    names = AWSNames(bosslet_config)
+    session = bosslet_config.session
 
-    vpc_id = config.find_vpc(session)
-    lambda_subnets, _ = config.find_all_availability_zones(session, lambda_compatible_only=True)
+    vpc_id = config.find_vpc()
+    lambda_subnets, _ = config.find_all_subnets(compatibility = 'lambda')
 
-    internal_sg = aws.sg_lookup(session, vpc_id, names.internal)
+    internal_sg = aws.sg_lookup(session, vpc_id, names.sg.internal)
 
-    loadbalancer_name = names.endpoint_elb
+    loadbalancer_name = names.dns.endpoint_elb
     if not aws.lb_lookup(session, loadbalancer_name):
         raise Exception("Invalid load balancer name: " + loadbalancer_name)
 
@@ -62,10 +63,10 @@ def create_config(session, domain):
     lambda_role = aws.role_arn_lookup(session, 'VaultConsulHealthChecker')
     config.add_arg(Arg.String(
         'VaultConsulHealthChecker', lambda_role,
-        'IAM role for vault/consul health check.' + domain))
+        'IAM role for vault/consul health check'))
 
     config.add_lambda('VaultLambda',
-                      names.vault_monitor,
+                      names.lambda_.vault_monitor,
                       description='Check health of vault instances.',
                       timeout=30,
                       role=Ref('VaultConsulHealthChecker'),
@@ -75,7 +76,7 @@ def create_config(session, domain):
                       file=const.VAULT_LAMBDA)
 
     config.add_lambda('ConsulLambda',
-                      names.consul_monitor,
+                      names.lambda_.consul_monitor,
                       description='Check health of vault instances.',
                       timeout=30,
                       role=Ref('VaultConsulHealthChecker'),
@@ -92,17 +93,17 @@ def create_config(session, domain):
     })
 
     config.add_cloudwatch_rule('VaultConsulCheck',
-                               name=names.vault_consul_check,
+                               name=names.cw.vault_consul_check,
                                description='Check health of vault and consul instances.',
                                targets=[
                                    {
                                        'Arn': Arn('VaultLambda'),
-                                       'Id': names.vault_monitor,
+                                       'Id': names.lambda_.vault_monitor,
                                        'Input': json_str
                                    },
                                    {
                                        'Arn': Arn('ConsulLambda'),
-                                       'Id': names.consul_monitor,
+                                       'Id': names.lambda_.consul_monitor,
                                        'Input': json_str
                                    },
                                ],
@@ -110,34 +111,26 @@ def create_config(session, domain):
                                depends_on=['VaultLambda', 'ConsulLambda'])
 
     config.add_lambda_permission('VaultPerms',
-                                 names.vault_monitor,
+                                 names.lambda_.vault_monitor,
                                  principal='events.amazonaws.com',
                                  source=Arn('VaultConsulCheck'))
 
     config.add_lambda_permission('ConsulPerms',
-                                 names.consul_monitor,
+                                 names.lambda_.consul_monitor,
                                  principal='events.amazonaws.com',
                                  source=Arn('VaultConsulCheck'))
 
     return config
 
 
-def generate(session, domain):
-    """Create the configuration and save it to disk
-    :arg folder location to generate the cloudformation template stack
-    :arg domain internal DNS name"""
-    config = create_config(session, domain)
+def generate(bosslet_config):
+    """Create the configuration and save it to disk"""
+    config = create_config(bosslet_config)
     config.generate()
 
-def create(session, domain):
-    """Create the configuration, launch it, and initialize Vault
-    :arg session information for performing lookups
-    :arg domain internal DNS name """
-    config = create_config(session, domain)
+def create(bosslet_config):
+    config = create_config(bosslet_config)
 
-    success = config.create(session)
+    success = config.create()
 
-    if success:
-        print('success')
-    else:
-        print('failed')
+    return success

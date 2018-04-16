@@ -487,52 +487,6 @@ def peering_lookup(session, from_id, to_id, owner_id=None):
         return response['VpcPeeringConnections'][0]['VpcPeeringConnectionId']
 
 
-def keypair_lookup(session):
-    """Lookup the names of valid Key Pair.
-
-    If the SSH_KEY enviro variable is defined and points to a valid keypair, that
-    keypair name is returned. Else all of the keypairs are printed to stdout and
-    the user is prompted to select which keypair to use.
-
-    Args:
-        session (Session|None) : Boto3 session used to lookup information in AWS
-                                 If session is None no lookup is performed
-
-    Returns:
-        (string|None) : Key Pair Name or None if the session is None
-    """
-    if session is None:
-        return None
-
-    client = session.client('ec2')
-    response = client.describe_key_pairs()
-
-    # If SSH_KEY exists and points to a valid Key Pair, use it
-    key = os.environ.get("SSH_KEY", None)  # reuse bastion.py env vars
-    if key is not None:
-        kp_name = os.path.basename(key)
-        if kp_name.endswith(".pem"):
-            kp_name = kp_name[:-4]
-        for kp in response['KeyPairs']:
-            if kp["KeyName"] == kp_name:
-                return kp_name
-
-    print("Key Pairs")
-    for i in range(len(response['KeyPairs'])):
-        print("{}:  {}".format(i, response['KeyPairs'][i]['KeyName']))
-    if len(response['KeyPairs']) == 0:
-        return None
-    while True:
-        try:
-            idx = input("[0]: ")
-            idx = int(idx if len(idx) > 0 else "0")
-            return response['KeyPairs'][idx]['KeyName']
-        except KeyboardInterrupt:
-            sys.exit(1)
-        except:
-            print("Invalid Key Pair number, try again")
-
-
 def instanceid_lookup(session, hostname):
     """Look up instance id by hostname (instance name).
 
@@ -1100,22 +1054,6 @@ def s3_bucket_exists(session, name):
             return True
 
     return False
-
-def get_account_id_from_session(session):
-    """
-    gets the account id from the session using the iam client.  This method will work even
-    if you have assumed a role in another account.
-    Args:
-        session (Session): Boto3 session used to lookup information in AWS.
-    Returns:
-        (str) AWS account id
-    """
-
-    if session is None:
-        return None
-
-    return session.client('iam').list_users(MaxItems=1)["Users"][0]["Arn"].split(':')[4]
-
 
 def lambda_arn_lookup(session, lambda_name):
     """

@@ -28,36 +28,6 @@ from . import hosts
 from . import aws
 from . import utils
 
-def get_scenario(var, default = None):
-    """Handle getting the appropriate value from a variable using the SCENARIO
-    environmental variable.
-
-    A common method that will currently handle decoding the (potential) dictionary
-    of variable values and selecting the correct on based on the SCENARIO environmental
-    variable.
-
-    If the key defined in SCENARIO doesn't exist in the variable dictionary, the
-    key "default" is used, and if that key is not defined, the default argument
-    passed to the function is used.
-
-    If var is not a dict, then it is returned without any change
-
-    Args:
-        var : The variable to (potentially) figure out the SCENARIO version for
-        default : Default value if var is a dict and don't have a key for the SCENARIO
-
-    Returns
-        object : The variable or the SCENARIO version of the variable
-    """
-    if type(var) == dict:
-        scenario = os.environ["SCENARIO"]
-        var_ = var.get(scenario, None)
-        if var_ is None:
-            var_ = var.get("default", default)
-    else:
-        var_ = var
-    return var_
-
 def bool_str(val):
     """CloudFormation Template formatted boolean string.
 
@@ -508,7 +478,7 @@ class CloudFormationConfiguration:
 
         client = self.session.client('cloudformation')
 
-        disable_preview = str(os.environ.get("DISABLE_PREVIEW"))
+        disable_preview = str(self.bosslet_config.disable_preview)
         disable_preview = disable_preview.lower() in ('yes', 'true', 'y', 't')
         if disable_preview:
             response = client.update_stack(
@@ -695,7 +665,6 @@ class CloudFormationConfiguration:
             key (string) : Unique name for the resource in the template
         """
 
-        print("CloudFormationConfiguration.find_vpc(): Not using the correct sesion object")
         vpc_id = aws.vpc_id_lookup(self.session, self.vpc_domain)
         vpc = Arg.VPC(key, vpc_id, "ID of the VPC")
         self.add_arg(vpc)
@@ -918,7 +887,7 @@ class CloudFormationConfiguration:
             "Type" : "AWS::EC2::Instance",
             "Properties" : {
                 "ImageId" : ami,
-                "InstanceType" : get_scenario(type_, "t2.micro"),
+                "InstanceType" : type_,
                 "KeyName" : keypair,
                 "SourceDestCheck": bool_str(iface_check),
                 "Tags" : [
@@ -973,13 +942,6 @@ class CloudFormationConfiguration:
             storage (int|string) : The storage size of the database (in GB)
             security_groups (None|list) : A list of SecurityGroup IDs or Refs
         """
-        scenario = os.environ["SCENARIO"]
-        multi_az = {
-            "development": "false",
-            "production": "true",
-            "ha-development": "true",
-        }.get(scenario, "false")
-
         hostname_ = hostname.replace('.','-')
 
         self.resources[key] = {
@@ -989,8 +951,8 @@ class CloudFormationConfiguration:
                 "Engine" : "mysql",
                 "LicenseModel" : "general-public-license",
                 "EngineVersion" : "5.6.34",
-                "DBInstanceClass" : get_scenario(type_, "db.t2.micro"),
-                "MultiAZ" : multi_az,
+                "DBInstanceClass" : type_,
+                "MultiAZ" : "true",
                 "StorageType" : "standard",
                 "AllocatedStorage" : str(storage),
                 "DBInstanceIdentifier" : hostname_,
@@ -1109,7 +1071,7 @@ class CloudFormationConfiguration:
             "Type" : "AWS::ElastiCache::CacheCluster",
             "Properties" : {
                 #"AutoMinorVersionUpgrade" : "false", # defaults to true - Indicates that minor engine upgrades will be applied automatically to the cache cluster during the maintenance window.
-                "CacheNodeType" : get_scenario(type_, "cache.t2.micro"),
+                "CacheNodeType" : type_,
                 "CacheSubnetGroupName" : Ref(key + "SubnetGroup"),
                 "Engine" : "redis",
                 "EngineVersion" : version,
@@ -1150,13 +1112,13 @@ class CloudFormationConfiguration:
             clusters (int|string) : Number of cluster instances to create (1 - 5)
             parameters (dict): Key/Values of Redis configuration parameters
         """
-        clusters = int(get_scenario(clusters, 1))
+        clusters = int(clusters)
         self.resources[key] =  {
             "Type" : "AWS::ElastiCache::ReplicationGroup",
             "Properties" : {
                 "AutomaticFailoverEnabled" : bool_str(clusters > 1),
                 #"AutoMinorVersionUpgrade" : "false", # defaults to true - Indicates that minor engine upgrades will be applied automatically to the cache cluster during the maintenance window.
-                "CacheNodeType" : get_scenario(type_, "cache.m3.medium"),
+                "CacheNodeType" : type_,
                 "CacheSubnetGroupName" : Ref(key + "SubnetGroup"),
                 "Engine" : "redis",
                 "EngineVersion" : version,
@@ -1469,13 +1431,13 @@ class CloudFormationConfiguration:
         self.resources[key] = {
             "Type" : "AWS::AutoScaling::AutoScalingGroup",
             "Properties" : {
-                "DesiredCapacity" : get_scenario(min, 1), # Initial capacity, will min size also ensure the size on startup?
+                "DesiredCapacity" : min, # Initial capacity, will min size also ensure the size on startup?
                 "HealthCheckType" : "EC2" if elb is None else "ELB",
                 "HealthCheckGracePeriod" : health_check_grace_period, # seconds
                 "LaunchConfigurationName" : Ref(key + "Configuration"),
                 "LoadBalancerNames" : [] if elb is None else [elb],
-                "MaxSize" : str(get_scenario(max, 1)),
-                "MinSize" : str(get_scenario(min, 1)),
+                "MaxSize" : str(max),
+                "MinSize" : str(min),
                 "Tags" : [
                     {"Key" : "Stack", "Value" : Ref("AWS::StackName"), "PropagateAtLaunch": "true" },
                     {"Key" : "Name", "Value" : hostname, "PropagateAtLaunch": "true" }
@@ -1487,7 +1449,7 @@ class CloudFormationConfiguration:
         if support_update:
             self.resources[key]["UpdatePolicy"] = {
                 "AutoScalingRollingUpdate" : {
-                    "MinInstancesInService" : str(get_scenario(min, 1) - 1), # Restart one instance at a time
+                    "MinInstancesInService" : str(min - 1), # Restart one instance at a time
                     "MaxBatchSize": "1",
                     #"WaitOnResourceSignals": "true", # need to have instances signal ready...
                     #"PauseTime": "PT5M" # 5 minutes
@@ -1523,7 +1485,7 @@ class CloudFormationConfiguration:
                 #"EbsOptimized" : Boolean, EBS I/O optimized
                 "ImageId" : ami,
                 "InstanceMonitoring" : detailed_monitoring, # CloudWatch Monitoring...
-                "InstanceType" : get_scenario(type_, "t2.micro"),
+                "InstanceType" : type_,
                 "KeyName" : keypair,
                 "SecurityGroups" : security_groups,
                 "UserData" : "" if user_data is None else { "Fn::Base64" : user_data }

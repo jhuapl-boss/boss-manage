@@ -128,7 +128,14 @@ def call_configs(bosslet_config, configs, func_name):
     if func_name == 'delete':
         modules.reverse()
 
+    print("Execution Order:")
     for config, module in modules:
+        print("\t{}".format(config))
+
+    for config, module in modules:
+        print()
+        print("======================================================================")
+        print("== Working on {}".format(config))
         try:
             if func_name in module.__dict__:
                 resp = module.__dict__[func_name](bosslet_config)
@@ -142,11 +149,9 @@ def call_configs(bosslet_config, configs, func_name):
                 print("Problem with {} {}, exiting early".format(config, func_name))
                 return False
         except:
-            msg = "== Error with {} {} ==".format(config, func_name)
-            bar = "=" * len(msg)
-            print(bar)
+            msg = "== Error with {} {}".format(config, func_name)
             print(msg)
-            print(bar)
+            print()
             raise
 
     return True
@@ -200,9 +205,6 @@ if __name__ == '__main__':
         parser.print_usage()
         print("Error: Bosslet name '{}' doesn't exist in configs file ({})".format(args.bosslet_name, configuration.CONFIGS_PATH))
         sys.exit(1)
-
-    os.environ["AMI_VERSION"] = args.ami_version
-    os.environ["DISABLE_PREVIEW"] = str(args.disable_preview)
 
     constants.load_scenario(args.scenario)
 

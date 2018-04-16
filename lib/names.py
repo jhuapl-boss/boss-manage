@@ -57,13 +57,22 @@ class AWSNames(object):
     TYPES = {
         'stack': format_capitalize,
         'subnet': None,
-        'dns': None, # Internal DNS name
-        'lambda_': None, # Need '_' as lambda is a keyword
+        'dns': None, # Internal DNS name, EC2 and ELB
+                     # XXX: maybe ec2, as it is an EC2 instance name
+        'lambda_': format_dash, # Need '_' as lambda is a keyword
+                                 # XXX: not all lambdas used dashes
+        'rds': None,
         'sns': None,
+        'sqs': format_capitalize,
         'sg': None, # Security Group
         'rt': None, # Route Table
         'gw': None, # Gateway
         'ami': None,
+        'redis': None, # ElastiSearch Redis
+        'ddb': None, # DynamoDB
+        's3': None, # S3 Bucket
+        'sfn': format_capitalize, # StepFunction
+        'cw': format_dash, # CloudWatch Rule
     }
 
     RESOURCES = {
@@ -77,7 +86,44 @@ class AWSNames(object):
         'auth_db': 'auth-db',
         'dns': 'dns',
         'ssh': 'ssh',
+        'https': 'https',
         'internet': 'internet',
+        "endpoint": "endpoint",
+        "endpoint_db": "endpoint-db",
+        "endpoint_elb": "elb",
+        "cache": "cache",
+        "cache_state": "cache-state",
+        "cache_manager": "cachemanager",
+        "meta": "bossmeta",
+        "s3flush": "S3flush",
+        "deadletter": "Deadletter",
+        "cuboid_bucket": "cuboids",
+        "tile_bucket": "tiles",
+        "ingest_bucket": "ingest",
+        'delete_bucket': 'delete',
+        "s3_index": "s3index",
+        "tile_index": "tileindex",
+        "id_index": "idIndex",
+        "id_count_index": "idCount",
+        'activities': 'activities',
+        "multi_lambda": "multiLambda",
+        'ingest_lambda': 'IngestUpload',
+        'delete_cuboid': 'Delete.Cuboid',
+        'resolution_hierarchy': 'Resolution.Hierarchy',
+        'downsample_volume': 'Downsample.Volume',
+        'ingest_queue_populate': 'Ingest.Populate',
+        'ingest_queue_upload': 'Ingest.Upload',
+        'delete_experiment': 'Delete.Experiment',
+        'delete_collection': 'Delete.Collection',
+        'delete_coord_frame': 'Delete.CoordFrame',
+        'query_deletes': 'Query.Deletes',
+        'delete_event_rule': 'deleteEventRule',
+        "cache_manager": "cachemanager",
+        'vault_monitor': 'vaultMonitor',
+        'consul_monitor': 'consulMonitor',
+        'vault_consul_check': 'checkVaultConsul',
+        'dynamo_lambda': 'dynamoLambda',
+        'trigger_dynamo_autoscale': 'triggerDynamoAutoscale',
     }
 
     def build(self, resource_type, name):
@@ -87,18 +133,20 @@ class AWSNames(object):
         if name not in self.RESOURCES:
             raise AttributeError("'{}' is not a valid resource name".format(name))
 
-        if resource_type == 'ami':
+        if self.TYPES[resource_type] is False:
+            return self.RESOURCES[name]
+        elif resource_type == 'ami':
             suffix = self.bosslet_config.AMI_SUFFIX
             return self.RESOURCES[name] + suffix
+        else:
+            domain = self.bosslet_config.INTERNAL_DOMAIN
+            fqdn = self.RESOURCES[name] + '.' + domain
 
-        domain = self.bosslet_config.INTERNAL_DOMAIN
-        fqdn = self.RESOURCES[name] + '.' + domain
+            transform = self.TYPES[resource_type]
+            if transform:
+                fqdn = transform(fqdn)
 
-        transform = self.TYPES[resource_type]
-        if transform:
-            fqdn = transform(fqdn)
-
-        return fqdn
+            return fqdn
 
 
 

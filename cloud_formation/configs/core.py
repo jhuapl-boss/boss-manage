@@ -14,13 +14,20 @@
 
 """
 Create the core configuration which consists of
-  * A new VPC
-  * An internal subnet containing a Vault server
-  * An external subnet containing a Bastion server
+  * A new VPC with an internal DNS Hosted Zone
+  * Internal and External subnets for every availability zone
+  * A Bastion server that allows SSH access to internal machines
+  * A Consul and Vault ASG clusters for secret storage
+  * A Keycloak Authentication server ASG, ELB,  and (optional) RDS instance
+  * A lambda to handle DNS updates for ASG instance changes
+  * An Internet Gateway allowing network connections to the internet
+  * A S3 endpoint for internal access to S3
+  * A NAT instance allowing protected internet access from internal resources
+    - A NAT instance is used instead of the bastion machine as it provides
+      higher throughput
 
 The core configuration create all of the infrastructure that is required for
-the other production resources to function. In the furture this may include
-other servers for services like Authentication.
+the other production resources to function.
 """
 
 DEPENDENCIES = None
@@ -34,7 +41,6 @@ from lib import aws
 from lib import utils
 from lib import scalyr
 from lib import constants as const
-from lib import configuration
 
 import os
 import json
@@ -252,13 +258,12 @@ def create(bosslet_config):
         vpc_id = aws.vpc_id_lookup(session, domain)
         aws.rt_name_default(session, vpc_id, "default." + domain)
 
-        post_init(bosslet_config)
+        success = post_init(bosslet_config)
+
+    return success
 
 def post_init(bosslet_config):
     session = bosslet_config.session
-    keypair = bosslet_config.SSH_KEY
-    domain = bosslet_config.INTERNAL_DOMAIN
-
     call = ExternalCalls(bosslet_config)
     names = AWSNames(bosslet_config)
 
@@ -292,7 +297,7 @@ def post_init(bosslet_config):
             print("Could not initialize Vault")
             print("Call: {}".format(utils.get_command("post-init")))
             print("Before launching other stacks")
-            return
+            return False
 
         #Check and see if these secrets already exist before we overwrite them with new ones.
         # Write data into Vault
@@ -365,13 +370,18 @@ def post_init(bosslet_config):
     instances = [ names.dns.vault ]
     scalyr.add_instances_to_scalyr(session, bosslet_config.REGION, instances)
 
-def update(session, domain):
-    # Only in the production scenario will data be preserved over the update
-    # TODO Check to see if AUTH has a RDS instance
-    # TODO Check to see if Consul has more than 1 instance (or 3+ instances)
-    #if os.environ["SCENARIO"] not in ("production", "ha-development",):
-    if True:
-        print("Can only update the production and ha-development scenario")
+    return True
+
+def update(bosslet_config):
+    # Checks to make sure they update can happen and the user wants to wait the required time
+    if not bosslet_config.AUTH_RDS:
+        print("Cannot update Auth server as it is not using an external database")
+        print("Updating the Auth server would loose all Keycloak information")
+        return None
+
+    if int(const.CONSUL_CLUSTER_SIZE) < 3: # Only tested updating with minimum 3 instances
+        print("Cannot update Consul server as it is not running in a cluster configuration")
+        print("Updating the Consul server would loose all Vault data")
         return None
 
     consul_update_timeout = 5 # minutes
@@ -384,22 +394,24 @@ def update(session, domain):
     resp = input("Update? [N/y] ")
     if len(resp) == 0 or resp[0] not in ('y', 'Y'):
         print("Canceled")
-        return
+        return None
 
-    config = create_config(session, domain)
-    success = config.update(session)
+    config = create_config(bosslet_config)
+    success = config.update()
 
     if success:
-        keypair = aws.keypair_lookup(session)
-        call = ExternalCalls(session, keypair, domain)
-        names = AWSNames(domain)
+        session = bosslet_config.session
+        call = ExternalCalls(bosslet_config)
+        names = AWSNames(bosslet_config)
 
         # Unseal Vault first, so the rest of the system can continue working
+        # TODO: Figure out what to do when the vault check fails, as consul
+        #       is not restarted
         print("Waiting for Vault...")
         if not call.check_vault(90, exception=False):
             print("Could not contact Vault, check networking and run the following command")
-            print("python3 bastion.py bastion.521.boss vault.521.boss vault-unseal")
-            return
+            print("bin/bastion.py vault.bosslet vault-unseal")
+            return False
 
         with call.vault() as vault:
             vault.unseal()
@@ -414,9 +426,9 @@ def update(session, domain):
             # Need time for the ASG to detect the terminated instance,
             # launch the new instance, and have the instance cluster
             tpe.submit(aws.asg_restart,
-                            session,
-                            names.consul,
-                            consul_update_timeout * 60)
+                       session,
+                       names.dns.consul,
+                       consul_update_timeout * 60)
 
     return success
 
@@ -432,4 +444,7 @@ def delete(bosslet_config):
 
     aws.sns_unsubscribe_all(session, names.sns.dns)
 
-    CloudFormationConfiguration('core', bosslet_config).delete()
+    config = CloudFormationConfiguration('core', bosslet_config)
+    success = config.delete()
+
+    return success

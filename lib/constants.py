@@ -114,8 +114,8 @@ TIMEOUT_KEYCLOAK = 150
 # Machine Instance Types
 ENDPOINT_TYPE = "t2.micro"
 RDS_TYPE = "db.t2.micro"
-REDIS_CACHE_TYPE = "cache.t2.small"
-REDIS_TYPE = "cache.t2.small"
+REDIS_CACHE_TYPE = "cache.t2.micro"
+REDIS_TYPE = "cache.t2.micro"
 CACHE_MANAGER_TYPE = "t2.micro"
 ACTIVITIES_TYPE = "t2.micro"
 
@@ -132,7 +132,7 @@ REDIS_CLUSTER_SIZE = 1
 
 #################
 # Resource Memory
-REDIS_RESERVED_MEMORY = 387
+REDIS_RESERVED_MEMORY = 0
 
 
 ########################
