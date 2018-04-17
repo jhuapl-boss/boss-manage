@@ -109,7 +109,7 @@ def create_messages(args):
     range_ = lambda v: range(args[v + '_start'], args[v + '_stop'], tile_size(v))
 
     # DP NOTE: generic version of
-    # BossBackend.encode_chunk_key and BossBackend.encode.tile_key
+    # BossBackend.encode_chunk_key and BiossBackend.encode.tle_key
     # from ingest-client/ingestclient/core/backend.py
     def hashed_key(*args):
         base = '&'.join(map(str,args))
