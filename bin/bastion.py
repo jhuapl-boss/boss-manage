@@ -166,7 +166,7 @@ if __name__ == "__main__":
             print()
     elif args.command in vault.COMMANDS:
         with vault_tunnel(bosslet_config.ssh_key, bastions):
-            vault.COMMANDS[args.command](Vault(args.internal, private), *args.arguments)
+            vault.COMMANDS[args.command](Vault(args.internal, ip), *args.arguments)
     else:
         parser.print_usage()
         sys.exit(1)

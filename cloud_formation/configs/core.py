@@ -442,7 +442,7 @@ def delete(bosslet_config):
     aws.route53_delete_records(session, domain, names.dns.consul)
     aws.route53_delete_records(session, domain, names.dns.vault)
 
-    aws.sns_unsubscribe_all(session, names.sns.dns)
+    aws.sns_unsubscribe_all(bosslet_config, names.sns.dns)
 
     config = CloudFormationConfiguration('core', bosslet_config)
     success = config.delete()

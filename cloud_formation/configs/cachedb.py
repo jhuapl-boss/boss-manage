@@ -285,7 +285,7 @@ def delete(bosslet_config):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
     session = bosslet_config.session
     domain = bosslet_config.INTERNAL_DOMAIN
-    names = AWSNames(domain)
+    names = AWSNames(bosslet_config)
 
     aws.route53_delete_records(session, domain, names.dns.cache_manager)
 

@@ -912,7 +912,7 @@ def route53_delete_records(session, hosted_zone, cname):
     )
     return response
 
-def sns_unsubscribe_all(session, topic, region="us-east-1", account=None):
+def sns_unsubscribe_all(bosslet_config, topic):
     """Unsubscribe all subscriptions for the given SNS topic
 
     Args:
@@ -923,12 +923,9 @@ def sns_unsubscribe_all(session, topic, region="us-east-1", account=None):
         account (string) : AWS account ID.  If None is provided the account ID
                            will be looked up from the session object using iam
     """
-    if session is None:
-        return None
-
-    if account is None:
-        account = get_account_id_from_session(session)
-
+    session = bosslet_config.session
+    region = bosslet_config.REGION
+    account = bosslet_config.ACCOUNT_ID
     topic = "arn:aws:sns:{}:{}:{}".format(region, account, topic.replace(".", "-"))
 
     client = session.client('sns')

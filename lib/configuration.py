@@ -112,3 +112,9 @@ class BossConfiguration(object):
         if cf_config:
             warnings.warn("Use of cf_config is unsupported at this time")
         return load_config(self.bosslet, cf_config)
+
+    def get(self, key, default=None):
+        try
+            return self.__getattr__(key)
+        except AttributeError:
+            return default

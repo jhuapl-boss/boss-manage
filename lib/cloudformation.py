@@ -834,7 +834,7 @@ class CloudFormationConfiguration:
             "Properties" : {
                 #"PolicyDocument" : JSON object, # allow full access
                 "RouteTableIds" : route_tables,
-                "ServiceName" : 'com.amazonaws.us-east-1.{}'.format(service),
+                "ServiceName" : 'com.amazonaws.{}.{}'.format(self.region, service),
                 "VpcId" : {"Ref": vpc},
             }
         }

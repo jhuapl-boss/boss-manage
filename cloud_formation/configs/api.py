@@ -84,7 +84,7 @@ def create_config(bosslet_config, db_config={}):
     user_data["aws"]["id-count-table"] = names.ddb.id_count_index
     user_data["aws"]["prod_mailing_list"] = mailing_list_arn
 
-    user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
+    user_data["auth"]["OIDC_VERIFY_SSL"] = str(bosslet_config.get('VERIFY_SSL', True))
     user_data["lambda"]["flush_function"] = names.lambda_.multi_lambda
     user_data["lambda"]["page_in_function"] = names.lambda_.multi_lambda
     user_data["lambda"]["ingest_function"] = names.lambda_.multi_lambda
@@ -245,7 +245,7 @@ def create(bosslet_config):
     config = create_config(bosslet_config, db_config)
 
     try:
-        success = config.create(session)
+        success = config.create()
         if not success:
             raise Exception("Create Failed")
     except:
@@ -293,7 +293,7 @@ def post_init(bosslet_config):
     call.check_keycloak(const.TIMEOUT_KEYCLOAK)
 
     # Add the API servers to the list of OIDC valid redirects
-    with call.tunnel(names.auth, 8080) as auth_port:
+    with call.tunnel(names.dns.auth, 8080) as auth_port:
         print("Update KeyCloak Client Info")
         auth_url = "http://localhost:{}".format(auth_port)
         with KeyCloakClient(auth_url, **creds) as kc:
@@ -310,6 +310,11 @@ def post_init(bosslet_config):
         'username': bossadmin['username'],
         'password': bossadmin['password'],
     }
+
+    if not bosslet_config.get('VERIFY_SSL', True):
+        import ssl
+        ssl._create_default_https_context = ssl._create_unverified_context
+
     auth_uri += '/protocol/openid-connect/token'
     req = Request(auth_uri,
                   headers = headers,
@@ -351,4 +356,6 @@ def delete(bosslet_config):
     aws.sqs_delete_all(session, domain)
     aws.policy_delete_all(session, domain, '/ingest/')
 
-    CloudFormationConfiguration('api', bosslet_config).delete()
+    config = CloudFormationConfiguration('api', bosslet_config)
+    resp = config.delete()
+    return resp

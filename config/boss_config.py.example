@@ -11,6 +11,7 @@ SUBNET = "10.0.0.0/16" # Class B Subnet
 AMI_SUFFIX = ".tld"
 SCENARIO = "" # (Optional) Uses internal defaults if not --scenario provided
 
+VERIFY_SSL = True # False if using a self-signed cert
 AUTH_RDS = False # If Keycloak will use an external database. Cannot update unless True
 
 # Lambda build server variables

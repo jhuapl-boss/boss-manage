@@ -160,7 +160,7 @@ if __name__ == '__main__':
 
     if bosslet_config.OUTBOUND_BASTION:
         bastion_config = """-var 'aws_bastion_ip={}'
-                            -var 'aws_bastion_user{}'
+                            -var 'aws_bastion_user={}'
                             -var 'aws_bastion_priv_key_file={}'
                          """.format(bosslet_config.OUTBOUND_IP,
                                     bosslet_config.OUTBOUND_USER,
