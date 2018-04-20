@@ -114,7 +114,7 @@ class BossConfiguration(object):
         return load_config(self.bosslet, cf_config)
 
     def get(self, key, default=None):
-        try
+        try:
             return self.__getattr__(key)
         except AttributeError:
             return default
