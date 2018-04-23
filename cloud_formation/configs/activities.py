@@ -107,6 +107,17 @@ def create_config(session, domain):
 
     config.add_lambda_permission("IngestLambdaExecute", Ref("IngestLambda"))
 
+    config.add_dynamo_table("DownsampleStatus"
+                            names.downsample_status,
+                            attributes = {
+                                'downsample_id': 'S',
+                                'cube_morton': 'N'
+                            },
+                            key_schema = {
+                                'downsample_id': 'HASH'
+                            },
+                            (10, 10)) # 10 reads / writes per second
+
     return config
 
 

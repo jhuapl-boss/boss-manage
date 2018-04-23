@@ -94,7 +94,8 @@ class AWSNames(object):
         'ingest_queue_upload': 'Ingest.Upload',
         'ingest_lambda': 'IngestUpload',
         'dynamo_lambda': 'dynamoLambda',
-        'trigger_dynamo_autoscale': 'triggerDynamoAutoscale'
+        'trigger_dynamo_autoscale': 'triggerDynamoAutoscale',
+        'downsample_status': 'downsample-status',
     }
 
     def __getattr__(self, name):
