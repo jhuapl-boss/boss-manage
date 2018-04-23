@@ -35,6 +35,7 @@ from lib import constants as const
 from lib import zip
 
 import argparse
+import botocore
 import configparser
 import os
 import sys
@@ -81,12 +82,16 @@ def update_lambda_code(session, domain, bucket):
         names.downsample_volume_lambda
     ]
     client = session.client('lambda')
-    resp = client.update_function_code(
-        FunctionName=names.multi_lambda,
-        S3Bucket=bucket,
-        S3Key=get_lambda_zip_name(domain),
-        Publish=True)
-    print(resp)
+    for lambda_name in uses_multilambda:
+        try:
+            resp = client.update_function_code(
+                FunctionName=lambda_name,
+                S3Bucket=bucket,
+                S3Key=get_lambda_zip_name(domain),
+                Publish=True)
+            print(resp)
+        except botocore.exceptions.ClientError as ex:
+            print('Error updating {}: {}'.format(lambda_name, ex))
 
 # DP TODO: Move to a lib/ library
 def load_lambdas_on_s3(session, domain, bucket):
