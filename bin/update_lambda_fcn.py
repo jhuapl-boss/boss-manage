@@ -76,6 +76,10 @@ def get_lambda_zip_name(domain):
 
 def update_lambda_code(session, domain, bucket):
     names = AWSNames(domain)
+    uses_multilambda = [
+        names.multi_lambda, 
+        names.downsample_volume_lambda
+    ]
     client = session.client('lambda')
     resp = client.update_function_code(
         FunctionName=names.multi_lambda,
