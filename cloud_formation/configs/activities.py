@@ -125,6 +125,17 @@ def create_config(session, domain):
         memory=1024,
         runtime='python3.6')
 
+    config.add_dynamo_table("DownsampleStatus",
+                            names.downsample_status,
+                            attributes = {
+                                'downsample_id': 'S',
+                                'cube_morton': 'N'
+                            },
+                            key_schema = {
+                                'downsample_id': 'HASH'
+                            },
+                            throughput=(10, 10)) # 10 reads / writes per second
+
     return config
 
 
