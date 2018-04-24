@@ -96,6 +96,7 @@ class AWSNames(object):
         'dynamo_lambda': 'dynamoLambda',
         'trigger_dynamo_autoscale': 'triggerDynamoAutoscale',
         'downsample_status': 'downsample-status',
+        'downsample_dlq': 'downsample-dlq',
     }
 
     def __getattr__(self, name):
@@ -109,7 +110,7 @@ class AWSNames(object):
         fq_hostname = hostname + self.base_dot
 
         if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'consul_monitor', 'vault_consul_check',
-                    'delete_lambda', 'ingest_lambda', 'dynamo_lambda']:
+                    'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 'downsample_dlq']:
             fq_hostname = fq_hostname.replace('.','-')
 
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',

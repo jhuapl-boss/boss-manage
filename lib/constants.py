@@ -55,6 +55,7 @@ DNS_LAMBDA = LAMBDA_DIR + '/updateRoute53/index.py'
 VAULT_LAMBDA = LAMBDA_DIR + '/monitors/chk_vault.py'
 CONSUL_LAMBDA = LAMBDA_DIR + '/monitors/chk_consul.py'
 INGEST_LAMBDA = LAMBDA_DIR + '/ingest_populate/ingest_queue_upload.py'
+DOWNSAMPLE_DLQ_LAMBDA = LAMBDA_DIR + '/downsample/dlq.py'
 
 
 ########################

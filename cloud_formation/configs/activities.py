@@ -85,6 +85,7 @@ def create_config(session, domain):
     user_data["aws"]["tile-index-table"] = names.tile_index
     user_data["aws"]["id-index-table"] = names.id_index
     user_data["aws"]["id-count-table"] = names.id_count_index
+    user_data["aws"]["downsample-table"] = names.downsample_status
 
     config.add_autoscale_group("Activities",
                                names.activities,
@@ -117,6 +118,21 @@ def create_config(session, domain):
                                 'downsample_id': 'HASH'
                             },
                             (10, 10)) # 10 reads / writes per second
+
+    config.add_sns_topic("DownsampleDLQ",
+                         names.downsample_dlq,
+                         names.downsample_dlq,
+                         [('lambda', Arn('DownsampleDLQLambda'))]
+
+    config.add_lambda('DonwsampleDLQLambda',
+                      names.downsample_dlq,
+                      aws.role_arn_lookup(session, 'lambda_resolution_hierarchy'),
+                      const.DOWNSAMPLE_DLQ_LAMBDA,
+                      handler='index.handler',
+                      timeout=10)
+
+    config.add_lambda_permission('DownsampleDLQLambdaExecute',
+                                 Ref('DownsampleDLQLambda'))
 
     return config
 

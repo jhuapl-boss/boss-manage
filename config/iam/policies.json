@@ -412,26 +412,21 @@
       "Statement": [
         {
           "Action": [
+            "s3:PutObject",
             "s3:GetObject",
-            "s3:PutObject"
-          ],
-          "Effect": "Allow",
-          "Resource": [
-            "*"
-          ],
-          "Sid": "Stmt1487283320000"
-        },
-        {
-          "Action": [
-            "dynamodb:GetItem",
             "dynamodb:PutItem",
-            "dynamodb:UpdateItem"
+            "dynamodb:DeleteItem",
+            "dynamodb:GetItem",
+            "dynamodb:Query",
+            "dynamodb:UpdateItem",
+            "sqs:GetQueueAttributes",
+            "sqs:CreateQueue",
+            "sqs:DeleteQueue",
+            "sqs:SendMessage"
           ],
           "Effect": "Allow",
-          "Resource": [
-            "*"
-          ],
-          "Sid": "Stmt1487283447000"
+          "Resource": "*",
+          "Sid": "VisualEditor0"
         }
       ],
       "Version": "2012-10-17"
