@@ -19,6 +19,7 @@ from lib.names import AWSNames
 from lib import aws
 from lib import constants as const
 from lib import stepfunctions as sfn
+from update_lambda_fcn import load_lambdas_on_s3, update_lambda_code
 
 keypair = None
 
@@ -108,7 +109,24 @@ def create_config(session, domain):
 
     config.add_lambda_permission("IngestLambdaExecute", Ref("IngestLambda"))
 
-    config.add_dynamo_table("DownsampleStatus"
+    role = aws.role_arn_lookup(session, "lambda_cache_execution")
+    config.add_arg(Arg.String(
+        "LambdaCacheExecutionRole", role,
+        "IAM role for multilambda." + domain))
+    lambda_bucket = aws.get_lambda_s3_bucket(session)
+
+    config.add_lambda(
+        "downsampleVolumeLambda",
+        names.downsample_volume_lambda,
+        Ref("LambdaCacheExecutionRole"),
+        s3=(aws.get_lambda_s3_bucket(session),
+            "multilambda.{}.zip".format(domain),
+            "downsample_volume.handler"),
+        timeout=120,
+        memory=1024,
+        runtime='python3.6')
+
+    config.add_dynamo_table("DownsampleStatus",
                             names.downsample_status,
                             attributes = {
                                 'downsample_id': 'S',
@@ -117,7 +135,7 @@ def create_config(session, domain):
                             key_schema = {
                                 'downsample_id': 'HASH'
                             },
-                            (10, 10)) # 10 reads / writes per second
+                            throughput=(10, 10)) # 10 reads / writes per second
 
     config.add_sns_topic("DownsampleDLQ",
                          names.downsample_dlq,
@@ -145,11 +163,42 @@ def generate(session, domain):
 
 def create(session, domain):
     """Create the configuration, launch it, and initialize Vault"""
+    resp = input('Rebuild multilambda: [Y/n]:')
+    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
+        pre_init(session, domain)
+
     config = create_config(session, domain)
 
     success = config.create(session)
     if success:
         post_init(session, domain)
+
+
+def pre_init(session, domain):
+    """Build multilambda zip file and put in S3."""
+    bucket = aws.get_lambda_s3_bucket(session)
+    load_lambdas_on_s3(session, domain, bucket)
+
+
+def update(session, domain):
+    resp = input('Rebuild multilambda: [Y/n]:')
+    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
+        pre_init(session, domain)
+        bucket = aws.get_lambda_s3_bucket(session)
+        update_lambda_code(session, domain, bucket)
+
+    config = create_config(session, domain)
+    success = config.update(session)
+
+    if not success:
+        return False
+
+    resp = input('Replace step functions: [Y/n]:')
+    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
+        delete_sfns(session, domain)
+        post_init(session, domain)
+
+    return True
 
 
 def post_init(session, domain):
@@ -169,10 +218,14 @@ def post_init(session, domain):
 
 
 def delete(session, domain):
-    names = AWSNames(domain)
     # DP TODO: delete activities
     CloudFormationConfiguration('activities', domain).delete(session)
+    delete_sfns(session, domain)
 
+
+def delete_sfns(session, domain):
+    """Delete step functions."""
+    names = AWSNames(domain)
     sfn.delete(session, names.delete_cuboid)
     sfn.delete(session, names.delete_experiment)
     sfn.delete(session, names.delete_coord_frame)

@@ -90,6 +90,7 @@ class AWSNames(object):
         'delete_lambda': "deleteLambda",
         'resolution_hierarchy': 'Resolution.Hierarchy',
         'downsample_volume': 'Downsample.Volume',
+        'downsample_volume_lambda': 'downsampleVolumeLambda',
         'ingest_queue_populate': 'Ingest.Populate',
         'ingest_queue_upload': 'Ingest.Upload',
         'ingest_lambda': 'IngestUpload',
@@ -110,7 +111,7 @@ class AWSNames(object):
         fq_hostname = hostname + self.base_dot
 
         if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'consul_monitor', 'vault_consul_check',
-                    'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 'downsample_dlq']:
+                    'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 'downsample_dlq', 'downsample_volume_lambda']:
             fq_hostname = fq_hostname.replace('.','-')
 
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
