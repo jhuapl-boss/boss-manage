@@ -1591,7 +1591,7 @@ class CloudFormationConfiguration:
         }
 
 
-    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python2.7"):
+    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python2.7", dlq=None):
         """Create a Python Lambda
 
         Args:
@@ -1664,6 +1664,11 @@ class CloudFormationConfiguration:
 
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
+
+        if dlq is not None:
+            self.resources[key]['DeadLetterConfig'] = {
+                'TargetArn': dlq
+            }
 
     def add_lambda_permission(self, key, lambda_, action="lambda:invokeFunction", principal="sns.amazonaws.com", source=None, depends_on=None):
         """Add permissions to a Lambda

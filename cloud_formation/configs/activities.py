@@ -109,22 +109,20 @@ def create_config(session, domain):
 
     config.add_lambda_permission("IngestLambdaExecute", Ref("IngestLambda"))
 
-    role = aws.role_arn_lookup(session, "lambda_cache_execution")
-    config.add_arg(Arg.String(
-        "LambdaCacheExecutionRole", role,
-        "IAM role for multilambda." + domain))
-    lambda_bucket = aws.get_lambda_s3_bucket(session)
 
-    config.add_lambda(
-        "downsampleVolumeLambda",
-        names.downsample_volume_lambda,
-        Ref("LambdaCacheExecutionRole"),
-        s3=(aws.get_lambda_s3_bucket(session),
-            "multilambda.{}.zip".format(domain),
-            "downsample_volume.handler"),
-        timeout=120,
-        memory=1024,
-        runtime='python3.6')
+    # Downsample / Resolution Hierarchy support
+    lambda_role = aws.role_arn_lookup(session, "lambda_resolution_hierarchy")
+
+    config.add_lambda("DownsampleVolumeLambda",
+                      names.downsample_volume_lambda,
+                      lambda_role,
+                      s3=(aws.get_lambda_s3_bucket(session),
+                          "multilambda.{}.zip".format(domain),
+                          "downsample_volume.handler"),
+                      timeout=120,
+                      memory=1024,
+                      runtime='python3.6',
+                      dlq = Arn('DownsampleDLQ'))
 
     config.add_dynamo_table("DownsampleStatus",
                             names.downsample_status,
@@ -144,7 +142,7 @@ def create_config(session, domain):
 
     config.add_lambda('DonwsampleDLQLambda',
                       names.downsample_dlq,
-                      aws.role_arn_lookup(session, 'lambda_resolution_hierarchy'),
+                      lambda_role,
                       const.DOWNSAMPLE_DLQ_LAMBDA,
                       handler='index.handler',
                       timeout=10)
