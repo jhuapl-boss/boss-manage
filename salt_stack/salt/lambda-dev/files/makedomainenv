@@ -75,11 +75,11 @@ else
    fi
 
    cd ~/virtualenvs/${1}/local/lib/python3.6/dist-packages
-   chmod -R 077 *
+   chmod -R 0777 *
    zip -r9 ~/lambdazips/multilambda.${1}.zip *
 
    cd ~/virtualenvs/${1}/local/lib/python3.6/site-packages
-   chmod -R 077 *
+   chmod -R 0777 *
    zip -r9 ~/lambdazips/multilambda.${1}.zip *
 
    cd ~/virtualenvs/${1}/lib64/atlas
