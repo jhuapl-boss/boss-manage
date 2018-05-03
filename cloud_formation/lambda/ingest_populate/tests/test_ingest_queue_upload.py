@@ -180,12 +180,7 @@ class TestIngestQueueUploadLambda(unittest.TestCase):
         dict = {}
         msgs = iqu.create_messages(args)
         for msg_json in msgs:
-            msg = json.loads(msg_json)
-            parts = msg["chunk_key"].split("&", 6)
-            chunk = parts[-1].replace("&", "  ")
-            parts = msg["tile_key"].split("&", 5)
-            tile = parts[-1].replace("&", "  ")
-            ct_key = "{} --- {}".format(chunk, tile)
+            ct_key = self.generate_chunk_tile_key(msg_json)
             if ct_key not in dict:
                 dict[ct_key] = 1
             else:
@@ -205,12 +200,7 @@ class TestIngestQueueUploadLambda(unittest.TestCase):
             #print("Skip: " + str(skip))
             msgs = iqu.create_messages(args)
             for msg_json in msgs:
-                msg = json.loads(msg_json)
-                parts = msg["chunk_key"].split("&", 6)
-                chunk = parts[-1].replace("&", "  ")
-                parts = msg["tile_key"].split("&", 5)
-                tile = parts[-1].replace("&", "  ")
-                ct_key = "{} --- {}".format(chunk, tile)
+                ct_key = self.generate_chunk_tile_key(msg_json)
                 if ct_key in dict:
                     del dict[ct_key]
                 else:
@@ -219,6 +209,22 @@ class TestIngestQueueUploadLambda(unittest.TestCase):
         # Verify Dictionary has no left over tiles.
         self.assertEqual(len(dict), 0)
 
+    def generate_chunk_tile_key(self, msg_json):
+        """
+        Generate a key to track messages for testing.
+
+        Args:
+            msg_json (str): JSON message encoded as string intended for the upload queue.
+
+        Returns:
+            (str): Unique key identifying message.
+        """
+        msg = json.loads(msg_json)
+        parts = msg["chunk_key"].split("&", 6)
+        chunk = parts[-1].replace("&", "  ")
+        parts = msg["tile_key"].split("&", 5)
+        tile = parts[-1].replace("&", "  ")
+        return "{} --- {}".format(chunk, tile)
 
     # Test for Catmaid Need to be moved to a separate test file.
     # It can't be in the same file as @patch('boto3.resource') on the top class.
