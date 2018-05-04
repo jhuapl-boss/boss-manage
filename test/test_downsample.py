@@ -24,10 +24,12 @@ import json
 from lib import aws
 from lib.hosts import PROD_ACCOUNT, DEV_ACCOUNT
 from lib.names import AWSNames
+from multiprocessing.pool import Pool
 import os
 from spdb.c_lib.ndtype import CUBOIDSIZE
 from spdb.spatialdb import AWSObjectStore, Cube
 from spdb.project.basicresource import BossResourceBasic
+from sys import stdout
 
 """
 Script for running the downsample process against test data.
@@ -229,12 +231,11 @@ class TestDownsample(object):
 
         return start_args
 
-    def upload_data(self, session, args):
+    def upload_data(self, aws_creds, region, args):
         """
         Fill the coord frame with random data.
 
         Args:
-            session (boto3.Session): Open session.
             args (dict): This should be the dict returned by get_downsample_args().
         """
         cuboid_size = CUBOIDSIZE[0]
@@ -252,19 +253,101 @@ class TestDownsample(object):
         resolution = 0
         ts = 0
 
-        bucket = S3Bucket(session, args['s3_bucket'])
+        process_args = (
+            aws_creds, region, resolution, resource, ts, cuboid_size, 
+            args['s3_bucket'])
+
+        global common_process_data
+        common_process_data = CommonProcessData(*process_args)
+
         print('Uploading test data', end='')
-        for cube in xyz_range(extents_in_cuboids):
-            key = AWSObjectStore.generate_object_key(resource, resolution, ts, cube.morton)
-            #print('morton: {}'.format(cube.morton))
-            #print('key: {}'.format(key))
-            cube = Cube.create_cube(resource, [x_dim, y_dim, z_dim])
-            cube.random()
-            data = cube.to_blosc()
-            bucket.put(key, data)
-            print('.', end='')
-        print('.')
+        with Pool(initializer=init_upload_process) as pool:
+            mortons = [cube.morton for cube in xyz_range(extents_in_cuboids)]
+            pool.map_async(upload_worker, mortons, error_callback=worker_error_callback)
+            pool.close()
+            pool.join()
         print('Done uploading.')
+
+
+class CommonProcessData(object):
+    """
+    Storage class for data that worker processes will "inherit" from the
+    parent process.
+
+    Attributes:
+        aws_creds (str): JSON credential data encoded in a string.
+        region (str): AWS region to run in.
+        resolution (str|int): Resolution of cuboid data.
+        ts (str|int): Experiment time step.
+        cube_dims (list[int]): Cuboid dimensions in X, Y, Z.
+        bucket_name (str): Name of S3 bucket to upload to.
+        session (boto3.Session): Created from args provided to constructor.
+        s3 (S3Bucket): Wrapper class for uploading to S3 bucket.
+    """
+    def __init__(
+        self, aws_creds, region, resolution, resource, ts, cube_dims, 
+        bucket_name
+    ):
+        self.aws_creds = aws_creds
+        self.region = region
+        self.resolution = resolution
+        self.resource = resource
+        self.ts = ts
+        self.cube_dims = cube_dims
+        self.bucket_name = bucket_name
+
+        # Can't pickle Boto3 Session or S3Bucket, so set to None for now.
+        self.session = None
+        self.s3 = None
+
+
+    def init_s3_bucket(self):
+        """
+        Creates S3Bucket.  Must be called by worker process because S3Bucket
+        cannot be pickled and passed from the main process to the worker
+        process.
+        """
+        self.session = aws.create_session(self.aws_creds)
+        self.s3 = S3Bucket(self.session, self.bucket_name)
+
+
+# Global variable with data needed by worker processes that do the actual
+# upload.  It will hold an instance of CommonProcessData.  Will be initially
+# populated in the main process and "inherited" by the worker processes.
+common_process_data = None
+
+
+def init_upload_process():
+    """
+    Initialize a process that will be part of a multiprocessing.Pool.  Creates
+    the S3Bucket needed for uploading.
+    """
+    global common_process_data
+    common_process_data.init_s3_bucket()
+
+
+def upload_worker(morton):
+    """
+    Multiprocessing worker function.
+
+    Args:
+        morton (str|int): Morton of cuboid to upload.
+    """
+    global common_process_data
+    key = AWSObjectStore.generate_object_key(
+        common_process_data.resource, common_process_data.resolution,
+        common_process_data.ts, morton)
+    cube = Cube.create_cube(
+        common_process_data.resource, common_process_data.cube_dims)
+    cube.random()
+    data = cube.to_blosc()
+    common_process_data.s3.put(key, data)
+    print('.', end='')
+    stdout.flush()
+
+
+def worker_error_callback(ex):
+    print('Upload error: {}'.format(ex))
 
 
 def parse_args():
@@ -325,7 +408,9 @@ if __name__ == '__main__':
     session = aws.create_session(args.aws_credentials)
 
     if not args.noupload:
-        ds_test.upload_data(session, start_args)
+        args.aws_credentials.seek(0)
+        creds = args.aws_credentials.read()
+        ds_test.upload_data(creds, args.region, start_args)
 
     sfn = session.client('stepfunctions')
     resp = sfn.start_execution(
