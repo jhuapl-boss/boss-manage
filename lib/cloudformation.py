@@ -1666,7 +1666,7 @@ class CloudFormationConfiguration:
             self.resources[key]["DependsOn"] = depends_on
 
         if dlq is not None:
-            self.resources[key]['DeadLetterConfig'] = {
+            self.resources[key]['Properties']['DeadLetterConfig'] = {
                 'TargetArn': dlq
             }
 

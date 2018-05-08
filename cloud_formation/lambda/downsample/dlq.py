@@ -15,7 +15,12 @@
 import boto3
 import json
 
-def lambda_handler(event, context):
-    sqs = boto3.client('sqs')
-    queue_arn = event[0]['args']['downsample_queue']
-    sqs.send_message(QueueUrl = queue_arn, MessageBody = json.dumps(event))
+def handler(event, context):
+    try:
+        sqs = boto3.client('sqs')
+        args = json.loads(event['Records'][0]['Sns']['Message'])
+        queue_arn = args['bucket_args'][0]['args']['downsample_dlq']
+        sqs.send_message(QueueUrl = queue_arn, MessageBody = json.dumps(event))
+    except:
+        print("Event: {}".format(json.dumps(event, indent=3)))
+        raise

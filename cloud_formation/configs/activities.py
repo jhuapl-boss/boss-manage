@@ -122,25 +122,14 @@ def create_config(session, domain):
                       timeout=120,
                       memory=1024,
                       runtime='python3.6',
-                      dlq = Arn('DownsampleDLQ'))
-
-    config.add_dynamo_table("DownsampleStatus",
-                            names.downsample_status,
-                            attributes = {
-                                'downsample_id': 'S',
-                                'cube_morton': 'N'
-                            },
-                            key_schema = {
-                                'downsample_id': 'HASH'
-                            },
-                            throughput=(10, 10)) # 10 reads / writes per second
+                      dlq = Ref('DownsampleDLQ'))
 
     config.add_sns_topic("DownsampleDLQ",
                          names.downsample_dlq,
                          names.downsample_dlq,
-                         [('lambda', Arn('DownsampleDLQLambda'))]
+                         [('lambda', Arn('DownsampleDLQLambda'))])
 
-    config.add_lambda('DonwsampleDLQLambda',
+    config.add_lambda('DownsampleDLQLambda',
                       names.downsample_dlq,
                       lambda_role,
                       const.DOWNSAMPLE_DLQ_LAMBDA,
@@ -212,7 +201,7 @@ def post_init(session, domain):
     sfn.create(session, names.ingest_queue_populate, domain, 'ingest_queue_populate.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.ingest_queue_upload, domain, 'ingest_queue_upload.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.resolution_hierarchy, domain, 'resolution_hierarchy.hsd', 'StatesExecutionRole-us-east-1')
-    sfn.create(session, names.downsample_volume, domain, 'downsample_volume.hsd', 'StatesExecutionRole-us-east-1')
+    #sfn.create(session, names.downsample_volume, domain, 'downsample_volume.hsd', 'StatesExecutionRole-us-east-1')
 
 
 def delete(session, domain):
@@ -232,4 +221,4 @@ def delete_sfns(session, domain):
     sfn.delete(session, names.ingest_queue_populate)
     sfn.delete(session, names.ingest_queue_upload)
     sfn.delete(session, names.resolution_hierarchy)
-    sfn.delete(session, names.downsample_volume)
+    #sfn.delete(session, names.downsample_volume)
