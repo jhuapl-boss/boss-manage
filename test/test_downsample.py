@@ -70,6 +70,7 @@ To run the test again with the same data, use:
 
 # Format string for building the first part of step function's arn.
 SFN_ARN_PREFIX_FORMAT = 'arn:aws:states:{}:{}:stateMachine:'
+LAMBDA_ARN_FORMAT = 'arn:aws:lambda:{}:{}:function:{}'
 
 def ceildiv(a, b):
     """
@@ -205,26 +206,34 @@ class TestDownsample(object):
             # resolution_hierarchy_sfn is used by the test script, but not by the
             # actual resolution hiearchy step function that the script invokes.
             'resolution_hierarchy_sfn': '{}{}'.format(sfn_arn_prefix, names.resolution_hierarchy),
-            'downsample_volume_sfn': '{}{}'.format(sfn_arn_prefix, names.downsample_volume),
-            'res_lt_max': True,
-            's3_index': names.s3_index,
-            's3_bucket': names.cuboid_bucket,
+
+            'downsample_volume_lambda': LAMBDA_ARN_FORMAT.format(region, self.account, names.downsample_volume_lambda),
+
             'collection_id': 'collfake',
             'experiment_id': 'expfake',
             'channel_id': self.chan_id,
-            'resolution_max': 2,
-            'iso_resolution': 3,
             'annotation_channel': False,
-            'resolution': 0,
-            'aws_region': region,
-            'type': 'anisotropic',
             'data_type': 'uint8',
+
+            's3_index': names.s3_index,
+            's3_bucket': names.cuboid_bucket,
+
             'x_start': 0,
             'y_start': 0,
             'z_start': 0,
+
             'x_stop': self.frame[0],
             'y_stop': self.frame[1],
-            'z_stop': self.frame[2]
+            'z_stop': self.frame[2],
+
+            'resolution': 0,
+            'resolution_max': 2,
+            'res_lt_max': True,
+
+            'type': 'anisotropic',
+            'iso_resolution': 3,
+
+            'aws_region': region,
         }
 
         return start_args
@@ -251,18 +260,24 @@ class TestDownsample(object):
         resource.from_dict(self.get_image_dict())
         resolution = 0
         ts = 0
+        version = 0
 
+        # DP HACK: uploading all cubes will take longer than the actual downsample
+        #          just upload the first volume worth of cubes and update the activity
+        #          to only use the first volume of cube data
         bucket = S3Bucket(session, args['s3_bucket'])
-        print('Uploading test data', end='')
-        for cube in xyz_range(extents_in_cuboids):
+        print('Uploading test data', end='', flush=True)
+        for cube in xyz_range(XYZ(0,0,0), XYZ(2,2,2)):
             key = AWSObjectStore.generate_object_key(resource, resolution, ts, cube.morton)
+            key += "&0" # Add the version number
             #print('morton: {}'.format(cube.morton))
             #print('key: {}'.format(key))
+            #print("{} -> {} -> {}".format(cube, cube.morton, key))
             cube = Cube.create_cube(resource, [x_dim, y_dim, z_dim])
             cube.random()
             data = cube.to_blosc()
             bucket.put(key, data)
-            print('.', end='')
+            print('.', end='', flush=True)
         print('.')
         print('Done uploading.')
 
