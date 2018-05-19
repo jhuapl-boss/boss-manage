@@ -1,0 +1,16 @@
+--- rpdb2.py	2018-05-19 07:22:37.149859200 -0700
++++ rpdb2.py	2018-05-19 07:21:55.232203600 -0700
+@@ -13679,8 +13679,11 @@
+ 
+ 
+ def __getsignal(signum):
+-    handler = g_signal_handlers.get(signum, g_signal_getsignal(signum))
+-    return handler
++    try:
++        handler = g_signal_handlers.get(signum, g_signal_getsignal(signum))
++        return handler
++    except ValueError:
++        return None
+ 
+ 
+ 

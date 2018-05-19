@@ -209,6 +209,8 @@ class TestDownsample(object):
 
             'downsample_volume_lambda': LAMBDA_ARN_FORMAT.format(region, self.account, names.downsample_volume_lambda),
 
+            'test': True,
+
             'collection_id': 'collfake',
             'experiment_id': 'expfake',
             'channel_id': self.chan_id,
