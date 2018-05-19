@@ -24,10 +24,12 @@ import json
 from lib import aws
 from lib.hosts import PROD_ACCOUNT, DEV_ACCOUNT
 from lib.names import AWSNames
+from multiprocessing.pool import Pool
 import os
 from spdb.c_lib.ndtype import CUBOIDSIZE
 from spdb.spatialdb import AWSObjectStore, Cube
 from spdb.project.basicresource import BossResourceBasic
+from sys import stdout
 
 """
 Script for running the downsample process against test data.
@@ -240,23 +242,17 @@ class TestDownsample(object):
 
         return start_args
 
-    def upload_data(self, session, args):
+    def upload_data(self, aws_creds, region, args):
         """
         Fill the coord frame with random data.
 
         Args:
-            session (boto3.Session): Open session.
             args (dict): This should be the dict returned by get_downsample_args().
         """
         cuboid_size = CUBOIDSIZE[0]
         x_dim = cuboid_size[0]
         y_dim = cuboid_size[1]
         z_dim = cuboid_size[2]
-
-        x_extent = ceildiv(args['x_stop'], x_dim)
-        y_extent = ceildiv(args['y_stop'], y_dim)
-        z_extent = ceildiv(args['z_stop'], z_dim)
-        extents_in_cuboids = XYZ(x_extent, y_extent, z_extent)
 
         resource = BossResourceBasic()
         resource.from_dict(self.get_image_dict())
@@ -282,7 +278,6 @@ class TestDownsample(object):
             print('.', end='', flush=True)
         print('.')
         print('Done uploading.')
-
 
 def parse_args():
     """
@@ -342,7 +337,9 @@ if __name__ == '__main__':
     session = aws.create_session(args.aws_credentials)
 
     if not args.noupload:
-        ds_test.upload_data(session, start_args)
+        args.aws_credentials.seek(0)
+        creds = args.aws_credentials.read()
+        ds_test.upload_data(creds, args.region, start_args)
 
     sfn = session.client('stepfunctions')
     resp = sfn.start_execution(
