@@ -17,10 +17,16 @@ import json
 
 def handler(event, context):
     try:
-        sqs = boto3.client('sqs')
+        sqs = boto3.resource('sqs')
         args = json.loads(event['Records'][0]['Sns']['Message'])
         queue_arn = args['bucket_args'][0]['args']['downsample_dlq']
-        sqs.send_message(QueueUrl = queue_arn, MessageBody = json.dumps(event))
+        try:
+            queue = sqs.Queue(queue_arn)
+            queue.load()
+        except:
+            print("Target queue '{}' no longer exists".format(queue_arn))
+            return
+        queue.send_message(MessageBody = json.dumps(event))
     except:
         print("Event: {}".format(json.dumps(event, indent=3)))
         raise
