@@ -103,7 +103,8 @@ def create_config(session, domain):
                       aws.role_arn_lookup(session, 'IngestQueueUpload'),
                       const.INGEST_LAMBDA,
                       handler="index.handler",
-                      timeout=60 * 5)
+                      timeout=60 * 5,
+                      memory=3008)
 
     config.add_lambda_permission("IngestLambdaExecute", Ref("IngestLambda"))
 

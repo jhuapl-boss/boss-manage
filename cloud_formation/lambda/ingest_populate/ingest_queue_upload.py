@@ -127,21 +127,7 @@ def create_messages(args):
         for z in range(args['z_start'], args['z_stop'], args['z_chunk_size']):
             for y in range_('y'):
                 for x in range_('x'):
-                    chunk_x = int(x/tile_size('x'))
-                    chunk_y = int(y/tile_size('y'))
-                    chunk_z = int(z/args['z_chunk_size'])
-
                     num_of_tiles = min(args['z_chunk_size'], args['z_stop'] - z)
-
-                    chunk_key = hashed_key(num_of_tiles,
-                                           args['project_info'][0],
-                                           args['project_info'][1],
-                                           args['project_info'][2],
-                                           args['resolution'],
-                                           chunk_x,
-                                           chunk_y,
-                                           chunk_z,
-                                           t)
 
                     for tile in range(z, z + num_of_tiles):
                         if tiles_to_skip > 0:
@@ -151,8 +137,21 @@ def create_messages(args):
                         if count_in_offset == 0:
                             print("Finished skipping tiles")
 
+                        chunk_x = int(x / tile_size('x'))
+                        chunk_y = int(y / tile_size('y'))
+                        chunk_z = int(z / args['z_chunk_size'])
+                        chunk_key = hashed_key(num_of_tiles,
+                                               args['project_info'][0],
+                                               args['project_info'][1],
+                                               args['project_info'][2],
+                                               args['resolution'],
+                                               chunk_x,
+                                               chunk_y,
+                                               chunk_z,
+                                               t)
+
                         count_in_offset += 1
-                        if count_in_offset % 1000 == 0:
+                        if count_in_offset % args['MAX_NUM_TILES_PER_LAMBDA'] == 0:
                             print("count_in_offset: " + str(count_in_offset))
                         if count_in_offset > args['MAX_NUM_TILES_PER_LAMBDA']:
                             return  # end the generator
