@@ -38,7 +38,9 @@ class AWSNames(object):
             (AWSNames)
 
         """
-        domain = name.split('-', 1)[1]
+        # Lambdas names can't have periods; restore proper name.
+        dotted_name = name.replace('-', '.')
+        domain = dotted_name.split('.', 1)[1]
         return cls(domain)
 
     ##################################
