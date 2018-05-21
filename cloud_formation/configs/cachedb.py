@@ -22,12 +22,9 @@ Create the cachedb configuration which consists of
   * Lambdas
   * SNS topics
   * SQS queues
-
-This will most likely be merged into production once it is finished.
-
 """
 
-from lib.cloudformation import CloudFormationConfiguration, Arg, Ref
+from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, Arn
 from lib.userdata import UserData
 from lib.names import AWSNames
 from lib.external import ExternalCalls
@@ -139,6 +136,9 @@ def create_config(session, domain, keypair=None, user_data=None):
                                 user_data=parsed_user_data,
                                 role="cachemanager")
 
+    config.add_sqs_queue(
+        names.ingest_cleanup_dlq, names.ingest_cleanup_dlq, 30, 20160)
+
     lambda_bucket = aws.get_lambda_s3_bucket(session)
     config.add_lambda("MultiLambda",
                       names.multi_lambda,
@@ -151,6 +151,26 @@ def create_config(session, domain, keypair=None, user_data=None):
                       security_groups=[Ref('InternalSecurityGroup')],
                       subnets=lambda_subnets,
                       runtime='python3.6')
+    config.add_lambda("DeleteTileObjsLambda",
+                      names.delete_tile_objs_lambda,
+                      Ref("LambdaCacheExecutionRole"),
+                      s3=(aws.get_lambda_s3_bucket(session),
+                          "multilambda.{}.zip".format(domain),
+                          "delete_tile_objs_lambda.handler"),
+                      timeout=90,
+                      memory=128,
+                      runtime='python3.6',
+                      dlq=Arn(names.ingest_cleanup_dlq))
+    config.add_lambda("DeleteTileEntryLambda",
+                      names.delete_tile_index_entry_lambda,
+                      Ref("LambdaCacheExecutionRole"),
+                      s3=(aws.get_lambda_s3_bucket(session),
+                          "multilambda.{}.zip".format(domain),
+                          "delete_tile_index_entry_lambda.handler"),
+                      timeout=90,
+                      memory=128,
+                      runtime='python3.6',
+                      dlq=Arn(names.ingest_cleanup_dlq))
 
     if creating_tile_bucket:
         config.add_lambda_permission(
@@ -239,6 +259,19 @@ def pre_init(session, domain):
     """
     bucket = aws.get_lambda_s3_bucket(session)
     load_lambdas_on_s3(session, domain, bucket)
+
+
+def update(session, domain):
+    config = create_config(session, domain)
+    success = config.update(session)
+
+    resp = input('Rebuild multilambda: [Y/n]:')
+    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
+        pre_init(session, domain)
+        bucket = aws.get_lambda_s3_bucket(session)
+        update_lambda_code(session, domain, bucket)
+
+    return success
 
 
 def post_init(session, domain):

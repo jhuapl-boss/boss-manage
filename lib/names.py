@@ -25,6 +25,24 @@ class AWSNames(object):
         self.base = base
         self.base_dot = '.' + base
 
+    @classmethod
+    def create_from_lambda_name(cls, name):
+        """
+        Instantiate AWSNames from the name of a lambda function.  Used by
+        lambdas so they can look up names of other resources.
+
+        Args:
+            name (str): Name of lambda function (ex: multiLambda-integration-boss)
+
+        Returns:
+            (AWSNames)
+
+        """
+        # Lambdas names can't have periods; restore proper name.
+        dotted_name = name.replace('-', '.')
+        domain = dotted_name.split('.', 1)[1]
+        return cls(domain)
+
     ##################################
     # Generic rules for different type of AWS resources
     def subnet(self, name):
@@ -69,7 +87,10 @@ class AWSNames(object):
         "s3_index": "s3index",
         "ingest_bucket": "ingest",
         "tile_bucket": "tiles",
+        "delete_tile_objs_lambda": 'deleteTileObjsLambda',
         "tile_index": "tileindex",
+        "delete_tile_index_entry_lambda": 'deleteTileEntryLambda',
+        "ingest_cleanup_dlq": "IngestCleanupDlq",
         "id_index": "idIndex",
         "id_count_index": "idCount",
         "s3flush_queue": "S3flush",
@@ -111,12 +132,14 @@ class AWSNames(object):
         fq_hostname = hostname + self.base_dot
 
         if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'consul_monitor', 'vault_consul_check',
-                    'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 'downsample_dlq', 'downsample_volume_lambda']:
+                    'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 'downsample_dlq', 'downsample_volume_lambda',
+                    'delete_tile_objs_lambda', 'delete_tile_index_entry_lambda']:
             fq_hostname = fq_hostname.replace('.','-')
 
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
                     'ingest_queue_populate', 'ingest_queue_upload', 'resolution_hierarchy',
-                    'downsample_volume', 'delete_experiment', 'delete_collection', 'delete_coord_frame']:
+                    'downsample_volume', 'delete_experiment', 'delete_collection', 'delete_coord_frame',
+                    'ingest_cleanup_dlq']:
             fq_hostname = "".join(map(lambda x: x.capitalize(), fq_hostname.split('.')))
 
         return fq_hostname
