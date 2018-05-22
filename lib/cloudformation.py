@@ -1635,8 +1635,8 @@ class CloudFormationConfiguration:
             raise Exception("Need source file or S3 bucket")
 
         memory = int(memory)
-        if memory < 128 or 1536 < memory:
-            raise Exception("Lambda memory should be between 128 and 1536")
+        if memory < 128 or 3008 < memory:
+            raise Exception("Lambda memory should be between 128 and 3008")
         if memory % 64 != 0:
             raise Exception("Lambda memory should be a multiple of 64")
 
