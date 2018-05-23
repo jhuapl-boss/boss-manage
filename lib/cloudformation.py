@@ -1591,7 +1591,7 @@ class CloudFormationConfiguration:
         }
 
 
-    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python2.7"):
+    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python2.7", reserved_executions=None):
         """Create a Python Lambda
 
         Args:
@@ -1611,6 +1611,7 @@ class CloudFormationConfiguration:
             depends_on (None|string|list) : A unique name or list of unique names of resources within the
                                             configuration and is used to determine the launch order of resources
             runtime (optional[string]) : Lambda runtime to use.  Defaults to "python2.7".
+            reserved_executions (optional[int]): Number of reserved concurrent executions for the lambda.
         """
 
         if file is not None:
@@ -1664,6 +1665,9 @@ class CloudFormationConfiguration:
 
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
+
+        if reserved_executions is not None:
+            self.resources[key]['Properties']['ReservedConcurrentExecutions'] = reserved_executions
 
     def add_lambda_permission(self, key, lambda_, action="lambda:invokeFunction", principal="sns.amazonaws.com", source=None, depends_on=None):
         """Add permissions to a Lambda
