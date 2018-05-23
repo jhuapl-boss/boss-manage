@@ -13,7 +13,7 @@
 [submodule "salt_stack/salt/ndingest/files/ndingest.git"]
 	path = salt_stack/salt/ndingest/files/ndingest.git
 	url = ../ndingest.git
-	branch = master
+	branch = ingest-lambda-timeout
 [submodule "salt_stack/salt/ingest-client/files/ingest-client.git"]
         path = salt_stack/salt/ingest-client/files/ingest-client.git
 	url = ../ingest-client.git
