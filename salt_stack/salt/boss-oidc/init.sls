@@ -30,3 +30,4 @@ bossoidc:
         - require:
             - pip: djangooidc
             - pip: oidcauth
+            
