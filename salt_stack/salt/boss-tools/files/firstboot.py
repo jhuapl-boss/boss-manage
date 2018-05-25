@@ -26,8 +26,6 @@
 ### END INIT INFO
 
 import os
-import site
-from importlib import reload
 import bossutils
 
 bossutils.utils.set_excepthook()
@@ -90,9 +88,6 @@ def set_hostname():
     bossutils.utils.execute("resolvconf -u")
 
 if __name__ == '__main__':
-    # *** Hack by SH to get oic to version 0.13.0
-    os.system('sudo pip install oic==0.13.0')
-    reload(site)
     logging.info("CONFIG_FILE = \"{}\"".format(bossutils.configuration.CONFIG_FILE))
     logging.info("Creating /etc/boss (if it does not exist)")
     base_dir = os.path.dirname(bossutils.configuration.CONFIG_FILE)
