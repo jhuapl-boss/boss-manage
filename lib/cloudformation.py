@@ -467,21 +467,17 @@ class CloudFormationConfiguration:
         client = session.client('cloudformation')
 
         try:
-            # Make sure stack doesn't already exist.
-            client.describe_stacks(StackName=self.stack_name)
+            response = client.create_stack(
+                StackName = self.stack_name,
+                TemplateBody = self._create_template(),
+                Parameters = self.arguments,
+                Tags = [
+                    {"Key": "Commit", "Value": utils.get_commit()}
+                ]
+            )
+        except client.exceptions.AlreadyExistsException:
             print('{} already exists, aborting.'.format(self.stack_name))
             return False
-        except ValidationError:
-            pass
-
-        response = client.create_stack(
-            StackName = self.stack_name,
-            TemplateBody = self._create_template(),
-            Parameters = self.arguments,
-            Tags = [
-                {"Key": "Commit", "Value": utils.get_commit()}
-            ]
-        )
 
         rtn = None
         if wait:
