@@ -19,7 +19,7 @@ def handler(event, context):
     try:
         sqs = boto3.resource('sqs')
         args = json.loads(event['Records'][0]['Sns']['Message'])
-        queue_arn = args['bucket_args'][0]['args']['downsample_dlq']
+        queue_arn = args['dlq_arn']
         try:
             queue = sqs.Queue(queue_arn)
             queue.load()
