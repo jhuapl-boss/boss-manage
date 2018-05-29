@@ -79,7 +79,9 @@ def update_lambda_code(session, domain, bucket):
     names = AWSNames(domain)
     uses_multilambda = [
         names.multi_lambda, 
-        names.downsample_volume_lambda
+        names.downsample_volume_lambda,
+        names.delete_tile_objs_lambda,
+        names.delete_tile_index_entry_lambda
     ]
     client = session.client('lambda')
     for lambda_name in uses_multilambda:
@@ -131,6 +133,11 @@ def load_lambdas_on_s3(session, domain, bucket):
 
     os.chdir(const.repo_path("lib"))
     zip.write_to_zip('heaviside.git', zipname)
+
+    # Let lambdas look up names by creating a bossnames module.
+    zip.write_to_zip('names.py', zipname, arcname='bossnames/names.py')
+    zip.write_to_zip('hosts.py', zipname, arcname='bossnames/hosts.py')
+    zip.write_to_zip('__init__.py', zipname, arcname='bossnames/__init__.py')
     os.chdir(cwd)
 
     print("Copying local modules to lambda-build-server")
