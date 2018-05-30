@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
 import json
 from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, get_scenario, Arg
 from lib.userdata import UserData
@@ -86,7 +87,6 @@ def create_config(session, domain):
     user_data["aws"]["tile-index-table"] = names.tile_index
     user_data["aws"]["id-index-table"] = names.id_index
     user_data["aws"]["id-count-table"] = names.id_count_index
-    user_data["aws"]["downsample-table"] = names.downsample_status
 
     config.add_autoscale_group("Activities",
                                names.activities,
@@ -183,6 +183,12 @@ def update(session, domain):
     resp = input('Replace step functions: [Y/n]:')
     if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
         delete_sfns(session, domain)
+
+        # Need to delay so AWS actually removes the step functions before trying to create them
+        delay = 30
+        print("Step Functions deleted, waiting for {} seconds".format(delay))
+        time.sleep(delay)
+
         post_init(session, domain)
 
     return True
