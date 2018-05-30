@@ -34,6 +34,7 @@ from lib import scalyr
 from lib import constants as const
 
 import os
+import sys
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -414,9 +415,28 @@ def update(session, domain):
 
 def delete(session, domain):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
-    names = AWSNames(domain)
-    aws.route53_delete_records(session, domain, names.auth)
-    aws.route53_delete_records(session, domain, names.consul)
-    aws.route53_delete_records(session, domain, names.vault)
-    aws.sns_unsubscribe_all(session, names.dns)
-    CloudFormationConfiguration('core', domain).delete(session)
+
+    yes = {'yes','y', 'ye'}
+    no = {'no','n'}
+
+    #Check the action is desired.
+    sys.stdout.write("Are you sure you want to proceed? All data within current boss will be lost.[y/n]")
+    choice = input().lower()
+    if choice in no:
+        print("Action cancelled.")
+    elif choice in yes:
+        names = AWSNames(domain)
+        aws.route53_delete_records(session, domain, names.auth)
+        aws.route53_delete_records(session, domain, names.consul)
+        aws.route53_delete_records(session, domain, names.vault)
+        aws.sns_unsubscribe_all(session, names.dns)
+        CloudFormationConfiguration('core', domain).delete(session)
+    else:
+        print("Please respond with 'yes' or 'no'")
+
+    # names = AWSNames(domain)
+    # aws.route53_delete_records(session, domain, names.auth)
+    # aws.route53_delete_records(session, domain, names.consul)
+    # aws.route53_delete_records(session, domain, names.vault)
+    # aws.sns_unsubscribe_all(session, names.dns)
+    # CloudFormationConfiguration('core', domain).delete(session)
