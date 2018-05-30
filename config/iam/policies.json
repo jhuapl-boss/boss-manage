@@ -419,14 +419,30 @@
             "dynamodb:GetItem",
             "dynamodb:Query",
             "dynamodb:UpdateItem",
-            "sqs:GetQueueAttributes",
-            "sqs:CreateQueue",
-            "sqs:DeleteQueue",
-            "sqs:SendMessage"
+            "logs:CreateLogStream",
+            "logs:CreateLogGroup",
+            "logs:PutLogEvents",
+            "sns:Publish",
+            "lambda:InvokeFunction"
           ],
           "Effect": "Allow",
           "Resource": "*",
           "Sid": "VisualEditor0"
+        },
+        {
+          "Action": [
+            "sqs:DeleteMessage",
+            "sqs:DeleteMessageBatch",
+            "sqs:SendMessageBatch",
+            "sqs:ReceiveMessage",
+            "sqs:DeleteQueue",
+            "sqs:SendMessage",
+            "sqs:GetQueueAttributes",
+            "sqs:CreateQueue"
+          ],
+          "Effect": "Allow",
+          "Resource": "arn:aws:sqs:*:*:downsample-*",
+          "Sid": "VisualEditor1"
         }
       ],
       "Version": "2012-10-17"
