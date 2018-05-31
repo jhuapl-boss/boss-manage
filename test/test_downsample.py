@@ -20,6 +20,7 @@ import blosc
 from bossutils.multidimensional import XYZ, Buffer
 from bossutils.multidimensional import range as xyz_range
 import boto3
+from boto3.dynamodb.conditions import Attr
 import json
 from lib import aws
 from lib.hosts import PROD_ACCOUNT, DEV_ACCOUNT
@@ -34,8 +35,8 @@ from sys import stdout
 """
 Script for running the downsample process against test data.
 
-By default, fills the given coordinate frame with random data.  If coordinate
-frame extents are not provided, defaults to a large frame (see parse_args()).
+By default, fills the first 2x2x2 cubes of the channel with random data.  If
+coordinate frame extents are not provided, defaults to a large frame (see parse_args()).
 
 The test places data directly in the S3 cuboid bucket.  Artificial ids are used
 for the collection and experiment so that there is no chance of overwriting
@@ -242,7 +243,7 @@ class TestDownsample(object):
 
         return start_args
 
-    def upload_data(self, aws_creds, region, args):
+    def upload_data(self, session, args):
         """
         Fill the coord frame with random data.
 
@@ -261,8 +262,9 @@ class TestDownsample(object):
         version = 0
 
         # DP HACK: uploading all cubes will take longer than the actual downsample
-        #          just upload the first volume worth of cubes and update the activity
-        #          to only use the first volume of cube data
+        #          just upload the first volume worth of cubes.
+        #          The downsample volume lambda will only read these cubes when
+        #          passed the 'test' argument.
         bucket = S3Bucket(session, args['s3_bucket'])
         print('Uploading test data', end='', flush=True)
         for cube in xyz_range(XYZ(0,0,0), XYZ(2,2,2)):
@@ -276,8 +278,42 @@ class TestDownsample(object):
             data = cube.to_blosc()
             bucket.put(key, data)
             print('.', end='', flush=True)
-        print('.')
-        print('Done uploading.')
+        print(' Done uploading.')
+
+    def delete_data(self, session, args):
+        lookup_prefix = '&'.join([args['collection_id'], args['experiment_id'], args['channel_id']])
+
+        client = session.client('s3')
+        args_ = { 'Bucket': args['s3_bucket'] }
+        resp = { 'KeyCount': 1 }
+        count = 0
+
+        while resp['KeyCount'] > 0:
+            resp = client.list_objects_v2(**args_)
+            args_['ContinuationToken'] = resp['NextContinuationToken']
+            for obj in resp['Contents']:
+                if lookup_prefix in obj['Key']:
+                    count += 1
+                    client.delete_object(Bucket = args['s3_bucket'],
+                                         Key = obj['Key'])
+
+        print("Deleted {} cubes".format(count))
+
+
+    def delete_index_keys(self, session, args):
+        table = session.resource('dynamodb').Table(args['s3_index'])
+        lookup_prefix = '&'.join([args['collection_id'], args['experiment_id'], args['channel_id']])
+
+        resp = {'Count': 1}
+        while resp['Count'] > 0:
+            resp = table.scan(FilterExpression = Attr('lookup-key').begins_with(lookup_prefix))
+            print("Removing {} S3 index keys".format(resp['Count']))
+            for item in resp['Items']:
+                key = {
+                    'object-key': item['object-key'],
+                    'version-node': item['version-node'],
+                }
+                table.delete_item(Key = key)
 
 def parse_args():
     """
@@ -290,27 +326,31 @@ def parse_args():
         description='Script for testing downsample process. ' + 
         'To supply arguments from a file, provide the filename prepended with an `@`.',
         fromfile_prefix_chars = '@')
-    parser.add_argument(
-        '--aws-credentials', '-a',
-        metavar='<file>',
-        default=os.environ.get('AWS_CREDENTIALS'),
-        type=argparse.FileType('r'),
-        help='File with credentials for connecting to AWS (default: AWS_CREDENTIALS)')
-    parser.add_argument(
-        '--region', '-r',
-        default='us-east-1',
-        help='AWS region (default: us-east-1)')
-    parser.add_argument(
-        '--frame', '-f',
-        nargs=3,
-        type=int,
-        default=[277504, 277504, 1000],
-        help='Coordinate frame max extents (default: 277504, 277504, 1000)')
-    parser.add_argument(
-        '--noupload',
-        action='store_true',
-        default=False,
-        help="Don't upload any data to the channel")
+    parser.add_argument('--aws-credentials', '-a',
+                        metavar='<file>',
+                        default=os.environ.get('AWS_CREDENTIALS'),
+                        type=argparse.FileType('r'),
+                        help='File with credentials for connecting to AWS (default: AWS_CREDENTIALS)')
+    parser.add_argument('--region', '-r',
+                        default='us-east-1',
+                        help='AWS region (default: us-east-1)')
+    parser.add_argument('--frame', '-f',
+                        nargs=3,
+                        type=int,
+                        default=[277504, 277504, 1000],
+                        help='Coordinate frame max extents (default: 277504, 277504, 1000)')
+    parser.add_argument('--noupload',
+                        action='store_true',
+                        default=False,
+                        help="Don't upload any data to the channel")
+    parser.add_argument('--leave-index',
+                        action = 'store_true',
+                        default = False,
+                        help = "Don't remove S3 Index table test keys")
+    parser.add_argument('--remove-cubes',
+                        action = 'store_true',
+                        default = False,
+                        help = 'Remove S3 cubes related to testing')
     parser.add_argument(
         'domain',
         help='Domain that lambda functions live in, such as integration.boss')
@@ -336,10 +376,15 @@ if __name__ == '__main__':
 
     session = aws.create_session(args.aws_credentials)
 
+    if not args.leave_index:
+        ds_test.delete_index_keys(session, start_args)
+
+    if args.remove_cubes:
+        ds_test.delete_data(session, start_args)
+        import sys; sys.exit(0)
+
     if not args.noupload:
-        args.aws_credentials.seek(0)
-        creds = args.aws_credentials.read()
-        ds_test.upload_data(creds, args.region, start_args)
+        ds_test.upload_data(session, start_args)
 
     sfn = session.client('stepfunctions')
     resp = sfn.start_execution(
