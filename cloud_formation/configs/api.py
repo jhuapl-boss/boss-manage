@@ -441,25 +441,11 @@ def update(session, domain):
     return success
 
 def delete(session, domain):
-    yes = {'yes','y', 'ye', ''}
-    no = {'no','n'}
+    # NOTE: CloudWatch logs for the DNS Lambda are not deleted
 
-    #Check the action is desired.
-    sys.stdout.write("Are you sure you want to proceed? All data within current boss will be lost.[y/n]")
-    choice = input().lower()
-    if choice in no:
-        print("Action cancelled.")
-    elif choice in yes:
+    if utils.warn("All data will be lost. Are you sure you want to proceed?") == None:
         names = AWSNames(domain)
         aws.route53_delete_records(session, domain, names.endpoint)
         aws.sqs_delete_all(session, domain)
         aws.policy_delete_all(session, domain, '/ingest/')
         CloudFormationConfiguration('api', domain).delete(session)
-    else:
-        print("Please respond with 'yes' or 'no'")
-
-    # names = AWSNames(domain)
-    # aws.route53_delete_records(session, domain, names.endpoint)
-    # aws.sqs_delete_all(session, domain)
-    # aws.policy_delete_all(session, domain, '/ingest/')
-    # CloudFormationConfiguration('api', domain).delete(session)
