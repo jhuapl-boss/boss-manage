@@ -457,8 +457,9 @@ def update(session, domain):
     return success
 
 def delete(session, domain):
-    names = AWSNames(domain)
-    aws.route53_delete_records(session, domain, names.endpoint)
-    aws.sqs_delete_all(session, domain)
-    aws.policy_delete_all(session, domain, '/ingest/')
-    CloudFormationConfiguration('api', domain).delete(session)
+    if utils.get_user_confirm("All data will be lost. Are you sure you want to proceed?"):
+        names = AWSNames(domain)
+        aws.route53_delete_records(session, domain, names.endpoint)
+        aws.sqs_delete_all(session, domain)
+        aws.policy_delete_all(session, domain, '/ingest/')
+        CloudFormationConfiguration('api', domain).delete(session)
