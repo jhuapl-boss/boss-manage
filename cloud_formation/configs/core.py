@@ -415,8 +415,7 @@ def update(session, domain):
 
 def delete(session, domain):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
-
-    if utils.warn("All data will be lost. Are you sure you want to proceed?") == None:
+    if utils.get_user_confirm("All data will be lost. Are you sure you want to proceed?"):
         names = AWSNames(domain)
         aws.route53_delete_records(session, domain, names.auth)
         aws.route53_delete_records(session, domain, names.consul)
