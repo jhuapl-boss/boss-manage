@@ -175,7 +175,7 @@ def get_user_confirm(message):
     Returns:
         returns True if user confirms with yes
     """
-    resp = input(message + " [y/n]")
+    resp = input(message + " [y/N]")
     if len(resp) == 0 or resp[0] not in ('y', 'Y'):
         print("Canceled")
         return False
