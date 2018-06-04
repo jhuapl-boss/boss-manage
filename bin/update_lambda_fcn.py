@@ -177,6 +177,7 @@ def create_ndingest_settings(domain, fp):
     parser['aws']['cuboid_bucket'] = names.cuboid_bucket
     parser['aws']['tile_index_table'] = names.tile_index
     parser['aws']['cuboid_index_table'] = names.s3_index
+    parser['aws']['max_task_id_suffix'] = str(const.MAX_TASK_ID_SUFFIX)
 
     # parser['spdb']['SUPER_CUBOID_SIZE'] = CUBOIDSIZE[0]
     # ToDo: find way to always get cuboid size from spdb.
