@@ -16,6 +16,19 @@ import boto3
 import json
 
 def handler(event, context):
+    """Dead letter queue Lambda for downsampling process
+
+    The downsample volume lambda uses a SNS DLQ, which invokes
+    this lambda when there is an error with a lambda invocation.
+
+    This lambda then looks at the arguments passed to the failed lambda
+    to pull out the ARN/URL of a SQS queue specific to the downsample
+    process that the failed lambda was launched for and puts the
+    SNS event on that queue.
+
+    The downsample activity just checks the SQS queue count to see if
+    there are any error messages and will fail if there are any messages.
+    """
     try:
         sqs = boto3.resource('sqs')
         args = json.loads(event['Records'][0]['Sns']['Message'])
@@ -24,6 +37,9 @@ def handler(event, context):
             queue = sqs.Queue(queue_arn)
             queue.load()
         except:
+            # If the downsample activity already failed it will have already
+            # deleted the queue. If the queue doesn't exists don't cause
+            # this lambda to have an error message.
             print("Target queue '{}' no longer exists".format(queue_arn))
             return
         queue.send_message(MessageBody = json.dumps(event))
