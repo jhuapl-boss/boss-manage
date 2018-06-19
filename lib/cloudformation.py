@@ -477,7 +477,7 @@ class CloudFormationConfiguration:
             )
         except client.exceptions.AlreadyExistsException:
             print('{} already exists, aborting.'.format(self.stack_name))
-            return False
+            return None
 
         rtn = None
         if wait:

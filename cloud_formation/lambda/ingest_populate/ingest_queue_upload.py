@@ -109,7 +109,7 @@ def create_messages(args):
     range_ = lambda v: range(args[v + '_start'], args[v + '_stop'], tile_size(v))
 
     # DP NOTE: generic version of
-    # BossBackend.encode_chunk_key and BiossBackend.encode.tle_key
+    # BossBackend.encode_chunk_key and BiossBackend.encode.tile_key
     # from ingest-client/ingestclient/core/backend.py
     def hashed_key(*args):
         base = '&'.join(map(str,args))
@@ -151,8 +151,6 @@ def create_messages(args):
                                                t)
 
                         count_in_offset += 1
-                        if count_in_offset % args['MAX_NUM_TILES_PER_LAMBDA'] == 0:
-                            print("count_in_offset: " + str(count_in_offset))
                         if count_in_offset > args['MAX_NUM_TILES_PER_LAMBDA']:
                             return  # end the generator
                         tile_key = hashed_key(args['project_info'][0],
