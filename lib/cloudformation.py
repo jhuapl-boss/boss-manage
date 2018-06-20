@@ -955,7 +955,7 @@ class CloudFormationConfiguration:
 
         self._add_record_cname(key, hostname, rds = True)
 
-    def add_dynamo_table_from_json(self, key, name, KeySchema, AttributeDefinitions, ProvisionedThroughput, GlobalSecondaryIndexes=None):
+    def add_dynamo_table_from_json(self, key, name, KeySchema, AttributeDefinitions, ProvisionedThroughput, GlobalSecondaryIndexes=None, TimeToLiveSpecification=None):
         """Add DynamoDB table to the configuration using DynamoDB's calling convention.
 
         Example:
@@ -977,6 +977,7 @@ class CloudFormationConfiguration:
             AttributeDefinitions (list) : List of dict of AttributeName / AttributeType
             ProvisionedThroughput (dictionary) : Dictionary of ReadCapacityUnits / WriteCapacityUnits
             GlobalSecondaryIndexes (optional[list]): List of dicts representing global secondary indexes.  Defaults to None.
+            TimeToLiveSpecification (opitonal[dict]): Defines TTL attribute and whether it's enabled.
         """
 
         self.resources[key] = {
@@ -991,6 +992,9 @@ class CloudFormationConfiguration:
 
         if GlobalSecondaryIndexes is not None:
             self.resources[key]["Properties"]["GlobalSecondaryIndexes"] = GlobalSecondaryIndexes
+
+        if TimeToLiveSpecification is not None:
+            self.resources[key]["Properties"]["TimeToLiveSpecification"] = TimeToLiveSpecification
 
     def add_dynamo_table(self, key, name, attributes, key_schema, throughput):
         """Add an DynamoDB Table to the configuration
@@ -1596,7 +1600,7 @@ class CloudFormationConfiguration:
         }
 
 
-    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python2.7", reserved_executions=None):
+    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python2.7", reserved_executions=None, dlq=None):
         """Create a Python Lambda
 
         Args:
@@ -1673,6 +1677,11 @@ class CloudFormationConfiguration:
 
         if reserved_executions is not None:
             self.resources[key]['Properties']['ReservedConcurrentExecutions'] = reserved_executions
+
+        if dlq is not None:
+            self.resources[key]['Properties']['DeadLetterConfig'] = {
+                'TargetArn': dlq
+            }
 
     def add_lambda_permission(self, key, lambda_, action="lambda:invokeFunction", principal="sns.amazonaws.com", source=None, depends_on=None):
         """Add permissions to a Lambda

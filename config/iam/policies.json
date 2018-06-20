@@ -412,26 +412,37 @@
       "Statement": [
         {
           "Action": [
+            "s3:PutObject",
             "s3:GetObject",
-            "s3:PutObject"
+            "dynamodb:PutItem",
+            "dynamodb:DeleteItem",
+            "dynamodb:GetItem",
+            "dynamodb:Query",
+            "dynamodb:UpdateItem",
+            "logs:CreateLogStream",
+            "logs:CreateLogGroup",
+            "logs:PutLogEvents",
+            "sns:Publish",
+            "lambda:InvokeFunction"
           ],
           "Effect": "Allow",
-          "Resource": [
-            "*"
-          ],
-          "Sid": "Stmt1487283320000"
+          "Resource": "*",
+          "Sid": "VisualEditor0"
         },
         {
           "Action": [
-            "dynamodb:GetItem",
-            "dynamodb:PutItem",
-            "dynamodb:UpdateItem"
+            "sqs:DeleteMessage",
+            "sqs:DeleteMessageBatch",
+            "sqs:SendMessageBatch",
+            "sqs:ReceiveMessage",
+            "sqs:DeleteQueue",
+            "sqs:SendMessage",
+            "sqs:GetQueueAttributes",
+            "sqs:CreateQueue"
           ],
           "Effect": "Allow",
-          "Resource": [
-            "*"
-          ],
-          "Sid": "Stmt1487283447000"
+          "Resource": "arn:aws:sqs:*:*:downsample-*",
+          "Sid": "VisualEditor1"
         }
       ],
       "Version": "2012-10-17"

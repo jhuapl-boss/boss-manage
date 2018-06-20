@@ -55,6 +55,7 @@ DNS_LAMBDA = LAMBDA_DIR + '/updateRoute53/index.py'
 VAULT_LAMBDA = LAMBDA_DIR + '/monitors/chk_vault.py'
 CONSUL_LAMBDA = LAMBDA_DIR + '/monitors/chk_consul.py'
 INGEST_LAMBDA = LAMBDA_DIR + '/ingest_populate/ingest_queue_upload.py'
+DOWNSAMPLE_DLQ_LAMBDA = LAMBDA_DIR + '/downsample/dlq.py'
 
 
 ########################
@@ -64,6 +65,9 @@ SALT_DIR = repo_path('salt_stack', 'salt')
 DYNAMO_METADATA_SCHEMA = SALT_DIR + '/boss/files/boss.git/django/bosscore/dynamo_schema.json'
 DYNAMO_S3_INDEX_SCHEMA = SALT_DIR + '/spdb/files/spdb.git/spatialdb/dynamo/s3_index_table.json'
 DYNAMO_TILE_INDEX_SCHEMA  = SALT_DIR + '/ndingest/files/ndingest.git/nddynamo/schemas/boss_tile_index.json'
+# Max number to append to task id attribute of tile index (used to prevent hot
+# partitions when writing to the task_id_index GSI).
+MAX_TASK_ID_SUFFIX = 100
 # Annotation id to supercuboid table.
 DYNAMO_ID_INDEX_SCHEMA = SALT_DIR + '/spdb/files/spdb.git/spatialdb/dynamo/id_index_schema.json'
 # Annotation id count table (allows for reserving the next id in a channel).

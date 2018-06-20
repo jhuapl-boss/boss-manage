@@ -35,6 +35,7 @@ from lib import constants as const
 from lib import zip
 
 import argparse
+import botocore
 import configparser
 import os
 import sys
@@ -76,13 +77,23 @@ def get_lambda_zip_name(domain):
 
 def update_lambda_code(session, domain, bucket):
     names = AWSNames(domain)
+    uses_multilambda = [
+        names.multi_lambda, 
+        names.downsample_volume_lambda,
+        names.delete_tile_objs_lambda,
+        names.delete_tile_index_entry_lambda
+    ]
     client = session.client('lambda')
-    resp = client.update_function_code(
-        FunctionName=names.multi_lambda,
-        S3Bucket=bucket,
-        S3Key=get_lambda_zip_name(domain),
-        Publish=True)
-    print(resp)
+    for lambda_name in uses_multilambda:
+        try:
+            resp = client.update_function_code(
+                FunctionName=lambda_name,
+                S3Bucket=bucket,
+                S3Key=get_lambda_zip_name(domain),
+                Publish=True)
+            print(resp)
+        except botocore.exceptions.ClientError as ex:
+            print('Error updating {}: {}'.format(lambda_name, ex))
 
 # DP TODO: Move to a lib/ library
 def load_lambdas_on_s3(session, domain, bucket):
@@ -118,6 +129,15 @@ def load_lambdas_on_s3(session, domain, bucket):
 
     os.chdir(const.repo_path("salt_stack", "salt", "ndingest", "files"))
     zip.write_to_zip('ndingest.git', zipname)
+    os.chdir(cwd)
+
+    os.chdir(const.repo_path("lib"))
+    zip.write_to_zip('heaviside.git', zipname)
+
+    # Let lambdas look up names by creating a bossnames module.
+    zip.write_to_zip('names.py', zipname, arcname='bossnames/names.py')
+    zip.write_to_zip('hosts.py', zipname, arcname='bossnames/hosts.py')
+    zip.write_to_zip('__init__.py', zipname, arcname='bossnames/__init__.py')
     os.chdir(cwd)
 
     print("Copying local modules to lambda-build-server")
@@ -157,6 +177,7 @@ def create_ndingest_settings(domain, fp):
     parser['aws']['cuboid_bucket'] = names.cuboid_bucket
     parser['aws']['tile_index_table'] = names.tile_index
     parser['aws']['cuboid_index_table'] = names.s3_index
+    parser['aws']['max_task_id_suffix'] = str(const.MAX_TASK_ID_SUFFIX)
 
     # parser['spdb']['SUPER_CUBOID_SIZE'] = CUBOIDSIZE[0]
     # ToDo: find way to always get cuboid size from spdb.

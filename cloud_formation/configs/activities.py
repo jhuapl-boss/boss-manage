@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
 import json
 from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, get_scenario, Arg
 from lib.userdata import UserData
@@ -19,6 +20,7 @@ from lib.names import AWSNames
 from lib import aws
 from lib import constants as const
 from lib import stepfunctions as sfn
+from update_lambda_fcn import load_lambdas_on_s3, update_lambda_code
 
 keypair = None
 
@@ -108,6 +110,36 @@ def create_config(session, domain):
 
     config.add_lambda_permission("IngestLambdaExecute", Ref("IngestLambda"))
 
+
+    # Downsample / Resolution Hierarchy support
+    lambda_role = aws.role_arn_lookup(session, "lambda_resolution_hierarchy")
+
+    config.add_lambda("DownsampleVolumeLambda",
+                      names.downsample_volume_lambda,
+                      lambda_role,
+                      s3=(aws.get_lambda_s3_bucket(session),
+                          "multilambda.{}.zip".format(domain),
+                          "downsample_volume.handler"),
+                      timeout=120,
+                      memory=1024,
+                      runtime='python3.6',
+                      dlq = Ref('DownsampleDLQ'))
+
+    config.add_sns_topic("DownsampleDLQ",
+                         names.downsample_dlq,
+                         names.downsample_dlq,
+                         [('lambda', Arn('DownsampleDLQLambda'))])
+
+    config.add_lambda('DownsampleDLQLambda',
+                      names.downsample_dlq,
+                      lambda_role,
+                      const.DOWNSAMPLE_DLQ_LAMBDA,
+                      handler='index.handler',
+                      timeout=10)
+
+    config.add_lambda_permission('DownsampleDLQLambdaExecute',
+                                 Ref('DownsampleDLQLambda'))
+
     return config
 
 
@@ -119,11 +151,48 @@ def generate(session, domain):
 
 def create(session, domain):
     """Create the configuration, launch it, and initialize Vault"""
+    resp = input('Rebuild multilambda: [Y/n]:')
+    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
+        pre_init(session, domain)
+
     config = create_config(session, domain)
 
     success = config.create(session)
     if success:
         post_init(session, domain)
+
+
+def pre_init(session, domain):
+    """Build multilambda zip file and put in S3."""
+    bucket = aws.get_lambda_s3_bucket(session)
+    load_lambdas_on_s3(session, domain, bucket)
+
+
+def update(session, domain):
+    resp = input('Rebuild multilambda: [Y/n]:')
+    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
+        pre_init(session, domain)
+        bucket = aws.get_lambda_s3_bucket(session)
+        update_lambda_code(session, domain, bucket)
+
+    config = create_config(session, domain)
+    success = config.update(session)
+
+    if not success:
+        return False
+
+    resp = input('Replace step functions: [Y/n]:')
+    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
+        delete_sfns(session, domain)
+
+        # Need to delay so AWS actually removes the step functions before trying to create them
+        delay = 30
+        print("Step Functions deleted, waiting for {} seconds".format(delay))
+        time.sleep(delay)
+
+        post_init(session, domain)
+
+    return True
 
 
 def post_init(session, domain):
@@ -139,14 +208,18 @@ def post_init(session, domain):
     sfn.create(session, names.ingest_queue_populate, domain, 'ingest_queue_populate.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.ingest_queue_upload, domain, 'ingest_queue_upload.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.resolution_hierarchy, domain, 'resolution_hierarchy.hsd', 'StatesExecutionRole-us-east-1')
-    sfn.create(session, names.downsample_volume, domain, 'downsample_volume.hsd', 'StatesExecutionRole-us-east-1')
+    #sfn.create(session, names.downsample_volume, domain, 'downsample_volume.hsd', 'StatesExecutionRole-us-east-1')
 
 
 def delete(session, domain):
-    names = AWSNames(domain)
     # DP TODO: delete activities
     CloudFormationConfiguration('activities', domain).delete(session)
+    delete_sfns(session, domain)
 
+
+def delete_sfns(session, domain):
+    """Delete step functions."""
+    names = AWSNames(domain)
     sfn.delete(session, names.delete_cuboid)
     sfn.delete(session, names.delete_experiment)
     sfn.delete(session, names.delete_coord_frame)
@@ -155,4 +228,4 @@ def delete(session, domain):
     sfn.delete(session, names.ingest_queue_populate)
     sfn.delete(session, names.ingest_queue_upload)
     sfn.delete(session, names.resolution_hierarchy)
-    sfn.delete(session, names.downsample_volume)
+    #sfn.delete(session, names.downsample_volume)
