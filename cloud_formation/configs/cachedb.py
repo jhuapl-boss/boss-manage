@@ -32,7 +32,7 @@ from lib import aws
 from lib import scalyr
 from lib import constants as const
 
-from update_lambda_fcn import load_lambdas_on_s3
+from update_lambda_fcn import load_lambdas_on_s3, update_lambda_code
 import boto3
 import botocore
 
@@ -237,7 +237,8 @@ def create_config(session, domain, keypair=None, user_data=None):
 
 def generate(session, domain):
     """Create the configuration and save it to disk"""
-    config = create_config(session, domain)
+    keypair = aws.keypair_lookup(session)
+    config = create_config(session, domain, keypair)
     config.generate()
 
 
@@ -300,7 +301,9 @@ def pre_init(session, domain):
 
 
 def update(session, domain):
-    config = create_config(session, domain)
+    keypair = aws.keypair_lookup(session)
+
+    config = create_config(session, domain, keypair)
     success = config.update(session)
 
     resp = input('Rebuild multilambda: [Y/n]:')
