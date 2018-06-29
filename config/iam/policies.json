@@ -1,28 +1,39 @@
 [
   {
-    "Path": "/",
+    "Path": "/service-role/",
     "PolicyDocument": {
       "Statement": [
         {
           "Action": [
-            "aws-portal:ModifyAccount",
-            "aws-portal:ModifyBilling",
-            "aws-portal:ModifyPaymentMethods",
-            "aws-portal:ViewAccount",
-            "aws-portal:ViewBilling",
-            "aws-portal:ViewPaymentMethods",
-            "aws-portal:ViewUsage"
+            "dynamodb:DeleteItem",
+            "dynamodb:GetItem",
+            "dynamodb:PutItem",
+            "dynamodb:Scan",
+            "dynamodb:UpdateItem"
           ],
           "Effect": "Allow",
-          "Resource": [
-            "*"
-          ],
-          "Sid": "Stmt1446839853000"
+          "Resource": "arn:aws:dynamodb:us-east-1:451493790433:table/*"
         }
       ],
       "Version": "2012-10-17"
     },
-    "PolicyName": "aplBillingGroupPolicy"
+    "PolicyName": "AWSLambdaMicroserviceExecutionRole-2ee1090c-8266-4f05-b910-9951ec0ab658"
+  },
+  {
+    "Path": "/service-role/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "s3:GetObject"
+          ],
+          "Effect": "Allow",
+          "Resource": "arn:aws:s3:::*"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "AWSLambdaS3ExecutionRole-2a0110ca-6e60-4f94-8510-fdaf9ddfb583"
   },
   {
     "Path": "/",
@@ -86,12 +97,14 @@
         {
           "Action": [
             "cloudwatch:*",
+            "cloudformation:*",
             "cognito-identity:ListIdentityPools",
             "cognito-sync:GetCognitoEvents",
             "cognito-sync:SetCognitoEvents",
             "dynamodb:*",
             "events:*",
-            "iam:ListAttachedRolePolicies",
+            "iam:List*",
+            "iam:Get*",
             "iam:ListRolePolicies",
             "iam:ListRoles",
             "iam:PassRole",
@@ -264,6 +277,48 @@
     "PolicyName": "aplCloudFormationFullAccess"
   },
   {
+    "Path": "/service-role/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "dynamodb:PutItem"
+          ],
+          "Effect": "Allow",
+          "Resource": "arn:aws:dynamodb:us-east-1:451493790433:table/*"
+        },
+        {
+          "Action": [
+            "lambda:InvokeFunction"
+          ],
+          "Effect": "Allow",
+          "Resource": "arn:aws:lambda:us-east-1:451493790433:function:*"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "AWSLambdaTestHarnessExecutionRole-03257ae2-b691-4ced-be24-8ddf2ef976a5"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "sqs:*"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "*"
+          ],
+          "Sid": "Stmt1485812624000"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "aplPopulateUploadQueue"
+  },
+  {
     "Path": "/",
     "PolicyDocument": {
       "Statement": [
@@ -352,6 +407,163 @@
       "Statement": [
         {
           "Action": [
+            "iam:UpdateSSHPublicKey",
+            "iam:UpdateServerCertificate",
+            "iam:UpdateSigningCertificate",
+            "iam:UploadSSHPublicKey",
+            "iam:UploadServerCertificate",
+            "iam:UploadSigningCertificate"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "*"
+          ],
+          "Sid": "Stmt1454613958000"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "aplUploadCertificatePolicy"
+  },
+  {
+    "Path": "/service-role/",
+    "PolicyDocument": {
+      "Statement": {
+        "Action": [
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords"
+        ],
+        "Effect": "Allow",
+        "Resource": [
+          "*"
+        ]
+      },
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "AWSLambdaTracerAccessExecutionRole-683aea08-9fc8-4468-adfc-7d4af2c826bc"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "iam:AttachUserPolicy",
+            "iam:DetachUserPolicy",
+            "iam:ListAttachedUserPolicies"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "arn:aws:iam::*:user/vault-*"
+          ],
+          "Sid": "Stmt1473863272000"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "aplVaultAttachUserPolicy"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "aws-portal:ModifyAccount",
+            "aws-portal:ModifyBilling",
+            "aws-portal:ModifyPaymentMethods",
+            "aws-portal:ViewAccount",
+            "aws-portal:ViewBilling",
+            "aws-portal:ViewPaymentMethods",
+            "aws-portal:ViewUsage"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "*"
+          ],
+          "Sid": "Stmt1446839853000"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "aplBillingGroupPolicy"
+  },
+  {
+    "Path": "/service-role/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": "logs:CreateLogGroup",
+          "Effect": "Allow",
+          "Resource": "arn:aws:logs:us-east-1:451493790433:*"
+        },
+        {
+          "Action": [
+            "logs:CreateLogStream",
+            "logs:PutLogEvents"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "arn:aws:logs:us-east-1:451493790433:log-group:/aws/lambda/check:*"
+          ]
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "AWSLambdaBasicExecutionRole-18e45b2f-a398-4109-8f35-b79c82f6749b"
+  },
+  {
+    "Path": "/service-role/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "ec2:CreateNetworkInterface"
+          ],
+          "Effect": "Allow",
+          "Resource": "*"
+        },
+        {
+          "Action": [
+            "ec2:DescribeNetworkInterfaces",
+            "ec2:DeleteNetworkInterface"
+          ],
+          "Effect": "Allow",
+          "Resource": "arn:aws:ec2:us-east-1:451493790433:network-interface/*"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "AWSLambdaVPCAccessExecutionRole-b2075bb1-0254-4f5f-abe6-c012abd2a001"
+  },
+  {
+    "Path": "/service-role/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "dynamodb:DescribeTable",
+            "dynamodb:UpdateTable",
+            "cloudwatch:PutMetricAlarm",
+            "cloudwatch:DescribeAlarms",
+            "cloudwatch:GetMetricStatistics",
+            "cloudwatch:SetAlarmState",
+            "cloudwatch:DeleteAlarms"
+          ],
+          "Effect": "Allow",
+          "Resource": "*"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "DynamoDBAutoscalePolicy"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
             "iam:CreateUser",
             "iam:PutUserPolicy",
             "iam:CreateAccessKey"
@@ -365,89 +577,46 @@
     "PolicyName": "aplDynamicVaultUserPolicy"
   },
   {
+    "Path": "/service-role/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": "logs:CreateLogGroup",
+          "Effect": "Allow",
+          "Resource": "arn:aws:logs:us-east-1:451493790433:*"
+        },
+        {
+          "Action": [
+            "logs:CreateLogStream",
+            "logs:PutLogEvents"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "arn:aws:logs:us-east-1:451493790433:log-group:/aws/lambda/objectRecognitionHandler:*"
+          ]
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "AWSLambdaBasicExecutionRole-12d9102c-34c8-47da-9686-b9801b176487"
+  },
+  {
     "Path": "/",
     "PolicyDocument": {
       "Statement": [
         {
-          "Effect": "Allow",
-          "NotAction": [
-            "iam:*",
-            "aws-portal:*",
-            "ses:*",
-            "iot:",
-            "mobileanalytics:*",
-            "devicefarm:*",
-            "sns:*",
-            "zocalo:*"
+          "Action": [
+            "cloudformation:Describe*",
+            "cloudformation:List*",
+            "cloudformation:Get*"
           ],
+          "Effect": "Allow",
           "Resource": "*"
         }
       ],
       "Version": "2012-10-17"
     },
-    "PolicyName": "aplInstanceOwnerPolicy"
-  },
-  {
-    "Path": "/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "sqs:*"
-          ],
-          "Effect": "Allow",
-          "Resource": [
-            "*"
-          ],
-          "Sid": "Stmt1485812624000"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "aplPopulateUploadQueue"
-  },
-  {
-    "Path": "/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "s3:PutObject",
-            "s3:GetObject",
-            "dynamodb:PutItem",
-            "dynamodb:DeleteItem",
-            "dynamodb:GetItem",
-            "dynamodb:Query",
-            "dynamodb:UpdateItem",
-            "logs:CreateLogStream",
-            "logs:CreateLogGroup",
-            "logs:PutLogEvents",
-            "sns:Publish",
-            "lambda:InvokeFunction"
-          ],
-          "Effect": "Allow",
-          "Resource": "*",
-          "Sid": "VisualEditor0"
-        },
-        {
-          "Action": [
-            "sqs:DeleteMessage",
-            "sqs:DeleteMessageBatch",
-            "sqs:SendMessageBatch",
-            "sqs:ReceiveMessage",
-            "sqs:DeleteQueue",
-            "sqs:SendMessage",
-            "sqs:GetQueueAttributes",
-            "sqs:CreateQueue"
-          ],
-          "Effect": "Allow",
-          "Resource": "arn:aws:sqs:*:*:downsample-*",
-          "Sid": "VisualEditor1"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "aplResolutionHierarchy"
+    "PolicyName": "aplTestCloudFormation"
   },
   {
     "Path": "/",
@@ -475,69 +644,107 @@
     "PolicyDocument": {
       "Statement": [
         {
+          "Effect": "Allow",
+          "NotAction": [
+            "iam:*",
+            "aws-portal:*",
+            "ses:*",
+            "iot:",
+            "mobileanalytics:*",
+            "devicefarm:*",
+            "sns:*",
+            "zocalo:*"
+          ],
+          "Resource": "*"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "aplInstanceOwnerPolicy"
+  },
+  {
+    "Path": "/service-role/",
+    "PolicyDocument": {
+      "Statement": {
+        "Action": [
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords"
+        ],
+        "Effect": "Allow",
+        "Resource": [
+          "*"
+        ]
+      },
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "AWSLambdaTracerAccessExecutionRole-ff12834d-2eb4-44cb-9130-1ce3a86f1b76"
+  },
+  {
+    "Path": "/service-role/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": "logs:CreateLogGroup",
+          "Effect": "Allow",
+          "Resource": "arn:aws:logs:us-east-1:451493790433:*"
+        },
+        {
           "Action": [
-            "s3:AbortMultipartUpload",
-            "s3:DeleteObject",
+            "logs:CreateLogStream",
+            "logs:PutLogEvents"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "arn:aws:logs:us-east-1:451493790433:log-group:/aws/lambda/SnowballTest:*"
+          ]
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "AWSLambdaBasicExecutionRole-28085153-2e10-4740-8166-7090f779f1c7"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
             "s3:PutObject",
-            "s3:ListMultipartUploadParts",
-            "s3:ListBucketMultipartUploads"
+            "s3:GetObject",
+            "logs:CreateLogStream",
+            "sns:Publish",
+            "dynamodb:PutItem",
+            "lambda:InvokeFunction",
+            "dynamodb:DeleteItem",
+            "dynamodb:GetItem",
+            "dynamodb:Query",
+            "dynamodb:UpdateItem",
+            "logs:CreateLogGroup",
+            "logs:PutLogEvents"
           ],
           "Effect": "Allow",
-          "Resource": [
-            "arn:aws:s3:::theboss.io-speed-test",
-            "arn:aws:s3:::theboss.io-speed-test/*"
-          ],
-          "Sid": "Stmt1464703254000"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "aplSpeedTestPolicy"
-  },
-  {
-    "Path": "/",
-    "PolicyDocument": {
-      "Statement": [
+          "Resource": "*",
+          "Sid": "VisualEditor0"
+        },
         {
           "Action": [
-            "iam:UpdateSSHPublicKey",
-            "iam:UpdateServerCertificate",
-            "iam:UpdateSigningCertificate",
-            "iam:UploadSSHPublicKey",
-            "iam:UploadServerCertificate",
-            "iam:UploadSigningCertificate"
+            "sqs:DeleteMessage",
+            "sqs:DeleteMessageBatch",
+            "sqs:SendMessageBatch",
+            "sqs:ReceiveMessage",
+            "sqs:DeleteQueue",
+            "sqs:SendMessage",
+            "sqs:GetQueueAttributes",
+            "sqs:CreateQueue"
           ],
           "Effect": "Allow",
-          "Resource": [
-            "*"
-          ],
-          "Sid": "Stmt1454613958000"
+          "Resource": "arn:aws:sqs:*:*:downsample-*",
+          "Sid": "VisualEditor1"
         }
       ],
       "Version": "2012-10-17"
     },
-    "PolicyName": "aplUploadCertificatePolicy"
-  },
-  {
-    "Path": "/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "iam:AttachUserPolicy",
-            "iam:DetachUserPolicy",
-            "iam:ListAttachedUserPolicies"
-          ],
-          "Effect": "Allow",
-          "Resource": [
-            "arn:aws:iam::*:user/vault-*"
-          ],
-          "Sid": "Stmt1473863272000"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "aplVaultAttachUserPolicy"
+    "PolicyName": "aplResolutionHierarchy"
   },
   {
     "Path": "/",
@@ -578,116 +785,5 @@
       "Version": "2012-10-17"
     },
     "PolicyName": "aplVaultPolicy"
-  },
-  {
-    "Path": "/service-role/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": "logs:CreateLogGroup",
-          "Effect": "Allow",
-          "Resource": "arn:aws:logs:us-east-1:451493790433:*"
-        },
-        {
-          "Action": [
-            "logs:CreateLogStream",
-            "logs:PutLogEvents"
-          ],
-          "Effect": "Allow",
-          "Resource": [
-            "arn:aws:logs:us-east-1:451493790433:log-group:/aws/lambda/check:*"
-          ]
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "AWSLambdaBasicExecutionRole-18e45b2f-a398-4109-8f35-b79c82f6749b"
-  },
-  {
-    "Path": "/service-role/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": "logs:CreateLogGroup",
-          "Effect": "Allow",
-          "Resource": "arn:aws:logs:us-east-1:451493790433:*"
-        },
-        {
-          "Action": [
-            "logs:CreateLogStream",
-            "logs:PutLogEvents"
-          ],
-          "Effect": "Allow",
-          "Resource": [
-            "arn:aws:logs:us-east-1:451493790433:log-group:/aws/lambda/SnowballTest:*"
-          ]
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "AWSLambdaBasicExecutionRole-28085153-2e10-4740-8166-7090f779f1c7"
-  },
-  {
-    "Path": "/service-role/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "s3:GetObject"
-          ],
-          "Effect": "Allow",
-          "Resource": "arn:aws:s3:::*"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "AWSLambdaS3ExecutionRole-2a0110ca-6e60-4f94-8510-fdaf9ddfb583"
-  },
-  {
-    "Path": "/service-role/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "dynamodb:PutItem"
-          ],
-          "Effect": "Allow",
-          "Resource": "arn:aws:dynamodb:us-east-1:451493790433:table/*"
-        },
-        {
-          "Action": [
-            "lambda:InvokeFunction"
-          ],
-          "Effect": "Allow",
-          "Resource": "arn:aws:lambda:us-east-1:451493790433:function:*"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "AWSLambdaTestHarnessExecutionRole-03257ae2-b691-4ced-be24-8ddf2ef976a5"
-  },
-  {
-    "Path": "/service-role/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "ec2:CreateNetworkInterface"
-          ],
-          "Effect": "Allow",
-          "Resource": "*"
-        },
-        {
-          "Action": [
-            "ec2:DescribeNetworkInterfaces",
-            "ec2:DeleteNetworkInterface"
-          ],
-          "Effect": "Allow",
-          "Resource": "arn:aws:ec2:us-east-1:451493790433:network-interface/*"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "AWSLambdaVPCAccessExecutionRole-b2075bb1-0254-4f5f-abe6-c012abd2a001"
   }
 ]
