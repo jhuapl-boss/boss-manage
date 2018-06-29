@@ -93,7 +93,7 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["aws"]["id-index-table"] = names.id_index
     user_data["aws"]["id-count-table"] = names.id_count_index
     user_data["aws"]["prod_mailing_list"] = mailing_list_arn
-    user_data["aws"]["max_task_id_suffix"] = const.MAX_TASK_ID_SUFFIX 
+    user_data["aws"]["max_task_id_suffix"] = str(const.MAX_TASK_ID_SUFFIX)
 
     user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
     user_data["lambda"]["flush_function"] = names.multi_lambda
