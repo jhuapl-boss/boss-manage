@@ -465,14 +465,19 @@ class CloudFormationConfiguration:
                 raise Exception("Could not determine argument '{}'".format(argument["ParameterKey"]))
 
         client = session.client('cloudformation')
-        response = client.create_stack(
-            StackName = self.stack_name,
-            TemplateBody = self._create_template(),
-            Parameters = self.arguments,
-            Tags = [
-                {"Key": "Commit", "Value": utils.get_commit()}
-            ]
-        )
+
+        try:
+            response = client.create_stack(
+                StackName = self.stack_name,
+                TemplateBody = self._create_template(),
+                Parameters = self.arguments,
+                Tags = [
+                    {"Key": "Commit", "Value": utils.get_commit()}
+                ]
+            )
+        except client.exceptions.AlreadyExistsException:
+            print('{} already exists, aborting.'.format(self.stack_name))
+            return None
 
         rtn = None
         if wait:
@@ -950,7 +955,7 @@ class CloudFormationConfiguration:
 
         self._add_record_cname(key, hostname, rds = True)
 
-    def add_dynamo_table_from_json(self, key, name, KeySchema, AttributeDefinitions, ProvisionedThroughput, GlobalSecondaryIndexes=None):
+    def add_dynamo_table_from_json(self, key, name, KeySchema, AttributeDefinitions, ProvisionedThroughput, GlobalSecondaryIndexes=None, TimeToLiveSpecification=None):
         """Add DynamoDB table to the configuration using DynamoDB's calling convention.
 
         Example:
@@ -972,6 +977,7 @@ class CloudFormationConfiguration:
             AttributeDefinitions (list) : List of dict of AttributeName / AttributeType
             ProvisionedThroughput (dictionary) : Dictionary of ReadCapacityUnits / WriteCapacityUnits
             GlobalSecondaryIndexes (optional[list]): List of dicts representing global secondary indexes.  Defaults to None.
+            TimeToLiveSpecification (opitonal[dict]): Defines TTL attribute and whether it's enabled.
         """
 
         self.resources[key] = {
@@ -986,6 +992,9 @@ class CloudFormationConfiguration:
 
         if GlobalSecondaryIndexes is not None:
             self.resources[key]["Properties"]["GlobalSecondaryIndexes"] = GlobalSecondaryIndexes
+
+        if TimeToLiveSpecification is not None:
+            self.resources[key]["Properties"]["TimeToLiveSpecification"] = TimeToLiveSpecification
 
     def add_dynamo_table(self, key, name, attributes, key_schema, throughput):
         """Add an DynamoDB Table to the configuration
@@ -1591,7 +1600,7 @@ class CloudFormationConfiguration:
         }
 
 
-    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python2.7"):
+    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python2.7", reserved_executions=None, dlq=None):
         """Create a Python Lambda
 
         Args:
@@ -1611,6 +1620,7 @@ class CloudFormationConfiguration:
             depends_on (None|string|list) : A unique name or list of unique names of resources within the
                                             configuration and is used to determine the launch order of resources
             runtime (optional[string]) : Lambda runtime to use.  Defaults to "python2.7".
+            reserved_executions (optional[int]): Number of reserved concurrent executions for the lambda.
         """
 
         if file is not None:
@@ -1635,8 +1645,8 @@ class CloudFormationConfiguration:
             raise Exception("Need source file or S3 bucket")
 
         memory = int(memory)
-        if memory < 128 or 1536 < memory:
-            raise Exception("Lambda memory should be between 128 and 1536")
+        if memory < 128 or 3008 < memory:
+            raise Exception("Lambda memory should be between 128 and 3008")
         if memory % 64 != 0:
             raise Exception("Lambda memory should be a multiple of 64")
 
@@ -1664,6 +1674,14 @@ class CloudFormationConfiguration:
 
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
+
+        if reserved_executions is not None:
+            self.resources[key]['Properties']['ReservedConcurrentExecutions'] = reserved_executions
+
+        if dlq is not None:
+            self.resources[key]['Properties']['DeadLetterConfig'] = {
+                'TargetArn': dlq
+            }
 
     def add_lambda_permission(self, key, lambda_, action="lambda:invokeFunction", principal="sns.amazonaws.com", source=None, depends_on=None):
         """Add permissions to a Lambda

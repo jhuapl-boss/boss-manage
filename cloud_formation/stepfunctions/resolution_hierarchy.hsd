@@ -7,5 +7,11 @@ two JsonPath values.
 """
 
 while '$.res_lt_max' == true:
+    """WhileResolutionLessThanMax
+    """
     Activity('DownsampleChannel')
-        retry [] 1 3 1.0
+        """RunDownSampleActivity
+
+        boss-tools/activities/resolution_hierarchy.py
+        """
+        retry [] 60 3 2.5

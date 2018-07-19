@@ -93,16 +93,17 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["aws"]["id-index-table"] = names.id_index
     user_data["aws"]["id-count-table"] = names.id_count_index
     user_data["aws"]["prod_mailing_list"] = mailing_list_arn
+    user_data["aws"]["max_task_id_suffix"] = str(const.MAX_TASK_ID_SUFFIX)
 
     user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
     user_data["lambda"]["flush_function"] = names.multi_lambda
     user_data["lambda"]["page_in_function"] = names.multi_lambda
     user_data["lambda"]["ingest_function"] = names.multi_lambda
+    user_data["lambda"]["downsample_volume"] = names.downsample_volume_lambda
 
     user_data['sfn']['populate_upload_queue'] = names.ingest_queue_populate
     user_data['sfn']['upload_sfn'] = names.ingest_queue_upload
     user_data['sfn']['downsample_sfn'] = names.resolution_hierarchy
-    user_data['sfn']['downsample_volume_sfn'] = names.downsample_volume
 
     # Prepare user data for parsing by CloudFormation.
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}

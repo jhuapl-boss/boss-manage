@@ -112,6 +112,158 @@
           "Action": "sts:AssumeRole",
           "Effect": "Allow",
           "Principal": {
+            "Service": "autoscaling.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/aws-service-role/AutoScalingServiceRolePolicy"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/aws-service-role/autoscaling.amazonaws.com/",
+    "RoleName": "AWSServiceRoleForAutoScaling",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "events.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/aws-service-role/CloudWatchEventsServiceRolePolicy"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/aws-service-role/events.amazonaws.com/",
+    "RoleName": "AWSServiceRoleForCloudWatchEvents",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "elasticache.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/aws-service-role/ElastiCacheServiceRolePolicy"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/aws-service-role/elasticache.amazonaws.com/",
+    "RoleName": "AWSServiceRoleForElastiCache",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "elasticloadbalancing.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/aws-service-role/AWSElasticLoadBalancingServiceRolePolicy"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/aws-service-role/elasticloadbalancing.amazonaws.com/",
+    "RoleName": "AWSServiceRoleForElasticLoadBalancing",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "elasticmapreduce.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/aws-service-role/AmazonEMRCleanupPolicy"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/aws-service-role/elasticmapreduce.amazonaws.com/",
+    "RoleName": "AWSServiceRoleForEMRCleanup",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "rds.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/aws-service-role/AmazonRDSServiceRolePolicy"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/aws-service-role/rds.amazonaws.com/",
+    "RoleName": "AWSServiceRoleForRDS",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "ec2.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforDataPipelineRole"
+    ],
+    "InstanceProfileList": [
+      {
+        "InstanceProfileName": "backup",
+        "Path": "/"
+      }
+    ],
+    "Path": "/",
+    "RoleName": "backup",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
             "Service": "ec2.amazonaws.com"
           }
         }
@@ -176,16 +328,62 @@
       "Version": "2012-10-17"
     },
     "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
+      "arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforDataPipelineRole"
     ],
     "InstanceProfileList": [
       {
-        "InstanceProfileName": "ecsInstanceRole",
+        "InstanceProfileName": "DataPipelineDefaultResourceRole",
         "Path": "/"
       }
     ],
     "Path": "/",
-    "RoleName": "ecsInstanceRole",
+    "RoleName": "DataPipelineDefaultResourceRole",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": [
+              "elasticmapreduce.amazonaws.com",
+              "datapipeline.amazonaws.com"
+            ]
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/service-role/AWSDataPipelineRole"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/",
+    "RoleName": "DataPipelineDefaultRole",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "application-autoscaling.amazonaws.com"
+          },
+          "Sid": ""
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::451493790433:policy/service-role/DynamoDBAutoscalePolicy"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/service-role/",
+    "RoleName": "DynamoDBAutoscaleRole",
     "RolePolicyList": []
   },
   {
@@ -307,7 +505,8 @@
       "Version": "2012-10-17"
     },
     "AttachedManagedPolicies": [
-      "arn:aws:iam::451493790433:policy/aplPopulateUploadQueue"
+      "arn:aws:iam::451493790433:policy/aplPopulateUploadQueue",
+      "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
     ],
     "InstanceProfileList": [],
     "Path": "/",
@@ -471,6 +670,27 @@
           "Action": "sts:AssumeRole",
           "Effect": "Allow",
           "Principal": {
+            "Service": "lambda.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::451493790433:policy/aplResolutionHierarchy"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/",
+    "RoleName": "lambda_resolution_hierarchy",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
             "Service": "events.amazonaws.com"
           },
           "Sid": ""
@@ -582,6 +802,29 @@
     "InstanceProfileList": [],
     "Path": "/service-role/",
     "RoleName": "StatesExecutionRole-us-east-1",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "lambda.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::451493790433:policy/service-role/AWSLambdaTracerAccessExecutionRole-683aea08-9fc8-4468-adfc-7d4af2c826bc",
+      "arn:aws:iam::451493790433:policy/service-role/AWSLambdaTracerAccessExecutionRole-ff12834d-2eb4-44cb-9130-1ce3a86f1b76",
+      "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/",
+    "RoleName": "StepfunctionFanout",
     "RolePolicyList": []
   },
   {

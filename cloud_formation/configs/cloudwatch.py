@@ -127,6 +127,7 @@ def generate(session, domain):
     config = create_config(session, domain)
     config.generate()
 
+
 def create(session, domain):
     """Create the configuration, launch it, and initialize Vault
     :arg session information for performing lookups
@@ -139,3 +140,9 @@ def create(session, domain):
         print('success')
     else:
         print('failed')
+
+
+def update(session, domain):
+    config = create_config(session, domain)
+    success = config.update(session)
+    return success

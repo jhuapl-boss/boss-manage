@@ -9,6 +9,14 @@
   },
   {
     "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/AmazonEC2FullAccess"
+    ],
+    "GroupName": "aplBasicUser",
+    "GroupPolicyList": [],
+    "Path": "/"
+  },
+  {
+    "AttachedManagedPolicies": [
       "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess",
       "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetAutoscaleRole",
       "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetRole",
@@ -43,7 +51,8 @@
       "arn:aws:iam::451493790433:policy/aplCloudFormationFullAccess",
       "arn:aws:iam::aws:policy/CloudFrontFullAccess",
       "arn:aws:iam::aws:policy/AWSCloudTrailFullAccess",
-      "arn:aws:iam::aws:policy/AmazonVPCFullAccess"
+      "arn:aws:iam::aws:policy/AmazonVPCFullAccess",
+      "arn:aws:iam::451493790433:policy/aplTestCloudFormation"
     ],
     "GroupName": "aplNetworkGroup",
     "GroupPolicyList": [],
@@ -69,7 +78,8 @@
   },
   {
     "AttachedManagedPolicies": [
-      "arn:aws:iam::451493790433:policy/aplCloudFormationFullAccess"
+      "arn:aws:iam::451493790433:policy/aplCloudFormationFullAccess",
+      "arn:aws:iam::aws:policy/AWSSupportAccess"
     ],
     "GroupName": "aplSWDevGroup",
     "GroupPolicyList": [],
