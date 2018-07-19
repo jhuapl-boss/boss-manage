@@ -1,11 +1,11 @@
 [submodule "salt_stack/salt/boss-tools/files/boss-tools.git"]
 	path = salt_stack/salt/boss-tools/files/boss-tools.git
 	url = ../boss-tools.git
-	branch = ingest-lambda-timeout
+	branch = master
 [submodule "salt_stack/salt/boss/files/boss.git"]
 	path = salt_stack/salt/boss/files/boss.git
 	url = ../boss.git
-	branch = ingest-lambda-timeout
+	branch = master
 [submodule "salt_stack/salt/spdb/files/spdb.git"]
 	path = salt_stack/salt/spdb/files/spdb.git
 	url = ../spdb.git
@@ -13,7 +13,7 @@
 [submodule "salt_stack/salt/ndingest/files/ndingest.git"]
 	path = salt_stack/salt/ndingest/files/ndingest.git
 	url = ../ndingest.git
-	branch = integration
+	branch = master
 [submodule "salt_stack/salt/ingest-client/files/ingest-client.git"]
         path = salt_stack/salt/ingest-client/files/ingest-client.git
 	url = ../ingest-client.git
@@ -25,4 +25,4 @@
 [submodule "cloud_formation/lambda/dynamodb-lambda-autoscale"]
 	path = cloud_formation/lambda/dynamodb-lambda-autoscale
 	url = ../dynamodb-lambda-autoscale.git
-	branch = integration
+	branch = master
