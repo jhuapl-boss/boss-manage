@@ -9,9 +9,9 @@
   },
   {
     "AttachedManagedPolicies": [
-      "arn:aws:iam::451493790433:policy/aplChurchDeliveryBucketReadOnlyPolicy"
+      "arn:aws:iam::aws:policy/AmazonEC2FullAccess"
     ],
-    "GroupName": "aplChruchDeliveryBucketReadOnly",
+    "GroupName": "aplBasicUser",
     "GroupPolicyList": [],
     "Path": "/"
   },
@@ -59,7 +59,7 @@
       "arn:aws:iam::aws:policy/CloudFrontFullAccess",
       "arn:aws:iam::aws:policy/AWSCloudTrailFullAccess",
       "arn:aws:iam::aws:policy/AmazonVPCFullAccess",
-      "arn:aws:iam::451493790433:policy/aplCloudFormationFullAccess"
+      "arn:aws:iam::451493790433:policy/aplTestCloudFormation"
     ],
     "GroupName": "aplNetworkGroup",
     "GroupPolicyList": [],
@@ -85,9 +85,8 @@
   },
   {
     "AttachedManagedPolicies": [
-      "arn:aws:iam::451493790433:policy/Prod-DynamoDB-DeleteTable-DENY",
-      "arn:aws:iam::451493790433:policy/Prod-RDS-DENY-Delete-Instance",
-      "arn:aws:iam::451493790433:policy/aplCloudFormationFullAccess"
+      "arn:aws:iam::451493790433:policy/aplCloudFormationFullAccess",
+      "arn:aws:iam::aws:policy/AWSSupportAccess"
     ],
     "GroupName": "aplSWDevGroup",
     "GroupPolicyList": [],

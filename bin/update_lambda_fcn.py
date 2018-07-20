@@ -85,6 +85,10 @@ def update_lambda_code(session, domain, bucket):
     """
     names = AWSNames(domain)
     uses_multilambda = [
+        names.multi_lambda, 
+        names.downsample_volume_lambda,
+        names.delete_tile_objs_lambda,
+        names.delete_tile_index_entry_lambda,
         names.multi_lambda, names.index_s3_writer_lambda, 
         names.index_fanout_id_writer_lambda, names.index_write_id_lambda,
         names.index_write_failed_lambda, names.index_find_cuboids_lambda,
@@ -151,6 +155,11 @@ def load_lambdas_on_s3(session, domain, bucket):
 
     os.chdir(const.repo_path("lib"))
     zip.write_to_zip('heaviside.git', zipname)
+
+    # Let lambdas look up names by creating a bossnames module.
+    zip.write_to_zip('names.py', zipname, arcname='bossnames/names.py')
+    zip.write_to_zip('hosts.py', zipname, arcname='bossnames/hosts.py')
+    zip.write_to_zip('__init__.py', zipname, arcname='bossnames/__init__.py')
     os.chdir(cwd)
 
     print("Copying local modules to lambda-build-server")
@@ -190,6 +199,7 @@ def create_ndingest_settings(domain, fp):
     parser['aws']['cuboid_bucket'] = names.cuboid_bucket
     parser['aws']['tile_index_table'] = names.tile_index
     parser['aws']['cuboid_index_table'] = names.s3_index
+    parser['aws']['max_task_id_suffix'] = str(const.MAX_TASK_ID_SUFFIX)
 
     # parser['spdb']['SUPER_CUBOID_SIZE'] = CUBOIDSIZE[0]
     # ToDo: find way to always get cuboid size from spdb.

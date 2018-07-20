@@ -61,6 +61,7 @@ base:
     'activities*':
         - scalyr
         - scalyr.update_host
+        - open-files.increase-open-files
         - boss-tools.activities
 
         # populate upload queue
