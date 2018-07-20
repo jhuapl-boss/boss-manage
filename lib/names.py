@@ -163,7 +163,7 @@ class AWSNames(object):
                     'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 
                     'index_s3_writer_lambda', 'index_fanout_id_writer_lambda',
                     'downsample_dlq', 'downsample_volume_lambda',
-                    'delete_tile_objs_lambda', 'delete_tile_index_entry_lambda'
+                    'delete_tile_objs_lambda', 'delete_tile_index_entry_lambda',
                     'index_write_id_lambda', 'index_write_failed_lambda',
                     'index_find_cuboids_lambda', 
                     'index_fanout_enqueue_cuboid_keys_lambda',
