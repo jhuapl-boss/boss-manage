@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Script to turn the boss on and off.
+   The script aims at switch the boss on and off once it has been configured a first time.
+   The instances should first be stood up by building stacks through cloudformation.
    ASG are shut down. Only execute this code if you are certain the boss will not
    be running for another hour."""
 
@@ -24,6 +26,7 @@ import argparse
 import os
 import subprocess
 import time
+import pickle
 
 import alter_path
 from lib import aws, utils, vault
@@ -43,9 +46,15 @@ def main():
 #Executed actions
 def startInstances():
 
+    #Use auto scaling groups last saved configuration
+    ASGdescription = load_obj('ASGdescriptions')
+    activitiesD = [ASGdescription["AutoScalingGroups"][0]["MinSize"], ASGdescription["AutoScalingGroups"][0]["MaxSize"],ASGdescription["AutoScalingGroups"][0]["DesiredCapacity"]]
+    endpointD = [ASGdescription["AutoScalingGroups"][1]["MinSize"], ASGdescription["AutoScalingGroups"][1]["MaxSize"],ASGdescription["AutoScalingGroups"][1]["DesiredCapacity"]]
+    vaultD = [ASGdescription["AutoScalingGroups"][2]["MinSize"], ASGdescription["AutoScalingGroups"][2]["MaxSize"],ASGdescription["AutoScalingGroups"][2]["DesiredCapacity"]]
+   
     #Start vault instance
     print("Starting vault...")
-    client.update_auto_scaling_group(AutoScalingGroupName=vaultg, MinSize = 1 , MaxSize = 1 , DesiredCapacity = 1)
+    client.update_auto_scaling_group(AutoScalingGroupName=vaultg, MinSize = vaultD[0] , MaxSize =  vaultD[1], DesiredCapacity = vaultD[2])
     client.resume_processes(AutoScalingGroupName=vaultg,ScalingProcesses=['HealthCheck'])
     time.sleep(120)
     print("Vault instance running")
@@ -58,10 +67,10 @@ def startInstances():
 
     #Start endpoint and activities instances
     print("Starting endpoint, and activities...")
-    client.update_auto_scaling_group(AutoScalingGroupName=endpoint, MinSize = 1 , MaxSize = 1 , DesiredCapacity = 1)
+    client.update_auto_scaling_group(AutoScalingGroupName=endpoint, MinSize = endpointD[0] , MaxSize = endpointD[1] , DesiredCapacity = endpointD[2])
     client.resume_processes(AutoScalingGroupName=endpoint,ScalingProcesses=['HealthCheck'])
     
-    client.update_auto_scaling_group(AutoScalingGroupName=activities, MinSize = 1 , MaxSize = 1 , DesiredCapacity = 1)
+    client.update_auto_scaling_group(AutoScalingGroupName=activities, MinSize = activitiesD[0] , MaxSize = activitiesD[1] , DesiredCapacity = activitiesD[2])
     client.resume_processes(AutoScalingGroupName=activities,ScalingProcesses=['HealthCheck'])
 
     print(bcolors.OKGREEN + "TheBoss is on" + bcolors.ENDC)
@@ -69,6 +78,11 @@ def startInstances():
 
 def stopInstances():
 
+    #Save current ASG descriptions:
+    print("Saving current auto scaling group configuration...")
+    response = client.describe_auto_scaling_groups(AutoScalingGroupNames=[endpoint,activities,vaultg])
+    save_obj(response,'ASGdescriptions')
+    
     #Export vault content:
     print("Exporting vault content...")
     subprocess.call('./bastion.py ' + args.vpc + ' vault-export > ../config/vault_export.json', shell=True)
@@ -87,6 +101,13 @@ def stopInstances():
 
     print(bcolors.FAIL + "TheBoss is off" + bcolors.ENDC)
 
+def save_obj(obj, name ):
+    with open('../'+ name + '.pkl', 'wb') as f:
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+
+def load_obj(name):
+    with open('../' + name + '.pkl', 'rb') as f:
+        return pickle.load(f)
 
 class bcolors:
     OKBLUE = '\033[94m'
@@ -94,7 +115,6 @@ class bcolors:
     WARNING = '\033[93m'
     FAIL = '\033[91m'
     ENDC = '\033[0m'
-
 
 if __name__ == '__main__':
 
