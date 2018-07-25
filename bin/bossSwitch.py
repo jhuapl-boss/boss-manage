@@ -45,7 +45,9 @@ def main():
 
 #Executed actions
 def startInstances():
-
+    """
+        Method used to start necessary instances
+    """
     #Use auto scaling groups last saved configuration
     ASGdescription = load_obj('ASGdescriptions')
     activitiesD = [ASGdescription["AutoScalingGroups"][0]["MinSize"], ASGdescription["AutoScalingGroups"][0]["MaxSize"],ASGdescription["AutoScalingGroups"][0]["DesiredCapacity"]]
@@ -77,7 +79,9 @@ def startInstances():
 
 
 def stopInstances():
-
+    """
+        Method used to stop currently running instances
+    """
     #Save current ASG descriptions:
     print("Saving current auto scaling group configuration...")
     response = client.describe_auto_scaling_groups(AutoScalingGroupNames=[endpoint,activities,vaultg])
@@ -102,14 +106,33 @@ def stopInstances():
     print(bcolors.FAIL + "TheBoss is off" + bcolors.ENDC)
 
 def save_obj(obj, name ):
+    """
+        Method to save objects as .pkl files
+
+        Args:
+            obj : The object that will be saved
+            name : The .pkl file name under which the object will be saved
+    """
     with open('../'+ name + '.pkl', 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
 def load_obj(name):
+    """
+        Method to load saved objects in .pkl file
+
+        Args:
+            name : The .pkl file name to open
+        
+        Returns:
+            object saved within .pkl file
+    """
     with open('../' + name + '.pkl', 'rb') as f:
         return pickle.load(f)
 
 class bcolors:
+    """
+        Used to add coloring to terminal print statements
+    """
     OKBLUE = '\033[94m'
     OKGREEN = '\033[92m'
     WARNING = '\033[93m'
