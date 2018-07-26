@@ -27,13 +27,13 @@ import os
 import subprocess
 import time
 import pickle
-
-import alter_path
-from lib import aws, utils, vault
+import vault as vaultB
+from lib.ssh import SSHConnection, vault_tunnel
+from lib import aws, utils, vault, constants, external
 
 def main():
 
-    choice = utils.get_user_confirm("Are you sure you want to proceed switching the boss on/off?")
+    choice = utils.get_user_confirm("Are you sure you want to proceed?")
     if choice:
         if args.action == "on":
             print("Turning the BossDB on...")
@@ -49,33 +49,49 @@ def startInstances():
         Method used to start necessary instances
     """
     #Use auto scaling groups last saved configuration
-    ASGdescription = load_obj('ASGdescriptions')
-    activitiesD = [ASGdescription["AutoScalingGroups"][0]["MinSize"], ASGdescription["AutoScalingGroups"][0]["MaxSize"],ASGdescription["AutoScalingGroups"][0]["DesiredCapacity"]]
-    endpointD = [ASGdescription["AutoScalingGroups"][1]["MinSize"], ASGdescription["AutoScalingGroups"][1]["MaxSize"],ASGdescription["AutoScalingGroups"][1]["DesiredCapacity"]]
-    vaultD = [ASGdescription["AutoScalingGroups"][2]["MinSize"], ASGdescription["AutoScalingGroups"][2]["MaxSize"],ASGdescription["AutoScalingGroups"][2]["DesiredCapacity"]]
-   
+    try:
+        ASGdescription = load_obj('ASGdescriptions')
+        activitiesD = [ASGdescription["AutoScalingGroups"][0]["MinSize"], ASGdescription["AutoScalingGroups"][0]["MaxSize"],ASGdescription["AutoScalingGroups"][0]["DesiredCapacity"]]
+        endpointD = [ASGdescription["AutoScalingGroups"][1]["MinSize"], ASGdescription["AutoScalingGroups"][1]["MaxSize"],ASGdescription["AutoScalingGroups"][1]["DesiredCapacity"]]
+        vaultD = [ASGdescription["AutoScalingGroups"][2]["MinSize"], ASGdescription["AutoScalingGroups"][2]["MaxSize"],ASGdescription["AutoScalingGroups"][2]["DesiredCapacity"]]
+    except Exception as e:
+       utils.console.fail("Unsuccessful ASG configuration")
+       print("Error due to: %s" % e)
+       exit()
+
     #Start vault instance
     print("Starting vault...")
     client.update_auto_scaling_group(AutoScalingGroupName=vaultg, MinSize = vaultD[0] , MaxSize =  vaultD[1], DesiredCapacity = vaultD[2])
     client.resume_processes(AutoScalingGroupName=vaultg,ScalingProcesses=['HealthCheck'])
-    time.sleep(120)
+    time.sleep(constants.TIMEOUT_VAULT)
     print("Vault instance running")
 
     #Import vault content:
-    subprocess.call('./bastion.py ' + args.vpc + ' vault-unseal',shell=True)
     print("Importing vault content")
-    subprocess.call('./bastion.py ' + args.vpc + ' vault-import < ../config/vault_export.json', shell=True)
-    print(bcolors.WARNING + "Successful import" + bcolors.ENDC)    
+    try:
+        with vault_tunnel(args.ssh_key, bastion):
+            private = aws.machine_lookup(session,args.vpc,public_ip=False)
+            vaultB.vault_unseal(vault.Vault(args.vpc, private))
+            vaultB.vault_import(vault.Vault(args.vpc, private), real_path + '/config/vault_export.json')
+        utils.console.okgreen("Successful import")
+    except Exception as e:
+        utils.console.fail("Unsuccessful import")
+        print("Error due to %s" % e)
+        exit()
 
     #Start endpoint and activities instances
     print("Starting endpoint, and activities...")
-    client.update_auto_scaling_group(AutoScalingGroupName=endpoint, MinSize = endpointD[0] , MaxSize = endpointD[1] , DesiredCapacity = endpointD[2])
-    client.resume_processes(AutoScalingGroupName=endpoint,ScalingProcesses=['HealthCheck'])
-    
-    client.update_auto_scaling_group(AutoScalingGroupName=activities, MinSize = activitiesD[0] , MaxSize = activitiesD[1] , DesiredCapacity = activitiesD[2])
-    client.resume_processes(AutoScalingGroupName=activities,ScalingProcesses=['HealthCheck'])
+    try:
+        client.update_auto_scaling_group(AutoScalingGroupName=endpoint, MinSize = endpointD[0] , MaxSize = endpointD[1] , DesiredCapacity = endpointD[2])
+        client.resume_processes(AutoScalingGroupName=endpoint,ScalingProcesses=['HealthCheck'])
+        
+        client.update_auto_scaling_group(AutoScalingGroupName=activities, MinSize = activitiesD[0] , MaxSize = activitiesD[1] , DesiredCapacity = activitiesD[2])
+        client.resume_processes(AutoScalingGroupName=activities,ScalingProcesses=['HealthCheck'])
+    except Exception as e:
+        print('Error: %s' % e)
+        exit()
 
-    print(bcolors.OKGREEN + "TheBoss is on" + bcolors.ENDC)
+    utils.console.okgreen("TheBoss is on")
 
 
 def stopInstances():
@@ -85,12 +101,25 @@ def stopInstances():
     #Save current ASG descriptions:
     print("Saving current auto scaling group configuration...")
     response = client.describe_auto_scaling_groups(AutoScalingGroupNames=[endpoint,activities,vaultg])
-    save_obj(response,'ASGdescriptions')
-    
+    try:
+        response['AutoScalingGroups'][0]
+        save_obj(response,'ASGdescriptions')
+        print("Successfully saved ASG descriptions")
+    except IndexError as e:
+        utils.console.fail("Failed while saving ASG descriptions")
+        print("Error: %s" % e)
+        exit()
+
     #Export vault content:
-    print("Exporting vault content...")
-    subprocess.call('./bastion.py ' + args.vpc + ' vault-export > ../config/vault_export.json', shell=True)
-    print(bcolors.WARNING + "Successful export" + bcolors.ENDC)
+    print("Exporting vault content...") 
+    try:
+        with vault_tunnel(args.ssh_key, bastion): 
+            vaultB.vault_export(vault.Vault(args.vpc, private), real_path+'/config/vault_export.json')
+        utils.console.okgreen("Successful vaul export")
+    except Exception as e:
+        utils.console.fail("Unsuccessful vault export")
+        print("Error: %s" % e)
+        exit()
 
     #Switch off:
     print("Stopping all Instances...")
@@ -103,7 +132,7 @@ def stopInstances():
     client.update_auto_scaling_group(AutoScalingGroupName=vaultg, MinSize = 0 , MaxSize = 0 , DesiredCapacity = 0)
     client.suspend_processes(AutoScalingGroupName=vaultg,ScalingProcesses=['HealthCheck'])
 
-    print(bcolors.FAIL + "TheBoss is off" + bcolors.ENDC)
+    utils.console.fail("TheBoss is off")
 
 def save_obj(obj, name ):
     """
@@ -113,7 +142,7 @@ def save_obj(obj, name ):
             obj : The object that will be saved
             name : The .pkl file name under which the object will be saved
     """
-    with open('../'+ name + '.pkl', 'wb') as f:
+    with open(real_path + '/' + name + '.pkl', 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
 def load_obj(name):
@@ -126,20 +155,13 @@ def load_obj(name):
         Returns:
             object saved within .pkl file
     """
-    with open('../' + name + '.pkl', 'rb') as f:
+    with open(real_path + '/' + name + '.pkl', 'rb') as f:
         return pickle.load(f)
 
-class bcolors:
-    """
-        Used to add coloring to terminal print statements
-    """
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-
 if __name__ == '__main__':
+
+    #Grab files path to use as reference.
+    real_path = constants.repo_path()
 
     def create_help(header, options):
         """Create formated help."""
@@ -157,13 +179,33 @@ if __name__ == '__main__':
                                      epilog=actions_help + scenario_help)
     parser.add_argument("--aws-credentials", "-a",
                         metavar = "<file>",
-                        default = "../config/aws-credentials",
+                        default = "aws-credentials",
                         help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
     parser.add_argument("--scenario",
                         metavar = "<scenario>",
                         default = "development",
                         choices = scenarios,
                         help = "The deployment configuration to use when creating the stack (instance size, autoscale group size, etc) (default: development)")
+    parser.add_argument("--config",
+                        metavar = "<config>",
+                        default ="asg-cfg-dev",
+                        help = "Name of auto scale group configuration file located inside boss-manage/config folder")
+    parser.add_argument("--private-ip", "-p",
+                        action='store_true',
+                        default=False,
+                        help = "add this flag to type in a private IP address in internal command instead of a DNS name which is looked up")
+    parser.add_argument("--user", "-u",
+                        default='ubuntu',
+                        help = "Username of the internal machine")
+    parser.add_argument("--port",
+                        default=22,
+                        type=int,
+                        help = "Port to connect to on the internal machine")
+    parser.add_argument("--ssh-key", "-s",
+                        metavar = "<file>",
+                        default = os.environ.get("SSH_KEY"),
+                        help = "SSH private key to use when connecting to AWS instances (default: SSH_KEY)")
+    parser.add_argument("--bastion","-b",  help="Hostname of the EC2 bastion server to create SSH Tunnels on")
     parser.add_argument("action",
                         choices = actions,
                         metavar = "action",
@@ -174,37 +216,39 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     #Loading AWS configuration files.
-    creds = json.load(open(args.aws_credentials))
+    creds = json.load(open(str(real_path + '/config/' + args.aws_credentials)))
     aws_access_key_id = creds["aws_access_key"]
     aws_secret_access_key = creds["aws_secret_key"]
-    region_name = 'us-east-1'
+    region_name = constants.REGION
 
     if creds is None:
-        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
+        raise Exception('AWS credentials not provided')
 
     # specify AWS keys, sets up connection to the client.
-    auth = {"aws_access_key_id": aws_access_key_id, "aws_secret_access_key": aws_secret_access_key, "region_name": region_name}
-    client = boto3.client('autoscaling', **auth)
+    session = aws.create_session(creds)
+    client = session.client('autoscaling')
 
-    if args.scenario == 'development':
-        #Loading ASG configuration files. Please specify your ASG names on asg-cfg found in the config file.
-        asg = json.load(open('../config/asg-cfg-dev'))
-        activities = asg["activities"]
-        endpoint = asg["endpoint"]
-        auth = asg["auth"]
-        vaultg = asg["vault"]
-        consul = asg["consul"]
-
-    elif args.scenario == 'production':
-        #Loading ASG configuration files. Please specify your ASG names on asg-cfg found in the config file.
-        asg = json.load(open('../config/asg-cfg'))
-        activities = asg["activities"]
-        endpoint = asg["endpoint"]
-        auth = asg["auth"]
-        vaultg = asg["vault"]
-        consul = asg["consul"]
-
+    # This next code block was adopted from bin/bastion.py and sets up vault_tunnel
+    boss_position = 1
+    try:
+        int(args.vpc.split(".", 1)[0])
+        boss_position = 2
+    except ValueError:
+        pass
+    bastion_host = args.bastion if args.bastion else "bastion." + args.vpc.split(".", boss_position)[boss_position]
+    bastion = aws.machine_lookup(session, bastion_host)
+    if args.private_ip:
+        private = args.vpc
     else:
-        raise NameError('The asg-cfg or asg-cfg-dev need to exist.')
+        private = aws.machine_lookup(session, args.vpc, public_ip=False)
+
+    ssh = SSHConnection(args.ssh_key, (private, args.port, args.user), bastion)
+
+    #Loading ASG configuration files. Please specify your ASG names on asg-cfg found in the config file.
+    asg = json.load(open(str(real_path + '/config/' + args.config)))
+    activities = asg["activities"]
+    endpoint = asg["endpoint"]
+    vaultg = asg["vault"]
+    auth = asg["auth"]
 
     main()
