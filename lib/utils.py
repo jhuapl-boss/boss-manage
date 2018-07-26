@@ -181,3 +181,20 @@ def get_user_confirm(message):
         return False
     else:
         return True
+
+class console:
+    """
+        Used to add coloring to terminal print statements
+    """
+
+    def warning(message):
+        print('\033[93m' + message +'\033[0m')
+
+    def okgreen(message):
+        print('\033[92m' + message +'\033[0m')
+
+    def okblue(message):
+        print('\033[94m' + message +'\033[0m')
+
+    def fail(message):
+        print('\033[91m' + message +'\033[0m')
