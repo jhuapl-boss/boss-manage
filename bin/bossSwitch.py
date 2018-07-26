@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Script to turn the boss on and off.
-   The script aims at switch the boss on and off once it has been configured a first time.
+   The script aims to switch the boss on and off once it has been configured a first time.
    The instances should first be stood up by building stacks through cloudformation.
    ASG are shut down. Only execute this code if you are certain the boss will not
    be running for another hour."""
@@ -194,9 +194,6 @@ if __name__ == '__main__':
                         action='store_true',
                         default=False,
                         help = "add this flag to type in a private IP address in internal command instead of a DNS name which is looked up")
-    parser.add_argument("--user", "-u",
-                        default='ubuntu',
-                        help = "Username of the internal machine")
     parser.add_argument("--port",
                         default=22,
                         type=int,
@@ -241,8 +238,6 @@ if __name__ == '__main__':
         private = args.vpc
     else:
         private = aws.machine_lookup(session, args.vpc, public_ip=False)
-
-    ssh = SSHConnection(args.ssh_key, (private, args.port, args.user), bastion)
 
     #Loading ASG configuration files. Please specify your ASG names on asg-cfg found in the config file.
     asg = json.load(open(str(real_path + '/config/' + args.config)))
