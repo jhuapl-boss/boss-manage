@@ -171,21 +171,13 @@ if __name__ == '__main__':
     actions = ["on", "off"]
     actions_help = create_help("action supports the following:", actions)
 
-    scenarios = ["development", "production"]
-    scenario_help = create_help("scenario supports the following:", scenarios)
-
     parser = argparse.ArgumentParser(description = "Script to turn the boss on and off by stopping and restarting EC2 instances.",
                                      formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     epilog=actions_help + scenario_help)
+                                     epilog=actions_help)
     parser.add_argument("--aws-credentials", "-a",
                         metavar = "<file>",
                         default = "aws-credentials",
                         help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
-    parser.add_argument("--scenario",
-                        metavar = "<scenario>",
-                        default = "development",
-                        choices = scenarios,
-                        help = "The deployment configuration to use when creating the stack (instance size, autoscale group size, etc) (default: development)")
     parser.add_argument("--config",
                         metavar = "<config>",
                         default ="asg-cfg-dev",
