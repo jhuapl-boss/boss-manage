@@ -72,7 +72,7 @@ def startInstances():
         with vault_tunnel(args.ssh_key, bastion):
             private = aws.machine_lookup(session,args.vpc,public_ip=False)
             vaultB.vault_unseal(vault.Vault(args.vpc, private))
-            vaultB.vault_import(vault.Vault(args.vpc, private), real_path + '/config/vault_export.json')
+            vaultB.vault_import(vault.Vault(args.vpc, private), REAL_PATH + '/config/vault_export.json')
         utils.console.okgreen("Successful import")
     except Exception as e:
         utils.console.fail("Unsuccessful import")
@@ -114,7 +114,7 @@ def stopInstances():
     print("Exporting vault content...") 
     try:
         with vault_tunnel(args.ssh_key, bastion): 
-            vaultB.vault_export(vault.Vault(args.vpc, private), real_path+'/config/vault_export.json')
+            vaultB.vault_export(vault.Vault(args.vpc, private), REAL_PATH+'/config/vault_export.json')
         utils.console.okgreen("Successful vaul export")
     except Exception as e:
         utils.console.fail("Unsuccessful vault export")
@@ -142,7 +142,7 @@ def save_obj(obj, name ):
             obj : The object that will be saved
             name : The .pkl file name under which the object will be saved
     """
-    with open(real_path + '/' + name + '.pkl', 'wb') as f:
+    with open(REAL_PATH + '/' + name + '.pkl', 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
 def load_obj(name):
@@ -155,13 +155,13 @@ def load_obj(name):
         Returns:
             object saved within .pkl file
     """
-    with open(real_path + '/' + name + '.pkl', 'rb') as f:
+    with open(REAL_PATH + '/' + name + '.pkl', 'rb') as f:
         return pickle.load(f)
 
 if __name__ == '__main__':
 
     #Grab files path to use as reference.
-    real_path = constants.repo_path()
+    REAL_PATH = constants.repo_path()
 
     def create_help(header, options):
         """Create formated help."""
@@ -205,7 +205,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     #Loading AWS configuration files.
-    creds = json.load(open(str(real_path + '/config/' + args.aws_credentials)))
+    creds = json.load(open(str(REAL_PATH + '/config/' + args.aws_credentials)))
     aws_access_key_id = creds["aws_access_key"]
     aws_secret_access_key = creds["aws_secret_key"]
     region_name = constants.REGION
@@ -232,7 +232,7 @@ if __name__ == '__main__':
         private = aws.machine_lookup(session, args.vpc, public_ip=False)
 
     #Loading ASG configuration files. Please specify your ASG names on asg-cfg found in the config file.
-    asg = json.load(open(str(real_path + '/config/' + args.config)))
+    asg = json.load(open(str(REAL_PATH + '/config/' + args.config)))
     activities = asg["activities"]
     endpoint = asg["endpoint"]
     vaultg = asg["vault"]
