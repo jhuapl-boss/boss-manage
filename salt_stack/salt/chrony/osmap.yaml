@@ -1,13 +1,13 @@
 # OS parameters overriding common defaults(.yaml)
 
-Ubuntu:
+Debian:
   service: chrony
   config: /etc/chrony/chrony.conf
-  ntpservers: [  '0.amazon.pool.ntp.org',
-                 '1.amazon.pool.ntp.org',
-                 '2.amazon.pool.ntp.org',
-                 '3.amazon.pool.ntp.org', 
-                '169.254.169.123 prefer iburst']
+  ntpservers: [ '0.debian.pool.ntp.org',
+                '1.debian.pool.ntp.org',
+                '2.debian.pool.ntp.org',
+                '3.debian.pool.ntp.org', ]
+
   options: offline minpoll 8
   keyfile: /etc/chrony/chrony.keys
   driftfile: /var/lib/chrony/chrony.drift
@@ -18,3 +18,35 @@ Ubuntu:
                  'commandkey 1',
                  'local stratum 10',
                  'rtconutc', ]
+
+RedHat:
+  ntpservers: [ '0.centos.pool.ntp.org',
+                '1.centos.pool.ntp.org',
+                '2.centos.pool.ntp.org',
+                '3.centos.pool.ntp.org', ]
+  otherparams: [ 'rtcsync',
+                 'makestep 10 3',
+                'stratumweight 0',
+                 'bindcmdaddress 127.0.0.1',
+                 'bindcmdaddress ::1',
+                 'commandkey 1',
+                 'generatecommandkey',
+                 'noclientlog',
+                 'logchange 0.5', ]
+
+Arch:
+  ntpservers: [ '0.arch.pool.ntp.org',
+                 '1.arch.pool.ntp.org',
+                 '2.arch.pool.ntp.org' ]
+  otherparams: [ 'rtconutc',
+                 'rtcsync',]
+
+Suse:
+  ntpservers: [ '0.arch.opensuse.ntp.org',
+                '1.arch.opensuse.ntp.org',
+                '2.arch.opensuse.ntp.org',
+                '3.opensuse.pool.ntp.org', ]
+  otherparams: [ 'rtcsync',
+                 'makestep 10 3',
+                 'maxdistance 6',
+                 'logchange 0.1', ]

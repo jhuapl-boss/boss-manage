@@ -5,10 +5,10 @@ chrony:
   service: chronyd
   config: /etc/chrony.conf
   config_src: salt://{{ slspath }}/files/chrony_config
-  ntpservers:  [ '0.amazon.pool.ntp.org',
-                 '1.amazon.pool.ntp.org',
-                 '2.amazon.pool.ntp.org',
-                 '3.amazon.pool.ntp.org'
+  ntpservers:  [ '0.np.pool.ntp.org',
+                 '1.np.pool.ntp.org',
+                 '2.np.pool.ntp.org',
+                 '3.np.pool.ntp.org'
                ]
   options: iburst
   logdir: /var/log/chrony
