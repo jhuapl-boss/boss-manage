@@ -25,9 +25,7 @@ base:
   # Jenkins server for Django proofreader tests.
   'pr-jenkins*':
     - proofreader-jenkins
-    - chrony
 
   # Jenkins server for Python scripts such as those in boss-tools.
   'jenkins*':
     - jenkins
-    - chrony
