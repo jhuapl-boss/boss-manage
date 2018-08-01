@@ -16,7 +16,6 @@ base:
 
   'ep-jenkins*':
     - endpoint-jenkins
-    - chrony
 
   'proofreader-web*':
     - proofreader-web
