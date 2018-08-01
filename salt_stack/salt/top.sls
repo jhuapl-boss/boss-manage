@@ -30,6 +30,7 @@ base:
 
     'lambda*':
         - lambda-dev
+        - chrony
 
     'ep-jenkins*':
         - jenkins-microns.endpoint
@@ -76,4 +77,5 @@ base:
         - spdb
         - scipy
 
+        # NTP
         - chrony
