@@ -3,4 +3,12 @@ if [ "$#" -lt 1 ] ; then
     exit 1
 fi
 
-./bastion.py vault.$1.boss vault-read secret/auth/realm | ./pq .data.password | ./bearer_token.py auth-$1.thebossdev.io --username bossadmin --password - --out keycloak.token
+if [ "$1" == "production" ] ; then
+    hostname="auth.theboss.io"
+else
+    hostname="auth-$1.thebossdev.io"
+fi
+
+echo "Getting bearer token for $hostname"
+
+./bastion.py vault.$1.boss vault-read secret/auth/realm | ./pq .data.password | ./bearer_token.py $hostname --username bossadmin --password - --out keycloak.token

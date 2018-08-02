@@ -93,6 +93,7 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["aws"]["id-index-table"] = names.id_index
     user_data["aws"]["id-count-table"] = names.id_count_index
     user_data["aws"]["prod_mailing_list"] = mailing_list_arn
+    user_data["aws"]["max_task_id_suffix"] = str(const.MAX_TASK_ID_SUFFIX)
     user_data["aws"]["id-index-new-chunk-threshold"] = str(const.DYNAMO_ID_INDEX_NEW_CHUNK_THRESHOLD)
     user_data["aws"]["index-deadletter-queue"] = str(Ref(names.index_deadletter_queue))
     user_data["aws"]["index-cuboids-keys-queue"] = str(Ref(names.index_cuboids_keys_queue))
@@ -101,11 +102,11 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["lambda"]["flush_function"] = names.multi_lambda
     user_data["lambda"]["page_in_function"] = names.multi_lambda
     user_data["lambda"]["ingest_function"] = names.multi_lambda
+    user_data["lambda"]["downsample_volume"] = names.downsample_volume_lambda
 
     user_data['sfn']['populate_upload_queue'] = names.ingest_queue_populate
     user_data['sfn']['upload_sfn'] = names.ingest_queue_upload
     user_data['sfn']['downsample_sfn'] = names.resolution_hierarchy
-    user_data['sfn']['downsample_volume_sfn'] = names.downsample_volume
     user_data['sfn']['index_id_writer_sfn'] = names.index_id_writer_sfn
     user_data['sfn']['index_cuboid_supervisor_sfn'] = names.index_cuboid_supervisor_sfn
 
@@ -457,8 +458,9 @@ def update(session, domain):
     return success
 
 def delete(session, domain):
-    names = AWSNames(domain)
-    aws.route53_delete_records(session, domain, names.endpoint)
-    aws.sqs_delete_all(session, domain)
-    aws.policy_delete_all(session, domain, '/ingest/')
-    CloudFormationConfiguration('api', domain).delete(session)
+    if utils.get_user_confirm("All data will be lost. Are you sure you want to proceed?"):
+        names = AWSNames(domain)
+        aws.route53_delete_records(session, domain, names.endpoint)
+        aws.sqs_delete_all(session, domain)
+        aws.policy_delete_all(session, domain, '/ingest/')
+        CloudFormationConfiguration('api', domain).delete(session)

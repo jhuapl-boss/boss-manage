@@ -1,3 +1,6 @@
 """Populate an ingest upload queue with message for each tile to be processed"""
 
 Lambda('IngestUpload')
+    """IngestUpload
+    Code: boss-manage.git/cloud_formation/lambda/ingest_populate/ingest_queue_upload.py
+    """

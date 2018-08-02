@@ -39,7 +39,7 @@ def create_billing_alarms(session):
         'Namespace': 'AWS/Billing',
         'Statistic': 'Maximum',
         'Dimensions': [{'Name': 'Currency', 'Value': 'USD'}],
-        'Period': 21600,
+        'Period': 10,
         'EvaluationPeriods': 1,
         'Threshold': 1000.0,
         'ComparisonOperator': 'GreaterThanOrEqualToThreshold'

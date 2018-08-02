@@ -45,6 +45,7 @@ def create_settings(tmpl_fp, boss_fp):
     nd_config['aws']['cuboid_bucket'] = boss_config['aws']['cuboid_bucket']
     nd_config['aws']['tile_index_table'] = boss_config['aws']['tile-index-table']
     nd_config['aws']['cuboid_index_table'] = boss_config['aws']['s3-index-table']
+    nd_config['aws']['max_task_id_suffix'] = boss_config['aws']['max_task_id_suffix']
 
     nd_config['spdb']['SUPER_CUBOID_SIZE'] = ', '.join(str(x) for x in CUBOIDSIZE[0])
 

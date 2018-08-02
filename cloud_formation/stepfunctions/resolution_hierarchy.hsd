@@ -14,4 +14,4 @@ while '$.res_lt_max' == true:
 
         boss-tools/activities/resolution_hierarchy.py
         """
-        retry [] 1 3 1.0
+        retry [] 60 3 2.5

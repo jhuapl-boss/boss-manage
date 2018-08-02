@@ -3,6 +3,7 @@ include:
     - python.pip
     - boss-tools.bossutils
     - heaviside
+    - python.winpdb
 
 activity-files:
     file.recurse:

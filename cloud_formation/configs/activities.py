@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
 import json
 from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, get_scenario, Arg
 from lib.userdata import UserData
@@ -104,26 +105,40 @@ def create_config(session, domain):
                       aws.role_arn_lookup(session, 'IngestQueueUpload'),
                       const.INGEST_LAMBDA,
                       handler="index.handler",
-                      timeout=60 * 5)
+                      timeout=60 * 5,
+                      memory=3008)
 
     config.add_lambda_permission("IngestLambdaExecute", Ref("IngestLambda"))
 
-    role = aws.role_arn_lookup(session, "lambda_cache_execution")
-    config.add_arg(Arg.String(
-        "LambdaCacheExecutionRole", role,
-        "IAM role for multilambda." + domain))
-    lambda_bucket = aws.get_lambda_s3_bucket(session)
 
-    config.add_lambda(
-        "downsampleVolumeLambda",
-        names.downsample_volume_lambda,
-        Ref("LambdaCacheExecutionRole"),
-        s3=(aws.get_lambda_s3_bucket(session),
-            "multilambda.{}.zip".format(domain),
-            "downsample_volume.handler"),
-        timeout=120,
-        memory=1024,
-        runtime='python3.6')
+    # Downsample / Resolution Hierarchy support
+    lambda_role = aws.role_arn_lookup(session, "lambda_resolution_hierarchy")
+
+    config.add_lambda("DownsampleVolumeLambda",
+                      names.downsample_volume_lambda,
+                      lambda_role,
+                      s3=(aws.get_lambda_s3_bucket(session),
+                          "multilambda.{}.zip".format(domain),
+                          "downsample_volume.handler"),
+                      timeout=120,
+                      memory=1024,
+                      runtime='python3.6',
+                      dlq = Ref('DownsampleDLQ'))
+
+    config.add_sns_topic("DownsampleDLQ",
+                         names.downsample_dlq,
+                         names.downsample_dlq,
+                         [('lambda', Arn('DownsampleDLQLambda'))])
+
+    config.add_lambda('DownsampleDLQLambda',
+                      names.downsample_dlq,
+                      lambda_role,
+                      const.DOWNSAMPLE_DLQ_LAMBDA,
+                      handler='index.handler',
+                      timeout=10)
+
+    config.add_lambda_permission('DownsampleDLQLambdaExecute',
+                                 Ref('DownsampleDLQLambda'))
 
     return config
 
@@ -169,6 +184,12 @@ def update(session, domain):
     resp = input('Replace step functions: [Y/n]:')
     if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
         delete_sfns(session, domain)
+
+        # Need to delay so AWS actually removes the step functions before trying to create them
+        delay = 30
+        print("Step Functions deleted, waiting for {} seconds".format(delay))
+        time.sleep(delay)
+
         post_init(session, domain)
 
     return True
@@ -187,7 +208,7 @@ def post_init(session, domain):
     sfn.create(session, names.ingest_queue_populate, domain, 'ingest_queue_populate.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.ingest_queue_upload, domain, 'ingest_queue_upload.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.resolution_hierarchy, domain, 'resolution_hierarchy.hsd', 'StatesExecutionRole-us-east-1')
-    sfn.create(session, names.downsample_volume, domain, 'downsample_volume.hsd', 'StatesExecutionRole-us-east-1')
+    #sfn.create(session, names.downsample_volume, domain, 'downsample_volume.hsd', 'StatesExecutionRole-us-east-1')
 
 
 def delete(session, domain):
@@ -207,4 +228,4 @@ def delete_sfns(session, domain):
     sfn.delete(session, names.ingest_queue_populate)
     sfn.delete(session, names.ingest_queue_upload)
     sfn.delete(session, names.resolution_hierarchy)
-    sfn.delete(session, names.downsample_volume)
+    #sfn.delete(session, names.downsample_volume)
