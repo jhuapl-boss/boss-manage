@@ -83,16 +83,22 @@ def create_config(bosslet_config, db_config={}):
     user_data["aws"]["id-index-table"] = names.ddb.id_index
     user_data["aws"]["id-count-table"] = names.ddb.id_count_index
     user_data["aws"]["prod_mailing_list"] = mailing_list_arn
+    user_data["aws"]["max_task_id_suffix"] = str(const.MAX_TASK_ID_SUFFIX)
+    user_data["aws"]["id-index-new-chunk-threshold"] = str(const.DYNAMO_ID_INDEX_NEW_CHUNK_THRESHOLD)
+    user_data["aws"]["index-deadletter-queue"] = str(Ref(names.index_deadletter_queue))
+    user_data["aws"]["index-cuboids-keys-queue"] = str(Ref(names.index_cuboids_keys_queue))
 
     user_data["auth"]["OIDC_VERIFY_SSL"] = str(bosslet_config.get('VERIFY_SSL', True))
     user_data["lambda"]["flush_function"] = names.lambda_.multi_lambda
     user_data["lambda"]["page_in_function"] = names.lambda_.multi_lambda
     user_data["lambda"]["ingest_function"] = names.lambda_.multi_lambda
+    user_data["lambda"]["downsample_volume"] = names.lambda_.downsample_volume
 
     user_data['sfn']['populate_upload_queue'] = names.sfn.ingest_queue_populate
     user_data['sfn']['upload_sfn'] = names.sfn.ingest_queue_upload
     user_data['sfn']['downsample_sfn'] = names.sfn.resolution_hierarchy
-    user_data['sfn']['downsample_volume_sfn'] = names.sfn.downsample_volume
+    user_data['sfn']['index_id_writer_sfn'] = names.sfn.index_id_writer
+    user_data['sfn']['index_cuboid_supervisor_sfn'] = names.sfn.index_cuboid_supervisor
 
     # Prepare user data for parsing by CloudFormation.
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
@@ -109,9 +115,17 @@ def create_config(bosslet_config, db_config={}):
     config.add_security_group('AllHTTPSSecurityGroup', names.sg.https, [('tcp', '443', '443', bosslet_config.HTTPS_INBOUND)])
     sgs[names.sg.https] = Ref('AllHTTPSSecurityGroup')
 
+
     # Create SQS queues and apply access control policies.
-    #config.add_sqs_queue("DeadLetterQueue", names.sqs.deadletter, 30, 20160) DP XXX
-    config.add_sqs_queue(names.sqs.deadletter, names.sqs.deadletter, 30, 20160)
+    # Deadletter queue for indexing operations.  This one is populated
+    # manually by states in the indexing step functions.
+    config.add_sqs_queue(names.sqs.index_deadletter, names.sqs.index_deadletter, 30, 20160)
+
+    # Queue that holds S3 object keys of cuboids to be indexed.
+    config.add_sqs_queue(names.sqs.index_cuboids_keys, names.sqs.index_cuboids_keys, 120, 20160)
+
+    #config.add_sqs_queue("DeadLetterQueue", names.deadletter_queue, 30, 20160) DP XXX
+    config.add_sqs_queue(names.deadletter_queue, names.deadletter_queue, 30, 20160)
 
     max_receives = 3
     #config.add_sqs_queue("S3FlushQueue", DP XXX
@@ -352,8 +366,12 @@ def delete(bosslet_config):
     domain = bosslet_config.INTERNAL_DOMAIN
     names = AWSNames(bosslet_config)
 
+    if not utils.get_user_confirm("All data will be lost. Are you sure you want to proceed?"):
+        return None
+
     aws.route53_delete_records(session, domain, names.dns.endpoint)
-    aws.sqs_delete_all(session, domain)
+    # Other configs may define SQS queues and we shouldn't delete them
+    aws.sqs_delete_all(session, domain) # !!! TODO FIX this so it doesn't bork the stack
     aws.policy_delete_all(session, domain, '/ingest/')
 
     config = CloudFormationConfiguration('api', bosslet_config)

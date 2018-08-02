@@ -36,6 +36,7 @@ from lib import constants as const
 from lib import zip
 
 import argparse
+import botocore
 import configparser
 import os
 import sys
@@ -62,14 +63,44 @@ NDINGEST_SETTINGS_FOLDER = const.repo_path('salt_stack', 'salt', 'ndingest', 'fi
 NDINGEST_SETTINGS_TEMPLATE = NDINGEST_SETTINGS_FOLDER + '/settings.ini.apl'
 
 def update_lambda_code(bosslet_config):
+    """Update all lambdas that use the multilambda zip file.
+
+    Args:
+        bosslet_config: Bosslet configuration object
+    """
     names = AWSNames(bosslet_config)
-    client = session.client('lambda')
-    resp = client.update_function_code(
-        FunctionName=names.lambda_.multi,
-        S3Bucket=bosslet_config.LAMBDA_BUCKET,
-        S3Key=names.zip.multi,
-        Publish=True)
-    print(resp)
+    uses_multilambda = [
+        names.lambda_.multi_lambda, 
+        names.lambda_.downsample_volume,
+        names.lambda_.delete_tile_objs,
+        names.lambda_.delete_tile_index_entry,
+        names.lambda_.index_s3_writer, 
+        names.lambda_.index_fanout_id_writer,
+        names.lambda_.index_write_id,
+        names.lambda_.index_write_failed,
+        names.lambda_.index_find_cuboids,
+        names.lambda_.index_split_cuboids,
+        names.lambda_.index_fanout_enqueue_cuboid_keys,
+        names.lambda_.index_batch_enqueue_cuboids,
+        names.lambda_.index_fanout_dequeue_cuboid_keys,
+        names.lambda_.index_dequeue_cuboid_keys,
+        names.lambda_.index_get_num_cuboid_keys_msgs,
+        names.lambda_.index_check_for_throttling,
+        names.lambda_.index_invoke_index_supervisor,
+        names.lambda_.start_sfn,
+        names.lambda_.downsample_volume,
+    ]
+    client = bosslet_config.session.client('lambda')
+    for lambda_name in uses_multilambda:
+        try:
+            resp = client.update_function_code(
+                FunctionName=lambda_name,
+                S3Bucket=bosslet_config.LAMBDA_BUCKET,
+                S3Key=names.zip.multi,
+                Publish=True)
+            print(resp)
+        except botocore.exceptions.ClientError as ex:
+            print('Error updating {}: {}'.format(lambda_name, ex))
 
 # DP TODO: Move to a lib/ library
 def load_lambdas_on_s3(bosslet_config):
@@ -81,7 +112,8 @@ def load_lambdas_on_s3(bosslet_config):
 
     Args:
         session (Session): boto3.Session
-        domain (string): The VPC's domain name such as integration.boss.
+        domain (str): The VPC's domain name such as integration.boss.
+        bucket (str): Name of bucket that contains the lambda zip file.
     """
     domain = bosslet_config.INTERNAL_DOMAIN
     tempname = tempfile.NamedTemporaryFile(delete=True)
@@ -96,6 +128,7 @@ def load_lambdas_on_s3(bosslet_config):
 
     os.chdir(const.repo_path("salt_stack", "salt", "boss-tools", "files", "boss-tools.git"))
     zip.write_to_zip('bossutils', zipname)
+    zip.write_to_zip('cloudwatchwrapper', zipname)
     zip.write_to_zip('lambda', zipname)
     zip.write_to_zip('lambdautils', zipname)
     os.chdir(cwd)
@@ -106,6 +139,15 @@ def load_lambdas_on_s3(bosslet_config):
 
     os.chdir(const.repo_path("salt_stack", "salt", "ndingest", "files"))
     zip.write_to_zip('ndingest.git', zipname)
+    os.chdir(cwd)
+
+    os.chdir(const.repo_path("lib"))
+    zip.write_to_zip('heaviside.git', zipname)
+
+    # Let lambdas look up names by creating a bossnames module.
+    zip.write_to_zip('names.py', zipname, arcname='bossnames/names.py')
+    zip.write_to_zip('hosts.py', zipname, arcname='bossnames/hosts.py')
+    zip.write_to_zip('__init__.py', zipname, arcname='bossnames/__init__.py')
     os.chdir(cwd)
 
     print("Copying local modules to lambda-build-server")
@@ -132,10 +174,10 @@ def load_lambdas_on_s3(bosslet_config):
 def create_ndingest_settings(bosslet_config, fp):
     """Create the settings.ini file for ndingest.
 
-    The file is placed in ndingest's settings folder.j
+    The file is placed in ndingest's settings folder.
 
     Args:
-        domain (string): The VPC's domain name such as integration.boss.
+        domain (str): The VPC's domain name such as integration.boss.
         fp (file-like object): File like object to read settings.ini template from.
     """
     names = AWSNames(bosslet_config)
@@ -150,6 +192,7 @@ def create_ndingest_settings(bosslet_config, fp):
     parser['aws']['cuboid_bucket'] = names.cuboid_bucket
     parser['aws']['tile_index_table'] = names.tile_index
     parser['aws']['cuboid_index_table'] = names.s3_index
+    parser['aws']['max_task_id_suffix'] = str(const.MAX_TASK_ID_SUFFIX)
 
     # parser['spdb']['SUPER_CUBOID_SIZE'] = CUBOIDSIZE[0]
     # ToDo: find way to always get cuboid size from spdb.

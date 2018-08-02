@@ -197,3 +197,21 @@ def parse_hostname(hostname):
             machine, bosslet_name = tmp[0], None
 
     return (idx, machine, bosslet_name)
+
+def get_user_confirm(message):
+    """
+    General method to warn the user to read the message before proceeding
+    and prompt a yes or no answer.
+    
+    Args:
+        message(str): The message which will be showed to the user.
+    
+    Returns:
+        returns True if user confirms with yes
+    """
+    resp = input(message + " [y/N]")
+    if len(resp) == 0 or resp[0] not in ('y', 'Y'):
+        print("Canceled")
+        return False
+    else:
+        return True

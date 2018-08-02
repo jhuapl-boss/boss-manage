@@ -187,21 +187,39 @@ Make another template for api and compare it in cloud formation.
 $ ./cloudformation.py generate production.boss --scenario production api 
 ```
 
-Now update api.
+_WARNING if updating API after sprint18 (7/19/18): We have modified the Global Secondary Indexes (GSI) on the Tile DynamoDB Table. If you try and update the API Cloudformation script, it may fail if it tries to remove an old GSI and add a new one.  You'll receive a failure that only once GSI change can occur at a time.  To resolve this edit the ndingest/nddynamo/schemas/boss_tile_index.json file.  If the GSI in your table is different then the named GSI in DynamoDB, edit this file and remove the GSI completely.  Update API and your GSI will be removed. Now put the GSI back in the boss_tile_index.json file and run API update again.  The new GSI will be created._    
+ 
+
+For *api*, *cachedb*, and *activities* update each stack in sequence
 
 ```shell
 $ ./cloudformation.py update production.boss --scenario production api
+$ ./cloudformation.py update production.boss --scenario production cachedb
+$ ./cloudformation.py update production.boss --scenario production activities
 ```
 
+If cachedb or activities has new lambdas being created for the first time you may get errors like this:
+Error updating downsampleVolumeLambda-integration-boss: An error occurred (ResourceNotFoundException) when calling the UpdateFunctionCode operation: Function not found:
+In which case you'll need to delete and create both cachedb and activities again:
 
-
-For *cachedb*, *activities* and *cloudwatch* delete and create the cloud formation stacks again.
-
+Error updated cachedb or activities?  do this step:
 ```shell
 $ ./cloudformation.py delete production.boss --scenario production cachedb
 $ ./cloudformation.py create production.boss --scenario production cachedb
 $ ./cloudformation.py delete production.boss --scenario production activities
 $ ./cloudformation.py create production.boss --scenario production activities
+```
+
+**Until Delete Step Functions are updated,  turn off the Cloudwatch Rule for Deletes**
+
+* Go to Cloudwatch in the AWS Console
+* Under Events -> Rules, select the deleteEventRule.production.boss Rule
+* Under the Action menu select Disable
+
+
+For *cloudwatch* and *dynamolambda* delete and create the cloud formation stacks again.
+
+```shell
 $ ./cloudformation.py delete production.boss --scenario production cloudwatch
 $ ./cloudformation.py create production.boss --scenario production cloudwatch
 $ ./cloudformation.py delete production.boss --scenario production dynamolambda

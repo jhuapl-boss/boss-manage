@@ -22,14 +22,11 @@ Create the cachedb configuration which consists of
   * Lambdas
   * SNS topics
   * SQS queues
-
-This will most likely be merged into production once it is finished.
-
 """
 
 DEPENDENCIES = ['core', 'redis', 'api']
 
-from lib.cloudformation import CloudFormationConfiguration, Arg, Ref
+from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, Arn
 from lib.userdata import UserData
 from lib.names import AWSNames
 from lib.external import ExternalCalls
@@ -37,9 +34,45 @@ from lib import aws
 from lib import scalyr
 from lib import constants as const
 
-from update_lambda_fcn import load_lambdas_on_s3
+from update_lambda_fcn import load_lambdas_on_s3, update_lambda_code
 import boto3
+import botocore
 
+# Number of days until objects expire in the tile bucket.
+EXPIRE_IN_DAYS = 21
+
+def get_cf_bucket_life_cycle_rules():
+    """
+    Generate the CloudFormation expiration policy for the tile bucket.  This is
+    a fallback in case tiles aren't cleaned up properly, post-ingest.  Messages 
+    n the ingest queue only last 14 days, so removing the S3 objects 7 days
+    after should be plenty of time.
+    """
+    return {
+        'Rules': [
+            {
+                'ExpirationInDays': EXPIRE_IN_DAYS,
+                'Status': 'Enabled'
+            }
+        ]
+    }
+
+def get_boto_bucket_life_cycle_rules():
+    """
+    Generate the boto expiration policy for the tile bucket.  This is
+    a fallback in case tiles aren't cleaned up properly, post-ingest.  Messages 
+    n the ingest queue only last 14 days, so removing the S3 objects 7 days
+    after should be plenty of time.
+    """
+    return {
+        'Rules': [
+            {
+                'Expiration': { 'Days': EXPIRE_IN_DAYS},
+                'Status': 'Enabled',
+                'Filter': {'Prefix': ''}
+            }
+        ]
+    }
 
 def create_config(bosslet_config, user_data=None):
     # Prepare user data for parsing by CloudFormation.
@@ -107,7 +140,9 @@ def create_config(bosslet_config, user_data=None):
     tile_bucket_name = names.s3.tile_bucket
     if not aws.s3_bucket_exists(session, tile_bucket_name):
         creating_tile_bucket = True
-        config.add_s3_bucket("tileBucket", tile_bucket_name)
+        life_cycle_cfg = get_bucket_life_cycle_rules()
+        config.add_s3_bucket(
+            "tileBucket", tile_bucket_name, life_cycle_config=life_cycle_cfg)
 
     config.add_s3_bucket_policy(
         "tileBucketPolicy", tile_bucket_name,
@@ -133,6 +168,9 @@ def create_config(bosslet_config, user_data=None):
                             user_data=parsed_user_data,
                             role="cachemanager")
 
+    config.add_sqs_queue(
+        names.sqs.ingest_cleanup_dlq, names.sqs.ingest_cleanup_dlq, 30, 20160)
+
     config.add_lambda("MultiLambda",
                       names.lambda_.multi_lambda,
                       Ref("LambdaCacheExecutionRole"),
@@ -144,6 +182,26 @@ def create_config(bosslet_config, user_data=None):
                       security_groups=[Ref('InternalSecurityGroup')],
                       subnets=lambda_subnets,
                       runtime='python3.6')
+    config.add_lambda("DeleteTileObjsLambda",
+                      names.delete_tile_objs_lambda,
+                      Ref("LambdaCacheExecutionRole"),
+                      s3=(aws.get_lambda_s3_bucket(session),
+                          "multilambda.{}.zip".format(domain),
+                          "delete_tile_objs_lambda.handler"),
+                      timeout=90,
+                      memory=128,
+                      runtime='python3.6',
+                      dlq=Arn(names.ingest_cleanup_dlq))
+    config.add_lambda("DeleteTileEntryLambda",
+                      names.delete_tile_index_entry_lambda,
+                      Ref("LambdaCacheExecutionRole"),
+                      s3=(aws.get_lambda_s3_bucket(session),
+                          "multilambda.{}.zip".format(domain),
+                          "delete_tile_index_entry_lambda.handler"),
+                      timeout=90,
+                      memory=128,
+                      runtime='python3.6',
+                      dlq=Arn(names.ingest_cleanup_dlq))
 
     if creating_tile_bucket:
         config.add_lambda_permission('tileBucketInvokeMultiLambda',
@@ -170,7 +228,12 @@ def create_config(bosslet_config, user_data=None):
 
 def generate(bosslet_config):
     """Create the configuration and save it to disk"""
+<<<<<<< HEAD
     config = create_config(bosslet_config)
+=======
+    keypair = aws.keypair_lookup(session)
+    config = create_config(session, domain, keypair)
+>>>>>>> integration
     config.generate()
 
 
@@ -230,11 +293,33 @@ def pre_init(bosslet_config):
     load_lambdas_on_s3(bosslet_config)
 
 
+<<<<<<< HEAD
 def post_init(bosslet_config):
+=======
+def update(session, domain):
+    keypair = aws.keypair_lookup(session)
+
+    config = create_config(session, domain, keypair)
+    success = config.update(session)
+
+    resp = input('Rebuild multilambda: [Y/n]:')
+    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
+        pre_init(session, domain)
+        bucket = aws.get_lambda_s3_bucket(session)
+        update_lambda_code(session, domain, bucket)
+
+    return success
+
+
+def post_init(session, domain):
+>>>>>>> integration
     print("post_init")
 
     print('adding tile bucket trigger of multi-lambda')
     add_tile_bucket_trigger(bosslet_config)
+
+    print('checking for tile bucket expiration policy')
+    check_tile_bucket_life_cycle_policy(session, domain)
 
     # Tell Scalyr to get CloudWatch metrics for these instances.
     names = AWSNames(bosslet_config)
@@ -242,9 +327,40 @@ def post_init(bosslet_config):
     scalyr.add_instances_to_scalyr(
         session, bosslet_config.REGION, instances)
 
+<<<<<<< HEAD
     return True
 
 def add_tile_bucket_trigger(bosslet_config):
+=======
+def check_tile_bucket_life_cycle_policy(session, domain):
+    names = AWSNames(domain)
+    s3 = session.client('s3')
+
+    try:
+        resp = s3.get_bucket_lifecycle_configuration(Bucket=names.tile_bucket)
+
+        policy_in_place = False
+        if 'Rules' in resp:
+            for rule in resp['Rules']:
+                if 'Expiration' in rule and 'Days' in rule['Expiration']:
+                    if (rule['Expiration']['Days'] == EXPIRE_IN_DAYS and 
+                            rule['Status'] == 'Enabled'):
+                        policy_in_place = True
+        if policy_in_place:
+            print('policy already set')
+            return
+    except botocore.exceptions.ClientError as ex:
+        if ex.response['Error']['Code'] != 'NoSuchLifecycleConfiguration':
+            raise
+
+    print('setting policy')
+    s3.put_bucket_lifecycle_configuration(
+        Bucket=names.tile_bucket,
+        LifecycleConfiguration=get_boto_bucket_life_cycle_rules())
+
+
+def add_tile_bucket_trigger(session, domain):
+>>>>>>> integration
     """Trigger MultiLambda when file uploaded to tile bucket.
 
     This is done in post-init() because the tile bucket isn't always

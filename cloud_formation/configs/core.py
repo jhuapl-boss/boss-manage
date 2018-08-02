@@ -43,6 +43,7 @@ from lib import scalyr
 from lib import constants as const
 
 import os
+import sys
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -434,6 +435,9 @@ def update(bosslet_config):
 
 def delete(bosslet_config):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
+    if not utils.get_user_confirm("All data will be lost. Are you sure you want to proceed?"):
+        return None
+
     session = bosslet_config.session
     domain = bosslet_config.INTERNAL_DOMAIN
     names = AWSNames(bosslet_config)

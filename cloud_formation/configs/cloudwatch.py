@@ -133,4 +133,14 @@ def create(bosslet_config):
 
     success = config.create()
 
+    if success:
+        print('success')
+    else:
+        print('failed')
+
+    return success
+
+def update(session, domain):
+    config = create_config(bosslet_config)
+    success = config.update()
     return success

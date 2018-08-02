@@ -52,8 +52,6 @@ Author:
 #          10.0.0.255: Network broadcast address. We do not support broadcast in a VPC, therefore we reserve this address.
 ##
 
-SUBNET_CIDR = 24 # make sure SUBNET_CIDR is greater than VPC_CIDR
-
 SUBNETS = [
     'internal',
     'external',

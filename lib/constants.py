@@ -18,7 +18,7 @@ import yaml
 
 PRODUCTION_MAILING_LIST = "ProductionMicronsMailingList"
 PRODUCTION_BILLING_TOPIC = "ProductionBillingList"
-MAX_ALARM_DOLLAR = 30  # Maximum size of alarms in $1,000s
+MAX_ALARM_DOLLAR = 200  # Maximum size of alarms in $1,000s
 
 
 ##################
@@ -71,6 +71,7 @@ DNS_LAMBDA = LAMBDA_DIR + '/updateRoute53/index.py'
 VAULT_LAMBDA = LAMBDA_DIR + '/monitors/chk_vault.py'
 CONSUL_LAMBDA = LAMBDA_DIR + '/monitors/chk_consul.py'
 INGEST_LAMBDA = LAMBDA_DIR + '/ingest_populate/ingest_queue_upload.py'
+DOWNSAMPLE_DLQ_LAMBDA = LAMBDA_DIR + '/downsample/dlq.py'
 
 
 ########################
@@ -80,11 +81,18 @@ SALT_DIR = repo_path('salt_stack', 'salt')
 DYNAMO_METADATA_SCHEMA = SALT_DIR + '/boss/files/boss.git/django/bosscore/dynamo_schema.json'
 DYNAMO_S3_INDEX_SCHEMA = SALT_DIR + '/spdb/files/spdb.git/spatialdb/dynamo/s3_index_table.json'
 DYNAMO_TILE_INDEX_SCHEMA  = SALT_DIR + '/ndingest/files/ndingest.git/nddynamo/schemas/boss_tile_index.json'
+# Max number to append to task id attribute of tile index (used to prevent hot
+# partitions when writing to the task_id_index GSI).
+MAX_TASK_ID_SUFFIX = 100
 # Annotation id to supercuboid table.
 DYNAMO_ID_INDEX_SCHEMA = SALT_DIR + '/spdb/files/spdb.git/spatialdb/dynamo/id_index_schema.json'
 # Annotation id count table (allows for reserving the next id in a channel).
 DYNAMO_ID_COUNT_SCHEMA = SALT_DIR + '/spdb/files/spdb.git/spatialdb/dynamo/id_count_schema.json'
 
+# Threshold when a new chunk should be added to the partition key of the id
+# index.  If the consumed write capacity is >= this number, write new
+# morton ids to a new key.
+DYNAMO_ID_INDEX_NEW_CHUNK_THRESHOLD = 100
 
 ########################
 # Other Salt Files

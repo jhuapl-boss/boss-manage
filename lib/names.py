@@ -110,7 +110,7 @@ class AWSNames(object):
         'ingest_lambda': 'IngestUpload',
         'delete_cuboid': 'Delete.Cuboid',
         'resolution_hierarchy': 'Resolution.Hierarchy',
-        'downsample_volume': 'Downsample.Volume',
+        'downsample_volume': 'downsample.volume',
         'ingest_queue_populate': 'Ingest.Populate',
         'ingest_queue_upload': 'Ingest.Upload',
         'delete_experiment': 'Delete.Experiment',
@@ -124,6 +124,27 @@ class AWSNames(object):
         'vault_consul_check': 'checkVaultConsul',
         'dynamo_lambda': 'dynamoLambda',
         'trigger_dynamo_autoscale': 'triggerDynamoAutoscale',
+        'ingest_cleanup_dlq': 'IngestCleanupDlq',
+        'index_id_writer': 'Index.IdWriter',
+        'index_cuboid_supervisor': 'Index.CuboidSupervisor',
+        'index_deadletter': 'indexDeadLetter',
+        'index_cuboids_keys': 'cuboidsKeys',
+        'delete_tile_objs': 'deleteTileObjsLambda',
+        'delete_tile_index_entry': 'deleteTileEntryLambda',
+        'index_s3_writer': 'indexS3WriterLambda',
+        'index_fanout_id_writer': 'indexFanoutIdWriterLambda',
+        'index_write_id': 'indexWriteIdLambda',
+        'index_write_failed': 'indexWriteFailedLambda',
+        'index_find_cuboids': 'indexFindCuboidsLambda',
+        'index_split_cuboids': 'indexSplitCuboidsLambda',
+        'index_fanout_enqueue_cuboid_keys': 'indexFanoutEnqueueCuboidsKeysLambda',
+        'index_batch_enqueue_cuboids': 'indexBatchEnqueueCuboidsLambda',
+        'index_fanout_dequeue_cuboid_keys': 'indexFanoutDequeueCuboidsKeysLambda',
+        'index_dequeue_cuboid_keys': 'indexDequeueCuboidsLambda',
+        'index_get_num_cuboid_keys_msgs': 'indexGetNumCuboidKeysMsgsLambda',
+        'index_check_for_throttling': 'indexCheckForThrottlingLambda',
+        'index_invoke_index_supervisor': 'indexInvokeIndexSupervisorLambda',
+        'start_sfn': 'startSfnLambda',
     }
 
     def build(self, resource_type, name):
@@ -161,6 +182,24 @@ class AWSNames(object):
     def __init__(self, base):
         self.base = base
         self.base_dot = '.' + base
+
+    @classmethod
+    def create_from_lambda_name(cls, name):
+        """
+        Instantiate AWSNames from the name of a lambda function.  Used by
+        lambdas so they can look up names of other resources.
+
+        Args:
+            name (str): Name of lambda function (ex: multiLambda-integration-boss)
+
+        Returns:
+            (AWSNames)
+
+        """
+        # Lambdas names can't have periods; restore proper name.
+        dotted_name = name.replace('-', '.')
+        domain = dotted_name.split('.', 1)[1]
+        return cls(domain)
 
     ##################################
     # Generic rules for different type of AWS resources
@@ -206,7 +245,11 @@ class AWSNames(object):
         "s3_index": "s3index",
         "ingest_bucket": "ingest",
         "tile_bucket": "tiles",
+        "delete_tile_objs_lambda": 'deleteTileObjsLambda',
         "tile_index": "tileindex",
+        "cuboid_ids_bucket": "cuboid-ids",
+        "delete_tile_index_entry_lambda": 'deleteTileEntryLambda',
+        "ingest_cleanup_dlq": "IngestCleanupDlq",
         "id_index": "idIndex",
         "id_count_index": "idCount",
         "s3flush_queue": "S3flush",
@@ -227,11 +270,40 @@ class AWSNames(object):
         'delete_lambda': "deleteLambda",
         'resolution_hierarchy': 'Resolution.Hierarchy',
         'downsample_volume': 'Downsample.Volume',
+        'downsample_volume_lambda': 'downsampleVolumeLambda',
         'ingest_queue_populate': 'Ingest.Populate',
         'ingest_queue_upload': 'Ingest.Upload',
         'ingest_lambda': 'IngestUpload',
         'dynamo_lambda': 'dynamoLambda',
-        'trigger_dynamo_autoscale': 'triggerDynamoAutoscale'
+        'trigger_dynamo_autoscale': 'triggerDynamoAutoscale',
+        'start_sfn_lambda': 'startSfnLambda',
+        'index_id_writer_sfn': 'Index.IdWriter',
+        'downsample_status': 'downsample-status',
+        'downsample_dlq': 'downsample-dlq',
+        'index_cuboid_supervisor_sfn': 'Index.CuboidSupervisor',
+        'index_find_cuboids_sfn': 'Index.FindCuboids',
+        'index_supervisor_sfn': 'Index.Supervisor',
+        'index_enqueue_cuboids_sfn': 'Index.EnqueueCuboids',
+        'index_fanout_enqueue_cuboids_sfn': 'Index.FanoutEnqueueCuboids',
+        'index_dequeue_cuboids_sfn': 'Index.DequeueCuboids',
+        'index_fanout_dequeue_cuboids_sfn': 'Index.FanoutDequeueCuboids',
+        'index_fanout_id_writers_sfn': 'Index.FanoutIdWriters',
+        'index_s3_writer_lambda': 'indexS3WriterLambda',
+        'index_fanout_id_writer_lambda': 'indexFanoutIdWriterLambda',
+        'index_write_id_lambda': 'indexWriteIdLambda',
+        'index_deadletter_queue': 'indexDeadLetter',
+        'index_write_failed_lambda': 'indexWriteFailedLambda',
+        'index_find_cuboids_lambda': 'indexFindCuboidsLambda',
+        'index_split_cuboids_lambda': 'indexSplitCuboidsLambda',
+        'index_fanout_enqueue_cuboid_keys_lambda': 'indexFanoutEnqueueCuboidsKeysLambda',
+        'index_batch_enqueue_cuboids_lambda': 'indexBatchEnqueueCuboidsLambda',
+        'index_fanout_dequeue_cuboid_keys_lambda': 'indexFanoutDequeueCuboidsKeysLambda',
+        'index_dequeue_cuboid_keys_lambda': 'indexDequeueCuboidsLambda',
+        'index_get_num_cuboid_keys_msgs_lambda': 'indexGetNumCuboidKeysMsgsLambda',
+        'index_check_for_throttling_lambda': 'indexCheckForThrottlingLambda',
+        'index_invoke_index_supervisor_lambda': 'indexInvokeIndexSupervisorLambda',
+        'index_load_ids_from_s3_lambda': 'indexLoadIdsFromS3Lambda',
+        'index_cuboids_keys_queue': 'cuboidsKeys'
     }
 
     def __getattr__(self, name):
@@ -244,13 +316,32 @@ class AWSNames(object):
 
         fq_hostname = hostname + self.base_dot
 
+        # Lambda names cannot have periods, so we use dashes, instead.
         if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'consul_monitor', 'vault_consul_check',
-                    'delete_lambda', 'ingest_lambda', 'dynamo_lambda']:
+                    'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 
+                    'index_s3_writer_lambda', 'index_fanout_id_writer_lambda',
+                    'downsample_dlq', 'downsample_volume_lambda',
+                    'delete_tile_objs_lambda', 'delete_tile_index_entry_lambda',
+                    'index_write_id_lambda', 'index_write_failed_lambda',
+                    'index_find_cuboids_lambda', 
+                    'index_fanout_enqueue_cuboid_keys_lambda',
+                    'index_batch_enqueue_cuboids_lambda', 
+                    'index_fanout_dequeue_cuboid_keys_lambda',
+                    'index_dequeue_cuboid_keys_lambda',
+                    'index_get_num_cuboid_keys_msgs_lambda',
+                    'index_check_for_throttling_lambda',
+                    'index_invoke_index_supervisor_lambda',
+                    'index_split_cuboids_lambda',
+                    'index_load_ids_from_s3_lambda',
+                    'start_sfn_lambda',
+                    'downsample_volume_lambda']:
             fq_hostname = fq_hostname.replace('.','-')
 
+        # Queue names cannot have periods, so we capitalize each word, instead.
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
                     'ingest_queue_populate', 'ingest_queue_upload', 'resolution_hierarchy',
-                    'downsample_volume', 'delete_experiment', 'delete_collection', 'delete_coord_frame']:
+                    'downsample_volume', 'delete_experiment', 'delete_collection', 'delete_coord_frame',
+                    'index_deadletter_queue', 'index_cuboids_keys_queue', 'ingest_cleanup_dlq']:
             fq_hostname = "".join(map(lambda x: x.capitalize(), fq_hostname.split('.')))
 
         return fq_hostname
