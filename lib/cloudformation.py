@@ -2012,6 +2012,17 @@ class CloudFormationConfiguration:
             self.resources[key]["Properties"]["Description"] = description
 
     def add_data_pipeline(self, key, name, objects, description="", depends_on=None):
+        """Add a Data Pipeline definition
+
+        Args:
+            key (str): Unique name for the resource in the template
+            name (str): Name of the Data Pipeline to create
+            objects (obj): The results of lib.datapipeline.DataPipeline().objects
+                           after building the pipeline
+            description (str): Description for the Data Pipeline
+            depends_on (None|string|list): A unique name or list of unique names of resources within the
+        """
+
         self.resources[key] = {
             "Type" : "AWS::DataPipeline::Pipeline",
             "Properties" : {
