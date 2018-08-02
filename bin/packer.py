@@ -27,6 +27,7 @@ import sys
 import os
 import glob
 import json
+import yaml
 import shlex
 import subprocess
 import configparser
@@ -114,7 +115,14 @@ if __name__ == '__main__':
         return "\n" + header + "\n" + \
                "\n".join(map(lambda x: "  " + x, options)) + "\n"
 
-    config_glob = repo_path("packer", "variables", "*")
+    # Use a seperate top level key in top.sls for AMIs?
+    # Use a seperate top level key to say which AMIs to not build using packer.py
+    #config_file = repo_path("salt_stack", "salt", "top.sls")
+    #with open(config_file, 'r') as fh:
+    #    top = yaml.load(fh.read())
+    #    configs = [k for k in top['base']]
+    #    print(configs)
+
     config_help_names = list(CONFIGS)
     config_help_names.append("all")
     config_help = create_help("config is on of the following:", config_help_names)
