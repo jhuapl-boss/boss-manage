@@ -3,6 +3,7 @@ include:
     - python.pip
     - mysql.client
     - boss-tools.bossutils
+    - boss-tools.noconfig
 
 rds-script:
     file.managed:
