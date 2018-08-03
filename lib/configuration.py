@@ -24,8 +24,35 @@ from . import constants as const
 from .external import ExternalCalls
 from .ssh import SSHTarget
 from .utils import keypair_to_file
+from .names import AWSNames
 
 # DP TODO: Add caching
+
+# DP ???: Should the `cf_config` support be kept? It could be useful but also
+#         complicates the code in this module a little bit. The external
+#         interface wouldn't change
+"""
+DP NOTE: The references to `cf_config` are left from initial work to support
+         multiple accounts. The current design is as follows:
+         - The entry in configs.json would be a dictionary of bosslet config files
+         - Each entry in resulting dictionary would be for a given CF config file
+         - The `cf_config` variable would let the callee specify which CF config
+           they need data for
+         - The idea was/is that in a CF config it would be easy to reference
+           resources from another CF config. In most cases the only thing needed
+           would be the AWS or DNS name of the resource to reference, thus most
+           of the heavy lifting would be done by AWSNames, but any value could be
+           located.
+           Example:
+             In `api.py` to reference a subnet created in `core.py` the dev
+             could use `bosslet_config['core'].names.subnet.external`
+
+             In `api.py` to reference the public hostname of the Keycloak server
+             from `auth.py` the dev could use `bosslet_config['auth'].names.public_dns('auth')`
+
+         The `cf_config` variable was left in so that in the future there is a
+         starting place for multi account support, if that is eventually added.
+"""
 
 CONFIGS_JSON = "configs.json"
 CONFIGS_PATH = const.repo_path("config", CONFIGS_JSON)
@@ -85,10 +112,17 @@ def load_config(bosslet, cf_config = None):
             module.ssh_key = keyfile
         else:
             module.ssh_key = None
+
+        # DP NOTE: not loading ExternalCalls because when initialized it
+        #          does DNS lookups of the bastion and vault instances
+        #          which we don't want to happen right now
         #if module.session and module.SSH_KEY:
         #    module.call = ExternalCalls(module)
         #else:
         #    module.call = None
+
+        module.names = AWSNames(module)
+
         return module
     except ImportError:
         print("Could not import file 'config/{}'".format(config))
