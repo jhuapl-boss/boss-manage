@@ -115,6 +115,7 @@ def stopInstances():
     try:
         with vault_tunnel(args.ssh_key, bastion): 
             vaultB.vault_export(vault.Vault(args.vpc, private), REAL_PATH+'/config/vault_export.json')
+        utils.console.warning("Please protect the vault_pexport.json file as it contains personal passwords.")
         utils.console.okgreen("Successful vaul export")
     except Exception as e:
         utils.console.fail("Unsuccessful vault export")
