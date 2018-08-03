@@ -17,7 +17,11 @@
    The script aims to switch the boss on and off once it has been configured a first time.
    The instances should first be stood up by building stacks through cloudformation.
    ASG are shut down. Only execute this code if you are certain the boss will not
-   be running for another hour."""
+   be running for another hour.
+   Currently not all of the ASGs are supported. The auth and consul ASGs could present problems
+   if shut down, since all their data would be lost and would not be recovered upon turning the boss on. 
+   Supporting Auth ASG could be done using the same check the core config uses to see ig an auth RDS should be create.
+   If there is an auth db then you should be able to shut the ec2 instances down."""
 
 import boto3
 import sys
@@ -54,6 +58,7 @@ def startInstances():
         activitiesD = [ASGdescription["AutoScalingGroups"][0]["MinSize"], ASGdescription["AutoScalingGroups"][0]["MaxSize"],ASGdescription["AutoScalingGroups"][0]["DesiredCapacity"]]
         endpointD = [ASGdescription["AutoScalingGroups"][1]["MinSize"], ASGdescription["AutoScalingGroups"][1]["MaxSize"],ASGdescription["AutoScalingGroups"][1]["DesiredCapacity"]]
         vaultD = [ASGdescription["AutoScalingGroups"][2]["MinSize"], ASGdescription["AutoScalingGroups"][2]["MaxSize"],ASGdescription["AutoScalingGroups"][2]["DesiredCapacity"]]
+        print("Successful ASG configuration")
     except Exception as e:
        utils.console.fail("Unsuccessful ASG configuration")
        print("Error due to: %s" % e)
@@ -70,9 +75,9 @@ def startInstances():
     print("Importing vault content")
     try:
         with vault_tunnel(args.ssh_key, bastion):
-            private = aws.machine_lookup(session,args.vpc,public_ip=False)
-            vaultB.vault_unseal(vault.Vault(args.vpc, private))
-            vaultB.vault_import(vault.Vault(args.vpc, private), REAL_PATH + '/config/vault_export.json')
+            private = aws.machine_lookup(session,vpc,public_ip=False)
+            vaultB.vault_unseal(vault.Vault(vpc, private))
+            vaultB.vault_import(vault.Vault(vpc, private), REAL_PATH + '/config/vault_export.json')
         utils.console.okgreen("Successful import")
     except Exception as e:
         utils.console.fail("Unsuccessful import")
@@ -114,7 +119,7 @@ def stopInstances():
     print("Exporting vault content...") 
     try:
         with vault_tunnel(args.ssh_key, bastion): 
-            vaultB.vault_export(vault.Vault(args.vpc, private), REAL_PATH+'/config/vault_export.json')
+            vaultB.vault_export(vault.Vault(vpc, private), REAL_PATH+'/config/vault_export.json')
         utils.console.warning("Please protect the vault_pexport.json file as it contains personal passwords.")
         utils.console.okgreen("Successful vaul export")
     except Exception as e:
@@ -177,7 +182,8 @@ if __name__ == '__main__':
                                      epilog=actions_help)
     parser.add_argument("--aws-credentials", "-a",
                         metavar = "<file>",
-                        default = "aws-credentials",
+                        default = os.environ.get("AWS_CREDENTIALS"),
+                        type = argparse.FileType('r'),
                         help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
     parser.add_argument("--config",
                         metavar = "<config>",
@@ -200,37 +206,34 @@ if __name__ == '__main__':
                         choices = actions,
                         metavar = "action",
                         help = "Action to execute")
-    parser.add_argument("vpc",
-                    metavar = "vpc-machine-name",
-                    help = "The vault machine name. ex: vault.user.boss")
+    parser.add_argument("domain_name",
+                    help="Domain in which to execute the configuration (example: subnet.vpc.boss)")
     args = parser.parse_args()
 
-    #Loading AWS configuration files.
-    creds = json.load(open(str(REAL_PATH + '/config/' + args.aws_credentials)))
-    aws_access_key_id = creds["aws_access_key"]
-    aws_secret_access_key = creds["aws_secret_key"]
-    region_name = constants.REGION
-
-    if creds is None:
-        raise Exception('AWS credentials not provided')
+    #Check AWS configurations
+    if args.aws_credentials is None:
+        parser.print_usage()
+        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
+        sys.exit(1)
 
     # specify AWS keys, sets up connection to the client.
-    session = aws.create_session(creds)
+    session = aws.create_session(args.aws_credentials)
     client = session.client('autoscaling')
 
     # This next code block was adopted from bin/bastion.py and sets up vault_tunnel
+    vpc = 'vault.' + args.domain_name
     boss_position = 1
     try:
-        int(args.vpc.split(".", 1)[0])
+        int(vpc.split(".", 1)[0])
         boss_position = 2
     except ValueError:
         pass
-    bastion_host = args.bastion if args.bastion else "bastion." + args.vpc.split(".", boss_position)[boss_position]
+    bastion_host = args.bastion if args.bastion else "bastion." + vpc.split(".", boss_position)[boss_position]
     bastion = aws.machine_lookup(session, bastion_host)
     if args.private_ip:
-        private = args.vpc
+        private = vpc
     else:
-        private = aws.machine_lookup(session, args.vpc, public_ip=False)
+        private = aws.machine_lookup(session, vpc, public_ip=False)
 
     #Loading ASG configuration files. Please specify your ASG names on asg-cfg found in the config file.
     asg = json.load(open(str(REAL_PATH + '/config/' + args.config)))
