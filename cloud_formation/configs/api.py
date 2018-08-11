@@ -75,10 +75,17 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["aws"]["db"] = names.endpoint_db
     user_data["aws"]["cache"] = names.cache
     user_data["aws"]["cache-state"] = names.cache_state
+    if get_scenario(const.REDIS_SESSION_TYPE, None) is not None:
+        user_data["aws"]["cache-session"] = names.cache_session
+    else:
+        # Don't create a Redis server for dev stacks.
+        user_data["aws"]["cache-session"] = ''
+
 
     ## cache-db and cache-stat-db need to be in user_data for lambda to access them.
     user_data["aws"]["cache-db"] = "0"
     user_data["aws"]["cache-state-db"] = "0"
+    user_data["aws"]["cache-session-db"] = "0"
     user_data["aws"]["meta-db"] = names.meta
 
     # Use CloudFormation's Ref function so that queues' URLs are placed into
