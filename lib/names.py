@@ -78,7 +78,8 @@ class AWSNames(object):
         "http": "http",
         "internet": "internet",
         "meta": "bossmeta",
-        "cache": "cache",
+        'cache_session': 'cache-session',   # Redis server for Django sessions.
+        "cache": "cache",                   # Redis server to cache cuboids.
         "cache_state": "cache-state",
         "cache_manager": "cachemanager",
         "cache_db": "cachedb",
