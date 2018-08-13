@@ -93,19 +93,25 @@ if __name__ == '__main__':
                         choices = config_names,
                         metavar = "config_name",
                         help="Configuration to act upon (imported from configs/)")
-
+    parser.add_argument("--internal",
+                        action = "store_true",
+                        help="Attemps to execute cloudformation script without any credentials. Meant to use from internal aws instances")
     args = parser.parse_args()
 
-    if args.aws_credentials is None:
-        parser.print_usage()
-        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
-        sys.exit(1)
+    if args.internal:
+        session = aws.use_iam_role()
 
-    os.environ["AMI_VERSION"] = args.ami_version
-    os.environ["SCENARIO"] = args.scenario
-    os.environ["DISABLE_PREVIEW"] = str(args.disable_preview)
+    else:
+        if args.aws_credentials is None:
+            parser.print_usage()
+            print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
+            sys.exit(1)
 
-    session = aws.create_session(args.aws_credentials)
+        os.environ["AMI_VERSION"] = args.ami_version
+        os.environ["SCENARIO"] = args.scenario
+        os.environ["DISABLE_PREVIEW"] = str(args.disable_preview)
+
+        session = aws.create_session(args.aws_credentials)
 
     try:
         func = args.action.replace('-','_')

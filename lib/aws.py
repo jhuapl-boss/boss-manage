@@ -50,6 +50,13 @@ def create_session(credentials):
                       region_name = credentials.get('aws_region', const.REGION))
     return session
 
+def use_iam_role():
+    """Create a session with no credentials, meant to be used by internal instance
+    with assumed iam role.
+    """
+    session = Session()
+    return session 
+
 def machine_lookup_all(session, hostname, public_ip = True):
     """Lookup all of the IP addresses for a given AWS instance name.
 
