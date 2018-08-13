@@ -121,7 +121,7 @@ REDIS_CACHE_TYPE = {
 # Django session cache using Redis.
 REDIS_SESSION_TYPE = {
     "development": None,            # Don't use Redis for dev stack sessions.
-    "production": "cache.t2.small",
+    "production": "cache.m4.xlarge",
     "ha-development": "cache.t2.small",
 }
 
