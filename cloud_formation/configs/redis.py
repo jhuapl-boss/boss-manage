@@ -83,7 +83,7 @@ def create_config(session, domain, keypair=None):
                                      [sgs[names.internal]],
                                      type_=const.REDIS_SESSION_TYPE,
                                      version="3.2.4",
-                                     clusters=const.REDIS_CLUSTER_SIZE)
+                                     clusters=1)
 
     return config
 
