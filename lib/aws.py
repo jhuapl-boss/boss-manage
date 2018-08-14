@@ -54,7 +54,7 @@ def use_iam_role():
     """Create a session with no credentials, meant to be used by internal instance
     with assumed iam role.
     """
-    session = Session()
+    session = Session(region_name='us-east-1')
     return session 
 
 def machine_lookup_all(session, hostname, public_ip = True):
