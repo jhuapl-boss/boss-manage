@@ -466,6 +466,9 @@ class CloudFormationConfiguration:
 
         client = session.client('cloudformation')
         print(utils.get_commit())
+        print(self.stack_name)
+        print(self._create_template())
+        print(self.arguments)
         try:
             response = client.create_stack(
                 StackName = self.stack_name,
