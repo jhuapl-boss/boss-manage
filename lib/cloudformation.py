@@ -49,7 +49,8 @@ def get_scenario(var, default = None):
     Returns
         object : The variable or the SCENARIO version of the variable
     """
-    scenario = os.environ["SCENARIO"]
+    # scenario = os.environ["SCENARIO"]
+    scenario = 'development'
     if type(var) == dict:
         var_ = var.get(scenario, None)
         if var_ is None:
