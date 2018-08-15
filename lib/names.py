@@ -120,7 +120,8 @@ class AWSNames(object):
         'trigger_dynamo_autoscale': 'triggerDynamoAutoscale',
         'downsample_status': 'downsample-status',
         'downsample_dlq': 'downsample-dlq',
-        'copy_cuboids_lambda': 'copyCuboidsLambda',
+        'copy_cuboid_lambda': 'copyCuboidLambda',
+        'copy_cuboid_dlq': 'copyCuboidDlq'
     }
 
     def __getattr__(self, name):
@@ -142,7 +143,7 @@ class AWSNames(object):
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
                     'ingest_queue_populate', 'ingest_queue_upload', 'resolution_hierarchy',
                     'downsample_volume', 'delete_experiment', 'delete_collection', 'delete_coord_frame',
-                    'ingest_cleanup_dlq']:
+                    'ingest_cleanup_dlq', 'copy_cuboid_dlq']:
             fq_hostname = "".join(map(lambda x: x.capitalize(), fq_hostname.split('.')))
 
         return fq_hostname
