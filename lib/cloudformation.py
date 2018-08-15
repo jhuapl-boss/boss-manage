@@ -860,7 +860,7 @@ class CloudFormationConfiguration:
             "Properties" : {
                 "ImageId" : ami,
                 "InstanceType" : get_scenario(type_, "t2.micro"),
-                "KeyName" : keypair,
+                # "KeyName" : keypair,
                 "SourceDestCheck": bool_str(iface_check),
                 "Tags" : [
                     {"Key" : "Stack", "Value" : Ref("AWS::StackName") },
@@ -1469,7 +1469,7 @@ class CloudFormationConfiguration:
                 "ImageId" : ami,
                 "InstanceMonitoring" : detailed_monitoring, # CloudWatch Monitoring...
                 "InstanceType" : get_scenario(type_, "t2.micro"),
-                "KeyName" : keypair,
+                # "KeyName" : keypair,
                 "SecurityGroups" : security_groups,
                 "UserData" : "" if user_data is None else { "Fn::Base64" : user_data }
             }
