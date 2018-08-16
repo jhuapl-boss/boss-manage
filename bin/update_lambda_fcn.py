@@ -101,7 +101,9 @@ def update_lambda_code(session, domain, bucket):
         names.index_invoke_index_supervisor_lambda,
         names.index_split_cuboids_lambda,
         names.start_sfn_lambda,
-        names.downsample_volume_lambda
+        names.downsample_volume_lambda,
+        names.delete_tile_index_entry_lambda,
+        names.copy_cuboid_lambda
     ]
     client = session.client('lambda')
     for lambda_name in uses_multilambda:

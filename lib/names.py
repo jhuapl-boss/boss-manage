@@ -146,7 +146,9 @@ class AWSNames(object):
         'index_check_for_throttling_lambda': 'indexCheckForThrottlingLambda',
         'index_invoke_index_supervisor_lambda': 'indexInvokeIndexSupervisorLambda',
         'index_load_ids_from_s3_lambda': 'indexLoadIdsFromS3Lambda',
-        'index_cuboids_keys_queue': 'cuboidsKeys'
+        'index_cuboids_keys_queue': 'cuboidsKeys',
+        'copy_cuboid_lambda': 'copyCuboidLambda',
+        'copy_cuboid_dlq': 'copyCuboidDlq'
     }
 
     def __getattr__(self, name):
@@ -177,14 +179,17 @@ class AWSNames(object):
                     'index_split_cuboids_lambda',
                     'index_load_ids_from_s3_lambda',
                     'start_sfn_lambda',
-                    'downsample_volume_lambda']:
+                    'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 'downsample_dlq', 'downsample_volume_lambda',
+                    'delete_tile_objs_lambda', 'delete_tile_index_entry_lambda',
+                    'copy_cuboids_lambda']:
             fq_hostname = fq_hostname.replace('.','-')
 
         # Queue names cannot have periods, so we capitalize each word, instead.
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
                     'ingest_queue_populate', 'ingest_queue_upload', 'resolution_hierarchy',
                     'downsample_volume', 'delete_experiment', 'delete_collection', 'delete_coord_frame',
-                    'index_deadletter_queue', 'index_cuboids_keys_queue', 'ingest_cleanup_dlq']:
+                    'index_deadletter_queue', 'index_cuboids_keys_queue',
+                    'ingest_cleanup_dlq', 'copy_cuboid_dlq']:
             fq_hostname = "".join(map(lambda x: x.capitalize(), fq_hostname.split('.')))
 
         return fq_hostname
