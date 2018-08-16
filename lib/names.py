@@ -120,6 +120,8 @@ class AWSNames(object):
         'trigger_dynamo_autoscale': 'triggerDynamoAutoscale',
         'downsample_status': 'downsample-status',
         'downsample_dlq': 'downsample-dlq',
+        'copy_cuboid_lambda': 'copyCuboidLambda',
+        'copy_cuboid_dlq': 'copyCuboidDlq'
     }
 
     def __getattr__(self, name):
@@ -134,13 +136,14 @@ class AWSNames(object):
 
         if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'consul_monitor', 'vault_consul_check',
                     'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 'downsample_dlq', 'downsample_volume_lambda',
-                    'delete_tile_objs_lambda', 'delete_tile_index_entry_lambda']:
+                    'delete_tile_objs_lambda', 'delete_tile_index_entry_lambda',
+                    'copy_cuboids_lambda']:
             fq_hostname = fq_hostname.replace('.','-')
 
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
                     'ingest_queue_populate', 'ingest_queue_upload', 'resolution_hierarchy',
                     'downsample_volume', 'delete_experiment', 'delete_collection', 'delete_coord_frame',
-                    'ingest_cleanup_dlq']:
+                    'ingest_cleanup_dlq', 'copy_cuboid_dlq']:
             fq_hostname = "".join(map(lambda x: x.capitalize(), fq_hostname.split('.')))
 
         return fq_hostname
