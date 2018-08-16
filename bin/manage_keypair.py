@@ -75,7 +75,7 @@ if __name__ == '__main__':
 
     if args.action == 'create':
         response = aws.create_keypair(session, args.keypairName)
-        subprocess.call('mkdir ~/.ssh',shell=True)
+        subprocess.call('mkdir ' + home + '/.ssh',shell=True)
         pem_file = open(home + '/.ssh/' + args.keypairName + '.pem','w')
         pem_file.write(response['KeyMaterial'])
         pem_file.close()
