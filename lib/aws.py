@@ -1235,5 +1235,44 @@ def lambda_arn_lookup(session, lambda_name):
     else:
         return response['Configuration']['FunctionArn']
 
+def create_keypair(session, KeyName, DryRun=False):
+    """
+    Returns dict with SHA-1 digest of the DER encoded private key
+    An unencrypted PEM encoded RSA private key
+    and the name of the key pair. 
+    Args:
+        session(Session): boto3.session.Session object
+        KeyName (str): Desired name of the keypair
+    
+    Returns:
+        (dict):
+    """
+    if session is None:
+        return None
+    
+    client = session.client('ec2')
+    response = client.create_key_pair(
+        KeyName = KeyName,
+        DryRun = DryRun
+    )
+    return response
 
-
+def delete_keypair(session, KeyName, DryRun=False):
+    """
+    Returns none
+    Args:
+        session(Session): boto3.session.Session object
+        KeyName (str): Desired name of the keypair
+    
+    Returns:
+        none
+    """
+    if session is None:
+        return None
+    
+    client = session.client('ec2')
+    response = client.delete_key_pair(
+        KeyName = KeyName,
+        DryRun = DryRun
+    )
+    return response
