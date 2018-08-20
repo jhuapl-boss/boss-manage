@@ -534,7 +534,7 @@ def keypair_lookup(session):
 
     client = session.client('ec2')
     response = client.describe_key_pairs()
-
+    
     # If SSH_KEY exists and points to a valid Key Pair, use it
     key = os.environ.get("SSH_KEY", None)  # reuse bastion.py env vars
     if key is not None:

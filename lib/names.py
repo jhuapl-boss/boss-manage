@@ -176,7 +176,8 @@ class AWSNames(object):
                     'index_split_cuboids_lambda',
                     'index_load_ids_from_s3_lambda',
                     'start_sfn_lambda',
-                    'downsample_volume_lambda']:
+                    'downsample_volume_lambda',
+                    'auto_build_test_lambda']:
             fq_hostname = fq_hostname.replace('.','-')
 
         # Queue names cannot have periods, so we capitalize each word, instead.
