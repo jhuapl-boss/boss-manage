@@ -25,8 +25,7 @@ import os
 
 import alter_path
 from lib import aws
-from lib import hosts
-from lib.names import AWSNames
+from lib import configuration
 
 CMDS = ['on', 'off']
 
@@ -43,69 +42,64 @@ def warnings(api):
     print("You can you use: dig {}".format(api))
     print("       This will show either cloudfront or elb server")
 
-def migrations_on(session, domain):
+def migrations_on(bosslet_config):
     """
     changes Route53 entry for the api in domain to use cloudfront for the s3 maintenance bucket.
     Args:
-        session(Session): boto3 session object
-        domain(str): name of domain. Ex: integration.boss
+        bosslet_config (BossConfiguration): Configuration for the target Bosslet
 
     Returns:
         Nothing
     """
-    hosted_zone = aws.get_hosted_zone(session)
-    (api, auth) = get_api_auth_names(session, domain)
-    api_cloud_front = aws.cloudfront_public_lookup(session, api[:-1])
+    (api, _) = get_api_auth_names(bosslet_config)
+    api_cloud_front = aws.cloudfront_public_lookup(bosslet_config.session, api[:-1])
+
+    if api_cloud_front is None:
+        msg = "Cannot turn on maintenance mode as there is not a Cloudfront site for {}"
+        print(msg.format(api[:-1]))
+        sys.exit(1)
+
     print("Setting Route53 for: ")
     print("{}: {}".format(api, api_cloud_front))
-    aws.set_domain_to_dns_name(session, api, api_cloud_front, hosted_zone)
+    aws.set_domain_to_dns_name(bosslet_config.session,
+                               api, api_cloud_front,
+                               bosslet_config.EXTERNAL_DOMAIN)
+
     warnings(api)
 
-def migrations_off(session, domain):
+def migrations_off(bosslet_config):
     """
     changes Route53 entries for the domain to use the api elastic load balancers
     Args:
-        session(Session): boto3 session object
-        domain(str): name of domain. Ex: integration.boss
+        bosslet_config (BossConfiguration): Configuration for the target Bosslet
 
     Returns:
         Nothing
     """
-    names = AWSNames(domain)
-    hosted_zone = aws.get_hosted_zone(session)
-    (api, auth) = get_api_auth_names(session, domain)
-    api_elb = aws.elb_public_lookup(session, "elb." + domain)
+    (api, _) = get_api_auth_names(bosslet_config)
+    api_elb = aws.elb_public_lookup(session, bosslet_config.names.elb.endpoint_elb)
+
     print("Setting Route53 for: ")
     print("{}: {}".format(api, api_elb))
-    aws.set_domain_to_dns_name(session, api, api_elb, hosted_zone)
+    aws.set_domain_to_dns_name(bosslet_config.session,
+                               api, api_elb,
+                               bosslet_config.EXTERNAL_DOMAIN)
+
     warnings(api)
 
 
-def get_api_auth_names(session, domain):
+def get_api_auth_names(bosslet_config):
     """
     gets the api and auth hostnames from the domain
     Args:
-        session(Session): boto3 session object
-        domain(str): name of domain. Ex: integration.boss
+        bosslet_config (BossConfiguration): Configuration for the target Bosslet
 
     Returns:
         tuple(str) of api hostname and auth hostname
     """
-    hosted_zone = aws.get_hosted_zone(session)
-    if domain in hosts.BASE_DOMAIN_CERTS.keys():
-        if hosted_zone != hosts.PROD_DOMAIN:
-            print("Incorrect AWS credentials being provided for the production domain, please check them.")
-            sys.exit(1)
-        api = "api.{}.".format(hosts.BASE_DOMAIN_CERTS[domain])
-        auth = "auth.{}.".format(hosts.BASE_DOMAIN_CERTS[domain])
-    else:
-        print("Maintenance can only be performed in production account.")  # The reason for this is cloudfront sessions would need to be created for dev systems.
-        sys.exit(1)
-        # if hosted_zone != hosts.DEV_DOMAIN:
-        #     print("Possibly wrong credentials being used, domain, {}, is not supposed to be used in this aws account")
-        #     sys.exit(1)
-        # api = "api-{}.{}.".format(domain.split('.')[0], hosts.DEV_DOMAIN)
-        # auth = "auth-{}.{}.".format(domain.split('.')[0], hosts.DEV_DOMAIN)
+    api = bosslet_config.names.public_dns('api') + '.'
+    auth = bosslet_config.names.public_dns('auth') + '.'
+
     return (api, auth)
 
 
@@ -115,15 +109,9 @@ def create_parser():
     Returns:
         (ArgumentParser) not yet parsed.
     """
-    parser = argparse.ArgumentParser(
-        description="",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=cmd_help)
-    parser.add_argument("--aws-credentials", "-a",
-                        metavar="<file>",
-                        default=os.environ.get("AWS_CREDENTIALS"),
-                        type=argparse.FileType('r'),
-                        help="File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
+    parser = configuration.BossParser(description="",
+                                      formatter_class=argparse.RawDescriptionHelpFormatter,
+                                      epilog=cmd_help)
     parser.add_argument("-yes", "-y",
                         default=False,
                         type=bool,
@@ -131,8 +119,7 @@ def create_parser():
     parser.add_argument("cmd",
                         choices=CMDS,
                         help="returns maintenance on or off")
-    parser.add_argument("domain_name",
-                        help="Domain in which perform maintenance")
+    parser.add_bosslet()
 
     return parser
 
@@ -143,22 +130,15 @@ if __name__ == '__main__':
     parser = create_parser()
     args = parser.parse_args()
 
-    if args.aws_credentials is None:
-        parser.print_usage()
-        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
-        sys.exit(1)
-
-    session = aws.create_session(args.aws_credentials)
-
     if args.cmd == "on":
         if not args.yes:
             print("Maintenance mode will update the api DNS entry to point to a maintenance page.")
-            print("Are you sure you want to go into maintenance mode for {}?".format(args.domain_name))
+            print("Are you sure you want to go into maintenance mode for {}?".format(args.bosslet_name))
             resp = input("Update? [N/y] ")
             if len(resp) == 0 or resp[0] not in ('y', 'Y'):
                 print("Canceled")
                 sys.exit(2)
-        migrations_on(session, args.domain_name)
+        migrations_on(args.bosslet_config)
     elif args.cmd == "off":
-        migrations_off(session, args.domain_name)
+        migrations_off(args.bosslet_config)
 

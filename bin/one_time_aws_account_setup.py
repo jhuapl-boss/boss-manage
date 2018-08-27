@@ -23,6 +23,7 @@ import iam_utils
 import alter_path
 from lib import aws
 from lib import constants as const
+from lib import configuration
 
 def create_billing_alarms(session):
     print("creating billing alarms")
@@ -63,8 +64,8 @@ def create_initial_sns_accounts(session):
         print("Failed to create {} topic".format(const.PRODUCTION_BILLING_TOPIC))
 
 
-def import_iam_details_from_files(session):
-    iam = iam_utils.IamUtils(session)
+def import_iam_details_from_files(bosslet_config):
+    iam = iam_utils.IamUtils(bosslet_config)
     iam.get_iam_details_from_aws()
     iam.load_from_files()
     print("Importing iam details to aws..")
@@ -74,25 +75,14 @@ def import_iam_details_from_files(session):
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
-    parser = argparse.ArgumentParser(description="This script does some initial configuration of a new AWS Account " +
-                                                 "to function as theboss.  It should only be run once on an AWS Account.",
-                                     formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     epilog='one time setup for new AWS Account')
-    parser.add_argument("--aws-credentials", "-a",
-                        metavar="<file>",
-                        default=os.environ.get("AWS_CREDENTIALS"),
-                        type=argparse.FileType('r'),
-                        help="File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
+    parser = configuration.BossParser(description="This script does some initial configuration of a new AWS Account " +
+                                                  "to function as theboss.  It should only be run once on an AWS Account.",
+                                      formatter_class=argparse.RawDescriptionHelpFormatter,
+                                      epilog='one time setup for new AWS Account')
+    parser.add_bosslet()
 
     args = parser.parse_args()
 
-    if args.aws_credentials is None:
-        parser.print_usage()
-        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
-        sys.exit(1)
-
-    session = aws.create_session(args.aws_credentials)
-
-    create_initial_sns_accounts(session)
-    create_billing_alarms(session)
-    import_iam_details_from_files(session)
+    create_initial_sns_accounts(args.bosslet_config.session)
+    create_billing_alarms(args.bosslet_config.session)
+    import_iam_details_from_files(args.bosslet_config)

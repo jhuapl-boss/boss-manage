@@ -43,9 +43,9 @@ Author:
     Derek Pryor <Derek.Pryor@jhuapl.edu>
 """
 
-import argparse
 import os
 import sys
+import argparse
 
 import vault
 
@@ -54,7 +54,6 @@ from lib import aws
 from lib import utils
 from lib import configuration
 from lib.ssh import SSHConnection, SSHTarget, vault_tunnel
-from lib.names import AWSNames
 from lib.vault import Vault
 
 if __name__ == "__main__":
@@ -67,15 +66,11 @@ if __name__ == "__main__":
     commands.extend(vault.COMMANDS.keys())
     commands_help = create_help("command supports the following:", commands)
 
-    parser = argparse.ArgumentParser(description = "Script creating SSH Tunnels and connecting to internal VMs",
-                                     formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     epilog=commands_help)
+    parser = configuration.BossParser(description = "Script creating SSH Tunnels and connecting to internal VMs",
+                                      formatter_class=argparse.RawDescriptionHelpFormatter,
+                                      epilog=commands_help)
 
-
-    parser.add_argument("--private-ip", "-p",
-                        action='store_true',
-                        default=False,
-                        help = "add this flag to type in a private IP address in internal command instead of a DNS name which is looked up")
+    parser.add_hostname(private_ip = True)
     parser.add_argument("--user", "-u",
                         default='ubuntu',
                         help = "Username of the internal machine")
@@ -83,10 +78,6 @@ if __name__ == "__main__":
                         default=22,
                         type=int,
                         help = "Port to connect to on the internal machine")
-    parser.add_argument("--bosslet",
-                        default=None,
-                        help="Bosslet in which the machine and bastion are running")
-    parser.add_argument("internal", help="Hostname of the EC2 internal server to create the SSH Tunnels to")
     parser.add_argument("command",
                         choices = commands,
                         metavar = "command",
@@ -96,49 +87,10 @@ if __name__ == "__main__":
                         help = "Arguments to pass to the command")
 
     args = parser.parse_args()
+    bosslet_config = args.bosslet_config
 
-    if args.private_ip and not args.bosslet:
-        parser.print_usage()
-        print("Error: --bosslet required if --private-ip is used")
-        sys.exit(1)
-
-    if not args.private_ip:
-        idx, machine, bosslet_name = utils.parse_hostname(args.internal)
-
-        if not bosslet_name and not args.bosslet:
-            parser.print_usage()
-            print("Error: could nto parse out bosslet name, use --bosslet")
-            sys.exit(1)
-
-        if args.bosslet:
-            bosslet_name = args.bosslet
-
-        if not configuration.valid_bosslet(bosslet_name):
-            parser.print_usage()
-            print("Error: Bosslet name '{}' doesn't exist in configs file ({})".format(bosslet_name, configuration.CONFIGS_PATH))
-            sys.exit(1)
-
-        bosslet_config = configuration.BossConfiguration(bosslet_name)
-        names = AWSNames(bosslet_config)
-        hostname = names.dns[machine]
-        if idx is not None:
-            hostname = str(idx) + "." + hostname
-        ip = aws.machine_lookup(bosslet_config.session, hostname, public_ip=False)
-        if not ip:
-            sys.exit(1)
-    else:
-        ip = args.internal
-        bosslet_name = args.bosslet
-
-        if not configuration.valid_bosslet(bosslet_name):
-            parser.print_usage()
-            print("Error: Bosslet name '{}' doesn't exist in configs file ({})".format(bosslet_name, configuration.CONFIGS_PATH))
-            sys.exit(1)
-
-        bosslet_config = configuration.BossConfiguration(bosslet_name)
-        names = AWSNames(bosslet_config)
-
-    bastion = aws.machine_lookup(bosslet_config.session, names.dns.bastion) 
+    bastion = aws.machine_lookup(bosslet_config.session,
+                                 bosslet_config.names.dns.bastion) 
 
     ssh_target = SSHTarget(bosslet_config.ssh_key, ip, args.port, args.user)
     bastions = [SSHTarget(bosslet_config.ssh_key, bastion, 22, 'ec2-user')]

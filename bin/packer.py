@@ -127,9 +127,9 @@ if __name__ == '__main__':
     config_help_names.append("all")
     config_help = create_help("config is on of the following:", config_help_names)
 
-    parser = argparse.ArgumentParser(description = "Script the building of machines images using Packer and SaltStack",
-                                     formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     epilog=config_help)
+    parser = configuration.BossParser(description = "Script the building of machines images using Packer and SaltStack",
+                                      formatter_class=argparse.RawDescriptionHelpFormatter,
+                                      epilog=config_help)
     parser.add_argument("--single-thread",
                         action = "store_true",
                         default = False,
@@ -146,8 +146,7 @@ if __name__ == '__main__':
                         metavar = "<ami-version>",
                         default = 'h' + git_hash[:8],
                         help = "The AMI version for the machine image(s). (default: First 8 characters of the git SHA1 hash)")
-    parser.add_argument("bosslet_name",
-                        help="Bosslet in which to execute the build")
+    parser.add_bosslet()
     parser.add_argument("config",
                         choices = config_help_names,
                         metavar = "<config>",
@@ -156,27 +155,20 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if not configuration.valid_bosslet(args.bosslet_name):
-        parser.print_usage()
-        print("Error: Bosslet name '{}' doesn't exist in configs file ({})".format(args.bosslet_name, configuration.CONFIGS_PATH))
-        sys.exit(1)
-
-    bosslet_config = configuration.BossConfiguration(args.bosslet_name)
-
     if "all" in args.config:
         args.config = CONFIGS
 
-    if bosslet_config.OUTBOUND_BASTION:
+    if args.bosslet_config.OUTBOUND_BASTION:
         bastion_config = """-var 'aws_bastion_ip={}'
                             -var 'aws_bastion_user={}'
                             -var 'aws_bastion_priv_key_file={}'
-                         """.format(bosslet_config.OUTBOUND_IP,
-                                    bosslet_config.OUTBOUND_USER,
-                                    utils.keypair_to_file(bosslet_config.OUTBOUND_KEY))
+                         """.format(args.bosslet_config.OUTBOUND_IP,
+                                    args.bosslet_config.OUTBOUND_USER,
+                                    utils.keypair_to_file(args.bosslet_config.OUTBOUND_KEY))
     else:
         bastion_config = ""
 
-    aws_creds = bosslet_config.session.get_credentials()
+    aws_creds = args.bosslet_config.session.get_credentials()
     credentials_config = repo_path("config", "aws-credentials")
     credentials_config = """-var 'aws_access_key={}'
                             -var 'aws_secret_key={}'
@@ -189,7 +181,7 @@ if __name__ == '__main__':
     if not os.path.isdir(packer_logs):
         os.mkdir(packer_logs)
 
-    ami = locate_ami(bosslet_config.session)
+    ami = locate_ami(args.bosslet_config.session)
 
     cmd = """{packer} build
              {bastion} {credentials}
@@ -203,8 +195,8 @@ if __name__ == '__main__':
         "credentials" : credentials_config,
         "only" : args.only,
         "packer_file" : packer_file,
-        "region": bosslet_config.REGION,
-        "ami_suffix": bosslet_config.AMI_SUFFIX,
+        "region": args.bosslet_config.REGION,
+        "ami_suffix": args.bosslet_config.AMI_SUFFIX,
         "ami_version" : "-" + args.ami_version,
         "commit" : git_hash,
         "ami" : ami,

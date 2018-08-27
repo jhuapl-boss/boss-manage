@@ -73,6 +73,8 @@ class AWSNames(object):
         's3': None, # S3 Bucket
         'sfn': format_capitalize, # StepFunction
         'cw': format_dash, # CloudWatch Rule
+
+        'zip': lambda x: x.lower() + '.zip' # lambda code files
     }
 
     RESOURCES = {
@@ -89,6 +91,7 @@ class AWSNames(object):
         'consul_monitor': 'consulMonitor',
         'core': 'core',
         'cuboid_bucket': 'cuboids',
+        "cuboid_ids_bucket": "cuboid-ids",
         'deadletter': 'Deadletter',
         'delete_bucket': 'delete',
         'delete_collection': 'Delete.Collection',
@@ -114,15 +117,21 @@ class AWSNames(object):
         'index_cuboid_supervisor': 'Index.CuboidSupervisor',
         'index_deadletter': 'indexDeadLetter',
         'index_dequeue_cuboid_keys': 'indexDequeueCuboidsLambda',
+        'index_dequeue_cuboids': 'Index.DequeueCuboids',
+        'index_enqueue_cuboids': 'Index.EnqueueCuboids',
         'index_fanout_dequeue_cuboid_keys': 'indexFanoutDequeueCuboidsKeysLambda',
+        'index_fanout_dequeue_cuboids': 'Index.FanoutDequeueCuboids',
         'index_fanout_enqueue_cuboid_keys': 'indexFanoutEnqueueCuboidsKeysLambda',
+        'index_fanout_enqueue_cuboids': 'Index.FanoutEnqueueCuboids',
         'index_fanout_id_writer': 'indexFanoutIdWriterLambda',
+        'index_fanout_id_writers': 'Index.FanoutIdWriters',
         'index_find_cuboids': 'indexFindCuboidsLambda',
         'index_get_num_cuboid_keys_msgs': 'indexGetNumCuboidKeysMsgsLambda',
         'index_id_writer': 'Index.IdWriter',
         'index_invoke_index_supervisor': 'indexInvokeIndexSupervisorLambda',
         'index_s3_writer': 'indexS3WriterLambda',
         'index_split_cuboids': 'indexSplitCuboidsLambda',
+        'index_supervisor': 'Index.Supervisor',
         'index_write_failed': 'indexWriteFailedLambda',
         'index_write_id': 'indexWriteIdLambda',
         'ingest_bucket': 'ingest',

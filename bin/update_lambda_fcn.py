@@ -202,19 +202,12 @@ def create_ndingest_settings(bosslet_config, fp):
         parser.write(out)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Script for updating lambda function code. ' + 
-                                     'To supply arguments from a file, provide the filename prepended with an `@`.',
-                                     fromfile_prefix_chars = '@')
-    parser.add_argument("bosslet_name", help="Bosslet in which to execute the configuration")
+    parser = configuration.BossParser(description='Script for updating lambda function code. ' + 
+                                      'To supply arguments from a file, provide the filename prepended with an `@`.',
+                                      fromfile_prefix_chars = '@')
+    parser.add_bosslet()
 
     args = parser.parse_args()
 
-    if not configuration.valid_bosslet(args.bosslet_name):
-        parser.print_usage()
-        print("Error: Bosslet name '{}' doesn't exist in configs file ({})".format(args.bosslet_name, configuration.CONFIGS_PATH))
-        sys.exit(1)
-
-    bosslet_config = configuration.BossConfiguration(args.bosslet_name)
-
-    load_lambdas_on_s3(bosslet_config)
-    update_lambda_code(bosslet_config)
+    load_lambdas_on_s3(args.bosslet_config)
+    update_lambda_code(args.bosslet_config)

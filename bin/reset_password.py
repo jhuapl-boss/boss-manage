@@ -23,10 +23,15 @@ import botocore
 import alter_path
 from lib import aws
 
-def read_password():
+def read_password(show_password = False):
+    if show_password:
+        prompt = input
+    else:
+        prompt = getpass.getpass
+
     while True:
-        initial = getpass.getpass()
-        confirm = getpass.getpass('Verify: ')
+        initial = prompt('Password: ')
+        confirm = prompt('Verify: ')
         if initial == confirm:
             return initial
         else:
@@ -34,26 +39,16 @@ def read_password():
             print()
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description = "Script to reset the password for an IAM user")
-    parser.add_argument("--aws-credentials", "-a",
-                        metavar = "<file>",
-                        default = os.environ.get("AWS_CREDENTIALS"),
-                        type = argparse.FileType('r'),
-                        help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
+    parser = configuration.BossParser(description = "Script to reset the password for an IAM user")
     parser.add_argument("--disable-reset",
                         action = "store_true",
                         help = "Disable the need to reset the password on next login")
+    parser.add_bosslet()
     parser.add_argument("iam_user", help="Name of the IAM User account")
 
     args = parser.parse_args()
 
-    if args.aws_credentials is None:
-        parser.print_usage()
-        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
-        sys.exit(1)
-
-    session = aws.create_session(args.aws_credentials)
-    iam = session.resource('iam')
+    iam = args.bosslet_config.session.resource('iam')
     profile = iam.LoginProfile(args.iam_user)
 
     try:

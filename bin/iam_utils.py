@@ -42,9 +42,12 @@ from botocore.exceptions import ClientError
 import alter_path
 from lib import aws
 from lib import utils
-from lib import hosts
 from lib import constants as const
 from lib.boto_wrapper import IamWrapper as iw
+from lib import configuration
+
+REGION_STANDIN = '--region--'
+ACCOUNT_STANDIN = '--account--'
 
 IAM_CONFIG_DIR = const.repo_path("config", "iam")
 DEFAULT_POLICY_FILE = os.path.join(IAM_CONFIG_DIR, "policies.json")
@@ -53,8 +56,10 @@ DEFAULT_ROLES_FILE = os.path.join(IAM_CONFIG_DIR, "roles.json")
 COMMANDS=["import", "export"]
 
 class IamUtils:
-    def __init__(self, session):
-        self.session = session
+    def __init__(self, bosslet_config):
+        self.bosslet_config = bosslet_config
+        self.session = bosslet_config.session
+
         self.iam_details = None
         self.iw = iw(session.client("iam"))
         self.policy_keyword_filters = ["-client-policy-"]  # Any keywords in the policy name should be skipped.
@@ -71,24 +76,17 @@ class IamUtils:
         self.roles = []
         os.makedirs(IAM_CONFIG_DIR, exist_ok=True)
 
-    def to_prod_account(self, list):
-        current_account = aws.get_account_id_from_session(self.session)
-        if current_account != hosts.PROD_ACCOUNT:
-            return self.swap_accounts(list, current_account, hosts.PROD_ACCOUNT)
-        else:
-            return list
+    def to_generic(self, data):
+        dumped = json.dumps(data)
+        dumped = dumped.replace(self.bosslet_config.REGION, REGION_STANDIN)
+        dumped = dumped.replace(self.bosslet_config.ACCOUNT_ID, ACCOUNT_STANDIN)
+        return json.loads(dumped)
 
-    def to_sessions_account(self, list):
-        current_account = aws.get_account_id_from_session(self.session)  # TODO SH this only works after we remove possible assume account
-        if current_account != hosts.PROD_ACCOUNT:
-            return self.swap_accounts(list, hosts.PROD_ACCOUNT, current_account)
-        else:
-            return list
-
-    def swap_accounts(self, list, from_acc, to_acc):
-        list_string = json.dumps(list, indent=2)
-        account_switched = list_string.replace(from_acc, to_acc)
-        return json.loads(account_switched)
+    def from_generic(self, data):
+        dumped = json.dumps(data)
+        dumped = dumped.replace(REGION_STANDIN, self.bosslet_config.REGION)
+        dumped = dumped.replace(ACCOUNT_STANDIN, self.bosslet_config.ACCOUNT_ID)
+        return json.loads(dumped)
 
     def get_iam_details_from_aws(self):
         client = self.session.client('iam')
@@ -142,7 +140,7 @@ class IamUtils:
                     policy_temp_list.append(new_policy)
                     break
 
-        self.policies = self.to_prod_account(policy_temp_list)
+        self.policies = self.to_generic(policy_temp_list)
 
     def save_policies(self, filename):
         with open(filename, 'w') as f:
@@ -237,7 +235,7 @@ class IamUtils:
                 inst_profile_list.append(new_inst_pro)
             new_role["InstanceProfileList"] =inst_profile_list
             role_temp_list.append(new_role)
-        self.roles = self.to_prod_account(role_temp_list)
+        self.roles = self.to_generic(role_temp_list)
 
     def create_full_role(self, role):
         assume_role_pol_doc_str = json.dumps(role["AssumeRolePolicyDocument"], indent=2, sort_keys=True)
@@ -364,7 +362,7 @@ class IamUtils:
             new_group["GroupPolicyList"] = inst_pol_group_list
 
             group_temp_list.append(new_group)
-        self.groups = self.to_prod_account(group_temp_list)
+        self.groups = self.to_generic(group_temp_list)
 
     def create_full_group(self, group):
         self.iw.create_group(group["GroupName"], group["Path"])
@@ -459,9 +457,9 @@ class IamUtils:
         self.save_groups(DEFAULT_GROUP_FILE)
 
     def change_account_memory(self):
-        self.policies = self.to_sessions_account(self.policies)
-        self.roles = self.to_sessions_account(self.roles)
-        self.groups = self.to_sessions_account(self.groups)
+        self.policies = self.from_generic(self.policies)
+        self.roles = self.from_generic(self.roles)
+        self.groups = self.from_generic(self.groups)
 
     def load_from_files(self):
         self.load_policies_from_file(DEFAULT_POLICY_FILE)
@@ -492,9 +490,12 @@ class IamUtils:
 
 
 def assume_production_role(session):
+    # DP TODO: Figure out how to update this with the refactor
+    # DP NOTE: It looks like nothing in this script enables the use_assume_role variable
 
     sts_client = session.client('sts')
-    role_arn = "arn:aws:iam::{}:role/DeveloperAccess".format(hosts.PROD_ACCOUNT)
+    account_id = input("Production Account ID: ")
+    role_arn = "arn:aws:iam::{}:role/DeveloperAccess".format(account_id)
     assumed_role_object = sts_client.assume_role(
         RoleArn=role_arn,
         RoleSessionName="AssumeRoleSession5"
@@ -526,28 +527,17 @@ def get_default_policy_version(policy):
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
-    parser = argparse.ArgumentParser(description="Load Policies, Roles and Groups into and out of AWS",
-                                     formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     epilog='Exports and Imports Iam Information')
-    parser.add_argument("--aws-credentials", "-a",
-                        metavar="<file>",
-                        default=os.environ.get("AWS_CREDENTIALS"),
-                        type=argparse.FileType('r'),
-                        help="File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
-
+    parser = configuration.BossParser(description="Load Policies, Roles and Groups into and out of AWS",
+                                      formatter_class=argparse.RawDescriptionHelpFormatter,
+                                      epilog='Exports and Imports Iam Information')
+    parser.add_bosslet()
     parser.add_argument("command",
                         choices=COMMANDS,
                         help="import from files to AWS, export from AWS to files. Files will be manaually edited so export should not be used after initial file creation.")
 
     args = parser.parse_args()
 
-    if args.aws_credentials is None:
-        parser.print_usage()
-        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
-        sys.exit(1)
-
-    session = aws.create_session(args.aws_credentials)
-    iam = IamUtils(session)
+    iam = IamUtils(args.boslet_config)
 
     if args.command == "export":
         print("Exporting from AWS...")

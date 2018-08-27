@@ -20,18 +20,20 @@ developing and small changes need to be made to a lambda function, but a full
 rebuild of the entire zip file isn't required.
 """
 
-import alter_path
 import argparse
 import boto3
-from lib import aws
 import os
 import sys
 
-def download_lambda_zip(session, domain, path, bucket):
-    s3 = session.client('s3')
-    zip_name = 'multilambda.{}.zip'.format(domain)
+import alter_path
+from lib import aws
+from lib import configuration
+
+def download_lambda_zip(bosslet_config, path):
+    s3 = bosslet_config.session.client('s3')
+    zip_name = bosslet_config.names.zip.multi_lambda
     full_path = '{}/{}'.format(path, zip_name)
-    resp = s3.get_object(Bucket=bucket, Key=zip_name)
+    resp = s3.get_object(Bucket=bosslet_config.LAMBDA_BUCKET, Key=zip_name)
 
     bytes = resp['Body'].read()
 
@@ -42,32 +44,16 @@ def download_lambda_zip(session, domain, path, bucket):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description='Script for downloading lambda function code from S3. ' + 
-        'To supply arguments from a file, provide the filename prepended with an `@`.',
-        fromfile_prefix_chars = '@')
-    parser.add_argument(
-        '--aws-credentials', '-a',
-        metavar='<file>',
-        default=os.environ.get('AWS_CREDENTIALS'),
-        type=argparse.FileType('r'),
-        help='File with credentials for connecting to AWS (default: AWS_CREDENTIALS)')
-    parser.add_argument(
-        '--save-path', '-p', 
-        default='.',
-        help='Where to save the lambda zip file.')
-    parser.add_argument(
-        'domain',
-        help='Domain that lambda functions live in, such as integration.boss.')
+    parser = configuration.BossParser(description='Script for downloading lambda ' +
+                                      'function code from S3. To supply arguments ' +
+                                      'from a file, provide the filename prepended ' +
+                                      'with an `@`.',
+                                      fromfile_prefix_chars = '@')
+    parser.add_bosslet()
+    parser.add_argument('--save-path', '-p', 
+                        default='.',
+                        help='Where to save the lambda zip file.')
 
     args = parser.parse_args()
 
-    if args.aws_credentials is None:
-        parser.print_usage()
-        print('Error: AWS credentials not provided and AWS_CREDENTIALS is not defined')
-        sys.exit(1)
-
-    session = aws.create_session(args.aws_credentials)
-    bucket = aws.get_lambda_s3_bucket(session)
-
-    download_lambda_zip(session, args.domain, args.save_path, bucket)
+    download_lambda_zip(args.bosslet_config, args.save_path)

@@ -46,8 +46,8 @@ from lib.names import AWSNames
 if __name__ == "__main__":
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
-    parser = argparse.ArgumentParser(description = "Script to lookup AWS instance names and start an SSH session",
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = configuration.BossParser(description = "Script to lookup AWS instance names and start an SSH session",
+                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--cmd", "-c",
                         default=None,
                         help="command to run in ssh, if you want to run a command.")
@@ -57,60 +57,9 @@ if __name__ == "__main__":
     parser.add_argument("--user", "-u",
                         default=None,
                         help="username on remote host.")
-    parser.add_argument("--bosslet", "-b",
-                        default=None,
-                        help="Bosslet in which the machine is running")
-    parser.add_argument("--private-ip", "-p",
-                        action='store_true',
-                        default=False,
-                        help="add this flag to type in a private IP address in internal command instead of a DNS name which is looked up")
-    parser.add_argument("hostname", help="Hostname of the EC2 instance to create SSH Tunnels on")
+    parser.add_hostname(private_ip = True)
 
     args = parser.parse_args()
-
-    if args.private_ip and not args.bosslet:
-        parser.print_usage()
-        print("Error: --bosslet required if --private-ip is used")
-        sys.exit(1)
-
-    if not args.private_ip:
-        idx, machine, bosslet_name = utils.parse_hostname(args.hostname)
-
-        if not bosslet_name and not args.bosslet:
-            parser.print_usage()
-            print("Error: could not parse out bosslet name, use --bosslet")
-            sys.exit(1)
-
-        # hande explicit bosslet
-        if args.bosslet:
-            bosslet_name = args.bosslet
-
-        if not configuration.valid_bosslet(bosslet_name):
-            parser.print_usage()
-            print("Error: Bosslet name '{}' doesn't exist in configs file ({})".format(bosslet_name, configuration.CONFIGS_PATH))
-            sys.exit(1)
-
-        # convert machine to hostname
-        bosslet_config = configuration.BossConfiguration(bosslet_name)
-        names = AWSNames(bosslet_config)
-        hostname = names.dns[machine]
-        if idx is not None:
-            hostname = str(idx) + "." + hostname # re-add the index value
-
-        # lookup hostname in aws
-        ip = aws.machine_lookup(bosslet_config.session, hostname)
-        if not ip:
-            sys.exit(1) # error message already printed
-    else:
-        ip = args.hostname
-        bosslet_name = args.bosslet
-
-        if not configuration.valid_bosslet(bosslet_name):
-            parser.print_usage()
-            print("Error: Bosslet name '{}' doesn't exist in configs file ({})".format(bosslet_name, configuration.CONFIGS_PATH))
-            sys.exit(1)
-
-        bosslet_config = configuration.BossConfiguration(bosslet_name)
 
     # the bastion server (being an AWS AMI) has a differnt username
     if args.user is None:
@@ -118,12 +67,12 @@ if __name__ == "__main__":
     else:
         user = args.user
 
-    if bosslet_config.outbound_bastion:
-        bastions = [bosslet_config.outbound_bastion]
+    if args.bosslet_config.outbound_bastion:
+        bastions = [args.bosslet_config.outbound_bastion]
     else:
         bastions = []
 
-    ssh_target = SSHTarget(bosslet_config.ssh_key, ip, 22, user)
+    ssh_target = SSHTarget(args.bosslet_config.ssh_key, args.ip, 22, user)
     ssh = SSHConnection(ssh_target, bastions)
     if args.cmd:
         ret = ssh.cmd(args.cmd)

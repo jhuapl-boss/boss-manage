@@ -192,6 +192,8 @@ if __name__ == '__main__':
                         metavar = "action",
                         help = "Action to execute")
     parser.add_argument("bosslet_name",
+                        metavar = "bosslet_name",
+                        choices = configuration.list_bosslets(),
                         help="Bosslet in which to execute the configuration")
     parser.add_argument("config_name",
                         choices = ['all', *config_names],
@@ -201,15 +203,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if not configuration.valid_bosslet(args.bosslet_name):
-        parser.print_usage()
-        print("Error: Bosslet name '{}' doesn't exist in configs file ({})".format(args.bosslet_name, configuration.CONFIGS_PATH))
-        sys.exit(1)
-
     constants.load_scenario(args.scenario)
 
     bosslet_config = configuration.BossConfiguration(args.bosslet_name,
-                                                     #cf_config = args.config_name,
                                                      ami_version = args.ami_version,
                                                      disable_preview = args.disable_preview)
 
