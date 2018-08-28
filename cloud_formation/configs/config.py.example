@@ -3,12 +3,12 @@
 #
 # A configuration file is used to build a Cloud Formation template
 # using the cloudformation library. Once the template is built it can
-# be created or updates.
+# be created, updated, and deleted.
 #
 
 # A list of other configuration files that this file depends upon
-# either because this file uses AWS resources created in a dependency
-# or because there are runtime dependencies between components
+# either because this file uses AWS resources created in it as a
+# dependency or because there are runtime dependencies between components
 DEPENDENCIES = []
 
 # Libraries that are often used. They all contain PyDocs that describe
@@ -20,6 +20,9 @@ from lib import aws
 from lib import scalyr
 
 def create_config(bosslet_config):
+    """A Common method for generating the configuration object
+    Used by multiple entry points for the file
+    """
     # AWSNames is used to provide the correct reference to different AWS resource
     names = AWSNames(bosslet_config)
 
@@ -27,7 +30,7 @@ def create_config(bosslet_config):
 
     config = CloudFormationConfiguration('<name of config file>', bosslet_config)
 
-    # create Cloud Formation template by calling `config.all_*` methods
+    # create Cloud Formation template by calling `config.add_*` methods
 
     return config
 
@@ -57,7 +60,7 @@ def post_init(bosslet_config):
     """
 
     # post-init actions
-    pass
+    return True
 
 def update(bosslet_config):
     """Build a new Cloud Formation template and update the existing stack

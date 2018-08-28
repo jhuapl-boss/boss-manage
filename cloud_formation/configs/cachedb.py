@@ -28,11 +28,10 @@ DEPENDENCIES = ['core', 'redis', 'api']
 
 from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, Arn
 from lib.userdata import UserData
-from lib.names import AWSNames
-from lib.external import ExternalCalls
 from lib import aws
 from lib import scalyr
 from lib import constants as const
+from lib import utils
 
 from update_lambda_fcn import load_lambdas_on_s3, update_lambda_code
 import boto3
@@ -83,7 +82,7 @@ def create_config(bosslet_config, user_data=None):
 
     keypair = bosslet_config.SSH_KEY
     session = bosslet_config.session
-    names = AWSNames(bosslet_config)
+    names = bosslet_config.names
     config = CloudFormationConfiguration("cachedb", bosslet_config)
 
     vpc_id = config.find_vpc()
@@ -228,18 +227,13 @@ def create_config(bosslet_config, user_data=None):
 
 def generate(bosslet_config):
     """Create the configuration and save it to disk"""
-<<<<<<< HEAD
     config = create_config(bosslet_config)
-=======
-    keypair = aws.keypair_lookup(session)
-    config = create_config(session, domain, keypair)
->>>>>>> integration
     config.generate()
 
 
 def create(bosslet_config):
     """Create the configuration, and launch it"""
-    names = AWSNames(bosslet_config)
+    names = bosslet_config.names
     session = bosslet_config.session
 
     user_data = UserData()
@@ -293,51 +287,44 @@ def pre_init(bosslet_config):
     load_lambdas_on_s3(bosslet_config)
 
 
-<<<<<<< HEAD
-def post_init(bosslet_config):
-=======
-def update(session, domain):
-    keypair = aws.keypair_lookup(session)
+def update(bosslet_config)
+    user_data = None
+    print("user_data not defined, update disabled")
+    return False
 
-    config = create_config(session, domain, keypair)
-    success = config.update(session)
+    config = create_config(bosslet_config, user_data)
+    success = config.update()
 
-    resp = input('Rebuild multilambda: [Y/n]:')
-    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
-        pre_init(session, domain)
-        bucket = aws.get_lambda_s3_bucket(session)
-        update_lambda_code(session, domain, bucket)
+    if utils.get_user_confirm("Rebuild multilambda", default = True):
+        pre_init(bosslet_config)
+        update_lambda_code(bosslet_config)
 
     return success
 
 
-def post_init(session, domain):
->>>>>>> integration
+def post_init(bosslet_config):
     print("post_init")
 
     print('adding tile bucket trigger of multi-lambda')
     add_tile_bucket_trigger(bosslet_config)
 
     print('checking for tile bucket expiration policy')
-    check_tile_bucket_life_cycle_policy(session, domain)
+    check_tile_bucket_life_cycle_policy(bosslet_config)
 
     # Tell Scalyr to get CloudWatch metrics for these instances.
-    names = AWSNames(bosslet_config)
-    instances = [names.dns.cache_manager]
     scalyr.add_instances_to_scalyr(
-        session, bosslet_config.REGION, instances)
+        bosslet_config.session,
+        bosslet_config.REGION,
+        [bosslet_config.names.dns.cache_manager])
 
-<<<<<<< HEAD
     return True
 
-def add_tile_bucket_trigger(bosslet_config):
-=======
-def check_tile_bucket_life_cycle_policy(session, domain):
-    names = AWSNames(domain)
-    s3 = session.client('s3')
+def check_tile_bucket_life_cycle_policy(bosslet_config):
+    names = bosslet_config.names
+    s3 = bosslet_config.session.client('s3')
 
     try:
-        resp = s3.get_bucket_lifecycle_configuration(Bucket=names.tile_bucket)
+        resp = s3.get_bucket_lifecycle_configuration(Bucket=names.s3.tile_bucket)
 
         policy_in_place = False
         if 'Rules' in resp:
@@ -355,12 +342,11 @@ def check_tile_bucket_life_cycle_policy(session, domain):
 
     print('setting policy')
     s3.put_bucket_lifecycle_configuration(
-        Bucket=names.tile_bucket,
+        Bucket=names.s3.tile_bucket,
         LifecycleConfiguration=get_boto_bucket_life_cycle_rules())
 
 
-def add_tile_bucket_trigger(session, domain):
->>>>>>> integration
+def add_tile_bucket_trigger(bosslet_config):
     """Trigger MultiLambda when file uploaded to tile bucket.
 
     This is done in post-init() because the tile bucket isn't always
@@ -374,7 +360,7 @@ def add_tile_bucket_trigger(session, domain):
         domain (string): VPC domain name.
     """
     session = bosslet_config.session
-    names = AWSNames(bosslet_config)
+    names = bosslet_config.names
     lambda_name = names.lambda_.multi_lambda
     bucket_name = names.s3.tile_bucket
 
@@ -401,7 +387,7 @@ def delete(bosslet_config):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
     session = bosslet_config.session
     domain = bosslet_config.INTERNAL_DOMAIN
-    names = AWSNames(bosslet_config)
+    names = bosslet_config.names
 
     aws.route53_delete_records(session, domain, names.dns.cache_manager)
 

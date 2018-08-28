@@ -34,9 +34,7 @@ DEPENDENCIES = None
 
 from lib.cloudformation import CloudFormationConfiguration, Ref, Arn
 from lib.userdata import UserData
-from lib.names import AWSNames
 from lib.keycloak import KeyCloakClient
-from lib.external import ExternalCalls
 from lib import aws
 from lib import utils
 from lib import scalyr
@@ -76,11 +74,10 @@ def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnet
 
 def create_config(bosslet_config):
     """Create the CloudFormationConfiguration object."""
-    names = AWSNames(bosslet_config)
-
     config = CloudFormationConfiguration('core', bosslet_config)
     session = bosslet_config.session
     keypair = bosslet_config.SSH_KEY
+    names = bosslet_config.names
 
     config.add_vpc()
 
@@ -265,8 +262,8 @@ def create(bosslet_config):
 
 def post_init(bosslet_config):
     session = bosslet_config.session
-    call = ExternalCalls(bosslet_config)
-    names = AWSNames(bosslet_config)
+    call = bosslet_config.call
+    names = bosslet_config.names
 
     # Figure out the external domain name of the auth server(s), matching the SSL cert
     auth_domain = names.public_dns("auth")
@@ -392,8 +389,7 @@ def update(bosslet_config):
 
     print("Update command will take {} - {} minutes to finish".format(min_time, max_time))
     print("Stack will be available during that time")
-    resp = input("Update? [N/y] ")
-    if len(resp) == 0 or resp[0] not in ('y', 'Y'):
+    if not utils.get_user_confirm("Update?" default = False):
         print("Canceled")
         return None
 
@@ -402,8 +398,8 @@ def update(bosslet_config):
 
     if success:
         session = bosslet_config.session
-        call = ExternalCalls(bosslet_config)
-        names = AWSNames(bosslet_config)
+        call = bosslet_config.call
+        names = bosslet_config.names
 
         # Unseal Vault first, so the rest of the system can continue working
         # TODO: Figure out what to do when the vault check fails, as consul
@@ -440,7 +436,7 @@ def delete(bosslet_config):
 
     session = bosslet_config.session
     domain = bosslet_config.INTERNAL_DOMAIN
-    names = AWSNames(bosslet_config)
+    names = bosslet_config.names
 
     aws.route53_delete_records(session, domain, names.dns.auth)
     aws.route53_delete_records(session, domain, names.dns.consul)

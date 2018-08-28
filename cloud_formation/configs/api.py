@@ -27,9 +27,7 @@ DEPENDENCIES = ['core', 'redis'] # also depends on activities for step functions
 
 from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, Arn
 from lib.userdata import UserData
-from lib.names import AWSNames
 from lib.keycloak import KeyCloakClient
-from lib.external import ExternalCalls
 from lib import aws
 from lib import utils
 from lib import scalyr
@@ -42,7 +40,7 @@ from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 
 def create_config(bosslet_config, db_config={}):
-    names = AWSNames(bosslet_config)
+    names = bosslet_config.names
     session = bosslet_config.session
 
     # Lookup IAM Role and SNS Topic ARNs for used later in the config
@@ -50,7 +48,7 @@ def create_config(bosslet_config, db_config={}):
     cachemanager_role_arn = aws.role_arn_lookup(session, 'cachemanager')
     dns_arn = aws.sns_topic_lookup(session, names.sns.dns.replace(".", "-"))
     if dns_arn is None:
-        raise Exception("SNS topic named dns." + domain + " does not exist.")
+        raise Exception("SNS topic named " + names.sns.dns + " does not exist.")
 
     mailing_list_arn = aws.sns_topic_lookup(session, const.PRODUCTION_MAILING_LIST)
     if mailing_list_arn is None:
@@ -226,10 +224,8 @@ def create_config(bosslet_config, db_config={}):
 
 def generate(bosslet_config):
     """Create the configuration and save it to disk"""
-    call = ExternalCalls(bosslet_config)
-
     try:
-        with call.vault() as vault:
+        with bosslet_config.call.vault() as vault:
             db_config = vault.read(const.VAULT_ENDPOINT_DB)
             if db_config is None:
                 raise Exception()
@@ -242,17 +238,14 @@ def generate(bosslet_config):
 
 def create(bosslet_config):
     """Configure Vault, create the configuration, and launch it"""
-    call = ExternalCalls(bosslet_config)
-    names = AWSNames(bosslet_config)
-
     db_config = const.ENDPOINT_DB_CONFIG.copy()
     db_config['password'] = utils.generate_password()
 
-    with call.vault() as vault:
+    with bosslet_config.call.vault() as vault:
         vault.write(const.VAULT_ENDPOINT, secret_key = str(uuid.uuid4()))
         vault.write(const.VAULT_ENDPOINT_DB, **db_config)
 
-        dns = names.public_dns("api")
+        dns = bosslet_config.names.public_dns("api")
         uri = "https://{}".format(dns)
         vault.update(const.VAULT_ENDPOINT_AUTH, public_uri = uri)
 
@@ -265,7 +258,7 @@ def create(bosslet_config):
     except:
         print("Error detected, revoking secrets")
         try:
-            with call.vault() as vault:
+            with bosslet_config.call.vault() as vault:
                 vault.delete(const.VAULT_ENDPOINT)
                 vault.delete(const.VAULT_ENDPOINT_DB)
                 #vault.delete(const.VAULT_ENDPOINT_AUTH) # Deleting this will bork the whole stack
@@ -281,8 +274,8 @@ def create(bosslet_config):
 
 def post_init(bosslet_config):
     session = bosslet_config.session
-    call = ExternalCalls(bosslet_config)
-    names = AWSNames(bosslet_config)
+    call = bosslet_config.call
+    names = bosslet_config.names
 
     # Configure external DNS
     # DP ???: Can this be moved into the CloudFormation template?
@@ -351,9 +344,7 @@ def post_init(bosslet_config):
         session, bosslet_config.REGION, instances)
 
 def update(bosslet_config):
-    call = ExternalCalls(bosslet_config)
-
-    with call.vault() as vault:
+    with bosslet_config.call.vault() as vault:
         db_config = vault.read(const.VAULT_ENDPOINT_DB)
 
     config = create_config(bosslet_config, db_config)
@@ -364,7 +355,7 @@ def update(bosslet_config):
 def delete(bosslet_config):
     session = bosslet_config.session
     domain = bosslet_config.INTERNAL_DOMAIN
-    names = AWSNames(bosslet_config)
+    names = bosslet_config.names
 
     if not utils.get_user_confirm("All data will be lost. Are you sure you want to proceed?"):
         return None

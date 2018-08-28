@@ -22,9 +22,7 @@ DEPENDENCIES = ['core', 'api']
 
 from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, Arn
 from lib.userdata import UserData
-from lib.names import AWSNames
 from lib.keycloak import KeyCloakClient
-from lib.external import ExternalCalls
 from lib import aws
 from lib import utils
 from lib import scalyr
@@ -38,8 +36,9 @@ def create_config(bosslet_config):
     :arg domain DNS name of vpc
     """
     config = CloudFormationConfiguration('cloudwatch', bosslet_config)
-    names = AWSNames(bosslet_config)
+    names = bosslet_config.names
     session = bosslet_config.session
+    domain = bosslet_config.INTERNAL_DOMAIN
 
     vpc_id = config.find_vpc()
     lambda_subnets, _ = config.find_all_subnets(compatibility = 'lambda')

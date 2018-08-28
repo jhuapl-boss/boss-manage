@@ -26,22 +26,18 @@ import boto3
 import configparser
 import io
 from lib.cloudformation import CloudFormationConfiguration, Arg, Arn, Ref
-from lib.names import AWSNames
-from lib.external import ExternalCalls
 from lib import aws
 from lib import constants as const
 import os
 import subprocess
 
 # Location of repo with the lambda autoscaler.
-LAMBDA_ROOT_FOLDER = os.path.join(
-    os.path.dirname(__file__), '../lambda/dynamodb-lambda-autoscale')
+LAMBDA_ROOT_FOLDER = const.repo_path('cloud_formation', 'lambda', 'dynamodb-lambda-autoscale')
 
 # Zip file created by `npm run build`
 LAMBDA_ZIP_FILE = os.path.join(LAMBDA_ROOT_FOLDER, 'dist.zip')
 
-CONFIG_TEMPLATE_PATH = os.path.join(
-    os.path.dirname(__file__), 'dynamo_config.template')
+CONFIG_TEMPLATE_PATH = const.repo_path('cloud_formation', 'configs', 'dynamo_config.template')
 CONFIG_OUTPUT_PATH = os.path.join(LAMBDA_ROOT_FOLDER, 'config.env.production')
 
 DYNAMO_LAMBDA_KEY = 'DynamoLambda'
@@ -73,7 +69,7 @@ DEV_STACK = 'DEV_STACK'
 
 def create_config(bosslet_config):
     session = bosslet_config.session
-    names = AWSNames(bosslet_config)
+    names = bosslet_config.names
     config = CloudFormationConfiguration("dynamolambda", bosslet_config)
 
     role = aws.role_arn_lookup(session, "lambda_cache_execution")
@@ -255,6 +251,5 @@ def generate_lambda_key(bosslet_config):
     Returns:
         (str)
     """
-    key = 'dynamodb_autoscale.' + bosslet_config.INTERNAL_DOMAIN + '.zip'
-    return key
+    return bosslet_config.names.zip.dynamodb_autoscale
 

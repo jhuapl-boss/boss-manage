@@ -15,8 +15,8 @@
 import json
 from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, get_scenario, Arg
 from lib.userdata import UserData
-from lib.names import AWSNames
 from lib import aws
+from lib import utils
 from lib import constants as const
 from lib import stepfunctions as sfn
 from update_lambda_fcn import load_lambdas_on_s3, update_lambda_code
@@ -27,276 +27,203 @@ for annotation (object) id indexing.  When building from scratch, it should
 be run after the CloudFormation cachedb config.
 """
 
-def create_config(session, domain):
+def create_config(bosslet_config):
     """Create the CloudFormationConfiguration object."""
-    config = CloudFormationConfiguration('idindexing', domain, const.REGION)
-    names = AWSNames(domain)
+    config = CloudFormationConfiguration('idindexing', bosslet_config)
+    session = bosslet_config.session
+    names = bosslet_config.names
 
     #topic_arn = aws.sns_topic_lookup(session, "ProductionMicronsMailingList")
 
     role = aws.role_arn_lookup(session, "lambda_cache_execution")
     config.add_arg(Arg.String(
         "LambdaCacheExecutionRole", role,
-        "IAM role for multilambda." + domain))
+        "IAM role for " + names.lambda_.multi_lambda))
 
-    lambda_bucket = aws.get_lambda_s3_bucket(session)
-    config.add_lambda(
-        "indexS3WriterLambda",
-        names.index_s3_writer_lambda,
-        Ref("LambdaCacheExecutionRole"),
-        s3=(aws.get_lambda_s3_bucket(session),
-            "multilambda.{}.zip".format(domain),
-            "write_s3_index_lambda.handler"),
-        timeout=120,
-        memory=1024,
-        runtime='python3.6')
+    def add_lambda(key, name, handler, timeout, memory):
+        """A method for defining the common arguments for adding a lambda"""
+        config.add_lambda(key,
+                          name,
+                          Ref('LambdaCacheExecutionRole'),
+                          s3=(bosslet_config.LAMBDA_BUCKET,
+                              names.zip.multi_lambda,
+                              handler),
+                          timeout = timeout,
+                          memory = memory,
+                          runtime='python3.6')
 
-    config.add_lambda(
-        "indexFanoutIdWriterLambda",
-        names.index_fanout_id_writer_lambda,
-        Ref("LambdaCacheExecutionRole"),
-        s3=(aws.get_lambda_s3_bucket(session),
-            "multilambda.{}.zip".format(domain),
-            "fanout_write_id_index_lambda.handler"),
-        timeout=120,
-        memory=256,
-        runtime='python3.6')
+    add_lambda("indexS3WriterLambda",
+               names.lambda_.index_s3_writer,
+               "write_s3_index_lambda.handler",
+               timeout=120, memory=1024)
 
-    config.add_lambda(
-        "indexWriteIdLambda",
-        names.index_write_id_lambda,
-        Ref("LambdaCacheExecutionRole"),
-        s3=(aws.get_lambda_s3_bucket(session),
-            "multilambda.{}.zip".format(domain),
-            "write_id_index_lambda.handler"),
-        timeout=120,
-        memory=512,
-        runtime='python3.6')
+    add_lambda("indexFanoutIdWriterLambda",
+               names.lambda_.index_fanout_id_writer,
+               "fanout_write_id_index_lambda.handler",
+               timeout=120, memory=256)
 
-    config.add_lambda(
-        "indexWriteFailedLambda",
-        names.index_write_failed_lambda,
-        Ref("LambdaCacheExecutionRole"),
-        s3=(aws.get_lambda_s3_bucket(session),
-            "multilambda.{}.zip".format(domain),
-            "write_index_failed_lambda.handler"),
-        timeout=60,
-        memory=128,
-        runtime='python3.6')
+    add_lambda("indexWriteIdLambda",
+               names.lambda_.index_write_id,
+               "write_id_index_lambda.handler",
+               timeout=120, memory=512)
 
-    config.add_lambda(
-        "indexFindCuboidsLambda",
-        names.index_find_cuboids_lambda,
-        Ref("LambdaCacheExecutionRole"),
-        s3=(aws.get_lambda_s3_bucket(session),
-            "multilambda.{}.zip".format(domain),
-            "index_find_cuboids_lambda.handler"),
-        timeout=120,
-        memory=256,
-        runtime='python3.6')
+    add_lambda("indexWriteFailedLambda",
+               names.lambda_.index_write_failed,
+               "write_index_failed_lambda.handler",
+               timeout=60, memory=128)
 
-    config.add_lambda(
-        "indexFanoutEnqueueCuboidsKeysLambda",
-        names.index_fanout_enqueue_cuboid_keys_lambda,
-        Ref("LambdaCacheExecutionRole"),
-        s3=(aws.get_lambda_s3_bucket(session),
-            "multilambda.{}.zip".format(domain),
-            "fanout_enqueue_cuboid_keys_lambda.handler"),
-        timeout=120,
-        memory=256,
-        runtime='python3.6')
+    add_lambda("indexFindCuboidsLambda",
+               names.lambda_.index_find_cuboids,
+               "index_find_cuboids_lambda.handler",
+               timeout=120, memory=256)
 
-    config.add_lambda(
-        "indexBatchEnqueueCuboidsLambda",
-        names.index_batch_enqueue_cuboids_lambda,
-        Ref("LambdaCacheExecutionRole"),
-        s3=(aws.get_lambda_s3_bucket(session),
-            "multilambda.{}.zip".format(domain),
-            "batch_enqueue_cuboids_lambda.handler"),
-        timeout=60,
-        memory=128,
-        runtime='python3.6')
+    add_lambda("indexFanoutEnqueueCuboidsKeysLambda",
+               names.lambda_.index_fanout_enqueue_cuboid_keys,
+               "fanout_enqueue_cuboid_keys_lambda.handler",
+               timeout=120, memory=256)
 
-    config.add_lambda(
-        "startSfnLambda",
-        names.start_sfn_lambda,
-        Ref("LambdaCacheExecutionRole"),
-        s3=(aws.get_lambda_s3_bucket(session),
-            "multilambda.{}.zip".format(domain),
-            "start_sfn_lambda.handler"),
-        timeout=60,
-        memory=128,
-        runtime='python3.6')
+    add_lambda("indexBatchEnqueueCuboidsLambda",
+               names.lambda_.index_batch_enqueue_cuboids,
+               "batch_enqueue_cuboids_lambda.handler",
+               timeout=60, memory=128)
 
-    config.add_lambda(
-        "indexFanoutDequeueCuboidKeysLambda",
-        names.index_fanout_dequeue_cuboid_keys_lambda,
-        Ref("LambdaCacheExecutionRole"),
-        s3=(aws.get_lambda_s3_bucket(session),
-            "multilambda.{}.zip".format(domain),
-            "fanout_dequeue_cuboid_keys_lambda.handler"),
-        timeout=60,
-        memory=128,
-        runtime='python3.6')
+    add_lambda("startSfnLambda",
+               names.lambda_.start_sfn,
+               "start_sfn_lambda.handler",
+               timeout=60, memory=128)
 
-    config.add_lambda(
-        "indexDequeueCuboidKeysLambda",
-        names.index_dequeue_cuboid_keys_lambda,
-        Ref("LambdaCacheExecutionRole"),
-        s3=(aws.get_lambda_s3_bucket(session),
-            "multilambda.{}.zip".format(domain),
-            "dequeue_cuboid_keys_lambda.handler"),
-        timeout=60,
-        memory=128,
-        runtime='python3.6')
+    add_lambda("indexFanoutDequeueCuboidKeysLambda",
+               names.lambda_.index_fanout_dequeue_cuboid_keys,
+               "fanout_dequeue_cuboid_keys_lambda.handler",
+               timeout=60, memory=128)
 
-    config.add_lambda(
-        "indexGetNumCuboidKeysMsgsLambda",
-        names.index_get_num_cuboid_keys_msgs_lambda,
-        Ref("LambdaCacheExecutionRole"),
-        s3=(aws.get_lambda_s3_bucket(session),
-            "multilambda.{}.zip".format(domain),
-            "get_num_msgs_cuboid_keys_queue_lambda.handler"),
-        timeout=60,
-        memory=128,
-        runtime='python3.6')
+    add_lambda("indexDequeueCuboidKeysLambda",
+               names.lambda_.index_dequeue_cuboid_keys,
+               "dequeue_cuboid_keys_lambda.handler",
+               timeout=60, memory=128)
 
-    config.add_lambda(
-        "indexCheckForThrottlingLambda",
-        names.index_check_for_throttling_lambda,
-        Ref("LambdaCacheExecutionRole"),
-        s3=(aws.get_lambda_s3_bucket(session),
-            "multilambda.{}.zip".format(domain),
-            "check_for_index_throttling_lambda.handler"),
-        timeout=60,
-        memory=128,
-        runtime='python3.6')
+    add_lambda("indexGetNumCuboidKeysMsgsLambda",
+               names.lambda_.index_get_num_cuboid_keys_msgs,
+               "get_num_msgs_cuboid_keys_queue_lambda.handler",
+               timeout=60, memory=128)
 
-    config.add_lambda(
-        "indexInvokeIndexSupervisorLambda",
-        names.index_invoke_index_supervisor_lambda,
-        Ref("LambdaCacheExecutionRole"),
-        s3=(aws.get_lambda_s3_bucket(session),
-            "multilambda.{}.zip".format(domain),
-            "invoke_index_supervisor_lambda.handler"),
-        timeout=60,
-        memory=128,
-        runtime='python3.6')
+    add_lambda("indexCheckForThrottlingLambda",
+               names.lambda_.index_check_for_throttling,
+               "check_for_index_throttling_lambda.handler",
+               timeout=60, memory=128)
 
-    config.add_lambda(
-        "indexSplitCuboidsLambda",
-        names.index_split_cuboids_lambda,
-        Ref("LambdaCacheExecutionRole"),
-        s3=(aws.get_lambda_s3_bucket(session),
-            "multilambda.{}.zip".format(domain),
-            "split_cuboids_lambda.handler"),
-        timeout=120,
-        memory=128,
-        runtime='python3.6')
+    add_lambda("indexInvokeIndexSupervisorLambda",
+               names.lambda_.index_invoke_index_supervisor,
+               "invoke_index_supervisor_lambda.handler",
+               timeout=60, memory=128)
 
-    config.add_lambda(
-        "indexLoadIdsFromS3Lambda",
-        names.index_load_ids_from_s3_lambda,
-        Ref("LambdaCacheExecutionRole"),
-        s3=(aws.get_lambda_s3_bucket(session),
-            "multilambda.{}.zip".format(domain),
-            "load_ids_from_s3_lambda.handler"),
-        timeout=120,
-        memory=128,
-        runtime='python3.6')
+    add_lambda("indexSplitCuboidsLambda",
+               names.lambda_.index_split_cuboids,
+               "split_cuboids_lambda.handler",
+               timeout=120, memory=128)
+
+    add_lambda("indexLoadIdsFromS3Lambda",
+               names.lambda_.index_load_ids_from_s3,
+               "load_ids_from_s3_lambda.handler",
+               timeout=120, memory=128)
 
     return config
 
 
-def generate(session, domain):
+def generate(bosslet_config):
     """Create the configuration and save it to disk."""
-    config = create_config(session, domain)
+    config = create_config(bosslet_config)
     config.generate()
 
 
-def create(session, domain):
+def create(bosslet_config):
     """Create the configuration and launch."""
-    resp = input('Rebuild multilambda: [Y/n]:')
-    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
-        pre_init(session, domain)
+    if utils.get_user_confirm("Rebuild multilambda", default = True):
+        pre_init(bosslet_config)
 
-    config = create_config(session, domain)
+    config = create_config(bosslet_config)
 
-    success = config.create(session)
+    success = config.create()
     if success:
-        post_init(session, domain)
+        post_init(bosslet_config)
+
+    return success
 
 
-def pre_init(session, domain):
+def pre_init(bosslet_config):
     """Build multilambda zip file and put in S3."""
-    bucket = aws.get_lambda_s3_bucket(session)
-    load_lambdas_on_s3(session, domain, bucket)
+    load_lambdas_on_s3(bosslet_config)
 
 
-def post_init(session, domain):
+def post_init(bosslet_config):
     """Create step functions."""
-    names = AWSNames(domain)
+    domain = bosslet_config.INTERNAL_DOMAIN
+    session = bosslet_config.session
+    names = bosslet_config.names.sfn
 
     sfn.create(
-        session, names.index_supervisor_sfn, domain, 
+        session, names.index_supervisor, domain, 
         'index_supervisor.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        session, names.index_cuboid_supervisor_sfn, domain, 
+        session, names.index_cuboid_supervisor, domain, 
         'index_cuboid_supervisor.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        session, names.index_id_writer_sfn, domain, 
+        session, names.index_id_writer, domain, 
         'index_id_writer.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        session, names.index_find_cuboids_sfn, domain, 
+        session, names.index_find_cuboids, domain, 
         'index_find_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        session, names.index_enqueue_cuboids_sfn, domain, 
+        session, names.index_enqueue_cuboids, domain, 
         'index_enqueue_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        session, names.index_fanout_enqueue_cuboids_sfn, domain, 
+        session, names.index_fanout_enqueue_cuboids, domain, 
         'index_fanout_enqueue_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        session, names.index_dequeue_cuboids_sfn, domain, 
+        session, names.index_dequeue_cuboids, domain, 
         'index_dequeue_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        session, names.index_fanout_id_writers_sfn, domain, 
+        session, names.index_fanout_id_writers, domain, 
         'index_fanout_id_writers.hsd', 'StatesExecutionRole-us-east-1 ')
 
 
-def update(session, domain):
-    resp = input('Rebuild multilambda: [Y/n]:')
-    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
-        pre_init(session, domain)
-        bucket = aws.get_lambda_s3_bucket(session)
-        update_lambda_code(session, domain, bucket)
+def update(bosslet_config):
+    if utils.get_user_confirm("Rebuild multilambda", default = True):
+        pre_init(bosslet_config)
+        update_lambda_code(bosslet_config)
 
-    config = create_config(session, domain)
-    success = config.update(session)
+    config = create_config(bosslet_config)
+    success = config.update()
 
     if not success:
         return False
 
-    resp = input('Replace step functions: [Y/n]:')
-    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
-        delete_sfns(session, domain)
-        post_init(session, domain)
+    if utils.get_user_confirm("Replace step functions", default = True):
+        delete_sfns(bosslet_config)
+
+        # Need to delay so AWS actually removes the step functions before trying to create them
+        delay = 60
+        print("Step Functions deleted, waiting for {} seconds".format(delay))
+        time.sleep(delay)
+
+        post_init(bosslet_config)
 
     return True
 
 
-def delete(session, domain):
-    CloudFormationConfiguration('idindexing', domain).delete(session)
-    delete_sfns(session, domain)
+def delete(bosslet_config):
+    CloudFormationConfiguration('idindexing', bosslet_config).delete()
+    delete_sfns(bosslet_config)
 
 
-def delete_sfns(session, domain):
-    names = AWSNames(domain)
-    sfn.delete(session, names.index_fanout_id_writers_sfn)
-    sfn.delete(session, names.index_dequeue_cuboids_sfn)
-    sfn.delete(session, names.index_fanout_enqueue_cuboids_sfn)
-    sfn.delete(session, names.index_enqueue_cuboids_sfn)
-    sfn.delete(session, names.index_find_cuboids_sfn)
-    sfn.delete(session, names.index_id_writer_sfn)
-    sfn.delete(session, names.index_cuboid_supervisor_sfn)
-    sfn.delete(session, names.index_supervisor_sfn)
+def delete_sfns(bosslet_config)
+    names = bosslet_config.names.sfn
+    sfn.delete(session, names.index_fanout_id_writers)
+    sfn.delete(session, names.index_dequeue_cuboids)
+    sfn.delete(session, names.index_fanout_enqueue_cuboids)
+    sfn.delete(session, names.index_enqueue_cuboids)
+    sfn.delete(session, names.index_find_cuboids)
+    sfn.delete(session, names.index_id_writer)
+    sfn.delete(session, names.index_cuboid_supervisor)
+    sfn.delete(session, names.index_supervisor)
 

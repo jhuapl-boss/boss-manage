@@ -24,13 +24,12 @@ BOSS system. redis configuration is in a separate file to improve the update pro
 """
 
 from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, Arn
-from lib.names import AWSNames
 from lib import aws
 from lib import constants as const
 
 
 def create_config(bosslet_config):
-    names = AWSNames(bosslet_config)
+    names = bosslet_config.names
     session = bosslet_config.session
 
     config = CloudFormationConfiguration('redis', bosslet_config)

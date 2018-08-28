@@ -30,7 +30,7 @@ import time
 import json
 from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, Arg
 from lib.userdata import UserData
-from lib.names import AWSNames
+from lib import utils
 from lib import aws
 from lib import constants as const
 from lib import stepfunctions as sfn
@@ -39,7 +39,7 @@ from update_lambda_fcn import load_lambdas_on_s3, update_lambda_code
 def create_config(bosslet_config, lookup=True):
     """Create the CloudFormationConfiguration object."""
     config = CloudFormationConfiguration('activities', bosslet_config)
-    names = AWSNames(bosslet_config)
+    names = bosslet_config.names
     keypair = bosslet_config.SSH_KEY
     session = bosslet_config.session
 
@@ -170,8 +170,7 @@ def generate(bosslet_config):
 
 
 def create(bosslet_config):
-    resp = input('Build multilambda: [Y/n]:')
-    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
+    if utils.get_user_confirm("Build multilambda", default = True):
         pre_init(bosslet_config)
 
     config = create_config(bosslet_config)
@@ -187,8 +186,7 @@ def pre_init(session, domain):
     load_lambdas_on_s3(bosslet_config)
 
 def update(session, domain):
-    resp = input('Rebuild multilambda: [Y/n]:')
-    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
+    if utils.get_user_confirm("Rebuild multilambda", default = True):
         pre_init(bosslet_config)
         update_lambda_code(bosslet_config)
 
@@ -198,12 +196,11 @@ def update(session, domain):
     if not success:
         return False
 
-    resp = input('Replace step functions: [Y/n]:')
-    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
+    if utils.get_user_confirm("Replace step functions", default = True):
         delete_sfns(bosslet_config)
 
         # Need to delay so AWS actually removes the step functions before trying to create them
-        delay = 30
+        delay = 60
         print("Step Functions deleted, waiting for {} seconds".format(delay))
         time.sleep(delay)
 
@@ -215,7 +212,7 @@ def update(session, domain):
 def post_init(bosslet_config)
     session = bosslet_config.session
     domain = bosslet_config.INTERNAL_DOMAIN
-    names = AWSNames(domain)
+    names = bosslet_config.names
 
     sfn.create(session, names.sfn.query_deletes, domain, 'query_for_deletes.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.sfn.delete_cuboid, domain, 'delete_cuboid.hsd', 'StatesExecutionRole-us-east-1 ')
@@ -234,10 +231,12 @@ def post_init(bosslet_config)
 def delete(bosslet_config):
     success = CloudFormationConfiguration('activities', bosslet_config).delete()
 
+    delete_sfns(bosslet_config)
+
 def delete_sfns(bosslet_config):
     """Delete step functions."""
     session = bosslet_config.session
-    names = AWSNames(bosslet_config)
+    names = bosslet_config.names
 
     # DP TODO: delete activities
     sfn.delete(session, names.sfn.delete_cuboid)
