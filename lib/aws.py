@@ -14,9 +14,6 @@
 
 """Library for common methods that are used by the different configs scripts.
 
-Library currently appends the boss-manage.git/vault/ directory to the system path
-so that it can import vault/bastion.py and vault/vault.py.
-
 Library contains a set of AWS lookup methods for locating AWS data and other related
 helper functions and classes.
 

@@ -58,14 +58,12 @@ class ExternalCalls:
                                Keypair is converted to file on disk using keypair_to_file()
             domain (string) : BOSS internal VPC domain name
         """
-        self.names = AWSNames(bosslet_config)
-
+        self.names = bosslet_config.names
         self.session = bosslet_config.session
-        self.keypair_file = keypair_to_file(bosslet_config.SSH_KEY)
 
         bastion_ip = aws.machine_lookup(self.session, self.names.dns.bastion)
 
-        self.bastions = [ SSHTarget(self.keypair_file, bastion_ip) ]
+        self.bastions = [ SSHTarget(self.ssh_key, bastion_ip) ]
 
         if bosslet_config.outbound_bastion:
             self.bastions.insert(0, bosslet_config.outbound_bastion)

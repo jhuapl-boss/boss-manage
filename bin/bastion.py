@@ -78,6 +78,10 @@ if __name__ == "__main__":
                         default=22,
                         type=int,
                         help = "Port to connect to on the internal machine")
+    parser.add_argument("--local-port",
+                        default = None,
+                        type = int,
+                        help = "Local port to use when tunneling")
     parser.add_argument("command",
                         choices = commands,
                         metavar = "command",
@@ -92,11 +96,11 @@ if __name__ == "__main__":
     bastion = aws.machine_lookup(bosslet_config.session,
                                  bosslet_config.names.dns.bastion) 
 
-    ssh_target = SSHTarget(bosslet_config.ssh_key, ip, args.port, args.user)
+    ssh_target = SSHTarget(bosslet_config.ssh_key, args.ip, args.port, args.user)
     bastions = [SSHTarget(bosslet_config.ssh_key, bastion, 22, 'ec2-user')]
     if bosslet_config.outbound_bastion:
         bastions.insert(0, bosslet_config.outbound_bastion)
-    ssh = SSHConnection(ssh_target, bastions)
+    ssh = SSHConnection(ssh_target, bastions, args.local_port)
 
     if args.command in ("ssh",):
         ssh.shell()
@@ -107,7 +111,9 @@ if __name__ == "__main__":
         ret = ssh.cmd(*args.arguments)
         sys.exit(ret)
     elif args.command in ("ssh-tunnel",):
-        ssh.external_tunnel(*args.arguments)
+        with ssh.tunnel() as local_port:
+            print("Connect to localhost:{} to be forwarded to {}:{}".format(local_port, args.ip, args.port))
+            input("Waiting to close tunnel...")
     elif args.command in ("ssh-all",):
         addrs = aws.machine_lookup_all(bosslet_config.session, hostname, public_ip=False)
         for addr in addrs:
