@@ -45,6 +45,7 @@ class Vault(object):
             host = "localhost"
 
         self.url = "http://{}:8200".format(host)
+        print(self.url)
         if proxy:
             self.proxy = {"http": "http://localhost:3128"}
         else:
@@ -215,7 +216,7 @@ class Vault(object):
             print("Vault AWS credentials files does not exist, skipping configuration of AWS-EC2 authentication backend")
         else:
             try:
-                #Enable AWS EC@ auth in Vault
+                #Enable AWS EC2 auth in Vault
                 client.enable_auth_backend('aws')
             except hvac.exceptions.InvalidRequest as ex:
                 print("aws auth backend already created.")
@@ -225,10 +226,12 @@ class Vault(object):
                                                    secret_key = aws_creds["aws_secret_key"])
             #Define policies and arn                                     
             policies = [p for p in provisioner_policies if p not in ('provisioner',)]
+            arn = 'arn:aws:iam::{}}:instance-profile/'.format(aws_creds["aws_account"])
 
             #For each policy configure the policies on a role of the same name
             for policy in policies:
-                client.write('/auth/aws/role/' + name, auth_type='ec2', bound_account_id = aws_creds["aws_account"], policies=policies)
+                client.write('/auth/aws/role/' + policy, auth_type='ec2', bound_iam_instance_profile_arn= arn + policy, policies=policies)
+                print('Successful write to aws/role/' + policy)
 
         # AWS Secret Backend
         if aws_creds is None:
@@ -243,7 +246,7 @@ class Vault(object):
                                             region = aws_creds.get("aws_region", "us-east-1"))
             client.write("aws/config/lease", lease = aws_creds.get("lease_duration", "1h"),
                                              lease_max = aws_creds.get("lease_max", "24h")) # DP TODO finalize default values
-
+            
             path = os.path.join(POLICY_DIR, "*.iam")
             for iam in glob.glob(path):
                 name = os.path.basename(iam).split('.')[0]
@@ -510,4 +513,3 @@ class Vault(object):
             kv = exported[path]
             fn = self.update if update else self.write
             fn(path, **kv)
-
