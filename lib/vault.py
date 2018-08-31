@@ -45,7 +45,6 @@ class Vault(object):
             host = "localhost"
 
         self.url = "http://{}:8200".format(host)
-        print(self.url)
         if proxy:
             self.proxy = {"http": "http://localhost:3128"}
         else:
