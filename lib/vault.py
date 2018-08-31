@@ -193,14 +193,14 @@ class Vault(object):
         else:
             aws_creds = None
 
-        # AWS Authentication Backend
+        # AWS-EC2 Authentication Backend
         if aws_creds is None:
             print("Vault AWS credentials files does not exist, skipping configuration of AWS-EC2 authentication backend")
         else:
             try:
                 client.enable_auth_backend('aws-ec2')
             except hvac.exceptions.InvalidRequest as ex:
-                print("aws-ec2 auth backend already created.")
+                print("aws-ec2 auth backend already created.")  
             client.write('auth/aws-ec2/config/client', access_key = aws_creds["aws_access_key"],
                                                        secret_key = aws_creds["aws_secret_key"])
 
@@ -209,6 +209,26 @@ class Vault(object):
             for policy in policies:
                 client.write('/auth/aws-ec2/role/' + policy, policies = policy,
                                                              bound_iam_role_arn = arn_prefix + policy)
+
+        # AWS Authentication Backend
+        if aws_creds is None:
+            print("Vault AWS credentials files does not exist, skipping configuration of AWS-EC2 authentication backend")
+        else:
+            try:
+                #Enable AWS EC@ auth in Vault
+                client.enable_auth_backend('aws')
+            except hvac.exceptions.InvalidRequest as ex:
+                print("aws auth backend already created.")
+            
+            #Configure the credentials required to make AWS API calls
+            client.write('auth/aws/config/client', access_key = aws_creds["aws_access_key"],
+                                                   secret_key = aws_creds["aws_secret_key"])
+            #Define policies and arn                                     
+            policies = [p for p in provisioner_policies if p not in ('provisioner',)]
+
+            #For each policy configure the policies on a role of the same name
+            for policy in policies:
+                client.write('/auth/aws/role/' + name, auth_type='ec2', bound_account_id = aws_creds["aws_account"], policies=policies)
 
         # AWS Secret Backend
         if aws_creds is None:
