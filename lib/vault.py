@@ -212,7 +212,7 @@ class Vault(object):
 
             #For each policy configure the policies on a role of the same name
             for policy in policies:
-                client.write('/auth/aws/role/' + policy, auth_type='ec2', bound_iam_instance_profile_arn= arn + policy, policies=policies)
+                client.write('/auth/aws/role/' + policy, auth_type='ec2', bound_iam_instance_profile_arn= arn + policy, policies=policy)
                 print('Successful write to aws/role/' + policy)
 
         # AWS Secret Backend
