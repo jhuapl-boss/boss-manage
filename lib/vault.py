@@ -197,10 +197,10 @@ class Vault(object):
         if aws_creds is None:
             print("Vault AWS credentials files does not exist, skipping configuration of AWS-EC2 authentication backend")
         else:
-            try:
-                #Enable AWS EC2 auth in Vault
+            #Enable AWS EC2 auth in Vault
+            if 'aws' not in client.list_auth_backends():
                 client.enable_auth_backend('aws')
-            except hvac.exceptions.InvalidRequest as ex:
+            else:
                 print("aws auth backend already created.")
             
             #Configure the credentials required to make AWS API calls
