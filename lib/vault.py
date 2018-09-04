@@ -193,23 +193,6 @@ class Vault(object):
         else:
             aws_creds = None
 
-        # AWS-EC2 Authentication Backend
-        if aws_creds is None:
-            print("Vault AWS credentials files does not exist, skipping configuration of AWS-EC2 authentication backend")
-        else:
-            try:
-                client.enable_auth_backend('aws-ec2')
-            except hvac.exceptions.InvalidRequest as ex:
-                print("aws-ec2 auth backend already created.")  
-            client.write('auth/aws-ec2/config/client', access_key = aws_creds["aws_access_key"],
-                                                       secret_key = aws_creds["aws_secret_key"])
-
-            arn_prefix = 'arn:aws:iam::{}:instance-profile/'.format(aws_creds["aws_account"])
-            policies = [p for p in provisioner_policies if p not in ('provisioner',)]
-            for policy in policies:
-                client.write('/auth/aws-ec2/role/' + policy, policies = policy,
-                                                             bound_iam_role_arn = arn_prefix + policy)
-
         # AWS Authentication Backend
         if aws_creds is None:
             print("Vault AWS credentials files does not exist, skipping configuration of AWS-EC2 authentication backend")
