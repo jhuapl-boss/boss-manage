@@ -47,6 +47,23 @@
   },
   {
     "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/AmazonAPIGatewayInvokeFullAccess",
+      "arn:aws:iam::aws:policy/AdministratorAccess"
+    ],
+    "GroupName": "aplMeshDevelopers",
+    "GroupPolicyList": [],
+    "Path": "/"
+  },
+  {
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/AmazonMechanicalTurkFullAccess"
+    ],
+    "GroupName": "aplMturk",
+    "GroupPolicyList": [],
+    "Path": "/"
+  },
+  {
+    "AttachedManagedPolicies": [
       "arn:aws:iam::aws:policy/IAMFullAccess",
       "arn:aws:iam::451493790433:policy/aplCloudFormationFullAccess",
       "arn:aws:iam::aws:policy/CloudFrontFullAccess",

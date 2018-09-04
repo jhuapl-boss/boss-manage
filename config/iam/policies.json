@@ -305,6 +305,43 @@
       "Statement": [
         {
           "Action": [
+            "s3:GetBucketLocation",
+            "s3:ListAllMyBuckets"
+          ],
+          "Effect": "Allow",
+          "Resource": "arn:aws:s3:::*"
+        },
+        {
+          "Action": [
+            "s3:ListBucket"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "arn:aws:s3:::drenkng1.agents"
+          ]
+        },
+        {
+          "Action": [
+            "s3:PutObject",
+            "s3:GetObject",
+            "s3:DeleteObject"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "arn:aws:s3:::drenkng1.agents/*"
+          ]
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "drenkng1-agents-rw-policy"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
             "sqs:*"
           ],
           "Effect": "Allow",
@@ -424,6 +461,31 @@
       "Version": "2012-10-17"
     },
     "PolicyName": "aplUploadCertificatePolicy"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "sns:*",
+            "iam:*",
+            "rds:*",
+            "s3:*",
+            "lambda:*",
+            "cloudformation:*",
+            "dynamodb:*",
+            "ec2:*",
+            "elasticloadbalancing:*"
+          ],
+          "Effect": "Allow",
+          "Resource": "*",
+          "Sid": "VisualEditor0"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "apl-auto-build"
   },
   {
     "Path": "/service-role/",
@@ -709,6 +771,26 @@
       "Statement": [
         {
           "Action": [
+            "sns:*",
+            "ec2:*",
+            "cloudformation:*",
+            "sqs:*"
+          ],
+          "Effect": "Allow",
+          "Resource": "*",
+          "Sid": "VisualEditor0"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "apl-lambda-test-build"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
             "s3:PutObject",
             "s3:GetObject",
             "logs:CreateLogStream",
@@ -785,5 +867,29 @@
       "Version": "2012-10-17"
     },
     "PolicyName": "aplVaultPolicy"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "s3:AbortMultipartUpload",
+            "s3:DeleteObject",
+            "s3:PutObject",
+            "s3:ListMultipartUploadParts",
+            "s3:ListBucketMultipartUploads"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "arn:aws:s3:::theboss.io-speed-test",
+            "arn:aws:s3:::theboss.io-speed-test/*"
+          ],
+          "Sid": "Stmt1464703254000"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "aplSpeedTestPolicy"
   }
 ]
