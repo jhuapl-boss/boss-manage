@@ -186,9 +186,13 @@ class Vault(object):
             provisioner_policies.append(name)
 
         # AWS Authentication Backend
-        #Enable AWS EC2 auth in Vault
+        #Enable AWS auth in Vault
         if 'aws' not in client.list_auth_backends():
-            client.enable_auth_backend('aws')
+            try:
+                client.enable_auth_backend('aws')
+            except Exception:
+                print("Path already in use passing")
+                pass
         else:
             print("aws auth backend already created.")
 
@@ -196,15 +200,18 @@ class Vault(object):
         policies = [p for p in provisioner_policies if p not in ('provisioner',)]
         arn = 'arn:aws:iam::{}:instance-profile/'.format(aws_account)
         #TODO: Find a temporary way of storing the aws account number
-
         #For each policy configure the policies on a role of the same name
         for policy in policies:
             client.write('/auth/aws/role/' + policy, auth_type='ec2', bound_iam_instance_profile_arn= arn + policy, policies=policy)
             print('Successful write to aws/role/' + policy)
-
+        
         # AWS Secret Backend
         if 'aws' not in client.list_secret_backends():
-            client.enable_auth_backend('aws')
+            try:
+                client.enable_auth_backend('aws')
+            except Exception:
+                print('Path already in use, passing')
+                pass
         else:
             print("aws secret backend already created.")
 
