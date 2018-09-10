@@ -198,7 +198,7 @@ class Vault(object):
 
         #Define policies and arn                                     
         policies = [p for p in provisioner_policies if p not in ('provisioner',)]
-        arn = 'arn:aws:iam::{}:instance-profile/'.format(aws_account)
+        arn = 'arn:aws:iam::{}:instance-profile/'.format(os.environ['AWS_ACCOUNT'])
         #TODO: Find a temporary way of storing the aws account number
         #For each policy configure the policies on a role of the same name
         for policy in policies:
