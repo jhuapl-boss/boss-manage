@@ -190,9 +190,9 @@ class Vault(object):
         if 'aws' not in client.list_auth_backends():
             try:
                 client.enable_auth_backend('aws')
-            except Exception:
-                print("Path already in use passing")
-                pass
+            except Exception as e:
+                print("Error while enabling auth back end: " + e)
+                sys.exit(1)
         else:
             print("aws auth backend already created.")
 
@@ -208,10 +208,10 @@ class Vault(object):
         # AWS Secret Backend
         if 'aws' not in client.list_secret_backends():
             try:
-                client.enable_auth_backend('aws')
-            except Exception:
-                print('Path already in use, passing')
-                pass
+                client.enable_secret_backend('aws')
+            except Exception as e:
+                print('Error while enabling secret back end: ' + e)
+                sys.exit(1)
         else:
             print("aws secret backend already created.")
 
