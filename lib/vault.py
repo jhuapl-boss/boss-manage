@@ -106,9 +106,7 @@ class Vault(object):
         """Initialize a Vault. Connect using get_client() and if the Vault is not
         initialized then initialize it with 5 secrets and a threashold of 3. The
         keys are stored as VAULT_KEY and root token is stored as VAULT_TOKEN.
-
         After initializing the Vault it is unsealed for use and vault-configure is called.
-
         Args:
             secrets (int) : Total number of secrets to split the master key into
             threashold (int) : The number of secrets required to reconstruct the master key
@@ -158,7 +156,6 @@ class Vault(object):
             * Configure AWS backend roles from policies/*.iam
             * Configure the PKI backend (if there is a certificate to use)
             * Configure PKI backend roles from policies/*.pki
-
         Args:
             machine (None|string) : hostname of the machine, used for reading/saving unique data
         """
@@ -185,51 +182,42 @@ class Vault(object):
             # superset of any policies that it will provision
             provisioner_policies.append(name)
 
-        # Read AWS credentials file
-        vault_aws_creds = os.path.join(PRIVATE_DIR, "vault_aws_credentials")
-        if os.path.exists(vault_aws_creds):
-            with open(vault_aws_creds, "r") as fh:
-                aws_creds = json.load(fh)
-        else:
-            aws_creds = None
-
         # AWS Authentication Backend
-        if aws_creds is None:
-            print("Vault AWS credentials files does not exist, skipping configuration of AWS-EC2 authentication backend")
-        else:
+        #Enable AWS auth in Vault
+        if 'aws' not in client.list_auth_backends():
             try:
-                client.enable_auth_backend('aws-ec2')
-            except hvac.exceptions.InvalidRequest as ex:
-                print("aws-ec2 auth backend already created.")
-            client.write('auth/aws-ec2/config/client', access_key = aws_creds["aws_access_key"],
-                                                       secret_key = aws_creds["aws_secret_key"])
-
-            arn_prefix = 'arn:aws:iam::{}:instance-profile/'.format(aws_creds["aws_account"])
-            policies = [p for p in provisioner_policies if p not in ('provisioner',)]
-            for policy in policies:
-                client.write('/auth/aws-ec2/role/' + policy, policies = policy,
-                                                             bound_iam_role_arn = arn_prefix + policy)
-
-        # AWS Secret Backend
-        if aws_creds is None:
-            print("Vault AWS credentials file does not exist, skipping configuration of AWS secret backend")
+                client.enable_auth_backend('aws')
+            except Exception as e:
+                print("Error while enabling auth back end: " + e)
+                sys.exit(1)
         else:
+            print("aws auth backend already created.")
+
+        #Define policies and arn                                     
+        policies = [p for p in provisioner_policies if p not in ('provisioner',)]
+        arn = 'arn:aws:iam::{}:instance-profile/'.format(os.environ['AWS_ACCOUNT'])
+        #TODO: Find a temporary way of storing the aws account number
+        #For each policy configure the policies on a role of the same name
+        for policy in policies:
+            client.write('/auth/aws/role/' + policy, auth_type='ec2', bound_iam_instance_profile_arn= arn + policy, policies=policy)
+            print('Successful write to aws/role/' + policy)
+        
+        # AWS Secret Backend
+        if 'aws' not in client.list_secret_backends():
             try:
                 client.enable_secret_backend('aws')
-            except hvac.exceptions.InvalidRequest as ex:
-                print("aws secret backend already created.")
-            client.write("aws/config/root", access_key = aws_creds["aws_access_key"],
-                                            secret_key = aws_creds["aws_secret_key"],
-                                            region = aws_creds.get("aws_region", "us-east-1"))
-            client.write("aws/config/lease", lease = aws_creds.get("lease_duration", "1h"),
-                                             lease_max = aws_creds.get("lease_max", "24h")) # DP TODO finalize default values
+            except Exception as e:
+                print('Error while enabling secret back end: ' + e)
+                sys.exit(1)
+        else:
+            print("aws secret backend already created.")
 
-            path = os.path.join(POLICY_DIR, "*.iam")
-            for iam in glob.glob(path):
-                name = os.path.basename(iam).split('.')[0]
-                with open(iam, 'r') as fh:
-                    # if we json parse the file first we can use the duplicate key trick for comments
-                    client.write("aws/roles/" + name, policy = fh.read())
+        path = os.path.join(POLICY_DIR, "*.iam")
+        for iam in glob.glob(path):
+            name = os.path.basename(iam).split('.')[0]
+            with open(iam, 'r') as fh:
+                # if we json parse the file first we can use the duplicate key trick for comments
+                client.write("aws/roles/" + name, policy = fh.read())
 
         # PKI Backend
         """
@@ -242,9 +230,7 @@ class Vault(object):
             response = client.write("pki/root/generate/internal", common_name=aws_creds["domain"])
             with open(get_path(machine, "ca.pem"), 'w') as fh:
                 fh.write(response["data"]["certificate"])
-
             # Should we configure CRL?
-
             path = os.path.join(_CURRENT_DIR, "policies", "*.pki")
             for pki in glob.glob(path):
                 name = os.path.basename(pki).split('.')[0]
@@ -256,7 +242,6 @@ class Vault(object):
     def unseal(self):
         """Unseal a sealed Vault. Connect using get_client() and if the Vault is
         not sealed read all of the keys defined by VAULT_KEY and unseal.
-
         If there are not enough keys to completely unseal the Vault, print a
         status message about how many more keys are required to finish the
         process.
@@ -290,7 +275,6 @@ class Vault(object):
     def seal(self):
         """Seal an unsealed Vault. Connect using get_client(True) and if the Vault
         is unsealed, seal it.
-
         Used to quickly protect a Vault without having to stop the Vault service
         on a protected VM.
         """
@@ -358,10 +342,8 @@ class Vault(object):
 
     def provision(self, policy):
         """Create a new Vault access token.
-
         Args:
             policy (string) : Name of the policy to attach to the new token
-
         Returns:
             (string) : String containing the new Vault token
         """
@@ -371,7 +353,6 @@ class Vault(object):
 
     def revoke(self, token):
         """Revoke a Vault access token.
-
         Args:
             token (string) : String containing the Vault token to revoke
         """
@@ -380,7 +361,6 @@ class Vault(object):
 
     def revoke_secret(self, lease_id):
         """Revoke a Vault lease
-
         Args:
             lease_id (string) : String containing the Vault lease id to revoke
         """
@@ -389,7 +369,6 @@ class Vault(object):
 
     def revoke_secret_prefix(self, prefix):
         """Revoke a Vault secret by prefix
-
         Args:
             prefix (string) : String containing the Vault secret prefix to revoke
         """
@@ -398,10 +377,8 @@ class Vault(object):
 
     def write(self, path, **kwargs):
         """A generic method for writing data into Vault.
-
             Note: vault-write will override any data already existing at path.
                   There is vault-update that will update data at path instead.
-
         Args:
             path (string) : Vault path to write data to
             kwargs : Key value pairs to store at path
@@ -411,7 +388,6 @@ class Vault(object):
 
     def update(self, path, **kwargs):
         """A generic method for adding/updating data to/in Vault.
-
         Args:
             path (string) : Vault path to write data to
             kwargs : Key value pairs to store at path
@@ -430,7 +406,6 @@ class Vault(object):
 
     def read(self, path):
         """A generic method for reading data from Vault.
-
         Args:
             path (string) : Vault path to read data from
         """
@@ -439,7 +414,6 @@ class Vault(object):
 
     def delete(self, path):
         """A generic method for deleting data from Vault.
-
         Args:
             path (string) : Vault path to delete all data from
         """
@@ -448,7 +422,6 @@ class Vault(object):
 
     def export(self, path):
         """A generic method for reading all of the paths and keys from Vault.
-
         Args:
             path (string) : Vault path to dump data from
         """
@@ -481,7 +454,6 @@ class Vault(object):
 
     def import_(self, exported, update=False):
         """A generic method for writing / updating data in multiple paths in Vault.
-
         Args:
             exported (dict): Dict of Vault path and dict of key / values to store at the path
             update (bool): If an Update should be done or if a Write should be done
@@ -490,4 +462,3 @@ class Vault(object):
             kv = exported[path]
             fn = self.update if update else self.write
             fn(path, **kv)
-
