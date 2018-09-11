@@ -36,7 +36,7 @@ def valid_bosslet(bosslet_name):
     return bosslet_name in list_bosslets()
 
 def list_bosslets():
-    return [os.path.basename(f)[:-3] for f in glob.glob(CONFIGS_GLOB)]
+    return [os.path.basename(f)[:-3].replace('_','.') for f in glob.glob(CONFIGS_GLOB)]
 
 class BossConfiguration(object):
     def __init__(self, bosslet, **kwargs):
@@ -47,6 +47,7 @@ class BossConfiguration(object):
 
         # Import the bosslet configuration file
         try:
+            bosslet = bosslet.replace('.','_')
             self._config = importlib.import_module('config.' + bosslet)
         except ImportError:
             raise exceptions.BossManageError("Problem importing 'config/{}.py'".format(bosslet))
