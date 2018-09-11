@@ -210,21 +210,19 @@ def update(session, domain):
 
 
 def post_init(bosslet_config)
-    session = bosslet_config.session
-    domain = bosslet_config.INTERNAL_DOMAIN
     names = bosslet_config.names
+    role = 'StatesExecutionRole-us-east-1 '
 
-    sfn.create(session, names.sfn.query_deletes, domain, 'query_for_deletes.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(session, names.sfn.delete_cuboid, domain, 'delete_cuboid.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(session, names.sfn.delete_experiment, domain, 'delete_experiment.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(session, names.sfn.delete_coord_frame, domain, 'delete_coordinate_frame.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(session, names.sfn.delete_collection, domain, 'delete_collection.hsd', 'StatesExecutionRole-us-east-1 ')
-    #sfn.create(session, names.sfn.populate_upload_queue, domain, 'populate_upload_queue.hsd',
-    #           'StatesExecutionRole-us-east-1 ')
-    sfn.create(session, names.sfn.ingest_queue_populate, domain, 'ingest_queue_populate.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(session, names.sfn.ingest_queue_upload, domain, 'ingest_queue_upload.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(session, names.sfn.resolution_hierarchy, domain, 'resolution_hierarchy.hsd', 'StatesExecutionRole-us-east-1')
-    #sfn.create(session, names.sfn.downsample_volume, domain, 'downsample_volume.hsd', 'StatesExecutionRole-us-east-1')
+    sfn.create(bosslet_config, names.sfn.query_deletes, 'query_for_deletes.hsd', role)
+    sfn.create(bosslet_config, names.sfn.delete_cuboid, 'delete_cuboid.hsd', role)
+    sfn.create(bosslet_config, names.sfn.delete_experiment, 'delete_experiment.hsd', role)
+    sfn.create(bosslet_config, names.sfn.delete_coord_frame, 'delete_coordinate_frame.hsd', role)
+    sfn.create(bosslet_config, names.sfn.delete_collection, 'delete_collection.hsd', role)
+    #sfn.create(bosslet_config, names.sfn.populate_upload_queue, 'populate_upload_queue.hsd', role)
+    sfn.create(bosslet_config, names.sfn.ingest_queue_populate, 'ingest_queue_populate.hsd', role)
+    sfn.create(bosslet_config, names.sfn.ingest_queue_upload, 'ingest_queue_upload.hsd', role)
+    sfn.create(bosslet_config, names.sfn.resolution_hierarchy, 'resolution_hierarchy.hsd', role
+    #sfn.create(bosslet_config, names.sfn.downsample_volume, 'downsample_volume.hsd', role)
 
     return True
 
@@ -235,18 +233,17 @@ def delete(bosslet_config):
 
 def delete_sfns(bosslet_config):
     """Delete step functions."""
-    session = bosslet_config.session
     names = bosslet_config.names
 
     # DP TODO: delete activities
-    sfn.delete(session, names.sfn.delete_cuboid)
-    sfn.delete(session, names.sfn.delete_experiment)
-    sfn.delete(session, names.sfn.delete_coord_frame)
-    sfn.delete(session, names.sfn.delete_collection)
-    sfn.delete(session, names.sfn.query_deletes)
-    sfn.delete(session, names.sfn.ingest_queue_populate)
-    sfn.delete(session, names.sfn.ingest_queue_upload)
-    sfn.delete(session, names.sfn.resolution_hierarchy)
-    #sfn.delete(session, names.sfn.downsample_volume)
+    sfn.delete(bosslet_config, names.sfn.delete_cuboid)
+    sfn.delete(bosslet_config, names.sfn.delete_experiment)
+    sfn.delete(bosslet_config, names.sfn.delete_coord_frame)
+    sfn.delete(bosslet_config, names.sfn.delete_collection)
+    sfn.delete(bosslet_config, names.sfn.query_deletes)
+    sfn.delete(bosslet_config, names.sfn.ingest_queue_populate)
+    sfn.delete(bosslet_config, names.sfn.ingest_queue_upload)
+    sfn.delete(bosslet_config, names.sfn.resolution_hierarchy)
+    #sfn.delete(bosslet_config, names.sfn.downsample_volume)
 
     return success

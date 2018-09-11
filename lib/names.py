@@ -74,7 +74,7 @@ class AWSNames(object):
         'sfn': format_capitalize, # StepFunction
         'cw': format_dash, # CloudWatch Rule
 
-        'zip': lambda x: x.lower() + '.zip' # lambda code files
+        'zip': lambda x: x.lower() + '.zip', # lambda code files
     }
 
     RESOURCES = {

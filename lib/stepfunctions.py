@@ -23,31 +23,29 @@ import heaviside
 
 
 class BossStateMachine(heaviside.StateMachine):
+    def __init__(self, name, bosslet_config):
+        super().__init__(name, session=bosslet_config.session)
 
-    def __init__(self, name, domain, session):
-        super().__init__(name, session=session)
-
-        if domain:
-            self.domain = domain.replace('.', '-')
+        # DP NOTE: Save _translate instead of using super() because it is a lambda
         self.__translate = self._translate
-
         def _translate(type_, function):
-            return self.__translate(type_, "{}-{}".format(function, self.domain))
+            fqdn = function + '.' + bosslet_config.INTERNAL_DOMAIN
+            return self.__translate(type_, fqdn.replace('.', '-'))
         self._translate = _translate
 
-def create(session, name, domain, sfn_file, role):
+def create(bosslet_config, name, sfn_file, role):
     filepath = repo_path('cloud_formation', 'stepfunctions', sfn_file)
     filepath = Path(filepath)
 
-    machine = BossStateMachine(name, domain, session)
+    machine = BossStateMachine(name, bosslet_config)
 
     if machine.arn is not None:
         print("StepFunction '{}' already exists, not creating".format(name))
     else:
         machine.create(filepath, role)
 
-def delete(session, name):
-    machine = BossStateMachine(name, None, session)
+def delete(bosslet_config, name):
+    machine = BossStateMachine(name, bosslet_config)
     machine.delete()
     # DP ???: remove activity ARNs when deleting the step function or when removing the activity code
 

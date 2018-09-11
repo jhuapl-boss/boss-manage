@@ -185,7 +185,7 @@ def get_user_confirm(message, default = False):
     resp = input(message + suffix)
     if len(resp) == 0:
         return default
-    else
+    else:
         return resp[0] in ('y', 'Y')
 
 def parse_hostname(hostname):

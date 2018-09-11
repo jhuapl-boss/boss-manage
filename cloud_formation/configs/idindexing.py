@@ -157,33 +157,31 @@ def pre_init(bosslet_config):
 
 def post_init(bosslet_config):
     """Create step functions."""
-    domain = bosslet_config.INTERNAL_DOMAIN
-    session = bosslet_config.session
     names = bosslet_config.names.sfn
 
     sfn.create(
-        session, names.index_supervisor, domain, 
+        bosslet_config, names.index_supervisor,
         'index_supervisor.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        session, names.index_cuboid_supervisor, domain, 
+        bosslet_config, names.index_cuboid_supervisor,
         'index_cuboid_supervisor.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        session, names.index_id_writer, domain, 
+        bosslet_config, names.index_id_writer,
         'index_id_writer.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        session, names.index_find_cuboids, domain, 
+        bosslet_config, names.index_find_cuboids,
         'index_find_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        session, names.index_enqueue_cuboids, domain, 
+        bosslet_config, names.index_enqueue_cuboids,
         'index_enqueue_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        session, names.index_fanout_enqueue_cuboids, domain, 
+        bosslet_config, names.index_fanout_enqueue_cuboids,
         'index_fanout_enqueue_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        session, names.index_dequeue_cuboids, domain, 
+        bosslet_config, names.index_dequeue_cuboids,
         'index_dequeue_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        session, names.index_fanout_id_writers, domain, 
+        bosslet_config, names.index_fanout_id_writers,
         'index_fanout_id_writers.hsd', 'StatesExecutionRole-us-east-1 ')
 
 
@@ -218,12 +216,12 @@ def delete(bosslet_config):
 
 def delete_sfns(bosslet_config)
     names = bosslet_config.names.sfn
-    sfn.delete(session, names.index_fanout_id_writers)
-    sfn.delete(session, names.index_dequeue_cuboids)
-    sfn.delete(session, names.index_fanout_enqueue_cuboids)
-    sfn.delete(session, names.index_enqueue_cuboids)
-    sfn.delete(session, names.index_find_cuboids)
-    sfn.delete(session, names.index_id_writer)
-    sfn.delete(session, names.index_cuboid_supervisor)
-    sfn.delete(session, names.index_supervisor)
+    sfn.delete(bosslet_config, names.index_fanout_id_writers)
+    sfn.delete(bosslet_config, names.index_dequeue_cuboids)
+    sfn.delete(bosslet_config, names.index_fanout_enqueue_cuboids)
+    sfn.delete(bosslet_config, names.index_enqueue_cuboids)
+    sfn.delete(bosslet_config, names.index_find_cuboids)
+    sfn.delete(bosslet_config, names.index_id_writer)
+    sfn.delete(bosslet_config, names.index_cuboid_supervisor)
+    sfn.delete(bosslet_config, names.index_supervisor)
 

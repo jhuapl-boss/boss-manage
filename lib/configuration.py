@@ -153,7 +153,7 @@ class BossParser(ArgumentParser):
 
         self.add_argument("bosslet_name",
                           metavar = "bosslet_name",
-                          choices = list_bosslets()
+                          choices = list_bosslets(),
                           help = help)
 
     def parse_args(self, *args, **kwargs):
