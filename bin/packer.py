@@ -169,7 +169,6 @@ if __name__ == '__main__':
         bastion_config = ""
 
     aws_creds = args.bosslet_config.session.get_credentials()
-    credentials_config = repo_path("config", "aws-credentials")
     credentials_config = """-var 'aws_access_key={}'
                             -var 'aws_secret_key={}'
                          """.format(aws_creds.access_key,
