@@ -209,7 +209,7 @@ def update(session, domain):
     return True
 
 
-def post_init(bosslet_config)
+def post_init(bosslet_config):
     names = bosslet_config.names
     role = 'StatesExecutionRole-us-east-1 '
 
@@ -221,7 +221,7 @@ def post_init(bosslet_config)
     #sfn.create(bosslet_config, names.sfn.populate_upload_queue, 'populate_upload_queue.hsd', role)
     sfn.create(bosslet_config, names.sfn.ingest_queue_populate, 'ingest_queue_populate.hsd', role)
     sfn.create(bosslet_config, names.sfn.ingest_queue_upload, 'ingest_queue_upload.hsd', role)
-    sfn.create(bosslet_config, names.sfn.resolution_hierarchy, 'resolution_hierarchy.hsd', role
+    sfn.create(bosslet_config, names.sfn.resolution_hierarchy, 'resolution_hierarchy.hsd', role)
     #sfn.create(bosslet_config, names.sfn.downsample_volume, 'downsample_volume.hsd', role)
 
     return True

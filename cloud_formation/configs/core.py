@@ -389,7 +389,7 @@ def update(bosslet_config):
 
     print("Update command will take {} - {} minutes to finish".format(min_time, max_time))
     print("Stack will be available during that time")
-    if not utils.get_user_confirm("Update?" default = False):
+    if not utils.get_user_confirm("Update?", default = False):
         print("Canceled")
         return None
 

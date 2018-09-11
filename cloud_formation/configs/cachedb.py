@@ -287,7 +287,7 @@ def pre_init(bosslet_config):
     load_lambdas_on_s3(bosslet_config)
 
 
-def update(bosslet_config)
+def update(bosslet_config):
     user_data = None
     print("user_data not defined, update disabled")
     return False

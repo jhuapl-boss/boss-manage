@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import json
-from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, get_scenario, Arg
+from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, Arg
 from lib.userdata import UserData
 from lib import aws
 from lib import utils
@@ -214,7 +214,7 @@ def delete(bosslet_config):
     delete_sfns(bosslet_config)
 
 
-def delete_sfns(bosslet_config)
+def delete_sfns(bosslet_config):
     names = bosslet_config.names.sfn
     sfn.delete(bosslet_config, names.index_fanout_id_writers)
     sfn.delete(bosslet_config, names.index_dequeue_cuboids)

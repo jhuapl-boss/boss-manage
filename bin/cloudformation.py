@@ -203,18 +203,18 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    constants.load_scenario(args.scenario)
-
-    bosslet_config = configuration.BossConfiguration(args.bosslet_name,
-                                                     ami_version = args.ami_version,
-                                                     disable_preview = args.disable_preview)
-
-    if args.config_name == ['all']:
-        configs = config_names
-    else:
-        configs = args.config_name
-
     try:
+        constants.load_scenario(args.scenario)
+
+        bosslet_config = configuration.BossConfiguration(args.bosslet_name,
+                                                         ami_version = args.ami_version,
+                                                         disable_preview = args.disable_preview)
+
+        if args.config_name == ['all']:
+            configs = config_names
+        else:
+            configs = args.config_name
+
         func = args.action.replace('-','_')
         ret = call_configs(bosslet_config, configs, func)
         if ret == False:
