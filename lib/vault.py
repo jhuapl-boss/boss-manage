@@ -106,7 +106,9 @@ class Vault(object):
         """Initialize a Vault. Connect using get_client() and if the Vault is not
         initialized then initialize it with 5 secrets and a threashold of 3. The
         keys are stored as VAULT_KEY and root token is stored as VAULT_TOKEN.
+
         After initializing the Vault it is unsealed for use and vault-configure is called.
+
         Args:
             secrets (int) : Total number of secrets to split the master key into
             threashold (int) : The number of secrets required to reconstruct the master key
@@ -156,6 +158,7 @@ class Vault(object):
             * Configure AWS backend roles from policies/*.iam
             * Configure the PKI backend (if there is a certificate to use)
             * Configure PKI backend roles from policies/*.pki
+
         Args:
             machine (None|string) : hostname of the machine, used for reading/saving unique data
         """
@@ -230,7 +233,9 @@ class Vault(object):
             response = client.write("pki/root/generate/internal", common_name=aws_creds["domain"])
             with open(get_path(machine, "ca.pem"), 'w') as fh:
                 fh.write(response["data"]["certificate"])
+
             # Should we configure CRL?
+
             path = os.path.join(_CURRENT_DIR, "policies", "*.pki")
             for pki in glob.glob(path):
                 name = os.path.basename(pki).split('.')[0]
@@ -242,6 +247,7 @@ class Vault(object):
     def unseal(self):
         """Unseal a sealed Vault. Connect using get_client() and if the Vault is
         not sealed read all of the keys defined by VAULT_KEY and unseal.
+
         If there are not enough keys to completely unseal the Vault, print a
         status message about how many more keys are required to finish the
         process.
@@ -275,6 +281,7 @@ class Vault(object):
     def seal(self):
         """Seal an unsealed Vault. Connect using get_client(True) and if the Vault
         is unsealed, seal it.
+
         Used to quickly protect a Vault without having to stop the Vault service
         on a protected VM.
         """
@@ -342,8 +349,10 @@ class Vault(object):
 
     def provision(self, policy):
         """Create a new Vault access token.
+
         Args:
             policy (string) : Name of the policy to attach to the new token
+
         Returns:
             (string) : String containing the new Vault token
         """
@@ -353,6 +362,7 @@ class Vault(object):
 
     def revoke(self, token):
         """Revoke a Vault access token.
+
         Args:
             token (string) : String containing the Vault token to revoke
         """
@@ -361,6 +371,7 @@ class Vault(object):
 
     def revoke_secret(self, lease_id):
         """Revoke a Vault lease
+
         Args:
             lease_id (string) : String containing the Vault lease id to revoke
         """
@@ -369,6 +380,7 @@ class Vault(object):
 
     def revoke_secret_prefix(self, prefix):
         """Revoke a Vault secret by prefix
+
         Args:
             prefix (string) : String containing the Vault secret prefix to revoke
         """
@@ -377,8 +389,10 @@ class Vault(object):
 
     def write(self, path, **kwargs):
         """A generic method for writing data into Vault.
+
             Note: vault-write will override any data already existing at path.
                   There is vault-update that will update data at path instead.
+
         Args:
             path (string) : Vault path to write data to
             kwargs : Key value pairs to store at path
@@ -388,6 +402,7 @@ class Vault(object):
 
     def update(self, path, **kwargs):
         """A generic method for adding/updating data to/in Vault.
+
         Args:
             path (string) : Vault path to write data to
             kwargs : Key value pairs to store at path
@@ -406,6 +421,7 @@ class Vault(object):
 
     def read(self, path):
         """A generic method for reading data from Vault.
+
         Args:
             path (string) : Vault path to read data from
         """
@@ -414,6 +430,7 @@ class Vault(object):
 
     def delete(self, path):
         """A generic method for deleting data from Vault.
+
         Args:
             path (string) : Vault path to delete all data from
         """
@@ -422,6 +439,7 @@ class Vault(object):
 
     def export(self, path):
         """A generic method for reading all of the paths and keys from Vault.
+
         Args:
             path (string) : Vault path to dump data from
         """
@@ -454,6 +472,7 @@ class Vault(object):
 
     def import_(self, exported, update=False):
         """A generic method for writing / updating data in multiple paths in Vault.
+
         Args:
             exported (dict): Dict of Vault path and dict of key / values to store at the path
             update (bool): If an Update should be done or if a Write should be done
