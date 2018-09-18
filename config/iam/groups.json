@@ -17,6 +17,14 @@
   },
   {
     "AttachedManagedPolicies": [
+      "arn:aws:iam::451493790433:policy/aplChurchDeliveryBucketPolicy"
+    ],
+    "GroupName": "aplChurchDeliveryBucket",
+    "GroupPolicyList": [],
+    "Path": "/"
+  },
+  {
+    "AttachedManagedPolicies": [
       "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess",
       "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetAutoscaleRole",
       "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetRole",
@@ -47,25 +55,7 @@
   },
   {
     "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/AmazonAPIGatewayInvokeFullAccess",
-      "arn:aws:iam::aws:policy/AdministratorAccess"
-    ],
-    "GroupName": "aplMeshDevelopers",
-    "GroupPolicyList": [],
-    "Path": "/"
-  },
-  {
-    "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/AmazonMechanicalTurkFullAccess"
-    ],
-    "GroupName": "aplMturk",
-    "GroupPolicyList": [],
-    "Path": "/"
-  },
-  {
-    "AttachedManagedPolicies": [
       "arn:aws:iam::aws:policy/IAMFullAccess",
-      "arn:aws:iam::451493790433:policy/aplCloudFormationFullAccess",
       "arn:aws:iam::aws:policy/CloudFrontFullAccess",
       "arn:aws:iam::aws:policy/AWSCloudTrailFullAccess",
       "arn:aws:iam::aws:policy/AmazonVPCFullAccess",
