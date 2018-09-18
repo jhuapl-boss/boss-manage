@@ -68,7 +68,7 @@ def bool_str(val):
         val (bool) : Boolean value to convert to a string
 
     Returns:
-        (string) : String of representing the boolean value
+        (str) : String of representing the boolean value
     """
     return "true" if val else "false"
 
@@ -100,10 +100,10 @@ class Arg:
         """Generic constructor used by all of the specific static methods.
 
         Args:
-            key (string) : Unique name associated with the argument
+            key (str) : Unique name associated with the argument
             parameter (dict) : Dictionary of parameter information, as defined
                                by CloudFormation / AWS.
-            value (string) : Value of the argument
+            value (str) : Value of the argument
             use_previous (bool) : Stored under the UsePreviousValue key
         """
         self.key = key
@@ -119,9 +119,9 @@ class Arg:
         """Create a String argument.
 
         Args:
-            key (string) : Unique name associated with the argument
-            value (string) : String value
-            description (string) : Argument description, only seen if manually
+            key (str) : Unique name associated with the argument
+            value (str) : String value
+            description (str) : Argument description, only seen if manually
                                    launching the template
         """
         parameter =  {
@@ -135,9 +135,9 @@ class Arg:
         """Create a String argument that does not show typed characters.
 
         Args:
-            key (string) : Unique name associated with the argument
-            value (string) : Password value
-            description (string) : Argument description, only seen if manually
+            key (str) : Unique name associated with the argument
+            value (str) : Password value
+            description (str) : Argument description, only seen if manually
                                    launching the template
         """
         parameter =  {
@@ -156,9 +156,9 @@ class Arg:
               subnet number is not checked to make sure it is between 0 and 255
 
         Args:
-            key (string) : Unique name associated with the argument
-            value (string) : IPv4 value
-            description (string) : Argument description, only seen if manually
+            key (str) : Unique name associated with the argument
+            value (str) : IPv4 value
+            description (str) : Argument description, only seen if manually
                                    launching the template
         """
         parameter = {
@@ -178,9 +178,9 @@ class Arg:
         valid port number.
 
         Args:
-            key (string) : Unique name associated with the argument
+            key (str) : Unique name associated with the argument
             value (string|int) : Port value
-            description (string) : Argument description, only seen if manually
+            description (str) : Argument description, only seen if manually
                                    launching the template
         """
         parameter =  {
@@ -202,9 +202,9 @@ class Arg:
               1 and 32
 
         Args:
-            key (string) : Unique name associated with the argument
-            value (string) : IPv4 CIDR value
-            description (string) : Argument description, only seen if manually
+            key (str) : Unique name associated with the argument
+            value (str) : IPv4 CIDR value
+            description (str) : Argument description, only seen if manually
                                    launching the template
         """
         parameter = {
@@ -223,9 +223,9 @@ class Arg:
         """Create a VPC ID argument that makes sure the value is a valid VPC ID.
 
         Args:
-            key (string) : Unique name associated with the argument
-            value (string) : VPC ID value
-            description (string) : Argument description, only seen if manually
+            key (str) : Unique name associated with the argument
+            value (str) : VPC ID value
+            description (str) : Argument description, only seen if manually
                                    launching the template
         """
         parameter = {
@@ -240,9 +240,9 @@ class Arg:
         valid Subnet ID.
 
         Args:
-            key (string) : Unique name associated with the argument
-            value (string) : Subnet ID value
-            description (string) : Argument description, only seen if manually
+            key (str) : Unique name associated with the argument
+            value (str) : Subnet ID value
+            description (str) : Argument description, only seen if manually
                                    launching the template
         """
         parameter = {
@@ -256,9 +256,9 @@ class Arg:
         """Create a AMI ID argument that makes sure the value is a valid AMI ID.
 
         Args:
-            key (string) : Unique name associated with the argument
-            value (string) : AMI ID value
-            description (string) : Argument description, only seen if manually
+            key (str) : Unique name associated with the argument
+            value (str) : AMI ID value
+            description (str) : Argument description, only seen if manually
                                    launching the template
         """
         parameter = {
@@ -272,9 +272,9 @@ class Arg:
         """Create a Instance ID argument that makes sure the value is a valid Instance ID.
 
         Args:
-            key (string) : Unique name associated with the argument
-            value (string) : Instance ID value
-            description (string) : Argument description, only seen if manually
+            key (str) : Unique name associated with the argument
+            value (str) : Instance ID value
+            description (str) : Argument description, only seen if manually
                                    launching the template
         """
         parameter = {
@@ -289,9 +289,9 @@ class Arg:
         valid KeyPair name.
 
         Args:
-            key (string) : Unique name associated with the argument
-            value (string) : Key Pair value
-            description (string) : Argument description, only seen if manually
+            key (str) : Unique name associated with the argument
+            value (str) : Key Pair value
+            description (str) : Argument description, only seen if manually
                                    launching the template
         """
         parameter = {
@@ -307,9 +307,9 @@ class Arg:
         valid SecurityGroup ID.
 
         Args:
-            key (string) : Unique name associated with the argument
-            value (string) : Security Group ID value
-            description (string) : Argument description, only seen if manually
+            key (str) : Unique name associated with the argument
+            value (str) : Security Group ID value
+            description (str) : Argument description, only seen if manually
                                    launching the template
         """
         parameter = {
@@ -327,9 +327,9 @@ class Arg:
               argument.
 
         Args:
-            key (string) : Unique name associated with the argument
-            value (string) : Route Table ID value
-            description (string) : Argument description, only seen if manually
+            key (str) : Unique name associated with the argument
+            value (str) : Route Table ID value
+            description (str) : Argument description, only seen if manually
                                    launching the template
         """
         parameter = {
@@ -346,9 +346,9 @@ class Arg:
         valid Certificate ID.
 
         Args:
-            key (string) : Unique name associated with the argument
-            value (string) : Certificate ID value
-            description (string) : Argument description, only seen if manually
+            key (str) : Unique name associated with the argument
+            value (str) : Certificate ID value
+            description (str) : Argument description, only seen if manually
                                    launching the template
         """
         parameter = {
@@ -391,8 +391,8 @@ class CloudFormationConfiguration:
         Note: region is used when creating the Hosted Zone for a new VPC.
 
         Args:
-            domain (string) : Domain that the CloudFormation template will work in.
-            region (string) : AWS region that the configuration will be created in.
+            domain (str) : Domain that the CloudFormation template will work in.
+            region (str) : AWS region that the configuration will be created in.
         """
         self.resources = {}
         self.parameters = {}
@@ -412,10 +412,10 @@ class CloudFormationConfiguration:
         be added to the object.
 
         Args:
-            description (string) : Template description
+            description (str) : Template description
 
         Returns:
-            (string) : The JSON formatted CloudFormation template
+            (str) : The JSON formatted CloudFormation template
         """
         return json.dumps({"AWSTemplateFormatVersion" : "2010-09-09",
                            "Description" : description,
@@ -465,7 +465,6 @@ class CloudFormationConfiguration:
                 raise Exception("Could not determine argument '{}'".format(argument["ParameterKey"]))
 
         client = session.client('cloudformation')
-
         try:
             response = client.create_stack(
                 StackName = self.stack_name,
@@ -612,7 +611,7 @@ class CloudFormationConfiguration:
 
         Args:
             session (boto3.Session): An active session.
-            domain (string): Name of domain.
+            domain (str): Name of domain.
             wait (bool) : If True, wait for the stack to be deleted, printing
                           status information
 
@@ -659,7 +658,7 @@ class CloudFormationConfiguration:
         VPC name is derived from the domain given to the constructor.
 
         Args:
-            key (string) : Unique name for the resource in the template
+            key (str) : Unique name for the resource in the template
         """
         self.resources[key] = {
             "Type" : "AWS::EC2::VPC",
@@ -695,7 +694,7 @@ class CloudFormationConfiguration:
 
         Args:
             session (Session) : Boto3 session used to lookup the VPC's ID
-            key (string) : Unique name for the resource in the template
+            key (str) : Unique name for the resource in the template
         """
 
         vpc_id = aws.vpc_id_lookup(session, self.vpc_domain)
@@ -709,9 +708,9 @@ class CloudFormationConfiguration:
         Subnet name is derived from the domain given to the constructor.
 
         Args:
-            key (string) : Unique name for the resource in the template
-            name (string) : Name of the subnet being added
-            vpc (string) : VPC ID or Ref for the VPC the subnet will be created in
+            key (str) : Unique name for the resource in the template
+            name (str) : Name of the subnet being added
+            vpc (str) : VPC ID or Ref for the VPC the subnet will be created in
             az (string|None) : Availability Zone to launch the subnet in or None
                                to allow AWS to decide
         """
@@ -831,11 +830,11 @@ class CloudFormationConfiguration:
         """Add an EC2 instance to the configuration
 
         Args:
-            key (string) : Unique name for the resource in the template
-            hostname (string) : The hostname / instance name of the instance
-            ami (string) : The AMI ID of the image to base the instance on
+            key (str) : Unique name for the resource in the template
+            hostname (str) : The hostname / instance name of the instance
+            ami (str) : The AMI ID of the image to base the instance on
             subnet (string|Ref) : The Subnet ID or Ref of the Subnet to launch this machine in
-            type_ (string) : The instance type to create
+            type_ (str) : The instance type to create
             iface_check (bool) : Should the network check if the traffic is destined for itself
                                  (usedful for NAT instances)
             public_ip (bool) : Should the instance gets a public IP address
@@ -899,15 +898,15 @@ class CloudFormationConfiguration:
         """Add an RDS DB instance to the configuration
 
         Args:
-            key (string) : Unique name for the resource in the template
-            hostname (string) : The hostname / instance name of the RDS DB
+            key (str) : Unique name for the resource in the template
+            hostname (str) : The hostname / instance name of the RDS DB
             port (int) : The port for the DB instance to listen on
-            db_name (string) : The name of the database to create on the DB instance
-            username (string) : The master username for the database
-            password (string) : The (plaintext) password for the master username
+            db_name (str) : The name of the database to create on the DB instance
+            username (str) : The master username for the database
+            password (str) : The (plaintext) password for the master username
             subnets (list) : A list of Subnet IDs or Refs across which
                              to create a DB SubnetGroup for the DB Instance to launch into
-            type_ (string) : The RDS instance type to create
+            type_ (str) : The RDS instance type to create
             storage (int|string) : The storage size of the database (in GB)
             security_groups (None|list) : A list of SecurityGroup IDs or Refs
         """
@@ -971,8 +970,8 @@ class CloudFormationConfiguration:
                 config.add_dynamo_table_from_json('thekey', 'thename', **tablecfg)
 
         Args:
-            key (string) : Unique name (within the configuration) for this instance
-            name (string) : DynamoDB Table name to create
+            key (str) : Unique name (within the configuration) for this instance
+            name (str) : DynamoDB Table name to create
             KeySchema (list) : List of dict of AttributeName / KeyType
             AttributeDefinitions (list) : List of dict of AttributeName / AttributeType
             ProvisionedThroughput (dictionary) : Dictionary of ReadCapacityUnits / WriteCapacityUnits
@@ -1000,8 +999,8 @@ class CloudFormationConfiguration:
         """Add an DynamoDB Table to the configuration
 
         Args:
-            key (string) : Unique name (within the configuration) for this instance
-            name (string) : DynamoDB Table name to create
+            key (str) : Unique name (within the configuration) for this instance
+            name (str) : DynamoDB Table name to create
             attributes (dict) : Dictionary of {'AttributeName' : 'AttributeType', ...}
             key_schema (dict) : Dictionary of {'AttributeName' : 'KeyType', ...}
             throughput (tuple) : Tuple of (ReadCapacity, WriteCapacity)
@@ -1038,14 +1037,14 @@ class CloudFormationConfiguration:
                   cluster using ElastiCache use the add_redis_replication() method.
 
         Args:
-            key (string) : Unique name for the resource in the template
-            hostname (string) : The hostname / instance name of the Redis Cache
+            key (str) : Unique name for the resource in the template
+            hostname (str) : The hostname / instance name of the Redis Cache
             subnets (list) : A list of Subnet IDs or Refs across which to create a ElastiCache
                              SubnetGroup for the ElastiCache Instance to launch into
             security_groups (list) : A list of SecurityGroup IDs or Refs
-            type_ (string) : The ElastiCache instance type to create
+            type_ (str) : The ElastiCache instance type to create
             port (int) : The port for the Redis instance to listen on
-            version (string) : Redis version to run on the instance
+            version (str) : Redis version to run on the instance
         """
         self.resources[key] =  {
             "Type" : "AWS::ElastiCache::CacheCluster",
@@ -1081,14 +1080,14 @@ class CloudFormationConfiguration:
         """Add a Redis ElastiCache Replication Group to the configuration
 
         Args:
-            key (string) : Unique name for the resource in the template
-            hostname (string) : The hostname / instance name of the Redis Cache
+            key (str) : Unique name for the resource in the template
+            hostname (str) : The hostname / instance name of the Redis Cache
             subnets (list) : A list of Subnet IDs or Refs across which to create a ElastiCache
                              SubnetGroup for the ElastiCache Instance to launch into
             security_groups (list) : A list of SecurityGroup IDs or Refs
-            type_ (string) : The ElastiCache instance type to create
+            type_ (str) : The ElastiCache instance type to create
             port (int|string) : The port for the Redis instance to listen on
-            version (string) : Redis version to run on the instance
+            version (str) : Redis version to run on the instance
             clusters (int|string) : Number of cluster instances to create (1 - 5)
             parameters (dict): Key/Values of Redis configuration parameters
         """
@@ -1145,11 +1144,11 @@ class CloudFormationConfiguration:
         """Add SecurityGroup to the configuration
 
         Args:
-            key (string) : Unique name for the resource in the template
-            name (string) : The name to give the SecurityGroup
+            key (str) : Unique name for the resource in the template
+            name (str) : The name to give the SecurityGroup
             rules (list) : A list of tuples (protocol, from port, to port, cidr)
                            Where protocol/from/to can be -1 if open access is desired
-            vpc (string) : The VPC ID or Ref to add the Security Group to
+            vpc (str) : The VPC ID or Ref to add the Security Group to
         """
         ports = "/".join(map(lambda x: x[1] + "-" + x[2], rules))
         ingress = []
@@ -1173,9 +1172,9 @@ class CloudFormationConfiguration:
         """Add RouteTable to the configuration
 
         Args:
-            key (string) : Unique name for the resource in the template
-            name (string) : The name to give the RouteTable
-            vpc (string) : The VPC ID or Ref to add the RouteTable to
+            key (str) : Unique name for the resource in the template
+            name (str) : The name to give the RouteTable
+            vpc (str) : The VPC ID or Ref to add the RouteTable to
             subnets (list) : A list of Subnet IDs or Refs to attach the RouteTable to
         """
         self.resources[key] = {
@@ -1197,8 +1196,8 @@ class CloudFormationConfiguration:
         """Add SubnetRouteTableAssociation to the configuration
 
         Args:
-            key (string) : Unique name for the resource in the template
-            route_table (string) : The unique name of the RouteTable in the configuration
+            key (str) : Unique name for the resource in the template
+            route_table (str) : The unique name of the RouteTable in the configuration
             subnet (string|Ref) : The the unique name of the Subnet to associate the RouteTable with
         """
         self.resources[key] = {
@@ -1215,9 +1214,9 @@ class CloudFormationConfiguration:
         Note: Only one of gateway/peer/instance should be specified for a call
 
         Args:
-            key (string) : Unique name for the resource in the template
-            route_table (string) : The RouteTable ID or Ref to add the Route to
-            cidr (string) : A CIDR formatted (x.x.x.x/y) subnet of the route
+            key (str) : Unique name for the resource in the template
+            route_table (str) : The RouteTable ID or Ref to add the Route to
+            cidr (str) : A CIDR formatted (x.x.x.x/y) subnet of the route
             gateway (None|string) The the target InternetGateway ID or Ref
             peer (None|string) : The the target VPCPeerConnection ID or Ref
             instance (None|string) : The the target EC2 Instance ID or Ref
@@ -1253,9 +1252,9 @@ class CloudFormationConfiguration:
         """Add an InternetGateway to the configuration
 
         Args:
-            key (string) : Unique name for the resource in the template
-            name (string) : The name to give the InternetGateway
-            vpc (string) : The VPC ID or Ref to add the InternetGateway to
+            key (str) : Unique name for the resource in the template
+            name (str) : The name to give the InternetGateway
+            vpc (str) : The VPC ID or Ref to add the InternetGateway to
         """
         self.resources[key] = {
           "Type" : "AWS::EC2::InternetGateway",
@@ -1283,9 +1282,9 @@ class CloudFormationConfiguration:
         """Add a VPCPeeringConnection to the configuration
 
         Args:
-            key (string) : Unique name for the resource in the template
-            vpc (string) : The VPC ID or Ref to create the peering connection from
-            peer_vpc (string) : The VPC ID or Ref to create the peering connection to
+            key (str) : Unique name for the resource in the template
+            vpc (str) : The VPC ID or Ref to create the peering connection from
+            peer_vpc (str) : The VPC ID or Ref to create the peering connection to
         """
         self.resources[key] = {
             "Type" : "AWS::EC2::VPCPeeringConnection",
@@ -1304,18 +1303,18 @@ class CloudFormationConfiguration:
         Add LoadBalancer to the configuration
 
         Args:
-            key (string) : Unique name for the resource in the template
-            name (string) : The name to give this elb
+            key (str) : Unique name for the resource in the template
+            name (str) : The name to give this elb
             listeners (list) : A list of tuples for the elb
                                (elb_port, instance_port, protocol [, ssl_cert_id])
-                                   elb_port (string) : The port for the elb to listening on
-                                   instance_port (string) : The port on the instance that the elb sends traffic to
-                                   protocol (string) : The protocol used, ex: HTTP, HTTPS
+                                   elb_port (str) : The port for the elb to listening on
+                                   instance_port (str) : The port on the instance that the elb sends traffic to
+                                   protocol (str) : The protocol used, ex: HTTP, HTTPS
                                    ssl_cert_id (Optional string) : The AWS ID of the SSL cert to use
             instances (None|list) : A list of Instance IDs or Refs to attach to the LoadBalancer
             subnets (None|list) : A list of Subnet IDs or Refsto attach the LoadBalancer to
             security_groups (None|list) : A list of SecurityGroup IDs or Refs to apply to the LoadBalancer
-            healthcheck_target (string) : The URL used for for health checks Ex: "HTTP:80/"
+            healthcheck_target (str) : The URL used for for health checks Ex: "HTTP:80/"
             public (bool) : If the ELB is public facing or internal
             internal_dns (bool) : If the ELB should have an internal Router53 entry
             depends_on (None|string|list): A unique name or list of unique names of resources within the
@@ -1383,11 +1382,11 @@ class CloudFormationConfiguration:
         """Add an AutoScalingGroup to the configuration
 
         Args:
-            key (string) : Unique name for the resource in the template
-            hostname (string) : The hostname / instance name of the instances
-            ami (string) : The AMI ID of the image to base the instances on
+            key (str) : Unique name for the resource in the template
+            hostname (str) : The hostname / instance name of the instances
+            ami (str) : The AMI ID of the image to base the instances on
             subnets (list) : A list of Subnet IDs or Refs to launch the instances in
-            type_ (string) : The instance type to create
+            type_ (str) : The instance type to create
             public_ip (bool) : Should the instances gets public IP addresses
             security_groups (list) : A list of SecurityGroup IDs or Refs to apply to the instances
             user_data (None|string) : A string of user-data to give to the instance when launching
@@ -1489,8 +1488,8 @@ class CloudFormationConfiguration:
         """Add an AutoScalingGroup AutoScale Policy to the configuration
 
         Args:
-            key (string) : Unique name for the resource in the template
-            asg (string): AutoScaleGroup ID or Ref of the ASG to scale
+            key (str) : Unique name for the resource in the template
+            asg (str): AutoScaleGroup ID or Ref of the ASG to scale
             warmup (int): Number of seconds estimated for a new machine to boot
                           and start processing data
             adjustments (list): List of tuples of (lower, upper, step) that defined
@@ -1541,8 +1540,8 @@ class CloudFormationConfiguration:
         Bucket is configured to never be deleted for safety reasons.
 
         Args:
-            key (string): Unique name for the resource in the template.
-            name (string): Bucket name.
+            key (str): Unique name for the resource in the template.
+            name (str): Bucket name.
             access_control (optional[string]): A canned access control list (see Canned ACL in S3 docs).
             life_cycle_config (optional[dict]): Life cycle configuration object.
             notification_config (optional[dict]): Optionally send notification to lamba function/SQS/SNS.
@@ -1577,7 +1576,7 @@ class CloudFormationConfiguration:
         """Add permissions to an S3 bucket.
 
         Args:
-            key (string): Unique name for the resource in the template.
+            key (str): Unique name for the resource in the template.
             bucket_name (string|dict): Bucket name or CloudFormation instrinsic function to determine name (example: {"Ref": "mybucket"}).
             action (list): List of strings for the types of actions to allow.
             principal (dict): Dictionary identifying the entity given permission to the S3 bucket.
@@ -1604,14 +1603,14 @@ class CloudFormationConfiguration:
         """Create a Python Lambda
 
         Args:
-            key (string) : Unique name for the resource in the template
-            name (string) : Function name
-            role (string) : IAM role the lambda will execute under
+            key (str) : Unique name for the resource in the template
+            name (str) : Function name
+            role (str) : IAM role the lambda will execute under
             file (None|string) : File path to file containing lambda source code
             handler (None|string) : Name of lambda's handler function (the entry point).  If using a file, than the handler should be 'index.<name of function>'.  This value is ignored if using s3.
             s3 (None|tuple) : Tuple (bucket, key, handler) for the S3 location containing lambda source code
                               handler is the Python function to execute
-            description (string) : Lambda description
+            description (str) : Lambda description
             memory (string|int) : Amount of memory (MB) to execute the lambda with
                                   Note, CPU is linked to the amount of memory allocated
             timeout (string|int) : Execution timeout (Seconds)
@@ -1620,6 +1619,7 @@ class CloudFormationConfiguration:
             depends_on (None|string|list) : A unique name or list of unique names of resources within the
                                             configuration and is used to determine the launch order of resources
             runtime (optional[string]) : Lambda runtime to use.  Defaults to "python2.7".
+            dlq (optional[string]): ARN of dead letter queue.  Defaults to None.
             reserved_executions (optional[int]): Number of reserved concurrent executions for the lambda.
         """
 
@@ -1683,15 +1683,21 @@ class CloudFormationConfiguration:
                 'TargetArn': dlq
             }
 
+        if dlq is not None:
+            self.resources[key]['Properties']['DeadLetterConfig'] = {'TargetArn': dlq}
+
+        if reserved_executions is not None:
+            self.resources[key]['Properties']['ReservedConcurrentExecutions'] = reserved_executions
+
     def add_lambda_permission(self, key, lambda_, action="lambda:invokeFunction", principal="sns.amazonaws.com", source=None, depends_on=None):
         """Add permissions to a Lambda
 
         Args:
-            key (string) : Unique name for the resource in the template
-            lambda_ (string) : Lambda ID or Ref to add the permission to
-            action (string) : Permission action to grant the lambda
-            principal (string) : AWS principal to grant the action to
-            source (string) : Source ARN to restrict the permission to
+            key (str) : Unique name for the resource in the template
+            lambda_ (str) : Lambda ID or Ref to add the permission to
+            action (str) : Permission action to grant the lambda
+            principal (str) : AWS principal to grant the action to
+            source (str) : Source ARN to restrict the permission to
             depends_on (optional[string]): Optional key of resource that permission depends on.
         """
         self.resources[key] = {
@@ -1716,10 +1722,10 @@ class CloudFormationConfiguration:
         Note: cluster is not currently supported, due to Fn::GetAtt not working on ElastiCache Redis Cluster instances
 
         Args:
-            key (string) : Unique name for the resource in the template to create the RecordSet for
-            hostname (string) : The DNS hostname to map to the resource
-            vpc (string) : The VPC ID or Ref containing the target HostedZone
-            ttl (string) : The Time to live for the RecordSet
+            key (str) : Unique name for the resource in the template to create the RecordSet for
+            hostname (str) : The DNS hostname to map to the resource
+            vpc (str) : The VPC ID or Ref containing the target HostedZone
+            ttl (str) : The Time to live for the RecordSet
             rds (bool) : The key is a RDS instance
             cluster (bool) : The key is a ElastiCache Cluster instance
             replication (bool) : The key is a ElastiCache ReplicationGroup instance
@@ -1754,10 +1760,10 @@ class CloudFormationConfiguration:
         """Add a CNAME RecordSet to the configuration
 
         Args:
-            key (string) : Unique name for the resource in the template to create the RecordSet for
-            full_domain_name (string) : The FQDN DNS entry to create
-            cname_value (string) : The CNAME value to return for the full_domain_name
-            hosted_zone_name (string) : The name of the HostedZone (should end in a '.')
+            key (str) : Unique name for the resource in the template to create the RecordSet for
+            full_domain_name (str) : The FQDN DNS entry to create
+            cname_value (str) : The CNAME value to return for the full_domain_name
+            hosted_zone_name (str) : The name of the HostedZone (should end in a '.')
             ttl (int|string) : The Time to live for the RecordSet
 
         """
@@ -1779,7 +1785,7 @@ class CloudFormationConfiguration:
         Note that event and schedule cannot both be None.
 
         Args:
-            key (string): Unique name for the resource in CloudFormation template.
+            key (str): Unique name for the resource in CloudFormation template.
             targets (list): List of dicts with keys: Arn, Id, and optionally, Input and InputPath.  See Amazon CloudWatch Events Rule Target documentation.
             name (optional[dict]): Name for rule.  One will be auto-generated if this isn't provided.
             event (optional[dict]): See Amazon Events and Event Patterns documentation.
@@ -1829,16 +1835,16 @@ class CloudFormationConfiguration:
         """Add CloudWatch Alarm for a LoadBalancer
 
         Args:
-            key (string) : Unique name for the resource in the template
-            description (string) : Alarm description
-            metric (string) : Statistic metric
-            statistic (string) : Alarm statistic (SampleCount|Average|Sum|Minimum|Maximum)
-            comparison (string) : Alarm's comparison operation
-            threashold (string) : Threashold limit
+            key (str) : Unique name for the resource in the template
+            description (str) : Alarm description
+            metric (str) : Statistic metric
+            statistic (str) : Alarm statistic (SampleCount|Average|Sum|Minimum|Maximum)
+            comparison (str) : Alarm's comparison operation
+            threashold (str) : Threashold limit
             alarm_actions (list) : List of ARN string of actions to execute when the alarm is triggered
             dimensions (dict) : Dictionary of dimensions for the alarm's associated metric
             period (int) : Number of 60 second periods over which the metric is evaluated
-            namespace (string) : AWS Namespace of the alarm metric (default AWS/ELB)
+            namespace (str) : AWS Namespace of the alarm metric (default AWS/ELB)
             depends_on (None|string|list): A unique name or list of unique names of resources within the
                                            configuration and is used to determine the launch order of resources
         """
@@ -1869,8 +1875,8 @@ class CloudFormationConfiguration:
         Adds CloudWatch Alarms for Latency, SurgeCount, and UnhealthyHostCount for an ELB
 
         Args:
-            lb_name (string) : The LoadBalancer name
-            alarm_actions (string) : The name of SNS mailing list
+            lb_name (str) : The LoadBalancer name
+            alarm_actions (str) : The name of SNS mailing list
             depends_on (None|string|list): A unique name or list of unique names of resources within the
                                            configuration and is used to determine the launch order of resources
         """
@@ -1890,9 +1896,9 @@ class CloudFormationConfiguration:
         """Create a SNS topic
 
         Args:
-            key (string) : Unique name for the resource in the template
-            name (string): Display name of the SNS topic
-            topic (string): SNS topic name
+            key (str) : Unique name for the resource in the template
+            name (str): Display name of the SNS topic
+            topic (str): SNS topic name
             subscriptions (list): List of tuples containing SNS scriptions to create
                                   (protocol, endpoint)
         """
@@ -1913,8 +1919,8 @@ class CloudFormationConfiguration:
             Maximum message size is 256KiB, which is the maximum size for SQS
 
         Args:
-            key (string) : Unique name for the resource in the template
-            name (string): Display name of the SQS queue
+            key (str) : Unique name for the resource in the template
+            name (str): Display name of the SQS queue
             hide (int) : Number of seconds to hide a queue item before it is again available for processing
             retention (int) : Number of minute a message will be retained
                               Limits are 1 minute to 14 days (default 4 days)
@@ -1954,10 +1960,10 @@ class CloudFormationConfiguration:
         name of the queue rather than the full URL of the queue.
 
         Args:
-            key (string): Lookup key for this SQS policy.
-            name (string): Id for this SQS policy.
+            key (str): Lookup key for this SQS policy.
+            name (str): Id for this SQS policy.
             queues_list (list): List of Queue IDs or Refs to apply policy to.
-            role (string): Give this IAM role full access to these queues.
+            role (str): Give this IAM role full access to these queues.
         """
 
         self.resources[key] = {
@@ -1983,12 +1989,12 @@ class CloudFormationConfiguration:
         """
 
         Args:
-            key (string) : Unique name for the resource in the template
-            name (string): Display name of the event rule
-            role_arn (string): ARN of role this event will use
-            schedule_expression (string): string expression of how often this rule will run.
+            key (str) : Unique name for the resource in the template
+            name (str): Display name of the event rule
+            role_arn (str): ARN of role this event will use
+            schedule_expression (str): string expression of how often this rule will run.
             event_pattern (JSON object):  describes which events CloudWatch Events routes to the specified target
-            state (string): indicates whether the rule is enabled
+            state (str): indicates whether the rule is enabled
             target_list: List of targets to forward events to.
             description: Description of the event rule.
 

@@ -34,6 +34,7 @@ from lib import scalyr
 from lib import constants as const
 
 import os
+import sys
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -73,7 +74,6 @@ def create_config(session, domain):
 
     global keypair
     keypair = aws.keypair_lookup(session)
-
     config.add_vpc()
 
     # Create the internal and external subnets
@@ -415,9 +415,10 @@ def update(session, domain):
 
 def delete(session, domain):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
-    names = AWSNames(domain)
-    aws.route53_delete_records(session, domain, names.auth)
-    aws.route53_delete_records(session, domain, names.consul)
-    aws.route53_delete_records(session, domain, names.vault)
-    aws.sns_unsubscribe_all(session, names.dns)
-    CloudFormationConfiguration('core', domain).delete(session)
+    if utils.get_user_confirm("All data will be lost. Are you sure you want to proceed?"):
+        names = AWSNames(domain)
+        aws.route53_delete_records(session, domain, names.auth)
+        aws.route53_delete_records(session, domain, names.consul)
+        aws.route53_delete_records(session, domain, names.vault)
+        aws.sns_unsubscribe_all(session, names.dns)
+        CloudFormationConfiguration('core', domain).delete(session)

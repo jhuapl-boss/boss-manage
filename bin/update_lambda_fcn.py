@@ -68,14 +68,21 @@ def get_lambda_zip_name(domain):
     the lambda build server.
 
     Args:
-        domain (string): The VPC's domain name such as integration.boss.
+        domain (str): The VPC's domain name such as integration.boss.
 
     Returns:
-        (string)
+        (str)
     """
     return 'multilambda.{}.zip'.format(domain)
 
 def update_lambda_code(session, domain, bucket):
+    """Update all lambdas that use the multilambda zip file.
+
+    Args:
+        session (Session): Boto3 session.
+        domain (str): VPC's domain name such as integration.boss.
+        bucket (str): Name of bucket that contains the lambda zip file.
+    """
     names = AWSNames(domain)
     uses_multilambda = [
         names.multi_lambda, 
@@ -106,7 +113,8 @@ def load_lambdas_on_s3(session, domain, bucket):
 
     Args:
         session (Session): boto3.Session
-        domain (string): The VPC's domain name such as integration.boss.
+        domain (str): The VPC's domain name such as integration.boss.
+        bucket (str): Name of bucket that contains the lambda zip file.
     """
     tempname = tempfile.NamedTemporaryFile(delete=True)
     zipname = tempname.name + '.zip'
@@ -120,6 +128,7 @@ def load_lambdas_on_s3(session, domain, bucket):
 
     os.chdir(const.repo_path("salt_stack", "salt", "boss-tools", "files", "boss-tools.git"))
     zip.write_to_zip('bossutils', zipname)
+    zip.write_to_zip('cloudwatchwrapper', zipname)
     zip.write_to_zip('lambda', zipname)
     zip.write_to_zip('lambdautils', zipname)
     os.chdir(cwd)
@@ -162,10 +171,10 @@ def load_lambdas_on_s3(session, domain, bucket):
 def create_ndingest_settings(domain, fp):
     """Create the settings.ini file for ndingest.
 
-    The file is placed in ndingest's settings folder.j
+    The file is placed in ndingest's settings folder.
 
     Args:
-        domain (string): The VPC's domain name such as integration.boss.
+        domain (str): The VPC's domain name such as integration.boss.
         fp (file-like object): File like object to read settings.ini template from.
     """
     names = AWSNames(domain)

@@ -101,6 +101,9 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["aws"]["id-count-table"] = names.id_count_index
     user_data["aws"]["prod_mailing_list"] = mailing_list_arn
     user_data["aws"]["max_task_id_suffix"] = str(const.MAX_TASK_ID_SUFFIX)
+    user_data["aws"]["id-index-new-chunk-threshold"] = str(const.DYNAMO_ID_INDEX_NEW_CHUNK_THRESHOLD)
+    user_data["aws"]["index-deadletter-queue"] = str(Ref(names.index_deadletter_queue))
+    user_data["aws"]["index-cuboids-keys-queue"] = str(Ref(names.index_cuboids_keys_queue))
 
     user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
     user_data["lambda"]["flush_function"] = names.multi_lambda
@@ -111,6 +114,8 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data['sfn']['populate_upload_queue'] = names.ingest_queue_populate
     user_data['sfn']['upload_sfn'] = names.ingest_queue_upload
     user_data['sfn']['downsample_sfn'] = names.resolution_hierarchy
+    user_data['sfn']['index_id_writer_sfn'] = names.index_id_writer_sfn
+    user_data['sfn']['index_cuboid_supervisor_sfn'] = names.index_cuboid_supervisor_sfn
 
     # Prepare user data for parsing by CloudFormation.
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
@@ -126,7 +131,18 @@ def create_config(session, domain, keypair=None, db_config={}):
     config.add_security_group('AllHTTPSSecurityGroup', 'https.' + domain, [('tcp', '443', '443', '0.0.0.0/0')])
     sgs[names.https] = Ref('AllHTTPSSecurityGroup')
 
+
     # Create SQS queues and apply access control policies.
+
+    # Deadletter queue for indexing operations.  This one is populated
+    # manually by states in the indexing step functions.
+    config.add_sqs_queue(
+        names.index_deadletter_queue, names.index_deadletter_queue, 30, 20160)
+
+    # Queue that holds S3 object keys of cuboids to be indexed.
+    config.add_sqs_queue(
+        names.index_cuboids_keys_queue, names.index_cuboids_keys_queue, 120, 20160)
+
     #config.add_sqs_queue("DeadLetterQueue", names.deadletter_queue, 30, 20160) DP XXX
     config.add_sqs_queue(names.deadletter_queue, names.deadletter_queue, 30, 20160)
 
@@ -449,8 +465,9 @@ def update(session, domain):
     return success
 
 def delete(session, domain):
-    names = AWSNames(domain)
-    aws.route53_delete_records(session, domain, names.endpoint)
-    aws.sqs_delete_all(session, domain)
-    aws.policy_delete_all(session, domain, '/ingest/')
-    CloudFormationConfiguration('api', domain).delete(session)
+    if utils.get_user_confirm("All data will be lost. Are you sure you want to proceed?"):
+        names = AWSNames(domain)
+        aws.route53_delete_records(session, domain, names.endpoint)
+        aws.sqs_delete_all(session, domain)
+        aws.policy_delete_all(session, domain, '/ingest/')
+        CloudFormationConfiguration('api', domain).delete(session)
