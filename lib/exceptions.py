@@ -15,6 +15,9 @@
 class BossManageError(Exception):
     pass
 
+class BossManageCanceled(BossManageError):
+    pass
+
 class CircularDependencyError(BossManageError):
     def __init__(self, a=None, b=None):
         msg = "Circular dependency"

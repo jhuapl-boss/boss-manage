@@ -27,6 +27,7 @@ from botocore.exceptions import ClientError
 from . import hosts
 from . import aws
 from . import utils
+from .exceptions import BossManageError, BossManageCanceled
 
 def bool_str(val):
     """CloudFormation Template formatted boolean string.
@@ -409,7 +410,8 @@ class CloudFormationConfiguration:
         get_status = lambda r: r['Stacks'][0]['StackStatus']
         response = client.describe_stacks(StackName=name)
         if len(response['Stacks']) == 0:
-            return None
+            msg = "Stack '{}' doesn't exist".format(name)
+            raise BossManageError(msg)
         else:
             print("Waiting for {} ".format(action), end="", flush=True)
             while get_status(response) == process:
@@ -428,13 +430,14 @@ class CloudFormationConfiguration:
             wait (bool) : If True, wait for the stack to be created, printing
                           status information
 
-        Returns:
-            (bool|None) : If wait is True, the result of launching the stack,
-                          else None
+        Raises:
+            BossManageError: If there was a problem creating the stack
         """
         for argument in self.arguments:
-            if argument["ParameterValue"] is None:
-                raise Exception("Could not determine argument '{}'".format(argument["ParameterKey"]))
+            arg_val = argument['ParameterValue']
+            if arg_val is None:
+                msg = "Could not determine argument '{}'".format(arg_val)
+                raise BossManageError(msg)
 
         client = self.session.client('cloudformation')
 
@@ -448,22 +451,17 @@ class CloudFormationConfiguration:
                 ]
             )
         except client.exceptions.AlreadyExistsException:
-            print('{} already exists, aborting.'.format(self.stack_name))
-            return None
+            msg = "Stack '{}' already exists".format(self.stack_name)
+            raise BossManageError(msg)
 
-        rtn = None
         if wait:
             status = self._poll(client, self.stack_name, 'create', 'CREATE_IN_PROGRESS')
 
-            if status is None:
-                print("Problem launching stack")
-            elif status == 'CREATE_COMPLETE':
+            if status == 'CREATE_COMPLETE':
                 print("Created stack '{}'".format(self.stack_name))
-                rtn = True
             else:
-                print("Status of stack '{}' is '{}'".format(self.stack_name, status))
-                rtn = False
-        return rtn
+                msg = "Status of stack '{}' is '{}'".format(self.stack_name, status)
+                raise BossManageError(msg)
 
     def update(self, wait = True):
         """Update the template this object represents in CloudFormation.
@@ -473,13 +471,15 @@ class CloudFormationConfiguration:
             wait (bool) : If True, wait for the stack to be updated, printing
                           status information
 
-        Returns:
-            (bool|None) : If wait is True, the result of launching the stack,
-                          else None
+        Raises:
+            BossManageCanceled: If the update was canceled
+            BossManageError: If there was a problem updating the stack
         """
         for argument in self.arguments:
-            if argument["ParameterValue"] is None:
-                raise Exception("Could not determine argument '{}'".format(argument["ParameterKey"]))
+            arg_val = argument['ParameterValue']
+            if arg_val is None:
+                msg = "Could not determine argument '{}'".format(arg_val)
+                raise BossManageError(msg)
 
         client = self.session.client('cloudformation')
 
@@ -556,25 +556,19 @@ class CloudFormationConfiguration:
                     ChangeSetName = 'h' + commit,
                     StackName = self.stack_name
                 )
-                return
+                raise BossManageCanceled()
 
-        rtn = None
         if wait:
             status = self._poll(client, self.stack_name, 'update', 'UPDATE_IN_PROGRESS')
 
-            if status is None:
-                print("Problem launching stack")
-            elif status == 'UPDATE_COMPLETE':
+            if status == 'UPDATE_COMPLETE':
                 print("Updated stack '{}'".format(self.stack_name))
-                rtn = True
             elif status == 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS':
                 status = self._poll(client, self.stack_name, 'update cleanup', 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS')
                 print("Updated stack '{}'".format(self.stack_name))
-                rtn = True
             else:
-                print("Status of stack '{}' is '{}'".format(self.stack_name, status))
-                rtn = False
-        return rtn
+                msg = "Status of stack '{}' is '{}'".format(self.stack_name, status)
+                raise BossManageError(msg)
 
     def delete(self, wait = True):
         """Deletes the given stack from CloudFormation.
@@ -588,32 +582,25 @@ class CloudFormationConfiguration:
             wait (bool) : If True, wait for the stack to be deleted, printing
                           status information
 
-        Returns:
-            (bool|None) : If wait is True, the result of launching the stack,
-                          else None
+        Raises:
+            BossManageError: If there was a problem deleting the stack
         """
 
         client = self.session.client("cloudformation")
         client.delete_stack(StackName = self.stack_name)
 
-        rtn = None
         if wait:
             try:
                 status = self._poll(client, self.stack_name, 'delete', 'DELETE_IN_PROGRESS')
 
-                if status is None:
-                    print("Problem deleting stack")
-                elif status == 'DELETE_COMPLETE':
+                if status == 'DELETE_COMPLETE':
                     print("Deleted stack '{}'".format(self.stack_name))
-                    rtn = True
                 else:
-                    print("Status of stack '{}' is '{}'".format(self.stack_name, status))
-                    rtn = False
+                    msg = "Status of stack '{}' is '{}'".format(self.stack_name, status)
+                    raise BossManageError(msg)
             except ClientError:
                 # Stack doesn't exist anymore
                 print(" done")
-                rtn = True
-        return rtn
 
     def add_arg(self, arg):
         """Add an Arg class instance to the internal configuration.

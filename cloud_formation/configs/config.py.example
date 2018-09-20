@@ -14,17 +14,23 @@ DEPENDENCIES = []
 # Libraries that are often used. They all contain PyDocs that describe
 # how should they work
 from lib.cloudformation import CloudFormationConfiguration
-from lib.names import AWSNames
 from lib import constants as const
 from lib import aws
 from lib import scalyr
+from lib.exceptions import BossManageError, BossManageCanceled
+
+# The create, update, delete, pre-init, post-init, generate methods
+# should raise a BossManageError if there is a problem. If the user
+# selected to not proceed with an action a BossManageCanceled should
+# be raised.
 
 def create_config(bosslet_config):
     """A Common method for generating the configuration object
     Used by multiple entry points for the file
     """
     # AWSNames is used to provide the correct reference to different AWS resource
-    names = AWSNames(bosslet_config)
+    session = bosslet_config.session
+    names = bosslet_config.names
 
     # const.* are constants, including the scenario overlay (if selected at runtime)
 
@@ -46,11 +52,9 @@ def create(bosslet_config):
     """Build and Create the Cloud Formation template in AWS"""
 
     config = create_config(bosslet_config)
-    success = config.create()
-    if success:
-        success = post_init(bosslet_config)
+    config.create()
 
-    return success
+    post_init(bosslet_config)
 
 def post_init(bosslet_config):
     """Post-create configuration actions
@@ -60,7 +64,7 @@ def post_init(bosslet_config):
     """
 
     # post-init actions
-    return True
+    pass
 
 def update(bosslet_config):
     """Build a new Cloud Formation template and update the existing stack
@@ -68,12 +72,10 @@ def update(bosslet_config):
     """
 
     config = create_config(bosslet_config)
-    success = config.update()
-    if success:
-        # post update actions
-        pass
+    config.update()
 
-    return success
+    # post update actions
+    pass
 
 def delete(bosslet_config):
     """Delete an existing Cloud Formation  stack
@@ -84,10 +86,7 @@ def delete(bosslet_config):
     # Pre-delete actions
 
     config = CloudFormationConfiguration('<name of config file>', bosslet_config)
-    success = config.delete()
+    config.delete()
 
-    if success:
-        # Post-delete actions
-        pass
-
-    return success
+    # Post-delete actions
+    pass

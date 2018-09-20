@@ -138,23 +138,17 @@ def call_configs(bosslet_config, configs, func_name):
         print("== Working on {}".format(config))
         try:
             if func_name in module.__dict__:
-                resp = module.__dict__[func_name](bosslet_config)
+                module.__dict__[func_name](bosslet_config)
             elif func_name == 'delete':
-                resp = CloudFormationConfiguration(config, bosslet_config).delete()
+                CloudFormationConfiguration(config, bosslet_config).delete()
             else:
                 print("Configuration '{}' doesn't implement function '{}', skipping".format(config, func_name))
-                resp = True
 
-            if resp is False:
-                print("Problem with {} {}, exiting early".format(config, func_name))
-                return False
         except:
             msg = "== Error with {} {}".format(config, func_name)
             print(msg)
             print()
             raise
-
-    return True
 
 if __name__ == '__main__':
     os.chdir(os.path.join(cur_dir, "..", "cloud_formation"))
@@ -216,11 +210,8 @@ if __name__ == '__main__':
             configs = args.config_name
 
         func = args.action.replace('-','_')
-        ret = call_configs(bosslet_config, configs, func)
-        if ret == False:
-            sys.exit(1)
-        else:
-            sys.exit(0)
+        call_configs(bosslet_config, configs, func)
+        sys.exit(0)
     except exceptions.StatusCheckError as ex:
         target = 'the server'
         if hasattr(ex, 'target') and ex.target is not None:
@@ -257,3 +248,7 @@ if __name__ == '__main__':
         print()
         print("Boss Manage Error: {}".format(ex))
         sys.exit(2)
+    except Exception as ex:
+        print()
+        print("Exception: {}".format(ex))
+        sys.exit(1)
