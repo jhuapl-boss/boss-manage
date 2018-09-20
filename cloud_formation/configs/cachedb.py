@@ -230,7 +230,6 @@ def generate(bosslet_config):
     config = create_config(bosslet_config)
     config.generate()
 
-
 def create(bosslet_config):
     """Create the configuration, and launch it"""
     names = bosslet_config.names
@@ -264,21 +263,12 @@ def create(bosslet_config):
     user_data["lambda"]["flush_function"] = names.lambda_.multi_lambda
     user_data["lambda"]["page_in_function"] = names.lambda_.multi_lambda
 
-    try:
-        pre_init(bosslet_config)
+    pre_init(bosslet_config)
 
-        config = create_config(bosslet_config, user_data)
+    config = create_config(bosslet_config, user_data)
+    config.create()
 
-        success = config.create()
-        if success:
-            success = post_init(bosslet_config)
-
-        return success
-    except:
-        # DP NOTE: This will catch errors from pre_init, create, and post_init
-        print("Error detected")
-        raise
-
+    post_init(bosslet_config)
 
 def pre_init(bosslet_config):
     """Send spdb, bossutils, lambda, and lambda_utils to the lambda build
@@ -286,11 +276,9 @@ def pre_init(bosslet_config):
     """
     load_lambdas_on_s3(bosslet_config)
 
-
 def update(bosslet_config):
     user_data = None
-    print("user_data not defined, update disabled")
-    return False
+    raise Exception("user_data not defined, update disabled")
 
     config = create_config(bosslet_config, user_data)
     success = config.update()
@@ -298,9 +286,6 @@ def update(bosslet_config):
     if utils.get_user_confirm("Rebuild multilambda", default = True):
         pre_init(bosslet_config)
         update_lambda_code(bosslet_config)
-
-    return success
-
 
 def post_init(bosslet_config):
     print("post_init")
@@ -316,8 +301,6 @@ def post_init(bosslet_config):
         bosslet_config.session,
         bosslet_config.REGION,
         [bosslet_config.names.dns.cache_manager])
-
-    return True
 
 def check_tile_bucket_life_cycle_policy(bosslet_config):
     names = bosslet_config.names
@@ -392,5 +375,4 @@ def delete(bosslet_config):
     aws.route53_delete_records(session, domain, names.dns.cache_manager)
 
     config = CloudFormationConfiguration("cachedb", bosslet_config)
-    success = config.delete()
-    return success
+    config.delete()

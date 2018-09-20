@@ -168,18 +168,14 @@ def generate(bosslet_config):
     config = create_config(bosslet_config, lookup=False)
     config.generate()
 
-
 def create(bosslet_config):
     if utils.get_user_confirm("Build multilambda", default = True):
         pre_init(bosslet_config)
 
     config = create_config(bosslet_config)
+    config.create()
 
-    success = config.create()
-    if success:
-        success = post_init(bosslet_config)
-
-    return success
+    post_init(bosslet_config)
 
 def pre_init(session, domain):
     """Build multilambda zip file and put in S3."""
@@ -191,10 +187,7 @@ def update(session, domain):
         update_lambda_code(bosslet_config)
 
     config = create_config(bosslet_config)
-    success = config.update()
-
-    if not success:
-        return False
+    config.update()
 
     if utils.get_user_confirm("Replace step functions", default = True):
         delete_sfns(bosslet_config)
@@ -205,9 +198,6 @@ def update(session, domain):
         time.sleep(delay)
 
         post_init(bosslet_config)
-
-    return True
-
 
 def post_init(bosslet_config):
     names = bosslet_config.names
@@ -224,10 +214,8 @@ def post_init(bosslet_config):
     sfn.create(bosslet_config, names.sfn.resolution_hierarchy, 'resolution_hierarchy.hsd', role)
     #sfn.create(bosslet_config, names.sfn.downsample_volume, 'downsample_volume.hsd', role)
 
-    return True
-
 def delete(bosslet_config):
-    success = CloudFormationConfiguration('activities', bosslet_config).delete()
+    CloudFormationConfiguration('activities', bosslet_config).delete()
 
     delete_sfns(bosslet_config)
 
@@ -245,5 +233,3 @@ def delete_sfns(bosslet_config):
     sfn.delete(bosslet_config, names.sfn.ingest_queue_upload)
     sfn.delete(bosslet_config, names.sfn.resolution_hierarchy)
     #sfn.delete(bosslet_config, names.sfn.downsample_volume)
-
-    return success

@@ -73,19 +73,13 @@ def generate(bosslet_config):
 
 def create(bosslet_config):
     config = create_config(bosslet_config)
-    success = config.create()
-
-    return success
+    config.create()
 
 def update(bosslet_config):
     config = create_config(bosslet_config)
-    success = config.update()
-
-    return success
+    config.update()
 
 
 def delete(bosslet_config):
     config = CloudFormationConfiguration('redis', bosslet_config)
-    success = config.delete()
-
-    return success
+    config.delete()

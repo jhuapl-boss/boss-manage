@@ -28,6 +28,7 @@ DEPENDENCIES = ['core', 'redis'] # also depends on activities for step functions
 from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, Arn
 from lib.userdata import UserData
 from lib.keycloak import KeyCloakClient
+from lib.exceptions import BossManageCanceled
 from lib import aws
 from lib import utils
 from lib import scalyr
@@ -235,7 +236,6 @@ def generate(bosslet_config):
     config = create_config(bosslet_config, db_config)
     config.generate()
 
-
 def create(bosslet_config):
     """Configure Vault, create the configuration, and launch it"""
     db_config = const.ENDPOINT_DB_CONFIG.copy()
@@ -252,9 +252,7 @@ def create(bosslet_config):
     config = create_config(bosslet_config, db_config)
 
     try:
-        success = config.create()
-        if not success:
-            raise Exception("Create Failed")
+        config.create()
     except:
         print("Error detected, revoking secrets")
         try:
@@ -267,10 +265,8 @@ def create(bosslet_config):
 
         raise
 
-    if success:
-        # Outside the try/except so it can be run again if there is an error
-        post_init(bosslet_config)
-
+    # Outside the try/except so it can be run again if there is an error
+    post_init(bosslet_config)
 
 def post_init(bosslet_config):
     session = bosslet_config.session
@@ -348,9 +344,7 @@ def update(bosslet_config):
         db_config = vault.read(const.VAULT_ENDPOINT_DB)
 
     config = create_config(bosslet_config, db_config)
-    success = config.update()
-
-    return success
+    config.update()
 
 def delete(bosslet_config):
     session = bosslet_config.session
@@ -358,7 +352,7 @@ def delete(bosslet_config):
     names = bosslet_config.names
 
     if not utils.get_user_confirm("All data will be lost. Are you sure you want to proceed?"):
-        return None
+        raise BossManageCanceled()
 
     aws.route53_delete_records(session, domain, names.dns.endpoint)
     # Other configs may define SQS queues and we shouldn't delete them
@@ -366,5 +360,4 @@ def delete(bosslet_config):
     aws.policy_delete_all(session, domain, '/ingest/')
 
     config = CloudFormationConfiguration('api', bosslet_config)
-    resp = config.delete()
-    return resp
+    config.delete()

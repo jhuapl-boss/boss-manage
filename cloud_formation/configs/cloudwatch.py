@@ -130,16 +130,8 @@ def generate(bosslet_config):
 def create(bosslet_config):
     config = create_config(bosslet_config)
 
-    success = config.create()
-
-    if success:
-        print('success')
-    else:
-        print('failed')
-
-    return success
+    config.create()
 
 def update(session, domain):
     config = create_config(bosslet_config)
-    success = config.update()
-    return success
+    config.update()

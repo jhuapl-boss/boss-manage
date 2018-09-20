@@ -113,22 +113,12 @@ def generate(bosslet_config):
     config = create_config(bosslet_config)
     config.generate()
 
-
 def create(bosslet_config):
     """Create the configuration, and launch it"""
-    try:
-        pre_init(bosslet_config)
+    pre_init(bosslet_config)
 
-        config = create_config(bosslet_config)
-
-        success = config.create()
-
-        return success
-    except:
-        # DP NOTE: This will catch errors from pre_init, create, and post_init
-        print("Error detected")
-        raise
-
+    config = create_config(bosslet_config)
+    config.create()
 
 def pre_init(bosslet_config):
     """

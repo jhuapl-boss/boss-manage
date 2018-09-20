@@ -35,6 +35,7 @@ DEPENDENCIES = None
 from lib.cloudformation import CloudFormationConfiguration, Ref, Arn
 from lib.userdata import UserData
 from lib.keycloak import KeyCloakClient
+from lib.exceptions import BossManageError, BossManageCanceled
 from lib import aws
 from lib import utils
 from lib import scalyr
@@ -249,16 +250,15 @@ def create(bosslet_config):
     """Create the configuration, launch it, and initialize Vault"""
     config = create_config(bosslet_config)
 
-    success = config.create()
-    if success:
-        session = bosslet_config.session
-        domain = bosslet_config.INTERNAL_DOMAIN
-        vpc_id = aws.vpc_id_lookup(session, domain)
-        aws.rt_name_default(session, vpc_id, "default." + domain)
+    config.create()
 
-        success = post_init(bosslet_config)
+    # NOTE: rename the default route table that is automatically created by AWS
+    session = bosslet_config.session
+    domain = bosslet_config.INTERNAL_DOMAIN
+    vpc_id = aws.vpc_id_lookup(session, domain)
+    aws.rt_name_default(session, vpc_id, "default." + domain)
 
-    return success
+    post_init(bosslet_config)
 
 def post_init(bosslet_config):
     session = bosslet_config.session
@@ -368,19 +368,17 @@ def post_init(bosslet_config):
     instances = [ names.dns.vault ]
     scalyr.add_instances_to_scalyr(session, bosslet_config.REGION, instances)
 
-    return True
-
 def update(bosslet_config):
     # Checks to make sure they update can happen and the user wants to wait the required time
     if not bosslet_config.AUTH_RDS:
         print("Cannot update Auth server as it is not using an external database")
         print("Updating the Auth server would loose all Keycloak information")
-        return None
+        raise BossManageError("Configuration doesn't support 'update'")
 
     if int(const.CONSUL_CLUSTER_SIZE) < 3: # Only tested updating with minimum 3 instances
         print("Cannot update Consul server as it is not running in a cluster configuration")
         print("Updating the Consul server would loose all Vault data")
-        return None
+        raise BossManageError("Configuration doesn't support 'update'")
 
     consul_update_timeout = 5 # minutes
     consul_size = int(const.CONSUL_CLUSTER_SIZE)
@@ -390,49 +388,45 @@ def update(bosslet_config):
     print("Update command will take {} - {} minutes to finish".format(min_time, max_time))
     print("Stack will be available during that time")
     if not utils.get_user_confirm("Update?", default = False):
-        print("Canceled")
-        return None
+        raise BossManageCanceled()
 
     config = create_config(bosslet_config)
-    success = config.update()
+    config.update()
 
-    if success:
-        session = bosslet_config.session
-        call = bosslet_config.call
-        names = bosslet_config.names
+    session = bosslet_config.session
+    call = bosslet_config.call
+    names = bosslet_config.names
 
-        # Unseal Vault first, so the rest of the system can continue working
-        # TODO: Figure out what to do when the vault check fails, as consul
-        #       is not restarted
-        print("Waiting for Vault...")
-        if not call.check_vault(90, exception=False):
-            print("Could not contact Vault, check networking and run the following command")
-            print("bin/bastion.py vault.bosslet vault-unseal")
-            return False
+    # Unseal Vault first, so the rest of the system can continue working
+    # TODO: Figure out what to do when the vault check fails, as consul
+    #       is not restarted
+    print("Waiting for Vault...")
+    if not call.check_vault(90, exception=False):
+        print("Could not contact Vault, check networking and run the following command")
+        print("bin/bastion.py vault.bosslet vault-unseal")
+        raise BossManageError("Could not contact Vault")
 
-        with call.vault() as vault:
-            vault.unseal()
+    with call.vault() as vault:
+        vault.unseal()
 
-        print("Stack should be ready for use")
-        print("Starting to cycle consul cluster instances")
+    print("Stack should be ready for use")
+    print("Starting to cycle consul cluster instances")
 
-        # DP NOTE: Cycling the instances is done manually (outside of CF)
-        #          so that Vault can be unsealed first, else the whole stacks
-        #          would not be usable until all consul instance were restarted
-        with ThreadPoolExecutor(max_workers=3) as tpe:
-            # Need time for the ASG to detect the terminated instance,
-            # launch the new instance, and have the instance cluster
-            tpe.submit(aws.asg_restart,
-                       session,
-                       names.dns.consul,
-                       consul_update_timeout * 60)
-
-    return success
+    # DP NOTE: Cycling the instances is done manually (outside of CF)
+    #          so that Vault can be unsealed first, else the whole stacks
+    #          would not be usable until all consul instance were restarted
+    with ThreadPoolExecutor(max_workers=3) as tpe:
+        # Need time for the ASG to detect the terminated instance,
+        # launch the new instance, and have the instance cluster
+        tpe.submit(aws.asg_restart,
+                   session,
+                   names.dns.consul,
+                   consul_update_timeout * 60)
 
 def delete(bosslet_config):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
     if not utils.get_user_confirm("All data will be lost. Are you sure you want to proceed?"):
-        return None
+        raise BossManageCanceled()
 
     session = bosslet_config.session
     domain = bosslet_config.INTERNAL_DOMAIN
@@ -445,6 +439,4 @@ def delete(bosslet_config):
     aws.sns_unsubscribe_all(bosslet_config, names.sns.dns)
 
     config = CloudFormationConfiguration('core', bosslet_config)
-    success = config.delete()
-
-    return success
+    config.delete()

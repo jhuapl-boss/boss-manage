@@ -135,20 +135,15 @@ def generate(bosslet_config):
     config = create_config(bosslet_config)
     config.generate()
 
-
 def create(bosslet_config):
     """Create the configuration and launch."""
     if utils.get_user_confirm("Rebuild multilambda", default = True):
         pre_init(bosslet_config)
 
     config = create_config(bosslet_config)
+    config.create()
 
-    success = config.create()
-    if success:
-        post_init(bosslet_config)
-
-    return success
-
+    post_init(bosslet_config)
 
 def pre_init(bosslet_config):
     """Build multilambda zip file and put in S3."""
@@ -191,10 +186,7 @@ def update(bosslet_config):
         update_lambda_code(bosslet_config)
 
     config = create_config(bosslet_config)
-    success = config.update()
-
-    if not success:
-        return False
+    config.update()
 
     if utils.get_user_confirm("Replace step functions", default = True):
         delete_sfns(bosslet_config)
@@ -205,8 +197,6 @@ def update(bosslet_config):
         time.sleep(delay)
 
         post_init(bosslet_config)
-
-    return True
 
 
 def delete(bosslet_config):
