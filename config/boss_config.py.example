@@ -6,12 +6,13 @@
 EXTERNAL_DOMAIN = "external.tld" # External domain and Route53 Hosted Zone
 EXTERNAL_FORMAT = "{machine}" # (Optional) allows names like api-integration.external.tld
 INTERNAL_DOMAIN = "internal.tld"
-SUBNET = "10.0.0.0/16" # Class B Subnet
+NETWORK = "10.0.0.0/16" # (Optional) Network allocation for VPC
+SUBNET_CIDR = 24 # (Optional) CIDR for each subnet in VPC
 
 AMI_SUFFIX = ".tld"
 SCENARIO = "" # (Optional) Uses internal defaults if not --scenario provided
 
-VERIFY_SSL = True # False if using a self-signed cert
+VERIFY_SSL = True # (Optional) False if using a self-signed cert
 AUTH_RDS = False # If Keycloak will use an external database. Cannot update unless True
 
 # Lambda build server variables
@@ -30,14 +31,16 @@ AVAILABILITY_ZONE_USAGE = { # Used to limit subnet usage for specific resources 
 ACCOUNT_ID = 123456789
 PROFILE = None
 
-OUTBOUND_BASTION = True
+# (Optional) Define an output bastion machine authenticated via SSH private key
+OUTBOUND_BASTION = False
 OUTBOUND_IP = "0.0.0.0"
 OUTBOUND_PORT = 22
 OUTBOUND_USER = "ec2-user"
 OUTBOUND_KEY = "bastion-key" # only keypair name
 
-HTTPS_INBOUND = "0.0.0.0/0"
-SSH_INBOUND = "0.0.0.0/32"
+HTTPS_INBOUND = "0.0.0.0/0" # (Optional) Network CIDR of traffic allowed for HTTPS
+SSH_INBOUND = "0.0.0.0/32" # Network CIDR of traffic allowed for SSH
+                           # Should include the OUTBOUND_IP if used
 SSH_KEY = "stack-key" # only keypair name
 
 # cloudformation configs - add verify command for post create / update

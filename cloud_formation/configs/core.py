@@ -88,7 +88,7 @@ def create_config(bosslet_config):
     internal_subnets, external_subnets = config.add_all_subnets()
     internal_subnets_asg, external_subnets_asg = config.find_all_subnets('asg')
 
-    user_data = const.BASTION_USER_DATA.format(bosslet_config.SUBNET)
+    user_data = const.BASTION_USER_DATA.format(bosslet_config.NETWORK)
     config.add_ec2_instance("Bastion",
                             names.dns.bastion,
                             aws.ami_lookup(bosslet_config, const.BASTION_AMI),

@@ -39,6 +39,15 @@ def list_bosslets():
     return [os.path.basename(f)[:-3].replace('_','.') for f in glob.glob(CONFIGS_GLOB)]
 
 class BossConfiguration(object):
+    __DEFAULTS = {
+        "EXTERNAL_FORMAT": "{machine}",
+        "NETWORK": "10.0.0.0/16",
+        "SUBNET_CIDR": 24,
+        "VERIFY_SSL": True,
+        "OUTBOUND_BASTION": False,
+        "HTTPS_INBOUND": "0.0.0.0/0",
+    }
+
     def __init__(self, bosslet, **kwargs):
         self.bosslet = bosslet
 
@@ -96,7 +105,13 @@ class BossConfiguration(object):
         return self._call
 
     def __getattr__(self, attr):
-        return  getattr(self._config, attr)
+        try:
+            return getattr(self._config, attr)
+        except AttributeError:
+            if attr in self.__DEFAULTS:
+                return self.__DEFAULTS[attr]
+            else:
+                raise
 
     def get(self, key, default=None):
         try:

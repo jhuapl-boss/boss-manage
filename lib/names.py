@@ -41,10 +41,7 @@ class AWSNames(object):
         self.bosslet_config = bosslet_config
 
     def public_dns(self, name):
-        try:
-            name = self.bosslet_config.EXTERNAL_FORMAT.format(machine = name)
-        except:
-            pass
+        name = self.bosslet_config.EXTERNAL_FORMAT.format(machine = name)
 
         return name + '.' + self.bosslet_config.EXTERNAL_DOMAIN
 

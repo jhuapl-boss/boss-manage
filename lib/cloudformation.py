@@ -377,7 +377,7 @@ class CloudFormationConfiguration:
         self.hosts = hosts.Hosts(bosslet_config)
 
         self.vpc_domain = domain
-        self.vpc_subnet = bosslet_config.SUBNET
+        self.vpc_subnet = bosslet_config.NETWORK
 
 
     def _create_template(self, description="", indent=None):
