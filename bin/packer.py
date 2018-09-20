@@ -34,6 +34,7 @@ from boto3.session import Session
 
 import alter_path
 from lib.constants import repo_path
+from lib import aws
 
 os.environ["PATH"] += ":" + repo_path("bin") # allow executing Packer from the bin/ directory
 
@@ -64,33 +65,37 @@ def locate_ami(aws_config):
                 return False
         return True
 
-    with open(aws_config) as fh:
-        cred = json.load(fh)
-        session = Session(aws_access_key_id = cred["aws_access_key"],
-                          aws_secret_access_key = cred["aws_secret_key"],
-                          region_name = 'us-east-1')
+    if aws_config == None:
+        session = aws.use_iam_role()
 
-        client = session.client('ec2')
-        response = client.describe_images(Filters=[
-                        {"Name": "owner-id", "Values": ["099720109477"]},
-                        {"Name": "virtualization-type", "Values": ["hvm"]},
-                        {"Name": "root-device-type", "Values": ["ebs"]},
-                        {"Name": "architecture", "Values": ["x86_64"]},
-                        #{"Name": "platform", "Values": ["Ubuntu"]},
-                        #{"Name": "name", "Values": ["hvm-ssd"]},
-                        #{"Name": "name", "Values": ["14.04"]},
-                   ])
+    else:
+        with open(aws_config) as fh:
+            cred = json.load(fh)
+            session = Session(aws_access_key_id = cred["aws_access_key"],
+                            aws_secret_access_key = cred["aws_secret_key"],
+                            region_name = 'us-east-1')
 
-        images = response['Images']
-        images = [i for i in images if contains(i['Name'], ('hvm-ssd', '14.04', 'server'))]
-        images.sort(key=lambda x: x["CreationDate"], reverse=True)
+    client = session.client('ec2')
+    response = client.describe_images(Filters=[
+                    {"Name": "owner-id", "Values": ["099720109477"]},
+                    {"Name": "virtualization-type", "Values": ["hvm"]},
+                    {"Name": "root-device-type", "Values": ["ebs"]},
+                    {"Name": "architecture", "Values": ["x86_64"]},
+                    #{"Name": "platform", "Values": ["Ubuntu"]},
+                    #{"Name": "name", "Values": ["hvm-ssd"]},
+                    #{"Name": "name", "Values": ["14.04"]},
+                ])
 
-        if len(images) == 0:
-            print("Error: could not locate base AMI, exiting ....")
-            sys.exit(1)
+    images = response['Images']
+    images = [i for i in images if contains(i['Name'], ('hvm-ssd', '14.04', 'server'))]
+    images.sort(key=lambda x: x["CreationDate"], reverse=True)
 
-        print("Using {}".format(images[0]['Name']))
-        return images[0]['ImageId']
+    if len(images) == 0:
+        print("Error: could not locate base AMI, exiting ....")
+        sys.exit(1)
+
+    print("Using {}".format(images[0]['Name']))
+    return images[0]['ImageId']
 
 if __name__ == '__main__':
     for cmd in ("git", "packer"):
@@ -138,6 +143,9 @@ if __name__ == '__main__':
                         metavar = "<config>",
                         nargs = "+",
                         help="Packer variable to build a machine image for")
+    parser.add_argument("--internal",
+                    action = "store_true",
+                    help="Attemps to execute cloudformation script without any credentials. Meant to use from internal aws instances")
 
     args = parser.parse_args()
 
@@ -148,7 +156,10 @@ if __name__ == '__main__':
     credentials_config = repo_path("config", "aws-credentials")
     packer_file = repo_path("packer", "vm.packer")
 
-    if not os.path.exists(credentials_config):
+    if args.internal:
+        credentials_config = None
+
+    elif not os.path.exists(credentials_config):
         print("Could not locate AWS credentials file at '{}', required...".format(credentials_config))
         sys.exit(1)
 
@@ -158,11 +169,18 @@ if __name__ == '__main__':
 
     ami = locate_ami(credentials_config)
 
-    cmd = """{packer} build
-             {bastion} -var-file={credentials}
-             -var-file={machine} -var 'name_suffix={name}'
-             -var 'commit={commit}' -var 'force_deregister={deregister}'
-             -var 'aws_source_ami={ami}' -only={only} {packer_file}"""
+    if args.internal:
+        cmd = """{packer} build
+            {bastion}
+            -var-file={machine} -var 'name_suffix={name}'
+            -var 'commit={commit}' -var 'force_deregister={deregister}'
+            -var 'aws_source_ami={ami}' -only={only} {packer_file}"""
+    else:
+        cmd = """{packer} build
+                {bastion} -var-file={credentials}
+                -var-file={machine} -var 'name_suffix={name}'
+                -var 'commit={commit}' -var 'force_deregister={deregister}'
+                -var 'aws_source_ami={ami}' -only={only} {packer_file}"""
     cmd_args = {
         "packer" : "packer",
         "bastion" : bastion_config if args.bastion else "",
