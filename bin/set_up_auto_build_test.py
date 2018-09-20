@@ -68,4 +68,18 @@ if __name__ == '__main__':
             sys.exit(1)
         session = aws.create_session(args.aws_credentials)
 
+    ec2 = session.client('ec2')
+
+    # Create aa security group for the buil ec2 instance to use. 
+    sec_group = ec2.create_security_group(GroupName='test_env', Description='Temporary security group')
+    sec_group_id = sec_group['GroupId']
     
+    data = EC2.authorize_security_group_ingress(
+        GroupId=sec_group_id,
+        IpPermissions=[
+            {'IpProtocol': 'tcp',
+            'FromPort': 22,
+            'ToPort':22,
+            'IpRanges':[({'CidrIp': '52.3.13.189/32'})]} #Make bastion IP a variable.
+        ]
+    )

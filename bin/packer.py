@@ -171,7 +171,6 @@ if __name__ == '__main__':
 
     if args.internal:
         cmd = """{packer} build
-            {bastion}
             -var-file={machine} -var 'name_suffix={name}'
             -var 'commit={commit}' -var 'force_deregister={deregister}'
             -var 'aws_source_ami={ami}' -only={only} {packer_file}"""
