@@ -21,6 +21,7 @@ import sys
 import os
 import importlib
 import glob
+import traceback
 
 import alter_path
 from lib import exceptions
@@ -250,5 +251,6 @@ if __name__ == '__main__':
         sys.exit(2)
     except Exception as ex:
         print()
-        print("Exception: {}".format(ex))
+        # suppress the printing of multiple chained exceptions, just the current one
+        traceback.print_exc(chain=False)
         sys.exit(1)
