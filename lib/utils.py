@@ -180,7 +180,7 @@ def get_user_confirm(message, default = False):
     Returns:
         returns True if user confirms with yes
     """
-    suffix = " [{}/{}]:".format("Y" if default else "y",
+    suffix = " [{}/{}]: ".format("Y" if default else "y",
                                 "n" if default else "N")
     resp = input(message + suffix)
     if len(resp) == 0:
