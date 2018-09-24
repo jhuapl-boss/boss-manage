@@ -98,20 +98,27 @@ class BossConfiguration(object):
 
         self.names = AWSNames(self)
 
-    @property
-    def call(self):
-        if self._call is False:
-            self._call = ExternalCalls(self)
-        return self._call
+        # Use __getattr__ to get the __DEFAULT value if not specified
+        if not self.VERIFY_SSL:
+            import ssl
+            ssl._create_default_https_context = ssl._create_unverified_context
 
     def __getattr__(self, attr):
-        try:
+        if hasattr(self._config, attr):
             return getattr(self._config, attr)
-        except AttributeError:
-            if attr in self.__DEFAULTS:
-                return self.__DEFAULTS[attr]
-            else:
-                raise
+        elif attr in self.__DEFAULTS:
+            return self.__DEFAULTS[attr]
+        elif attr == 'call' and self._call is not None:
+            # Using __getattr__ instead of an @property because if an
+            # @property raises an AttributeError then __getattr__ gets
+            # called.
+            if self._call is False:
+                self._call = ExternalCalls(self)
+            return self._call
+        else:
+            msg = "'{}' object has not attribute '{}'".format(self.__class__.__name__,
+                                                              attr)
+            raise AttributeError(msg)
 
     def get(self, key, default=None):
         try:
