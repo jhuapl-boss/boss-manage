@@ -16,9 +16,13 @@ class BossManageError(Exception):
     pass
 
 class BossManageCanceled(BossManageError):
+    def __init__(self):
+        super().__init__("Action Canceled")
+
+class DependencyError(BossManageError):
     pass
 
-class CircularDependencyError(BossManageError):
+class CircularDependencyError(DependencyError):
     def __init__(self, a=None, b=None):
         msg = "Circular dependency"
         if a and b:
@@ -27,11 +31,17 @@ class CircularDependencyError(BossManageError):
             msg += " in configurations"
         super(CircularDependencyError, self).__init__(msg)
 
-class MissingDependencyError(BossManageError):
+class MissingDependencyError(DependencyError):
     def __init__(self, config, dependency):
         msg = "Dependency '{}' for config '{}' is not being launched and doesn't exist"
         msg = msg.format(dependency, config)
         super(MissingDependencyError, self).__init__(msg)
+
+class DependencyInProgressError(DependencyError):
+    def __init__(self, config):
+        msg = "Dependency '{}' is in progress"
+        msg = msg.format(config)
+        super(DependencyInProgressError, self).__init__(msg)
 
 class SSHError(BossManageError):
     pass

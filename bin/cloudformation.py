@@ -37,7 +37,7 @@ cur_dir = os.path.dirname(os.path.realpath(__file__))
 cf_dir = os.path.normpath(os.path.join(cur_dir, '..', 'cloud_formation'))
 sys.path.append(cf_dir) # Needed for importing CF configs
 
-def build_dependency_graph(bosslet_config, modules):
+def build_dependency_graph(action, bosslet_config, modules):
     class Node(object):
         """Directed Dependency Graph Node"""
         def __init__(self, name):
@@ -77,12 +77,11 @@ def build_dependency_graph(bosslet_config, modules):
     # be satisfied (by either existing or being launched)
     client = bosslet_config.session.client('cloudformation')
     suffix = "".join([x.capitalize() for x in bosslet_config.INTERNAL_DOMAIN.split('.')])
-    valid_status = ('UPDATE_COMPLETE', 'CREATE_COMPLETE')
-    existing = [
-        stack['StackName'][:-len(suffix)].lower()
+    existing = {
+        stack['StackName'][:-len(suffix)].lower(): stack['StackStatus']
         for stack in client.list_stacks()['StackSummaries']
-        if stack['StackName'].endswith(suffix) and stack['StackStatus'] in valid_status
-    ]
+        if stack['StackName'].endswith(suffix)
+    }
 
     # Create dependency graph and locate root nodes
     for config, module in modules:
@@ -95,10 +94,16 @@ def build_dependency_graph(bosslet_config, modules):
         for dep in deps:
             if dep not in nodes:
                 # dependency not part of configs to launch
-                if dep not in existing:
+                if dep not in existing and action == "create":
                     raise exceptions.MissingDependencyError(config, dep)
             else:
+                # If action is update, post-init, pre-init, verify that
+                # the config is already existing
+                if action not in ('create', 'delete') and dep not in existing:
+                    raise exceptions.MissingDependencyError(config, dep)
+
                 nodes[config].depends_on(nodes[dep])
+
                 try:
                     no_deps.remove(dep)
                 except:
@@ -116,6 +121,29 @@ def build_dependency_graph(bosslet_config, modules):
     if len(reordered) != len(modules):
         raise exceptions.CircularDependencyError()
 
+    # Removed configs that don't need to be created
+    if action == "create":
+        for config, module in reordered[:]:
+            if config in existing:
+                # If the config already exists, don't try to create it again
+                reordered.remove((config, module))
+
+    # Remove configs that don't need to be deleted / updated / etc
+    else:
+        for config, module in reordered[:]:
+            if config not in existing:
+                # If the config doesn't exist, don't try to delete it again
+                # If the config doesn't exist, don't try to update it
+                reordered.remove((config, module))
+
+        if action == "delete": # Delete in reverse order
+            reordered.reverse()
+
+    # Make sure that the target configs are not currently being processed
+    for config, module in reordered:
+        if config in existing and existing[config].endswith("_IN_PROGRESS"):
+            raise exceptions.DependencyInProgressError(config)
+
     return reordered
 
 
@@ -125,9 +153,8 @@ def call_configs(bosslet_config, configs, func_name):
     """
     modules = [(config, importlib.import_module("configs." + config)) for config in configs]
 
-    modules = build_dependency_graph(bosslet_config, modules)
-    if func_name == 'delete':
-        modules.reverse()
+    if func_name != 'generate':
+        modules = build_dependency_graph(func_name, bosslet_config, modules)
 
     print("Execution Order:")
     for config, module in modules:
