@@ -135,10 +135,10 @@ def create_config(bosslet_config, lookup=True):
     lambda_role = aws.role_arn_lookup(session, "lambda_resolution_hierarchy")
 
     config.add_lambda("DownsampleVolumeLambda",
-                      names.downsample_volume_lambda,
+                      names.lambda_.downsample_volume,
                       lambda_role,
-                      s3=(aws.get_lambda_s3_bucket(session),
-                          "multilambda.{}.zip".format(domain),
+                      s3=(bosslet_config.LAMBDA_BUCKET,
+                          names.zip.multi_lambda,
                           "downsample_volume.handler"),
                       timeout=120,
                       memory=1024,
@@ -146,12 +146,12 @@ def create_config(bosslet_config, lookup=True):
                       dlq = Ref('DownsampleDLQ'))
 
     config.add_sns_topic("DownsampleDLQ",
-                         names.downsample_dlq,
-                         names.downsample_dlq,
+                         names.sqs.downsample_dlq,
+                         names.sqs.downsample_dlq,
                          [('lambda', Arn('DownsampleDLQLambda'))])
 
     config.add_lambda('DownsampleDLQLambda',
-                      names.downsample_dlq,
+                      names.sqs.downsample_dlq,
                       lambda_role,
                       const.DOWNSAMPLE_DLQ_LAMBDA,
                       handler='index.handler',
@@ -177,11 +177,11 @@ def create(bosslet_config):
 
     post_init(bosslet_config)
 
-def pre_init(session, domain):
+def pre_init(bosslet_config):
     """Build multilambda zip file and put in S3."""
     load_lambdas_on_s3(bosslet_config)
 
-def update(session, domain):
+def update(bosslet_config):
     if utils.get_user_confirm("Rebuild multilambda", default = True):
         pre_init(bosslet_config)
         update_lambda_code(bosslet_config)

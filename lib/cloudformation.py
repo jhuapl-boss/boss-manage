@@ -733,7 +733,7 @@ class CloudFormationConfiguration:
         internal = []
 
         # transforms [(AZ_Name, AZ_Letter)] -> ([AZ_Name], [AZ_Letter])
-        azs = list(zip(*aws.azs_lookup(self.bosslet_config, compatibility='lambda')))[1]
+        azs = list(zip(*aws.azs_lookup(self.bosslet_config, compatibility='lambda')))[0]
         print("Lambda AZs: {}".format(azs))
         subnets = [x for x in hosts.SUBNETS if x.startswith('lambda')]
 

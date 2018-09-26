@@ -84,8 +84,8 @@ def create_config(bosslet_config, db_config={}):
     user_data["aws"]["prod_mailing_list"] = mailing_list_arn
     user_data["aws"]["max_task_id_suffix"] = str(const.MAX_TASK_ID_SUFFIX)
     user_data["aws"]["id-index-new-chunk-threshold"] = str(const.DYNAMO_ID_INDEX_NEW_CHUNK_THRESHOLD)
-    user_data["aws"]["index-deadletter-queue"] = str(Ref(names.index_deadletter_queue))
-    user_data["aws"]["index-cuboids-keys-queue"] = str(Ref(names.index_cuboids_keys_queue))
+    user_data["aws"]["index-deadletter-queue"] = str(Ref(names.sqs.index_deadletter))
+    user_data["aws"]["index-cuboids-keys-queue"] = str(Ref(names.sqs.index_cuboids_keys))
 
     user_data["auth"]["OIDC_VERIFY_SSL"] = str(bosslet_config.get('VERIFY_SSL', True))
     user_data["lambda"]["flush_function"] = names.lambda_.multi_lambda
@@ -124,7 +124,7 @@ def create_config(bosslet_config, db_config={}):
     config.add_sqs_queue(names.sqs.index_cuboids_keys, names.sqs.index_cuboids_keys, 120, 20160)
 
     #config.add_sqs_queue("DeadLetterQueue", names.deadletter_queue, 30, 20160) DP XXX
-    config.add_sqs_queue(names.deadletter_queue, names.deadletter_queue, 30, 20160)
+    config.add_sqs_queue(names.sqs.deadletter, names.sqs.deadletter, 30, 20160)
 
     max_receives = 3
     #config.add_sqs_queue("S3FlushQueue", DP XXX
@@ -313,10 +313,6 @@ def post_init(bosslet_config):
         'username': bossadmin['username'],
         'password': bossadmin['password'],
     }
-
-    if not bosslet_config.get('VERIFY_SSL', True):
-        import ssl
-        ssl._create_default_https_context = ssl._create_unverified_context
 
     auth_uri += '/protocol/openid-connect/token'
     req = Request(auth_uri,

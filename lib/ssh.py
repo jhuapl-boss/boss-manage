@@ -291,7 +291,7 @@ class SSHConnection(object):
                 first = local_file if upload else ""
                 second = "" if upload else local_file
                 scp_str = "scp -i {} {} -P {} {} {}@{}:{} {}" \
-                                .format(target.key, SSH_OPTIONS, taret.port, first, target.user, target.ip, remote_file, second)
+                                .format(target.key, SSH_OPTIONS, target.port, first, target.user, target.ip, remote_file, second)
                 ret = subprocess.call(shlex.split(scp_str))
                 check_ssh(ret)
                 return ret

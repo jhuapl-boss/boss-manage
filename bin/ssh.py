@@ -42,6 +42,7 @@ from lib import aws
 from lib import configuration
 from lib.ssh import SSHConnection, SSHTarget
 from lib.names import AWSNames
+from lib.utils import keypair_to_file
 
 if __name__ == "__main__":
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
@@ -57,6 +58,9 @@ if __name__ == "__main__":
     parser.add_argument("--user", "-u",
                         default=None,
                         help="username on remote host.")
+    parser.add_argument("--key", "-k",
+                        default=None,
+                        help="SSH keypair name for the instance (Default: bosslet.SSH_KEY)")
     parser.add_hostname(private_ip = True)
 
     args = parser.parse_args()
@@ -72,7 +76,8 @@ if __name__ == "__main__":
     else:
         bastions = []
 
-    ssh_target = SSHTarget(args.bosslet_config.ssh_key, args.ip, 22, user)
+    ssh_key = keypair_to_file(args.key) if args.key else args.bosslet_config.ssh_key
+    ssh_target = SSHTarget(ssh_key, args.ip, 22, user)
     ssh = SSHConnection(ssh_target, bastions)
     if args.cmd:
         ret = ssh.cmd(args.cmd)

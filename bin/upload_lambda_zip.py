@@ -28,7 +28,7 @@ import sys
 import alter_path
 from lib import configuration
 
-def upload_lambda_zip(bosslet_config):
+def upload_lambda_zip(bosslet_config, path):
     s3 = bosslet_config.session.client('s3')
     with open(path, 'rb') as in_file:
         resp = s3.put_object(Bucket=bosslet_config.LAMBDA_BUCKET,
@@ -49,5 +49,5 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    upload_lambda_zip(bosslet_config)
+    upload_lambda_zip(args.bosslet_config, args.zip_name)
 

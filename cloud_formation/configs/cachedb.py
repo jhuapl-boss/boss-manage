@@ -139,7 +139,7 @@ def create_config(bosslet_config, user_data=None):
     tile_bucket_name = names.s3.tile_bucket
     if not aws.s3_bucket_exists(session, tile_bucket_name):
         creating_tile_bucket = True
-        life_cycle_cfg = get_bucket_life_cycle_rules()
+        life_cycle_cfg = get_cf_bucket_life_cycle_rules()
         config.add_s3_bucket(
             "tileBucket", tile_bucket_name, life_cycle_config=life_cycle_cfg)
 
@@ -174,7 +174,7 @@ def create_config(bosslet_config, user_data=None):
                       names.lambda_.multi_lambda,
                       Ref("LambdaCacheExecutionRole"),
                       s3=(bosslet_config.LAMBDA_BUCKET,
-                          "multilambda.{}.zip".format(bosslet_config.INTERNAL_DOMAIN),
+                          names.zip.multi_lambda,
                           "lambda_loader.handler"),
                       timeout=120,
                       memory=1024,
@@ -182,25 +182,25 @@ def create_config(bosslet_config, user_data=None):
                       subnets=lambda_subnets,
                       runtime='python3.6')
     config.add_lambda("DeleteTileObjsLambda",
-                      names.delete_tile_objs_lambda,
+                      names.lambda_.delete_tile_objs,
                       Ref("LambdaCacheExecutionRole"),
-                      s3=(aws.get_lambda_s3_bucket(session),
-                          "multilambda.{}.zip".format(domain),
+                      s3=(bosslet_config.LAMBDA_BUCKET,
+                          names.zip.multi_lambda,
                           "delete_tile_objs_lambda.handler"),
                       timeout=90,
                       memory=128,
                       runtime='python3.6',
-                      dlq=Arn(names.ingest_cleanup_dlq))
+                      dlq=Arn(names.sqs.ingest_cleanup_dlq))
     config.add_lambda("DeleteTileEntryLambda",
-                      names.delete_tile_index_entry_lambda,
+                      names.lambda_.delete_tile_index_entry,
                       Ref("LambdaCacheExecutionRole"),
-                      s3=(aws.get_lambda_s3_bucket(session),
-                          "multilambda.{}.zip".format(domain),
+                      s3=(bosslet_config.LAMBDA_BUCKET,
+                          names.zip.multi_lambda,
                           "delete_tile_index_entry_lambda.handler"),
                       timeout=90,
                       memory=128,
                       runtime='python3.6',
-                      dlq=Arn(names.ingest_cleanup_dlq))
+                      dlq=Arn(names.sqs.ingest_cleanup_dlq))
 
     if creating_tile_bucket:
         config.add_lambda_permission('tileBucketInvokeMultiLambda',

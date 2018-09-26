@@ -100,6 +100,7 @@ class AWSNames(object):
         'delete_tile_index_entry': 'deleteTileEntryLambda',
         'delete_tile_objs': 'deleteTileObjsLambda',
         'dns': 'dns',
+        'downsample_dlq': 'downsample-dlq',
         'downsample_volume': 'downsample.volume',
         'dynamodb_autoscale': 'dynamodb_autoscale',
         'dynamo_lambda': 'dynamoLambda',

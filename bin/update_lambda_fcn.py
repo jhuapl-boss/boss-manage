@@ -96,7 +96,7 @@ def update_lambda_code(bosslet_config):
             resp = client.update_function_code(
                 FunctionName=lambda_name,
                 S3Bucket=bosslet_config.LAMBDA_BUCKET,
-                S3Key=names.zip.multi,
+                S3Key=names.zip.multi_lambda,
                 Publish=True)
             print(resp)
         except botocore.exceptions.ClientError as ex:
@@ -169,7 +169,8 @@ def load_lambdas_on_s3(bosslet_config):
     # This section will run makedomainenv on lambda-build-server
     print("calling makedomainenv on lambda-build-server")
     cmd = 'source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {} {}'.format(domain, lambda_bucket)
-    ssh.cmd(cmd)
+    ret = ssh.cmd(cmd)
+    print("ssh return code: " + str(ret))
 
 def create_ndingest_settings(bosslet_config, fp):
     """Create the settings.ini file for ndingest.
@@ -184,14 +185,12 @@ def create_ndingest_settings(bosslet_config, fp):
     parser = configparser.ConfigParser()
     parser.read_file(fp)
 
-    raise Exception("populate with correct calls to AWSNames")
+    parser['boss']['domain'] = bosslet_config.INTERNAL_DOMAIN
 
-    parser['boss']['domain'] = domain
-
-    parser['aws']['tile_bucket'] = names.tile_bucket
-    parser['aws']['cuboid_bucket'] = names.cuboid_bucket
-    parser['aws']['tile_index_table'] = names.tile_index
-    parser['aws']['cuboid_index_table'] = names.s3_index
+    parser['aws']['tile_bucket'] = names.s3.tile_bucket
+    parser['aws']['cuboid_bucket'] = names.s3.cuboid_bucket
+    parser['aws']['tile_index_table'] = names.ddb.tile_index
+    parser['aws']['cuboid_index_table'] = names.ddb.s3_index
     parser['aws']['max_task_id_suffix'] = str(const.MAX_TASK_ID_SUFFIX)
 
     # parser['spdb']['SUPER_CUBOID_SIZE'] = CUBOIDSIZE[0]

@@ -60,10 +60,11 @@ class ExternalCalls:
         """
         self.names = bosslet_config.names
         self.session = bosslet_config.session
+        self.keypair_file = bosslet_config.ssh_key
 
         bastion_ip = aws.machine_lookup(self.session, self.names.dns.bastion)
 
-        self.bastions = [ SSHTarget(self.ssh_key, bastion_ip) ]
+        self.bastions = [ SSHTarget(self.keypair_file, bastion_ip) ]
 
         if bosslet_config.outbound_bastion:
             self.bastions.insert(0, bosslet_config.outbound_bastion)

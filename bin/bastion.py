@@ -115,16 +115,16 @@ if __name__ == "__main__":
             print("Connect to localhost:{} to be forwarded to {}:{}".format(local_port, args.ip, args.port))
             input("Waiting to close tunnel...")
     elif args.command in ("ssh-all",):
-        addrs = aws.machine_lookup_all(bosslet_config.session, hostname, public_ip=False)
+        addrs = aws.machine_lookup_all(bosslet_config.session, args.hostname, public_ip=False)
         for addr in addrs:
-            print("{} at {}".format(hostname, addr))
-            ssh_target = SSHTarget(bosslet_config.ssh_key, ip, args.port, args.user)
+            print("{} at {}".format(args.hostname, addr))
+            ssh_target = SSHTarget(bosslet_config.ssh_key, addr, args.port, args.user)
             ssh = SSHConnection(ssh_target, bastions)
             ssh.cmd(*args.arguments)
             print()
     elif args.command in vault.COMMANDS:
         with vault_tunnel(bosslet_config.ssh_key, bastions):
-            vault.COMMANDS[args.command](Vault(args.internal, ip), *args.arguments)
+            vault.COMMANDS[args.command](Vault(args.hostname, args.ip), *args.arguments)
     else:
         parser.print_usage()
         sys.exit(1)
