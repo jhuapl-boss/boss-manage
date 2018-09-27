@@ -115,6 +115,7 @@ class AWSNames(object):
         'downsample_volume_lambda': 'downsampleVolumeLambda',
         'ingest_queue_populate': 'Ingest.Populate',
         'ingest_queue_upload': 'Ingest.Upload',
+        'volumetric_ingest_queue_upload': 'Ingest.VolumetricUpload',
         'ingest_lambda': 'IngestUpload',
         'dynamo_lambda': 'dynamoLambda',
         'trigger_dynamo_autoscale': 'triggerDynamoAutoscale',
