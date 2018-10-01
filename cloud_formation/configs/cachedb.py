@@ -43,7 +43,7 @@ EXPIRE_IN_DAYS = 21
 TILE_BUCKET_TRIGGER = 'tileBucketInvokeMultiLambda'
 INGEST_BUCKET_TRIGGER = 'ingestBucketInvokeCuboidImportLambda'
 
-CUBOID_IMPORT_ROLE = 'CuboidImportLambda'
+CUBOID_IMPORT_ROLE = 'CuboidImportLambdaRole'
 
 def get_cf_bucket_life_cycle_rules():
     """
@@ -138,8 +138,8 @@ def create_config(session, domain, keypair=None, user_data=None):
     config.add_arg(Arg.String("LambdaCacheExecutionRole", role,
                               "IAM role for multilambda." + domain))
 
-    cuboid_import_role = aws.role_arn_lookup(session, "CUBOID_IMPORT_ROLE")
-    config.add_arg(Arg.String("CUBOID_IMPORT_ROLE", role,
+    cuboid_import_role = aws.role_arn_lookup(session, CUBOID_IMPORT_ROLE)
+    config.add_arg(Arg.String(CUBOID_IMPORT_ROLE, role,
                               "IAM role for cuboidImport." + domain))
 
     cuboid_bucket_name = names.cuboid_bucket
@@ -175,8 +175,10 @@ def create_config(session, domain, keypair=None, user_data=None):
         { 'AWS': role})
 
     # The ingest bucket is a staging area for cuboids uploaded during volumetric ingest.
+    creating_ingest_bucket = False
     ingest_bucket_name = names.ingest_bucket
     if not aws.s3_bucket_exists(session, ingest_bucket_name):
+        creating_ingest_bucket = True
         ing_bucket_life_cycle_cfg = get_cf_bucket_life_cycle_rules()
         config.add_s3_bucket("ingestBucket", ingest_bucket_name,
             life_cycle_config=ing_bucket_life_cycle_cfg)
@@ -199,6 +201,8 @@ def create_config(session, domain, keypair=None, user_data=None):
 
     config.add_sqs_queue(
         names.ingest_cleanup_dlq, names.ingest_cleanup_dlq, 30, 20160)
+    config.add_sqs_queue(
+        names.cuboid_import_dlq, names.cuboid_import_dlq, 30, 20160)
 
     lambda_bucket = aws.get_lambda_s3_bucket(session)
     config.add_lambda("MultiLambda",
@@ -232,6 +236,16 @@ def create_config(session, domain, keypair=None, user_data=None):
                       memory=128,
                       runtime='python3.6',
                       dlq=Arn(names.ingest_cleanup_dlq))
+    config.add_lambda("CuboidImportLambda",
+                      names.cuboid_import_lambda,
+                      Ref(CUBOID_IMPORT_ROLE),
+                      s3=(lambda_bucket,
+                          "multilambda.{}.zip".format(domain),
+                          "cuboid_import_lambda.handler"),
+                      timeout=90,
+                      memory=128,
+                      runtime='python3.6',
+                      dlq=Arn(names.cuboid_import_dlq))
 
     if creating_tile_bucket:
         config.add_lambda_permission(
@@ -248,6 +262,20 @@ def create_config(session, domain, keypair=None, user_data=None):
             depends_on='MultiLambda'
         )
 
+    if creating_ingest_bucket:
+        config.add_lambda_permission(
+            'ingestBucketInvokeCuboidImportLambda', names.cuboid_import_lambda,
+            principal='s3.amazonaws.com', source={
+                'Fn::Join': [':', ['arn', 'aws', 's3', '', '', ingest_bucket_name]]}, #DP TODO: move into constants
+            depends_on=['ingestBucket', 'CuboidImportLambda']
+        )
+    else:
+        config.add_lambda_permission(
+            'ingestBucketInvokeCuboidImportLambda', names.cuboid_import_lambda,
+            principal='s3.amazonaws.com', source={
+                'Fn::Join': [':', ['arn', 'aws', 's3', '', '', ingest_bucket_name]]},
+            depends_on='CuboidImportLambda'
+        )
     # Add topic to indicating that the object store has been write locked.
     # Now using "production mailing list" instead of separate write lock topic.
     #config.add_sns_topic('WriteLock',
