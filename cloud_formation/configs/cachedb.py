@@ -139,7 +139,7 @@ def create_config(session, domain, keypair=None, user_data=None):
                               "IAM role for multilambda." + domain))
 
     cuboid_import_role = aws.role_arn_lookup(session, CUBOID_IMPORT_ROLE)
-    config.add_arg(Arg.String(CUBOID_IMPORT_ROLE, role,
+    config.add_arg(Arg.String(CUBOID_IMPORT_ROLE, cuboid_import_role,
                               "IAM role for cuboidImport." + domain))
 
     cuboid_bucket_name = names.cuboid_bucket
@@ -185,7 +185,7 @@ def create_config(session, domain, keypair=None, user_data=None):
 
     config.add_s3_bucket_policy(
         "ingestBucketPolicy", ingest_bucket_name,
-        ['s3:GetObject', 's3:PutObject'],
+        ['s3:GetObject', 's3:PutObject', 's3:DeleteObject'],
         { 'AWS': cuboid_import_role})
 
     config.add_ec2_instance("CacheManager",
@@ -203,6 +203,9 @@ def create_config(session, domain, keypair=None, user_data=None):
         names.ingest_cleanup_dlq, names.ingest_cleanup_dlq, 30, 20160)
     config.add_sqs_queue(
         names.cuboid_import_dlq, names.cuboid_import_dlq, 30, 20160)
+
+    config.add_sqs_policy('cuboidImportDlqPolicy', 'cuboidImportDlqPolicy',
+        [Ref(names.cuboid_import_dlq)], cuboid_import_role)
 
     lambda_bucket = aws.get_lambda_s3_bucket(session)
     config.add_lambda("MultiLambda",
