@@ -39,12 +39,21 @@ import botocore
 # Number of days until objects expire in the tile bucket.
 EXPIRE_IN_DAYS = 21
 
+# Ids used for bucket lambda triggers.
+TILE_BUCKET_TRIGGER = 'tileBucketInvokeMultiLambda'
+INGEST_BUCKET_TRIGGER = 'ingestBucketInvokeCuboidImportLambda'
+
+CUBOID_IMPORT_ROLE = 'CuboidImportLambda'
+
 def get_cf_bucket_life_cycle_rules():
     """
     Generate the CloudFormation expiration policy for the tile bucket.  This is
     a fallback in case tiles aren't cleaned up properly, post-ingest.  Messages 
     n the ingest queue only last 14 days, so removing the S3 objects 7 days
     after should be plenty of time.
+
+    This policy is also now used for the ingest bucket to ensure removal of
+    cuboids uploaded during volumetric ingest.
     """
     return {
         'Rules': [
@@ -61,6 +70,9 @@ def get_boto_bucket_life_cycle_rules():
     a fallback in case tiles aren't cleaned up properly, post-ingest.  Messages 
     n the ingest queue only last 14 days, so removing the S3 objects 7 days
     after should be plenty of time.
+
+    This policy is also now used for the ingest bucket to ensure removal of
+    cuboids uploaded during volumetric ingest.
     """
     return {
         'Rules': [
@@ -126,13 +138,20 @@ def create_config(session, domain, keypair=None, user_data=None):
     config.add_arg(Arg.String("LambdaCacheExecutionRole", role,
                               "IAM role for multilambda." + domain))
 
-    index_bucket_name = names.cuboid_bucket
-    if not aws.s3_bucket_exists(session, index_bucket_name):
-        config.add_s3_bucket("cuboidBucket", index_bucket_name)
+    cuboid_import_role = aws.role_arn_lookup(session, "CUBOID_IMPORT_ROLE")
+    config.add_arg(Arg.String("CUBOID_IMPORT_ROLE", role,
+                              "IAM role for cuboidImport." + domain))
+
+    cuboid_bucket_name = names.cuboid_bucket
+    if not aws.s3_bucket_exists(session, cuboid_bucket_name):
+        config.add_s3_bucket("cuboidBucket", cuboid_bucket_name)
     config.add_s3_bucket_policy(
-        "cuboidBucketPolicy", index_bucket_name,
+        "cuboidBucketPolicy", cuboid_bucket_name,
         ['s3:GetObject', 's3:PutObject'],
         { 'AWS': role})
+    config.add_s3_bucket_policy(
+        "cuboidBucketPolicyForCuboidImportLambda", cuboid_bucket_name,
+        ['s3:PutObject'], { 'AWS': cuboid_import_role})
 
     delete_bucket_name = names.delete_bucket
     if not aws.s3_bucket_exists(session, delete_bucket_name):
@@ -146,7 +165,7 @@ def create_config(session, domain, keypair=None, user_data=None):
     tile_bucket_name = names.tile_bucket
     if not aws.s3_bucket_exists(session, tile_bucket_name):
         creating_tile_bucket = True
-        life_cycle_cfg = get_bucket_life_cycle_rules()
+        life_cycle_cfg = get_cf_bucket_life_cycle_rules()
         config.add_s3_bucket(
             "tileBucket", tile_bucket_name, life_cycle_config=life_cycle_cfg)
 
@@ -155,13 +174,17 @@ def create_config(session, domain, keypair=None, user_data=None):
         ['s3:GetObject', 's3:PutObject'],
         { 'AWS': role})
 
+    # The ingest bucket is a staging area for cuboids uploaded during volumetric ingest.
     ingest_bucket_name = names.ingest_bucket
     if not aws.s3_bucket_exists(session, ingest_bucket_name):
-        config.add_s3_bucket("ingestBucket", ingest_bucket_name)
+        ing_bucket_life_cycle_cfg = get_cf_bucket_life_cycle_rules()
+        config.add_s3_bucket("ingestBucket", ingest_bucket_name,
+            life_cycle_config=ing_bucket_life_cycle_cfg)
+
     config.add_s3_bucket_policy(
         "ingestBucketPolicy", ingest_bucket_name,
         ['s3:GetObject', 's3:PutObject'],
-        { 'AWS': role})
+        { 'AWS': cuboid_import_role})
 
     config.add_ec2_instance("CacheManager",
                                 names.cache_manager,
@@ -181,7 +204,7 @@ def create_config(session, domain, keypair=None, user_data=None):
     config.add_lambda("MultiLambda",
                       names.multi_lambda,
                       Ref("LambdaCacheExecutionRole"),
-                      s3=(aws.get_lambda_s3_bucket(session),
+                      s3=(lambda_bucket,
                           "multilambda.{}.zip".format(domain),
                           "lambda_loader.handler"),
                       timeout=120,
@@ -192,7 +215,7 @@ def create_config(session, domain, keypair=None, user_data=None):
     config.add_lambda("DeleteTileObjsLambda",
                       names.delete_tile_objs_lambda,
                       Ref("LambdaCacheExecutionRole"),
-                      s3=(aws.get_lambda_s3_bucket(session),
+                      s3=(lambda_bucket,
                           "multilambda.{}.zip".format(domain),
                           "delete_tile_objs_lambda.handler"),
                       timeout=90,
@@ -202,7 +225,7 @@ def create_config(session, domain, keypair=None, user_data=None):
     config.add_lambda("DeleteTileEntryLambda",
                       names.delete_tile_index_entry_lambda,
                       Ref("LambdaCacheExecutionRole"),
-                      s3=(aws.get_lambda_s3_bucket(session),
+                      s3=(lambda_bucket,
                           "multilambda.{}.zip".format(domain),
                           "delete_tile_index_entry_lambda.handler"),
                       timeout=90,
@@ -318,24 +341,32 @@ def update(session, domain):
 def post_init(session, domain):
     print("post_init")
 
+    names = AWSNames(domain)
+
     print('adding tile bucket trigger of multi-lambda')
-    add_tile_bucket_trigger(session, domain)
+    add_bucket_trigger(session, names.multi_lambda, names.tile_bucket, TILE_BUCKET_TRIGGER)
+
+    print('adding ingest bucket trigger of import-cuboid lambda')
+    add_bucket_trigger(session, names.cuboid_import_lambda, names.ingest_bucket, INGEST_BUCKET_TRIGGER)
 
     print('checking for tile bucket expiration policy')
-    check_tile_bucket_life_cycle_policy(session, domain)
+    check_bucket_life_cycle_policy(session, names.tile_bucket)
 
-    # Tell Scalyr to get CloudWatch metrics for these instances.
-    names = AWSNames(domain)
-    instances = [names.cache_manager]
-    scalyr.add_instances_to_scalyr(
-        session, const.REGION, instances)
+    print('checking for ingest bucket expiration policy')
+    check_bucket_life_cycle_policy(session, names.ingest_bucket)
 
-def check_tile_bucket_life_cycle_policy(session, domain):
-    names = AWSNames(domain)
+
+def check_bucket_life_cycle_policy(session, bucket_name):
+    """
+    Ensure the expiration policy is attached to the given bucket.
+
+    Args:
+        bucket_name (str): Name of S3 bucket.
+    """
     s3 = session.client('s3')
 
     try:
-        resp = s3.get_bucket_lifecycle_configuration(Bucket=names.tile_bucket)
+        resp = s3.get_bucket_lifecycle_configuration(Bucket=bucket_name)
 
         policy_in_place = False
         if 'Rules' in resp:
@@ -353,27 +384,25 @@ def check_tile_bucket_life_cycle_policy(session, domain):
 
     print('setting policy')
     s3.put_bucket_lifecycle_configuration(
-        Bucket=names.tile_bucket,
+        Bucket=bucket_name,
         LifecycleConfiguration=get_boto_bucket_life_cycle_rules())
 
 
-def add_tile_bucket_trigger(session, domain):
-    """Trigger MultiLambda when file uploaded to tile bucket.
+def add_bucket_trigger(session, lambda_name, bucket_name, trigger_id):
+    """Trigger lambda when file uploaded to tile bucket.
 
-    This is done in post-init() because the tile bucket isn't always
+    This is done in post-init() because the bucket isn't always
     created during CloudFormation (it may already exist).
 
     This function's effects should be idempotent because the same id is
-    used everytime the notification event is added to the tile bucket.
+    used everytime the notification event is added to the bucket.
 
     Args:
         session (Boto3.Session)
-        domain (string): VPC domain name.
+        lambda_name (str): Name of lambda to trigger.
+        bucket_name (str): Bucket that triggers lambda.
+        trigger_id (str): Name to use for trigger to preserve idempotentness.
     """
-    names = AWSNames(domain)
-    lambda_name = names.multi_lambda
-    bucket_name = names.tile_bucket
-
     lam = session.client('lambda')
     resp = lam.get_function_configuration(FunctionName=lambda_name)
     lambda_arn = resp['FunctionArn']
@@ -385,7 +414,7 @@ def add_tile_bucket_trigger(session, domain):
     notification.put(NotificationConfiguration={
         'LambdaFunctionConfigurations': [
             {
-                'Id': 'tileBucketInvokeMultiLambda',
+                'Id': trigger_id,
                 'LambdaFunctionArn': lambda_arn,
                 'Events': ['s3:ObjectCreated:*']
             }
