@@ -273,6 +273,11 @@ def create_config(session, domain, keypair=None, user_data=None):
             depends_on=['ingestBucket', 'CuboidImportLambda']
         )
     else:
+        # NOTE: this permission doesn't seem to apply properly when doing a
+        # CloudFormation update.  During testing, I had to manually apply this
+        # permission before the bucket trigger could be applied in post_init().
+        # Doing a CloudFormation delete followed by a create did not have a
+        # problem.
         config.add_lambda_permission(
             'ingestBucketInvokeCuboidImportLambda', names.cuboid_import_lambda,
             principal='s3.amazonaws.com', source={
