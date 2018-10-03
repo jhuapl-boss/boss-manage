@@ -41,7 +41,7 @@ def handler(args, context):
             'z_stop': 0
             'z_tile_size': 0,
 
-            'z_chunk_size': 16,
+            'z_chunk_size': 64, or other possible number
             'MAX_NUM_TILES_PER_LAMBDA': 20000
         }
 
