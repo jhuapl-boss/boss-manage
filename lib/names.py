@@ -146,7 +146,7 @@ class AWSNames(object):
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
                     'ingest_queue_populate', 'ingest_queue_upload', 'resolution_hierarchy',
                     'downsample_volume', 'delete_experiment', 'delete_collection', 'delete_coord_frame',
-                     'cuboid_import_dlq', 'ingest_cleanup_dlq', 'copy_cuboid_dlq']:
+                     'cuboid_import_dlq', 'ingest_cleanup_dlq', 'copy_cuboid_dlq', 'volumetric_ingest_queue_upload']:
             fq_hostname = "".join(map(lambda x: x.capitalize(), fq_hostname.split('.')))
 
         return fq_hostname

@@ -249,6 +249,17 @@ def create_config(session, domain, keypair=None, user_data=None):
                       memory=128,
                       runtime='python3.6',
                       dlq=Arn(names.cuboid_import_dlq))
+    config.add_lambda("VolumetricIngestLambda",
+                      names.volumetric_ingest_queue_upload,
+                      Ref("LambdaCacheExecutionRole"),
+                      s3=(lambda_bucket,
+                          "multilambda.{}.zip".format(domain),
+                          "ingest_queue_upload_volumetric_lambda.handler"),
+                      timeout=120,
+                      memory=1024,
+                      runtime='python3.6',
+                      dlq=Arn(names.cuboid_import_dlq))
+
 
     if creating_tile_bucket:
         config.add_lambda_permission(
