@@ -80,7 +80,7 @@ class TestIngestQueueUploadLambda(unittest.TestCase):
             "t_tile_size": 1,
             "z_tile_size": 1,
             "resolution": 0,
-            "tiles_to_skip": 0,
+            "items_to_skip": 0,
             'MAX_NUM_ITEMS_PER_LAMBDA': 500000,
             'z_chunk_size': 16
         }
@@ -106,7 +106,7 @@ class TestIngestQueueUploadLambda(unittest.TestCase):
         num_lambdas = 4
         args["MAX_NUM_ITEMS_PER_LAMBDA"] = math.ceil(dict_length / num_lambdas)
         for skip in range(0, dict_length, args["MAX_NUM_ITEMS_PER_LAMBDA"]):
-            args["tiles_to_skip"] = skip
+            args["items_to_skip"] = skip
             #print("Skip: " + str(skip))
             msgs = iqu.create_messages(args)
             for msg_json in msgs:
