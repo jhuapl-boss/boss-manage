@@ -257,8 +257,7 @@ def create_config(session, domain, keypair=None, user_data=None):
                           "ingest_queue_upload_volumetric_lambda.handler"),
                       timeout=120,
                       memory=1024,
-                      runtime='python3.6',
-                      dlq=Arn(names.cuboid_import_dlq))
+                      runtime='python3.6')
 
 
     if creating_tile_bucket:
