@@ -1,0 +1,6 @@
+"""Populate a volumetric ingest upload queue with message for each chunk to be processed"""
+
+Lambda('VolumetricIngestUpload')
+    """IngestUpload
+    Code: boss-tools.git/lambda/ingest_queue_upload_volumetric_lambda.py
+    """

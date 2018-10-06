@@ -250,7 +250,7 @@ def create_config(session, domain, keypair=None, user_data=None):
                       runtime='python3.6',
                       dlq=Arn(names.cuboid_import_dlq))
     config.add_lambda("VolumetricIngestLambda",
-                      names.volumetric_ingest_queue_upload,
+                      names.volumetric_ingest_queue_upload_lambda,
                       Ref("LambdaCacheExecutionRole"),
                       s3=(lambda_bucket,
                           "multilambda.{}.zip".format(domain),

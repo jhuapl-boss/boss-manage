@@ -115,7 +115,8 @@ class AWSNames(object):
         'downsample_volume_lambda': 'downsampleVolumeLambda',
         'ingest_queue_populate': 'Ingest.Populate',
         'ingest_queue_upload': 'Ingest.Upload',
-        'volumetric_ingest_queue_upload': 'Ingest.VolumetricUpload',
+        'volumetric_ingest_queue_upload': 'Ingest.Volumetric.Upload',
+        'volumetric_ingest_queue_upload_lambda': 'VolumetricIngestUpload',
         'ingest_lambda': 'IngestUpload',
         'dynamo_lambda': 'dynamoLambda',
         'trigger_dynamo_autoscale': 'triggerDynamoAutoscale',
@@ -140,7 +141,9 @@ class AWSNames(object):
         if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'consul_monitor', 'vault_consul_check',
                     'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 'downsample_dlq', 'downsample_volume_lambda',
                     'delete_tile_objs_lambda', 'delete_tile_index_entry_lambda',
-                    'copy_cuboid_lambda', 'cuboid_import_lambda']:
+                    'copy_cuboid_lambda', 'cuboid_import_lambda',
+                    'volumetric_ingest_queue_upload_lambda'
+                    ]:
             fq_hostname = fq_hostname.replace('.','-')
 
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
