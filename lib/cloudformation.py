@@ -1600,6 +1600,33 @@ class CloudFormationConfiguration:
         }
 
 
+    def append_s3_bucket_policy(self, key, bucket_name, action, principal):
+        """Add an additional action-principal pair to a bucket.
+
+        Args:
+            key (string): Existing name for the resource in the template.
+            bucket_name (string|dict): Bucket name or CloudFormation instrinsic function to determine name (example: {"Ref": "mybucket"}).
+            action (list): List of strings for the types of actions to allow.
+            principal (dict): Dictionary identifying the entity given permission to the S3 bucket.
+        """
+        if key not in self.resources:
+            raise ValueError(key + " doesn't exist, cannot append to")
+
+        if self.resources[key]['Type'] != 'AWS::S3::BucketPolicy':
+            raise ValueError(key + " is not an S3 bucket policy")
+
+        if self.resources[key]['Properties']['Bucket'] != bucket_name:
+            raise ValueError(key + " is not an S3 bucket policy for bucket: " + bucket_name)
+
+        self.resources[key]['Properties']['PolicyDocument']['Statement'].append(
+            {
+                'Action': action,
+                'Effect': 'Allow',
+                'Resource': { 'Fn::Join': ['', ['arn:aws:s3:::', bucket_name, '/*']]},
+                'Principal': principal
+            })
+
+
     def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python2.7", reserved_executions=None, dlq=None):
         """Create a Python Lambda
 

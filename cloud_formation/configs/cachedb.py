@@ -149,8 +149,8 @@ def create_config(session, domain, keypair=None, user_data=None):
         "cuboidBucketPolicy", cuboid_bucket_name,
         ['s3:GetObject', 's3:PutObject'],
         { 'AWS': role})
-    config.add_s3_bucket_policy(
-        "cuboidBucketPolicyForCuboidImportLambda", cuboid_bucket_name,
+    config.append_s3_bucket_policy(
+        "cuboidBucketPolicy", cuboid_bucket_name,
         ['s3:PutObject'], { 'AWS': cuboid_import_role})
 
     delete_bucket_name = names.delete_bucket
