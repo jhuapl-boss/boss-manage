@@ -84,6 +84,22 @@ def get_boto_bucket_life_cycle_rules():
         ]
     }
 
+def get_s3_index_arn(session, domain):
+    """
+    Get arn of the DynamoDB s3 index.
+
+    Args:
+        session (boto3.Session): amazon session object
+        domain (str): domain of the stack being created
+
+    Returns:
+        (str):
+    """
+    names = AWSNames(domain)
+    dynamo = session.client('dynamodb')
+    resp = dynamo.describe_table(TableName=names.s3_index)
+    return resp['Table']['TableArn']
+
 def create_config(session, domain, keypair=None, user_data=None):
     """
     Create the CloudFormationConfiguration object.
@@ -141,6 +157,13 @@ def create_config(session, domain, keypair=None, user_data=None):
     cuboid_import_role = aws.role_arn_lookup(session, CUBOID_IMPORT_ROLE)
     config.add_arg(Arg.String(CUBOID_IMPORT_ROLE, cuboid_import_role,
                               "IAM role for cuboidImport." + domain))
+
+    config.add_capabilities(['CAPABILITY_IAM'])
+ 
+    config.add_iam_policy_to_role(
+        'S3IndexPutItem{}'.format(domain).replace('.', ''),
+        get_s3_index_arn(session, domain),
+        [CUBOID_IMPORT_ROLE], ['dynamodb:PutItem'])
 
     cuboid_bucket_name = names.cuboid_bucket
     if not aws.s3_bucket_exists(session, cuboid_bucket_name):
