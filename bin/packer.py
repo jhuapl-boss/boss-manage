@@ -172,7 +172,7 @@ if __name__ == '__main__':
         "name" : "-" + args.name,
         "commit" : git_hash,
         "ami" : ami,
-        "deregister" : "true" if args.name in ["test", "sandy", "dean"] else "false",
+        "deregister" : "true" if args.name in ["test", "sandy", "dean", "prodtest"] else "false",
         "machine" : "" # replace for each call
     }
 

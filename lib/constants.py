@@ -121,7 +121,7 @@ REDIS_CACHE_TYPE = {
 # Django session cache using Redis.
 REDIS_SESSION_TYPE = {
     "development": None,            # Don't use Redis for dev stack sessions.
-    "production": "cache.m4.xlarge",
+    "production": "cache.t2.medium",
     "ha-development": "cache.t2.small",
 }
 
@@ -172,7 +172,7 @@ ENDPOINT_CLUSTER_MIN = { # Minimum and Default size of the ASG
 
 ENDPOINT_CLUSTER_MAX = { # Maximum number of instances in the ASG
     "development": 1,
-    "production": 20,
+    "production": 60,
     "ha-development": 3,
 }
 
