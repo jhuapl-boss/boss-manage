@@ -146,7 +146,7 @@ def create_config(session, domain, keypair=None, user_data=None):
     tile_bucket_name = names.tile_bucket
     if not aws.s3_bucket_exists(session, tile_bucket_name):
         creating_tile_bucket = True
-        life_cycle_cfg = get_bucket_life_cycle_rules()
+        life_cycle_cfg = get_cf_bucket_life_cycle_rules()
         config.add_s3_bucket(
             "tileBucket", tile_bucket_name, life_cycle_config=life_cycle_cfg)
 
