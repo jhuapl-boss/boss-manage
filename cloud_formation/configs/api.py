@@ -105,7 +105,7 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
     user_data["lambda"]["flush_function"] = names.multi_lambda
     user_data["lambda"]["page_in_function"] = names.multi_lambda
-    user_data["lambda"]["ingest_function"] = names.multi_lambda
+    user_data["lambda"]["ingest_function"] = names.tile_ingest_lambda
     user_data["lambda"]["downsample_volume"] = names.downsample_volume_lambda
 
     user_data['sfn']['populate_upload_queue'] = names.ingest_queue_populate

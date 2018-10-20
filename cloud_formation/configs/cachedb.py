@@ -242,6 +242,24 @@ def create_config(session, domain, keypair=None, user_data=None):
                       security_groups=[Ref('InternalSecurityGroup')],
                       subnets=lambda_subnets,
                       runtime='python3.6')
+    config.add_lambda("TileUploadedLambda",
+                      names.tile_uploaded_lambda,
+                      Ref("LambdaCacheExecutionRole"),
+                      s3=(lambda_bucket,
+                          "multilambda.{}.zip".format(domain),
+                          "tile_uploaded_lambda.handler"),
+                      timeout=120,
+                      memory=1024,
+                      runtime='python3.6')
+    config.add_lambda("TileIngestLambda",
+                      names.tile_ingest_lambda,
+                      Ref("LambdaCacheExecutionRole"),
+                      s3=(lambda_bucket,
+                          "multilambda.{}.zip".format(domain),
+                          "tile_ingest_lambda.handler"),
+                      timeout=120,
+                      memory=1024,
+                      runtime='python3.6')
     config.add_lambda("DeleteTileObjsLambda",
                       names.delete_tile_objs_lambda,
                       Ref("LambdaCacheExecutionRole"),
@@ -285,10 +303,10 @@ def create_config(session, domain, keypair=None, user_data=None):
 
     if creating_tile_bucket:
         config.add_lambda_permission(
-            'tileBucketInvokeMultiLambda', names.multi_lambda,
+            'tileBucketInvokeTileUploadLambda', names.tile_uploaded_lambda,
             principal='s3.amazonaws.com', source={
                 'Fn::Join': [':', ['arn', 'aws', 's3', '', '', tile_bucket_name]]}, #DP TODO: move into constants
-            depends_on=['tileBucket', 'MultiLambda']
+            depends_on=['tileBucket', 'TileUploadedLambda']
         )
     else:
         config.add_lambda_permission(
@@ -414,8 +432,8 @@ def post_init(session, domain):
 
     names = AWSNames(domain)
 
-    print('adding tile bucket trigger of multi-lambda')
-    add_bucket_trigger(session, names.multi_lambda, names.tile_bucket, TILE_BUCKET_TRIGGER)
+    print('adding tile bucket trigger of tile_uploaded_lambda')
+    add_bucket_trigger(session, names.tile_uploaded_lambda, names.tile_bucket, TILE_BUCKET_TRIGGER)
 
     print('adding ingest bucket trigger of import-cuboid lambda')
     add_bucket_trigger(session, names.cuboid_import_lambda, names.ingest_bucket, INGEST_BUCKET_TRIGGER)

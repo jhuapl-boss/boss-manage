@@ -125,7 +125,9 @@ class AWSNames(object):
         'cuboid_import_lambda': 'cuboidImportLambda',
         'cuboid_import_dlq': 'cuboidImportDlq',
         'copy_cuboid_lambda': 'copyCuboidLambda',
-        'copy_cuboid_dlq': 'copyCuboidDlq'
+        'copy_cuboid_dlq': 'copyCuboidDlq',
+        'tile_uploaded_lambda': 'tileUploadLambda',
+        'tile_ingest_lambda': 'tileIngestLambda'
     }
 
     def __getattr__(self, name):
@@ -142,7 +144,8 @@ class AWSNames(object):
                     'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 'downsample_dlq', 'downsample_volume_lambda',
                     'delete_tile_objs_lambda', 'delete_tile_index_entry_lambda',
                     'copy_cuboid_lambda', 'cuboid_import_lambda',
-                    'volumetric_ingest_queue_upload_lambda'
+                    'volumetric_ingest_queue_upload_lambda', 'tile_ingest_lambda',
+                    'tile_upload_lambda'
                     ]:
             fq_hostname = fq_hostname.replace('.','-')
 
