@@ -145,7 +145,7 @@ class AWSNames(object):
                     'delete_tile_objs_lambda', 'delete_tile_index_entry_lambda',
                     'copy_cuboid_lambda', 'cuboid_import_lambda',
                     'volumetric_ingest_queue_upload_lambda', 'tile_ingest_lambda',
-                    'tile_upload_lambda'
+                    'tile_uploaded_lambda'
                     ]:
             fq_hostname = fq_hostname.replace('.','-')
 

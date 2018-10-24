@@ -40,7 +40,7 @@ import botocore
 EXPIRE_IN_DAYS = 21
 
 # Ids used for bucket lambda triggers.
-TILE_BUCKET_TRIGGER = 'tileBucketInvokeMultiLambda'
+TILE_BUCKET_TRIGGER = 'tileBucketInvokeTileUploadedLambda'
 INGEST_BUCKET_TRIGGER = 'ingestBucketInvokeCuboidImportLambda'
 
 CUBOID_IMPORT_ROLE = 'CuboidImportLambdaRole'
@@ -248,8 +248,8 @@ def create_config(session, domain, keypair=None, user_data=None):
                       s3=(lambda_bucket,
                           "multilambda.{}.zip".format(domain),
                           "tile_uploaded_lambda.handler"),
-                      timeout=120,
-                      memory=1024,
+                      timeout=30,
+                      memory=256,
                       runtime='python3.6')
     config.add_lambda("TileIngestLambda",
                       names.tile_ingest_lambda,
@@ -310,10 +310,10 @@ def create_config(session, domain, keypair=None, user_data=None):
         )
     else:
         config.add_lambda_permission(
-            'tileBucketInvokeMultiLambda', names.multi_lambda,
+            'tileBucketInvokeMultiLambda', names.tile_uploaded_lambda,
             principal='s3.amazonaws.com', source={
                 'Fn::Join': [':', ['arn', 'aws', 's3', '', '', tile_bucket_name]]},
-            depends_on='MultiLambda'
+            depends_on='TileUploadedLambda'
         )
 
     if creating_ingest_bucket:
