@@ -24,12 +24,12 @@ Create the cachedb configuration which consists of
   * SQS queues
 """
 
+from lib.bucket_object_tags import TAG_DELETE_KEY, TAG_DELETE_VALUE
 from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, Arn
 from lib.userdata import UserData
 from lib.names import AWSNames
 from lib.external import ExternalCalls
 from lib import aws
-from lib import scalyr
 from lib import constants as const
 
 from update_lambda_fcn import load_lambdas_on_s3, update_lambda_code
@@ -38,6 +38,9 @@ import botocore
 
 # Number of days until objects expire in the tile bucket.
 EXPIRE_IN_DAYS = 21
+
+# Number of days to wait before deleting an object marked for deletion.
+MARKED_FOR_DELETION_DAYS = 1
 
 # Ids used for bucket lambda triggers.
 TILE_BUCKET_TRIGGER = 'tileBucketInvokeTileUploadedLambda'
@@ -54,12 +57,28 @@ def get_cf_bucket_life_cycle_rules():
 
     This policy is also now used for the ingest bucket to ensure removal of
     cuboids uploaded during volumetric ingest.
+
+    This policy now contains a new rule to expire an object 1 day after it's
+    marked with a delete tag.  Objects are now marked for deletion (instead
+    of immediate deletion) by lambdas triggered by bucket uploads to maintain
+    idempotentness.
     """
     return {
         'Rules': [
             {
                 'ExpirationInDays': EXPIRE_IN_DAYS,
-                'Status': 'Enabled'
+                'Status': 'Enabled',
+                'Filter': {}
+            },
+            {
+                # Marked for deletion rule.
+                'ExpirationInDays': MARKED_FOR_DELETION_DAYS,
+                'Status': 'Enabled',
+                'Filter': {
+                    'Tag': {
+                        'Key': TAG_DELETE_KEY,
+                        'Value': TAG_DELETE_VALUE }
+                }
             }
         ]
     }
@@ -73,13 +92,28 @@ def get_boto_bucket_life_cycle_rules():
 
     This policy is also now used for the ingest bucket to ensure removal of
     cuboids uploaded during volumetric ingest.
+
+    This policy now contains a new rule to expire an object 1 day after it's
+    marked with a delete tag.  Objects are now marked for deletion (instead
+    of immediate deletion) by lambdas triggered by bucket uploads to maintain
+    idempotentness.
     """
     return {
         'Rules': [
             {
                 'Expiration': { 'Days': EXPIRE_IN_DAYS},
                 'Status': 'Enabled',
-                'Filter': {'Prefix': ''}
+                'Filter': {}
+            },
+            {
+                # Marked for deletion rule.
+                'Expiration': { 'Days': MARKED_FOR_DELETION_DAYS },
+                'Status': 'Enabled',
+                'Filter': {
+                    'Tag': {
+                        'Key': TAG_DELETE_KEY,
+                        'Value': TAG_DELETE_VALUE }
+                }
             }
         ]
     }
@@ -208,7 +242,7 @@ def create_config(session, domain, keypair=None, user_data=None):
 
     config.add_s3_bucket_policy(
         "ingestBucketPolicy", ingest_bucket_name,
-        ['s3:GetObject', 's3:PutObject', 's3:DeleteObject'],
+        ['s3:GetObject', 's3:PutObject', 's3:PutObjectTagging'],
         { 'AWS': cuboid_import_role})
 
     config.add_ec2_instance("CacheManager",
@@ -438,40 +472,21 @@ def post_init(session, domain):
     print('adding ingest bucket trigger of import-cuboid lambda')
     add_bucket_trigger(session, names.cuboid_import_lambda, names.ingest_bucket, INGEST_BUCKET_TRIGGER)
 
-    print('checking for tile bucket expiration policy')
-    check_bucket_life_cycle_policy(session, names.tile_bucket)
+    print('setting tile bucket expiration policy')
+    set_bucket_life_cycle_policy(session, names.tile_bucket)
 
-    print('checking for ingest bucket expiration policy')
-    check_bucket_life_cycle_policy(session, names.ingest_bucket)
+    print('setting ingest bucket expiration policy')
+    set_bucket_life_cycle_policy(session, names.ingest_bucket)
 
 
-def check_bucket_life_cycle_policy(session, bucket_name):
+def set_bucket_life_cycle_policy(session, bucket_name):
     """
-    Ensure the expiration policy is attached to the given bucket.
+    Set the expiration policy for the given bucket.
 
     Args:
         bucket_name (str): Name of S3 bucket.
     """
     s3 = session.client('s3')
-
-    try:
-        resp = s3.get_bucket_lifecycle_configuration(Bucket=bucket_name)
-
-        policy_in_place = False
-        if 'Rules' in resp:
-            for rule in resp['Rules']:
-                if 'Expiration' in rule and 'Days' in rule['Expiration']:
-                    if (rule['Expiration']['Days'] == EXPIRE_IN_DAYS and 
-                            rule['Status'] == 'Enabled'):
-                        policy_in_place = True
-        if policy_in_place:
-            print('policy already set')
-            return
-    except botocore.exceptions.ClientError as ex:
-        if ex.response['Error']['Code'] != 'NoSuchLifecycleConfiguration':
-            raise
-
-    print('setting policy')
     s3.put_bucket_lifecycle_configuration(
         Bucket=bucket_name,
         LifecycleConfiguration=get_boto_bucket_life_cycle_rules())
