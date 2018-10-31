@@ -83,6 +83,8 @@ def update_lambda_code(session, domain, bucket):
         names.delete_tile_objs_lambda,
         names.delete_tile_index_entry_lambda,
         names.copy_cuboid_lambda
+        names.tile_uploaded_lambda,
+        names.tile_ingest_lambda
     ]
     client = session.client('lambda')
     for lambda_name in uses_multilambda:
