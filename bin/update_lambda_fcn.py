@@ -82,7 +82,7 @@ def update_lambda_code(session, domain, bucket):
         names.downsample_volume_lambda,
         names.delete_tile_objs_lambda,
         names.delete_tile_index_entry_lambda,
-        names.copy_cuboid_lambda
+        names.copy_cuboid_lambda,
         names.tile_uploaded_lambda,
         names.tile_ingest_lambda
     ]

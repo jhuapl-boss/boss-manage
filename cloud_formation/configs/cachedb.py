@@ -386,8 +386,8 @@ def post_init(session, domain):
     print('adding tile bucket trigger of tile_uploaded_lambda')
     add_bucket_trigger(session, names.tile_uploaded_lambda, names.tile_bucket, TILE_BUCKET_TRIGGER)
 
-    print('adding ingest bucket trigger of import-cuboid lambda')
-    add_bucket_trigger(session, names.cuboid_import_lambda, names.ingest_bucket, INGEST_BUCKET_TRIGGER)
+    #print('adding ingest bucket trigger of import-cuboid lambda')
+    #add_bucket_trigger(session, names.cuboid_import_lambda, names.ingest_bucket, INGEST_BUCKET_TRIGGER)
 
     print('setting tile bucket expiration policy')
     set_bucket_life_cycle_policy(session, names.tile_bucket)
