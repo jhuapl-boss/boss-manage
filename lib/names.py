@@ -121,7 +121,9 @@ class AWSNames(object):
         'downsample_status': 'downsample-status',
         'downsample_dlq': 'downsample-dlq',
         'copy_cuboid_lambda': 'copyCuboidLambda',
-        'copy_cuboid_dlq': 'copyCuboidDlq'
+        'copy_cuboid_dlq': 'copyCuboidDlq',
+        'tile_uploaded_lambda': 'tileUploadLambda',
+        'tile_ingest_lambda': 'tileIngestLambda'
     }
 
     def __getattr__(self, name):
@@ -137,7 +139,10 @@ class AWSNames(object):
         if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'consul_monitor', 'vault_consul_check',
                     'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 'downsample_dlq', 'downsample_volume_lambda',
                     'delete_tile_objs_lambda', 'delete_tile_index_entry_lambda',
-                    'copy_cuboid_lambda']:
+                    'copy_cuboid_lambda', 'cuboid_import_lambda',
+                    'volumetric_ingest_queue_upload_lambda', 'tile_ingest_lambda',
+                    'tile_upload_lambda'
+                    ]:
             fq_hostname = fq_hostname.replace('.','-')
 
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
