@@ -230,7 +230,7 @@ def create_config(session, domain, keypair=None, user_data=None):
                           "multilambda.{}.zip".format(domain),
                           "lambda_loader.handler"),
                       timeout=120,
-                      memory=1024,
+                      memory=1536,
                       security_groups=[Ref('InternalSecurityGroup')],
                       subnets=lambda_subnets,
                       runtime='python3.6')
