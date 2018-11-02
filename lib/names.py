@@ -148,7 +148,9 @@ class AWSNames(object):
         'index_load_ids_from_s3_lambda': 'indexLoadIdsFromS3Lambda',
         'index_cuboids_keys_queue': 'cuboidsKeys',
         'copy_cuboid_lambda': 'copyCuboidLambda',
-        'copy_cuboid_dlq': 'copyCuboidDlq'
+        'copy_cuboid_dlq': 'copyCuboidDlq',
+        'tile_uploaded_lambda': 'tileUploadLambda',
+        'tile_ingest_lambda': 'tileIngestLambda'
     }
 
     def __getattr__(self, name):
@@ -181,7 +183,10 @@ class AWSNames(object):
                     'start_sfn_lambda',
                     'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 'downsample_dlq', 'downsample_volume_lambda',
                     'delete_tile_objs_lambda', 'delete_tile_index_entry_lambda',
-                    'copy_cuboid_lambda']:
+                    'copy_cuboid_lambda', 'cuboid_import_lambda',
+                    'volumetric_ingest_queue_upload_lambda', 'tile_ingest_lambda',
+                    'tile_uploaded_lambda'
+                    ]:
             fq_hostname = fq_hostname.replace('.','-')
 
         # Queue names cannot have periods, so we capitalize each word, instead.

@@ -482,6 +482,31 @@
     "PolicyName": "aplUploadCertificatePolicy"
   },
   {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "sns:*",
+            "iam:*",
+            "rds:*",
+            "s3:*",
+            "lambda:*",
+            "cloudformation:*",
+            "dynamodb:*",
+            "ec2:*",
+            "elasticloadbalancing:*"
+          ],
+          "Effect": "Allow",
+          "Resource": "*",
+          "Sid": "VisualEditor0"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "apl-auto-build"
+  },
+  {
     "Path": "/service-role/",
     "PolicyDocument": {
       "Statement": {
@@ -765,18 +790,39 @@
       "Statement": [
         {
           "Action": [
+            "sns:*",
+            "ec2:*",
+            "cloudformation:*",
+            "sqs:*"
+          ],
+          "Effect": "Allow",
+          "Resource": "*",
+          "Sid": "VisualEditor0"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "apl-lambda-test-build"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "dynamodb:PutItem",
+            "lambda:InvokeFunction",
+            "dynamodb:DeleteItem",
+            "dynamodb:Query",
+            "dynamodb:UpdateItem",
+            "s3:ListBucket",
+            "logs:CreateLogGroup",
+            "logs:PutLogEvents",
             "s3:PutObject",
             "s3:GetObject",
             "logs:CreateLogStream",
             "sns:Publish",
-            "dynamodb:PutItem",
-            "lambda:InvokeFunction",
-            "dynamodb:DeleteItem",
-            "dynamodb:GetItem",
-            "dynamodb:Query",
-            "dynamodb:UpdateItem",
-            "logs:CreateLogGroup",
-            "logs:PutLogEvents"
+            "dynamodb:GetItem"
           ],
           "Effect": "Allow",
           "Resource": "*",

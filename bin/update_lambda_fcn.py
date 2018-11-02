@@ -92,6 +92,9 @@ def update_lambda_code(session, domain, bucket):
         names.multi_lambda, names.index_s3_writer_lambda, 
         names.index_fanout_id_writer_lambda, names.index_write_id_lambda,
         names.index_write_failed_lambda, names.index_find_cuboids_lambda,
+        names.copy_cuboid_lambda,
+        names.tile_uploaded_lambda,
+        names.tile_ingest_lambda
         names.index_fanout_enqueue_cuboid_keys_lambda,
         names.index_batch_enqueue_cuboids_lambda,
         names.index_fanout_dequeue_cuboid_keys_lambda,
@@ -103,7 +106,6 @@ def update_lambda_code(session, domain, bucket):
         names.start_sfn_lambda,
         names.downsample_volume_lambda,
         names.delete_tile_index_entry_lambda,
-        names.copy_cuboid_lambda
     ]
     client = session.client('lambda')
     for lambda_name in uses_multilambda:
@@ -161,6 +163,7 @@ def load_lambdas_on_s3(session, domain, bucket):
     # Let lambdas look up names by creating a bossnames module.
     zip.write_to_zip('names.py', zipname, arcname='bossnames/names.py')
     zip.write_to_zip('hosts.py', zipname, arcname='bossnames/hosts.py')
+    zip.write_to_zip('bucket_object_tags.py', zipname, arcname='bossnames/bucket_object_tags.py')
     zip.write_to_zip('__init__.py', zipname, arcname='bossnames/__init__.py')
     os.chdir(cwd)
 
