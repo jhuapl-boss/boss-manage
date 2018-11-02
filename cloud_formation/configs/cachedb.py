@@ -375,6 +375,8 @@ def update(session, domain):
         bucket = aws.get_lambda_s3_bucket(session)
         update_lambda_code(session, domain, bucket)
 
+    post_init()
+
     return success
 
 
