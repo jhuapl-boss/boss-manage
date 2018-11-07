@@ -102,7 +102,7 @@ TIMEOUT_KEYCLOAK = 150
 # Machine Instance Types
 ENDPOINT_TYPE = {
     "development": "t2.medium",
-    "production": "m4.2xlarge",
+    "production": "m5.2xlarge",
     "ha-development": "t2.medium",
 }
 
@@ -138,9 +138,9 @@ CACHE_MANAGER_TYPE = {
 }
 
 ACTIVITIES_TYPE = {
-    "development": "m4.large",
-    "production": "m4.xlarge",
-    "ha-development": "m4.large",
+    "development": "m5.large",
+    "production": "m5.xlarge",
+    "ha-development": "m5.large",
 }
 
 
