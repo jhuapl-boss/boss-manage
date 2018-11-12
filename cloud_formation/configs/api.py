@@ -64,10 +64,16 @@ def create_config(bosslet_config, db_config={}):
     user_data["aws"]["db"] = names.rds.endpoint_db # XXX: rds type?
     user_data["aws"]["cache"] = names.redis.cache
     user_data["aws"]["cache-state"] = names.redis.cache_state
+    if const.REDIS_SESSION_TYPE is not None:
+        user_data["aws"]["cache-session"] = names.redis.cache_session
+    else:
+        # Don't create a Redis server for dev stacks.
+        user_data["aws"]["cache-session"] = ''
 
     ## cache-db and cache-stat-db need to be in user_data for lambda to access them.
     user_data["aws"]["cache-db"] = "0"
     user_data["aws"]["cache-state-db"] = "0"
+    user_data["aws"]["cache-session-db"] = "0"
     user_data["aws"]["meta-db"] = names.ddb.meta
 
     # Use CloudFormation's Ref function so that queues' URLs are placed into
@@ -87,10 +93,10 @@ def create_config(bosslet_config, db_config={}):
     user_data["aws"]["index-deadletter-queue"] = str(Ref(names.sqs.index_deadletter))
     user_data["aws"]["index-cuboids-keys-queue"] = str(Ref(names.sqs.index_cuboids_keys))
 
-    user_data["auth"]["OIDC_VERIFY_SSL"] = str(bosslet_config.get('VERIFY_SSL', True))
+    user_data["auth"]["OIDC_VERIFY_SSL"] = bosslet_config.VERIFY_SSL
     user_data["lambda"]["flush_function"] = names.lambda_.multi_lambda
     user_data["lambda"]["page_in_function"] = names.lambda_.multi_lambda
-    user_data["lambda"]["ingest_function"] = names.lambda_.multi_lambda
+    user_data["lambda"]["ingest_function"] = names.lambda_.tile_ingest
     user_data["lambda"]["downsample_volume"] = names.lambda_.downsample_volume
 
     user_data['sfn']['populate_upload_queue'] = names.sfn.ingest_queue_populate

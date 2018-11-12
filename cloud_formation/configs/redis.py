@@ -62,6 +62,16 @@ def create_config(bosslet_config):
                                  version="3.2.4",
                                  clusters=const.REDIS_CLUSTER_SIZE)
 
+    # This one may not be created depending on the scenario type.
+    if const.REDIS_SESSION_TYPE is not None:
+        config.add_redis_replication("CacheSession",
+                                     names.redis.cache_session,
+                                     internal_subnets,
+                                     [sgs[names.sg.internal]],
+                                     type_=const.REDIS_SESSION_TYPE,
+                                     version="3.2.4",
+                                     clusters=1)
+
     return config
 
 

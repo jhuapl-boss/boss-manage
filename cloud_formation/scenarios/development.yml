@@ -2,6 +2,7 @@
 ENDPOINT_TYPE: t2.medium
 RDS_TYPE: db.t2.micro
 REDIS_CACHE_TYPE: cache.t2.small
+REDIS_SESSION_TYPE: null # Not used for dev
 REDIS_TYPE: cache.t2.small
 CACHE_MANAGER_TYPE: t2.micro
 ACTIVITIES_TYPE: m4.large

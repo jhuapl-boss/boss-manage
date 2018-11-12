@@ -146,6 +146,9 @@ if __name__ == '__main__':
                         metavar = "<ami-version>",
                         default = 'h' + git_hash[:8],
                         help = "The AMI version for the machine image(s). (default: First 8 characters of the git SHA1 hash)")
+    parser.add_argument("--base-ami",
+                        metavar = "<base-ami>",
+                        help = "Base AMI to build the new Image from")
     parser.add_bosslet()
     parser.add_argument("config",
                         choices = config_help_names,
@@ -180,7 +183,10 @@ if __name__ == '__main__':
     if not os.path.isdir(packer_logs):
         os.mkdir(packer_logs)
 
-    ami = locate_ami(args.bosslet_config.session)
+    if args.base_ami:
+        ami = args.base_ami
+    else:
+        ami = locate_ami(args.bosslet_config.session)
 
     cmd = """{packer} build
              {bastion} {credentials}

@@ -219,7 +219,7 @@ class TestDownsample(object):
             'z_stop': self.frame[2],
 
             'resolution': 0,
-            'resolution_max': 2,
+            'resolution_max': 7,
             'res_lt_max': True,
 
             'type': 'anisotropic',
@@ -274,13 +274,18 @@ class TestDownsample(object):
         args_ = { 'Bucket': args['s3_bucket'] }
         resp = { 'KeyCount': 1 }
         count = 0
+        spin = ['|', '/', '-', '\\']
+
+        print("Deleting S3 test cubes, this may take a long time")
 
         while resp['KeyCount'] > 0:
             resp = client.list_objects_v2(**args_)
             args_['ContinuationToken'] = resp['NextContinuationToken']
+            print("\rDeleting Cubes: Querying", end='')
             for obj in resp['Contents']:
                 if lookup_prefix in obj['Key']:
                     count += 1
+                    print("\rDeleting Cubes: {}".format(spin[count % 4]), end='')
                     client.delete_object(Bucket = args['s3_bucket'],
                                          Key = obj['Key'])
 
@@ -326,10 +331,10 @@ def parse_args():
                         action = 'store_true',
                         default = False,
                         help = "Don't remove S3 Index table test keys")
-    parser.add_argument('--remove-cubes',
+    parser.add_argument('--cleanup',
                         action = 'store_true',
                         default = False,
-                        help = 'Remove S3 cubes related to testing')
+                        help = 'Remove S3 cubes and S3 index table keys related to testing')
     parser.add_bosslet()
     parser.add_argument(
         'channel_id',
@@ -346,12 +351,13 @@ if __name__ == '__main__':
     ds_test = TestDownsample(args.bosslet_config, args.channel_id, args.frame)
     start_args = ds_test.get_downsample_args()
 
-    if not args.leave_index:
-        ds_test.delete_index_keys(start_args)
-
-    if args.remove_cubes:
-        ds_test.delete_data(start_args)
+    if args.cleanup:
+        ds_test.delete_index_keys(session, start_args)
+        ds_test.delete_data(session, start_args)
         import sys; sys.exit(0)
+
+    if not args.leave_index:
+        ds_test.delete_index_keys(session, start_args)
 
     if not args.noupload:
         ds_test.upload_data(start_args)

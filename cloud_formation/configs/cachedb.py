@@ -26,19 +26,27 @@ Create the cachedb configuration which consists of
 
 DEPENDENCIES = ['core', 'redis', 'api']
 
+from lib.bucket_object_tags import TAG_DELETE_KEY, TAG_DELETE_VALUE
 from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, Arn
 from lib.userdata import UserData
 from lib import aws
-from lib import scalyr
 from lib import constants as const
 from lib import utils
 
 from update_lambda_fcn import load_lambdas_on_s3, update_lambda_code
-import boto3
 import botocore
 
 # Number of days until objects expire in the tile bucket.
 EXPIRE_IN_DAYS = 21
+
+# Number of days to wait before deleting an object marked for deletion.
+MARKED_FOR_DELETION_DAYS = 1
+
+# Ids used for bucket lambda triggers.
+TILE_BUCKET_TRIGGER = 'tileBucketInvokeTileUploadedLambda'
+INGEST_BUCKET_TRIGGER = 'ingestBucketInvokeCuboidImportLambda'
+
+CUBOID_IMPORT_ROLE = 'CuboidImportLambdaRole'
 
 def get_cf_bucket_life_cycle_rules():
     """
@@ -46,12 +54,31 @@ def get_cf_bucket_life_cycle_rules():
     a fallback in case tiles aren't cleaned up properly, post-ingest.  Messages 
     n the ingest queue only last 14 days, so removing the S3 objects 7 days
     after should be plenty of time.
+
+    This policy is also now used for the ingest bucket to ensure removal of
+    cuboids uploaded during volumetric ingest.
+
+    This policy now contains a new rule to expire an object 1 day after it's
+    marked with a delete tag.  Objects are now marked for deletion (instead
+    of immediate deletion) by lambdas triggered by bucket uploads to maintain
+    idempotentness.
     """
     return {
         'Rules': [
             {
                 'ExpirationInDays': EXPIRE_IN_DAYS,
-                'Status': 'Enabled'
+                'Status': 'Enabled',
+                'Filter': {}
+            },
+            {
+                # Marked for deletion rule.
+                'ExpirationInDays': MARKED_FOR_DELETION_DAYS,
+                'Status': 'Enabled',
+                'Filter': {
+                    'Tag': {
+                        'Key': TAG_DELETE_KEY,
+                        'Value': TAG_DELETE_VALUE }
+                }
             }
         ]
     }
@@ -62,13 +89,31 @@ def get_boto_bucket_life_cycle_rules():
     a fallback in case tiles aren't cleaned up properly, post-ingest.  Messages 
     n the ingest queue only last 14 days, so removing the S3 objects 7 days
     after should be plenty of time.
+
+    This policy is also now used for the ingest bucket to ensure removal of
+    cuboids uploaded during volumetric ingest.
+
+    This policy now contains a new rule to expire an object 1 day after it's
+    marked with a delete tag.  Objects are now marked for deletion (instead
+    of immediate deletion) by lambdas triggered by bucket uploads to maintain
+    idempotentness.
     """
     return {
         'Rules': [
             {
                 'Expiration': { 'Days': EXPIRE_IN_DAYS},
                 'Status': 'Enabled',
-                'Filter': {'Prefix': ''}
+                'Filter': {}
+            },
+            {
+                # Marked for deletion rule.
+                'Expiration': { 'Days': MARKED_FOR_DELETION_DAYS },
+                'Status': 'Enabled',
+                'Filter': {
+                    'Tag': {
+                        'Key': TAG_DELETE_KEY,
+                        'Value': TAG_DELETE_VALUE }
+                }
             }
         ]
     }
@@ -151,10 +196,11 @@ def create_config(bosslet_config, user_data=None):
     ingest_bucket_name = names.s3.ingest_bucket
     if not aws.s3_bucket_exists(session, ingest_bucket_name):
         config.add_s3_bucket("ingestBucket", ingest_bucket_name)
-    config.add_s3_bucket_policy(
-        "ingestBucketPolicy", ingest_bucket_name,
-        ['s3:GetObject', 's3:PutObject'],
-        { 'AWS': role})
+    # Uncomment when merging volumetric ingest back in.
+    #config.add_s3_bucket_policy(
+    #    "ingestBucketPolicy", ingest_bucket_name,
+    #    ['s3:GetObject', 's3:PutObject', 's3:PutObjectTagging'],
+    #    { 'AWS': cuboid_import_role})
 
     config.add_ec2_instance("CacheManager",
                             names.dns.cache_manager,
@@ -177,9 +223,27 @@ def create_config(bosslet_config, user_data=None):
                           names.zip.multi_lambda,
                           "lambda_loader.handler"),
                       timeout=120,
-                      memory=1024,
+                      memory=1536,
                       security_groups=[Ref('InternalSecurityGroup')],
                       subnets=lambda_subnets,
+                      runtime='python3.6')
+    config.add_lambda("TileUploadedLambda",
+                      names.lambda_.tile_uploaded,
+                      Ref("LambdaCacheExecutionRole"),
+                      s3=(bosslet_config.LAMBDA_BUCKET,
+                          names.zip.multi_lambda,
+                          "tile_uploaded_lambda.handler"),
+                      timeout=30,
+                      memory=256,
+                      runtime='python3.6')
+    config.add_lambda("TileIngestLambda",
+                      names.lambda_.tile_ingest,
+                      Ref("LambdaCacheExecutionRole"),
+                      s3=(bosslet_config.LAMBDA_BUCKET,
+                          names.zip.multi_lambda,
+                          "tile_ingest_lambda.handler"),
+                      timeout=120,
+                      memory=1024,
                       runtime='python3.6')
     config.add_lambda("DeleteTileObjsLambda",
                       names.lambda_.delete_tile_objs,
@@ -203,17 +267,17 @@ def create_config(bosslet_config, user_data=None):
                       dlq=Arn(names.sqs.ingest_cleanup_dlq))
 
     if creating_tile_bucket:
-        config.add_lambda_permission('tileBucketInvokeMultiLambda',
-                                     names.lambda_.multi_lambda,
-                                     principal='s3.amazonaws.com',
-                                     source={ 'Fn::Join': [':', ['arn', 'aws', 's3', '', '', tile_bucket_name]]}, #DP TODO: move into constants
-                                     depends_on=['tileBucket', 'MultiLambda'])
-    else:
-        config.add_lambda_permission('tileBucketInvokeMultiLambda',
-                                     names.lambda_.multi_lambda,
+        config.add_lambda_permission('tileBucketInvokeTileUploadLambda',
+                                     names.lambda_.tile_uploaded,
                                      principal='s3.amazonaws.com',
                                      source={ 'Fn::Join': [':', ['arn', 'aws', 's3', '', '', tile_bucket_name]]},
-                                     depends_on='MultiLambda')
+                                     depends_on=['tileBucket', 'TileUploadedLambda'])
+    else:
+        config.add_lambda_permission('tileBucketInvokeMultiLambda',
+                                     names.lambda_.tile_uploaded,
+                                     principal='s3.amazonaws.com',
+                                     source={ 'Fn::Join': [':', ['arn', 'aws', 's3', '', '', tile_bucket_name]]},
+                                     depends_on='TileUploadedLambda')
 
     # Add topic to indicating that the object store has been write locked.
     # Now using "production mailing list" instead of separate write lock topic.
@@ -287,66 +351,53 @@ def update(bosslet_config):
         pre_init(bosslet_config)
         update_lambda_code(bosslet_config)
 
+    post_init()
+
 def post_init(bosslet_config):
     print("post_init")
 
-    print('adding tile bucket trigger of multi-lambda')
-    add_tile_bucket_trigger(bosslet_config)
+    print('adding tile bucket trigger of tile_uploaded_lambda')
+    add_bucket_trigger(bosslet_config.session,
+                       bosslet_config.names.lambda_.tile_uploaded,
+                       bosslet_config.names.s3.tile_bucket,
+                       TILE_BUCKET_TRIGGER)
 
-    print('checking for tile bucket expiration policy')
-    check_tile_bucket_life_cycle_policy(bosslet_config)
+    print('setting tile bucket expiration policy')
+    set_bucket_life_cycle_policy(bosslet_config.session,
+                                 bosslet_config.names.s3.tile_bucket)
 
-    # Tell Scalyr to get CloudWatch metrics for these instances.
-    scalyr.add_instances_to_scalyr(
-        bosslet_config.session,
-        bosslet_config.REGION,
-        [bosslet_config.names.dns.cache_manager])
+    print('setting ingest bucket expiration policy')
+    set_bucket_life_cycle_policy(bosslet_config.session,
+                                 bosslet_config.names.s3.ingest_bucket)
 
-def check_tile_bucket_life_cycle_policy(bosslet_config):
-    names = bosslet_config.names
-    s3 = bosslet_config.session.client('s3')
+def set_bucket_life_cycle_policy(session, bucket_name):
+    """
+    Set the expiration policy for the given bucket.
 
-    try:
-        resp = s3.get_bucket_lifecycle_configuration(Bucket=names.s3.tile_bucket)
-
-        policy_in_place = False
-        if 'Rules' in resp:
-            for rule in resp['Rules']:
-                if 'Expiration' in rule and 'Days' in rule['Expiration']:
-                    if (rule['Expiration']['Days'] == EXPIRE_IN_DAYS and 
-                            rule['Status'] == 'Enabled'):
-                        policy_in_place = True
-        if policy_in_place:
-            print('policy already set')
-            return
-    except botocore.exceptions.ClientError as ex:
-        if ex.response['Error']['Code'] != 'NoSuchLifecycleConfiguration':
-            raise
-
-    print('setting policy')
+    Args:
+        bucket_name (str): Name of S3 bucket.
+    """
+    s3 = session.client('s3')
     s3.put_bucket_lifecycle_configuration(
-        Bucket=names.s3.tile_bucket,
+        Bucket=bucket_name,
         LifecycleConfiguration=get_boto_bucket_life_cycle_rules())
 
 
-def add_tile_bucket_trigger(bosslet_config):
+def add_bucket_trigger(session, lambda_name, bucket_name, trigger_id):
     """Trigger MultiLambda when file uploaded to tile bucket.
 
-    This is done in post-init() because the tile bucket isn't always
+    This is done in post-init() because the bucket isn't always
     created during CloudFormation (it may already exist).
 
     This function's effects should be idempotent because the same id is
-    used everytime the notification event is added to the tile bucket.
+    used everytime the notification event is added to the bucket.
 
     Args:
         session (Boto3.Session)
-        domain (string): VPC domain name.
+        lambda_name (str): Name of lambda to trigger.
+        bucket_name (str): Bucket that triggers lambda.
+        triger_id (str): Name to use for triger to preserve idempotentness.
     """
-    session = bosslet_config.session
-    names = bosslet_config.names
-    lambda_name = names.lambda_.multi_lambda
-    bucket_name = names.s3.tile_bucket
-
     lam = session.client('lambda')
     resp = lam.get_function_configuration(FunctionName=lambda_name)
     lambda_arn = resp['FunctionArn']
@@ -358,7 +409,7 @@ def add_tile_bucket_trigger(bosslet_config):
     notification.put(NotificationConfiguration={
         'LambdaFunctionConfigurations': [
             {
-                'Id': 'tileBucketInvokeMultiLambda',
+                'Id': trigger_id,
                 'LambdaFunctionArn': lambda_arn,
                 'Events': ['s3:ObjectCreated:*']
             }

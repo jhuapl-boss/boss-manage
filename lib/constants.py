@@ -123,6 +123,7 @@ TIMEOUT_KEYCLOAK = 150
 ENDPOINT_TYPE = "t2.micro"
 RDS_TYPE = "db.t2.micro"
 REDIS_CACHE_TYPE = "cache.t2.micro"
+REDIS_SESSION_TYPE = None
 REDIS_TYPE = "cache.t2.micro"
 CACHE_MANAGER_TYPE = "t2.micro"
 ACTIVITIES_TYPE = "t2.micro"

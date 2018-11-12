@@ -89,6 +89,9 @@ def update_lambda_code(bosslet_config):
         names.lambda_.index_invoke_index_supervisor,
         names.lambda_.start_sfn,
         names.lambda_.downsample_volume,
+        names.lambda_.copy_cuboid_lambda,
+        names.lambda_.tile_uploaded
+        names.lambda_.tile_ingest
     ]
     client = bosslet_config.session.client('lambda')
     for lambda_name in uses_multilambda:
@@ -147,6 +150,7 @@ def load_lambdas_on_s3(bosslet_config):
     # Let lambdas look up names by creating a bossnames module.
     zip.write_to_zip('names.py', zipname, arcname='bossnames/names.py')
     zip.write_to_zip('hosts.py', zipname, arcname='bossnames/hosts.py')
+    zip.write_to_zip('bucket_object_tags.py', zipname, arcname='bossnames/bucket_object_tags.py')
     zip.write_to_zip('__init__.py', zipname, arcname='bossnames/__init__.py')
     os.chdir(cwd)
 
