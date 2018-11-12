@@ -34,21 +34,27 @@ from lib.utils import open_
 
 NEW_TOKEN = "new_token"
 
-def vault_init(vault):
+def vault_init(vault, account_id = None):
     """Initialize a new Vault instance
 
     Args:
         vault (Vault) : Vault connection to use
+        account_id (str)  : AWS Account ID under which Vault runs
     """
-    vault.initialize()
+    if account_id is None:
+        account_id = input("AWS Account ID: ")
+    vault.initialize(account_id)
 
-def vault_configure(vault):
+def vault_configure(vault, account_id = None):
     """Configure a new Vault instance
 
     Args:
         vault (Vault) : Vault connection to use
+        account_id (str)  : AWS Account ID under which Vault runs
     """
-    vault.configure()
+    if account_id is None:
+        account_id = input("AWS Account ID: ")
+    vault.configure(account_id)
 
 def vault_unseal(vault):
     """Unseal a Vault instance

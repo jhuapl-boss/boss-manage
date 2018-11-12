@@ -19,7 +19,7 @@ import json
 from pprint import pprint
 import traceback
 
-from .utils import deprecated
+from .exceptions import VaultError
 
 VAULT_TOKEN = "vault_token"
 VAULT_KEY = "vault_key."
@@ -104,7 +104,7 @@ class Vault(object):
         client = self.connect(VAULT_TOKEN)
         code.interact(local=locals())
 
-    def initialize(self, secrets = 5, threashold = 3):
+    def initialize(self, account_id, secrets = 5, threashold = 3):
         """Initialize a Vault. Connect using get_client() and if the Vault is not
         initialized then initialize it with 5 secrets and a threashold of 3. The
         keys are stored as VAULT_KEY and root token is stored as VAULT_TOKEN.
@@ -112,6 +112,7 @@ class Vault(object):
         After initializing the Vault it is unsealed for use and vault-configure is called.
 
         Args:
+            account_id (str) : AWS Account ID that Vault is running under, passed to configure()
             secrets (int) : Total number of secrets to split the master key into
             threashold (int) : The number of secrets required to reconstruct the master key
         """
@@ -146,9 +147,9 @@ class Vault(object):
             print("Unsealing Vault")
             client.unseal_multi(result["keys"])
 
-        self.configure()
+        self.configure(account_id)
 
-    def configure(self):
+    def configure(self, account_id):
         """A companion function that will configure a newly initialized Vault
         as needed for BOSS. This includes:
             * Configuring the Audit Backend
@@ -162,7 +163,8 @@ class Vault(object):
             * Configure PKI backend roles from policies/*.pki
 
         Args:
-            machine (None|string) : hostname of the machine, used for reading/saving unique data
+            account_id (str) : AWS Account ID that Vault is running under, used when binding
+                               AWS roles to Vault policies in the AWS authentication backend
         """
         print("Configuring Vault")
         client = self.connect(VAULT_TOKEN)
@@ -187,53 +189,43 @@ class Vault(object):
             # superset of any policies that it will provision
             provisioner_policies.append(name)
 
-        # Read AWS credentials file
-        deprecated("Update Vault to use IAM role for AWS credentials")
-        vault_aws_creds = os.path.join(PRIVATE_DIR, "vault_aws_credentials")
-        if os.path.exists(vault_aws_creds):
-            with open(vault_aws_creds, "r") as fh:
-                aws_creds = json.load(fh)
-        else:
-            aws_creds = None
-
         # AWS Authentication Backend
-        if aws_creds is None:
-            print("Vault AWS credentials files does not exist, skipping configuration of AWS-EC2 authentication backend")
-        else:
+        if 'aws' not in client.list_auth_backends():
             try:
-                client.enable_auth_backend('aws-ec2')
-            except hvac.exceptions.InvalidRequest as ex:
-                print("aws-ec2 auth backend already created.")
-            client.write('auth/aws-ec2/config/client', access_key = aws_creds["aws_access_key"],
-                                                       secret_key = aws_creds["aws_secret_key"])
-
-            deprecated("Update to use boss_config['core'].ACCOUNT_ID")
-            arn_prefix = 'arn:aws:iam::{}:instance-profile/'.format(aws_creds["aws_account"])
-            policies = [p for p in provisioner_policies if p not in ('provisioner',)]
-            for policy in policies:
-                client.write('/auth/aws-ec2/role/' + policy, policies = policy,
-                                                             bound_iam_role_arn = arn_prefix + policy)
-
-        # AWS Secret Backend
-        if aws_creds is None:
-            print("Vault AWS credentials file does not exist, skipping configuration of AWS secret backend")
+                client.enable_auth_backend('aws')
+            except Exception as e:
+                msg = "Error while enabling AWS auth backend: " + e
+                raise VaultError(msg)
         else:
+            print("aws auth backend already created.")
+
+        #Define policies and arn                                     
+        policies = [p for p in provisioner_policies if p not in ('provisioner',)]
+        arn = 'arn:aws:iam::{}:instance-profile/'.format(account_id)
+        #For each policy configure the policies on a role of the same name
+        for policy in policies:
+            client.write('/auth/aws/role/' + policy,
+                         auth_type='ec2',
+                         bound_iam_instance_profile_arn= arn + policy,
+                         policies=policy)
+            print('Successful write to aws/role/' + policy)
+        
+        # AWS Secret Backend
+        if 'aws' not in client.list_secret_backends():
             try:
                 client.enable_secret_backend('aws')
-            except hvac.exceptions.InvalidRequest as ex:
-                print("aws secret backend already created.")
-            client.write("aws/config/root", access_key = aws_creds["aws_access_key"],
-                                            secret_key = aws_creds["aws_secret_key"],
-                                            region = aws_creds.get("aws_region", "us-east-1"))
-            client.write("aws/config/lease", lease = aws_creds.get("lease_duration", "1h"),
-                                             lease_max = aws_creds.get("lease_max", "24h")) # DP TODO finalize default values
+            except Exception as e:
+                msg = "Error while enabling AWS secret backend: " + e
+                raise VaultError(msg)
+        else:
+            print("aws secret backend already created.")
 
-            path = os.path.join(POLICY_DIR, "*.iam")
-            for iam in glob.glob(path):
-                name = os.path.basename(iam).split('.')[0]
-                with open(iam, 'r') as fh:
-                    # if we json parse the file first we can use the duplicate key trick for comments
-                    client.write("aws/roles/" + name, policy = fh.read())
+        path = os.path.join(POLICY_DIR, "*.iam")
+        for iam in glob.glob(path):
+            name = os.path.basename(iam).split('.')[0]
+            with open(iam, 'r') as fh:
+                # if we json parse the file first we can use the duplicate key trick for comments
+                client.write("aws/roles/" + name, policy = fh.read())
 
         # PKI Backend
         """
@@ -494,4 +486,3 @@ class Vault(object):
             kv = exported[path]
             fn = self.update if update else self.write
             fn(path, **kv)
-

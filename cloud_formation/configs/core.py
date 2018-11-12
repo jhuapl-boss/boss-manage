@@ -130,6 +130,7 @@ def create_config(bosslet_config):
                                min = const.VAULT_CLUSTER_SIZE,
                                max = const.VAULT_CLUSTER_SIZE,
                                notifications = Ref("DNSSNS"),
+                               role = aws.instance_profile_arn_lookup(session, 'apl-vault'),
                                depends_on = ["Consul", "DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
 
@@ -289,7 +290,7 @@ def post_init(bosslet_config):
     with call.vault() as vault:
         print("Initializing Vault...")
         try:
-            vault.initialize()
+            vault.initialize(bosslet_config.ACCOUNT_ID)
         except Exception as ex:
             print(ex)
             print("Could not initialize Vault")

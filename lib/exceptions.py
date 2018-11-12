@@ -96,3 +96,6 @@ class KeyCloakLoginError(KeyCloakError):
     def __init__(self, target, username):
         message = "Could not login to Keycloak at {} with username {}".format(target, username)
         super(KeyCloakLoginError, self).__init__(None, message)
+
+class VaultError(Exception):
+    pass
