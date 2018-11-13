@@ -80,6 +80,7 @@ class AWSNames(object):
         'auth': 'auth',
         'auth_db': 'auth-db',
         'bastion': 'bastion',
+        'backup': 'backup',
         'cache': 'cache', # Redis server to cache cuboids
         'cache_manager': 'cachemanager',
         'cache_session': 'cache-session', # Redis server for Django sessions

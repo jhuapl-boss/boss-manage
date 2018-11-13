@@ -1049,6 +1049,24 @@ def s3_bucket_exists(session, name):
 
     return False
 
+def s3_bucket_delete(session, name, empty=False):
+    """Delete the given S3 bucket
+
+    Args:
+        session (Session): Boto3 session used to lookup information in AWS.
+        name (string): Name of S3 bucket.
+
+    Returns:
+        (None)
+    """
+    s3 = session.resource('s3')
+    bucket = s3.Bucket(name)
+
+    if empty:
+        bucket.objects.all().delete()
+
+    bucket.delete()
+
 def lambda_arn_lookup(session, lambda_name):
     """
     Returns the arn for a lambda given a lambda function name.
@@ -1069,5 +1087,56 @@ def lambda_arn_lookup(session, lambda_name):
     else:
         return response['Configuration']['FunctionArn']
 
+def get_data_pipeline_id(session, name):
+    client = session.client('datapipeline')
 
+    marker = ''
+    while True:
+        resp = client.list_pipelines(marker = marker)
+        for obj in resp['pipelineIdList']:
+            if obj['name'] == name:
+                return obj['id']
+
+        if not resp['hasMoreResults']:
+            break
+
+        marker = resp['marker']
+
+    return None
+
+def create_data_pipeline(session, name, pipeline):
+    client = session.client('datapipeline')
+
+    resp = client.create_pipeline(name = name,
+                                  uniqueId = name)
+
+    id = resp['pipelineId']
+
+    resp = client.put_pipeline_definition(pipelineId = id,
+                                          pipelineObjects = pipeline.objects)
+
+    for warning in resp['validationWarnings']:
+        for msg in warning['warnings']:
+            print("{:20}: {}".format(warning['id'], msg))
+    for error in resp['validationErrors']:
+        for msg in error['errors']:
+            print("{:20}: {}".format(error['id'], msg))
+
+    if resp['errored']:
+        print("Errors in the pipeline, deleting...")
+        delete_data_pipeline(session, id)
+        return None
+
+    return id
+
+def delete_data_pipeline(session, id):
+    client = session.client('datapipeline')
+    client.delete_pipeline(pipelineId = id)
+
+def activate_data_pipeline(session, id):
+    client = session.client('datapipeline')
+
+    from datetime import datetime
+    client.activate_pipeline(pipelineId = id,
+                             startTimestamp = datetime.utcnow())
 

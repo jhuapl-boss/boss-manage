@@ -114,6 +114,8 @@ class ExternalCalls:
             provision = self.vaults[0].provision
             revoke = self.vaults[0].revoke
             revoke_secret_prefix = self.vaults[0].revoke_secret_prefix
+            set_policy = self.vaults[0].set_policy
+            list_policies = self.vaults[0].list_policies
 
         with vault_tunnel(self.keypair_file, self.bastions):
             yield ContextVault()
