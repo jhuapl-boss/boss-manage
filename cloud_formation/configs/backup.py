@@ -176,7 +176,7 @@ def create(bosslet_config):
 
 def post_init(bosslet_config):
     # DP NOTE: For an existing stack the backup policy,
-    #          aws-ec2 login, and keycloak RDS credentials
+    #          aws login, and keycloak RDS credentials
     #          need to be configured in Vault
     #
     #          At some point this code can be deprecated and eventually removed
@@ -184,13 +184,13 @@ def post_init(bosslet_config):
         name = "backup"
         if name not in vault.list_policies(): # only update if needed
             policy = "{}/{}.hcl".format(VAULT_POLICY_DIR, name)
-            account_id = aws.get_account_id_from_session(session)
-            policy_arn = 'arn:aws:iam::{}:instance-profile/{}'.format(account_id, name)
+            policy_arn = 'arn:aws:iam::{}:instance-profile/{}'.format(bosslet_config.ACCOUNT_ID, name)
 
             with open(policy, 'r') as fh:
                 vault.set_policy(name, fh.read()) # Create Vault Policy
 
-            vault.write("/auth/aws-ec2/role/" + name, # Create AWS-EC2 login
+            vault.write("/auth/aws/role/" + name, # Create AWS login
+                        auth_type = 'ec2',
                         policies = name,
                         bound_iam_role_arn = policy_arn)
 
