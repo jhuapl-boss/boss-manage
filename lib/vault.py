@@ -159,8 +159,6 @@ class Vault(object):
                   for any policy
             * Configure the AWS backend (if there are AWS credentials to use)
             * Configure AWS backend roles from policies/*.iam
-            * Configure the PKI backend (if there is a certificate to use)
-            * Configure PKI backend roles from policies/*.pki
 
         Args:
             account_id (str) : AWS Account ID that Vault is running under, used when binding
@@ -226,28 +224,6 @@ class Vault(object):
             with open(iam, 'r') as fh:
                 # if we json parse the file first we can use the duplicate key trick for comments
                 client.write("aws/roles/" + name, policy = fh.read())
-
-        # PKI Backend
-        """
-        if True: # Disabled until we either have a CA cert or can generate a CA
-            print("Vault PKI cert file does not exist, skipping configuration of PKI secret backend")
-        else:
-            client.enable_secret_backend('pki')
-            # Generate a self signed certificate for CA
-            print("Generating self signed CA")
-            response = client.write("pki/root/generate/internal", common_name=aws_creds["domain"])
-            with open(get_path(machine, "ca.pem"), 'w') as fh:
-                fh.write(response["data"]["certificate"])
-
-            # Should we configure CRL?
-
-            path = os.path.join(_CURRENT_DIR, "policies", "*.pki")
-            for pki in glob.glob(path):
-                name = os.path.basename(pki).split('.')[0]
-                with open(pki, 'r') as fh:
-                    keys = json.load(fh)
-                    client.write("aws/roles/" + name, **keys)
-        """
 
     def set_policy(self, name, policy):
         """Create or Update a policy
