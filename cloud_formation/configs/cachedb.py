@@ -240,8 +240,8 @@ def create_config(session, domain, keypair=None, user_data=None):
                       s3=(lambda_bucket,
                           "multilambda.{}.zip".format(domain),
                           "tile_uploaded_lambda.handler"),
-                      timeout=30,
-                      memory=256,
+                      timeout=5,
+                      memory=1024,
                       runtime='python3.6')
     config.add_lambda("TileIngestLambda",
                       names.tile_ingest_lambda,
@@ -249,8 +249,8 @@ def create_config(session, domain, keypair=None, user_data=None):
                       s3=(lambda_bucket,
                           "multilambda.{}.zip".format(domain),
                           "tile_ingest_lambda.handler"),
-                      timeout=120,
-                      memory=1024,
+                      timeout=30,
+                      memory=1536,
                       runtime='python3.6')
     config.add_lambda("DeleteTileObjsLambda",
                       names.delete_tile_objs_lambda,
