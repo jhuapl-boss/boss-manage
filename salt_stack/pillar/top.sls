@@ -1,8 +1,4 @@
-base:
-  '*':
-    -scalyr
-    - ignore_missing: True
-    
+base:   
   'endpoint*':
     - endpoint
 
