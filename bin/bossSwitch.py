@@ -34,143 +34,318 @@ import pickle
 
 import alter_path
 import vault as vaultB
-from lib.ssh import SSHTarget, vault_tunnel
-from lib import aws, utils, vault, constants
+from lib import utils, constants
 from lib.configuration import BossParser
 
-def main():
+# Cannot stop consul without losing data
+# Could do it if Vault was first re-initialized and configured
+# and then existing data imported
 
-    choice = utils.get_user_confirm("Are you sure you want to proceed?")
-    if choice:
-        if args.action == "on":
-            print("Turning the BossDB on...")
-            startInstances()
+"""
+Error conditions and handling
 
-        elif args.action == "off":
-            print("Turning the BossDB off...")
-            stopInstances()
+Code should be able to handle multiple calls to on or off in a row
+and only work with the machines that didn't get turned on or off
+
+ex: On -> Vault failure, Manually fix Vault, On to finish all other instances
+
+Should prompt for turning Consul off?
+What about when no ASGs exist for the bosslet?
+
+Starting:
+    An error when starting ASG that is off - 
+    Starting ASG that already is on - 
+    Initializing Vault - 
+    Unsealing Vault - 
+    Exported Vault data not existing - 
+    Importing Vault data - 
+
+
+Stopping:
+    An error when stopping ASG that is on - 
+    Stopping ASG that is already off - 
+    Exporting Vault data - 
+    Stopping Auth without RDS - 
+"""
+
+VAULT_FILE = constants.repo_path('vault', 'private', '{}', 'export.json')
+
+def load_aws(bosslet_config, method):
+    suffix = '.' + bosslet_config.INTERNAL_DOMAIN
+
+    client = bosslet_config.session.client('autoscaling')
+    response = client.describe_auto_scaling_groups()
+
+    def name(tags):
+        for tag in tags:
+            if tag['Key'] == 'Name':
+                return tag['Value']
+        return ""
+
+    asgs = [AutoScalingGroup(bosslet_config, asg)
+            for asg in response['AutoScalingGroups']
+            if name(asg['Tags']).endswith(suffix) ]
+
+    if method == 'on':
+        for asg in asgs:
+            asg.load_tags()
+    elif method == 'off':
+        for asg in asgs:
+            asg.save_tags()
+
+    return load_sort(asgs, method)
+
+def load_sort(asgs, method):
+    unsorted = asgs.copy()
+    sorted = []
+
+    def pop(name):
+        for i in range(len(unsorted)):
+            if name in unsorted[i].name:
+                return unsorted.pop(i)
+
+    def add(name):
+        obj = pop(name)
+        if obj:
+            sorted.append(obj)
+
+    add('Consul')
+    add('Vault')
+    sorted.extend(unsorted)
+
+    if method == "off":
+        sorted.reverse()
+
+    return sorted
+
+class AutoScalingGroup(object):
+    def __init__(self, bosslet_config, definition):
+        self.bosslet_config = bosslet_config
+        self.client = bosslet_config.session.client('autoscaling')
+        self.definition = definition
+
+        self.name = definition['AutoScalingGroupName']
+
+        self.min = definition['MinSize']
+        self.max = definition['MaxSize']
+        self.desired = definition['DesiredCapacity']
+
+    def start(self):
+        if DRY_RUN:
+            print("Setting {} to {}/{}/{}".format(self.name,
+                                                  self.min,
+                                                  self.max,
+                                                  self.desired))
+        else:
+            self.client.update_auto_scaling_group(AutoScalingGroupName = self.name,
+                                                  MinSize = self.min,
+                                                  MaxSize = self.max,
+                                                  DesiredCapacity = self.desired)
+
+            self.client.resume_processes(AutoScalingGroupName = self.name,
+                                         ScalingProcesses = ['HealthCheck'])
+
+    def stop(self):
+        if DRY_RUN:
+            print("Setting {} to 0/0/0".format(self.name))
+        else:
+            self.client.update_auto_scaling_group(AutoScalingGroupName = self.name,
+                                                  MinSize = 0,
+                                                  MaxSize = 0,
+                                                  DesiredCapacity = 0)
+
+            self.client.suspend_processes(AutoScalingGroupName = self.name,
+                                          ScalingProcesses = ['HealthCheck'])
+
+    def save_tags(self):
+        pass # TODO Luis
+        # Create tags to store current self.min / self.max / self.desired
+        # use self.client to interact with AWS
+
+        # Non-standard situations to think about
+        # Saving tags when tags already exist and have different values
+        # Loading tags when self.min / self.max / self.desired are not 0/0/0
+        # Saving tags when self.min / self.max / self.desired are already 0/0/0
+    def load_tags(self):
+        pass # TODO Luis
+        # set self.min / self.max / self.desired based on tags in self.definition
+        # Should there be a call to AWS to remove the tags?
 
 #Executed actions
-def startInstances():
+def startInstances(bosslet_config):
     """
         Method used to start necessary instances
     """
-    #Use auto scaling groups last saved configuration
-    try:
-        ASGdescription = load_obj('ASGdescriptions')
-        activitiesD = [ASGdescription["AutoScalingGroups"][0]["MinSize"], ASGdescription["AutoScalingGroups"][0]["MaxSize"],ASGdescription["AutoScalingGroups"][0]["DesiredCapacity"]]
-        endpointD = [ASGdescription["AutoScalingGroups"][1]["MinSize"], ASGdescription["AutoScalingGroups"][1]["MaxSize"],ASGdescription["AutoScalingGroups"][1]["DesiredCapacity"]]
-        vaultD = [ASGdescription["AutoScalingGroups"][2]["MinSize"], ASGdescription["AutoScalingGroups"][2]["MaxSize"],ASGdescription["AutoScalingGroups"][2]["DesiredCapacity"]]
-        print("Successful ASG configuration")
-    except Exception as e:
-       utils.console.fail("Unsuccessful ASG configuration")
-       print("Error due to: %s" % e)
-       exit()
 
-    #Start vault instance
-    print("Starting vault...")
-    client.update_auto_scaling_group(AutoScalingGroupName=vaultg, MinSize = vaultD[0] , MaxSize =  vaultD[1], DesiredCapacity = vaultD[2])
-    client.resume_processes(AutoScalingGroupName=vaultg,ScalingProcesses=['HealthCheck'])
-    time.sleep(constants.TIMEOUT_VAULT)
-    print("Vault instance running")
+    # Verify Vault data exists before continuing
+    filename = VAULT_FILE.format(bosslet_config.names.dns.vault)
+    if not os.path.exists(filename):
+        msg = "File {} doesn't exist, cannot reimport Vault data".format(filename)
+        if DRY_RUN:
+            utils.console.warning(msg)
+        else:
+            utils.console.fail(msg)
+            return
 
-    #Import vault content:
-    print("Importing vault content")
-    try:
-        with vault_tunnel(bosslet_config.ssh_key, bastions):
-            vaultB.vault_unseal(vault_client)
-            vaultB.vault_import(vault_client, REAL_PATH + '/config/vault_export.json')
-        utils.console.okgreen("Successful import")
-    except Exception as e:
-        utils.console.fail("Unsuccessful import")
-        print("Error due to %s" % e)
-        exit()
+    asg_problem = False
+    consul_started = False
 
-    #Start endpoint and activities instances
-    print("Starting endpoint, and activities...")
-    try:
-        client.update_auto_scaling_group(AutoScalingGroupName=endpoint, MinSize = endpointD[0] , MaxSize = endpointD[1] , DesiredCapacity = endpointD[2])
-        client.resume_processes(AutoScalingGroupName=endpoint,ScalingProcesses=['HealthCheck'])
-        
-        client.update_auto_scaling_group(AutoScalingGroupName=activities, MinSize = activitiesD[0] , MaxSize = activitiesD[1] , DesiredCapacity = activitiesD[2])
-        client.resume_processes(AutoScalingGroupName=activities,ScalingProcesses=['HealthCheck'])
-    except Exception as e:
-        print('Error: %s' % e)
-        exit()
+    asgs = load_aws(bosslet_config, 'on')
+    for asg in asgs:
+        print(asg.name)
+    for asg in asgs:
+        # TODO: Add error handling
+        # If Vault error, stop
+        # If error starting ASG log error and continue
 
-    utils.console.okgreen("TheBoss is on")
+        ###############################
+        # Pre-start actions or checks #
+        ###############################
+
+        if 'Auth' in asg.name:
+            if not bosslet_config.AUTH_RDS:
+                utils.console.warning("Skipping starting Auth ASG, as it was not stopped")
+                continue
+
+        ###################
+        # Start Instances #
+        ###################
+
+        print("Turning on {}".format(asg.name))
+        try:
+            asg.start()
+            utils.console.okgreen("{} is on".format(asg.name))
+        except Exception as ex:
+            asg_problem = True
+            utils.console.warning("{} is not on".format(asg.name))
+            print(ex)
+
+        ################################
+        # Post-start actions or checks #
+        ################################
+
+        if 'Consul' in asg.name:
+            consul_started = True
+        if 'Vault' in asg.name:
+            if DRY_RUN:
+                print("Waiting for Vault to start")
+                if not consul_started:
+                    print("Vault unseal")
+                else:
+                    print("Vault initialize")
+                    print("Vault unseal")
+                    print("Vault configure")
+                print("Vault import {}".format(filename))
+                continue
+
+            print("Waiting for Vault to start")
+            # XXX: May need to wait a little before creating call, so that
+            #      vault instances are named and can be resolved
+            bosslet_config.call.check_vault(constants.TIMEOUT_VAULT)
+
+            with bosslet_config.call.vault() as vault:
+                if not consul_started:
+                    vault.unseal()
+                else:
+                    print("Initializing Vault...")
+                    try:
+                        vault.initialize(bosslet_config.ACCOUNT_ID)
+                    except Exception as ex:
+                        filename = VAULT_FILE.format(bosslet_config.names.dns.vault)
+                        print(ex)
+                        print("Could not initialize Vault")
+                        print("Call the following commands before trying to turn the bosslet back on")
+                        print(" > bin/bastion.py vault.<bosslet> vault-initialize")
+                        print(" > bin/bastion.py vault.<bosslet> vault-import {}".format(filename))
+                        return
+
+                print("Importing previous Vault data")
+                try:
+                    with open(filename) as fh:
+                        data = json.load(fh)
+                    vault.import_(data)
+                    utils.console.okgreen("Successful import")
+                except Exception as e:
+                    utils.console.fail("Unsuccessful import")
+                    print(ex)
+                    print("Cannot continue restore")
+                    return
+
+    if asg_problem:
+        utils.console.warning("Problems turning on bosslet")
+    else:
+        utils.console.okblue("Bosslet is on")
 
 
-def stopInstances():
+def stopInstances(bosslet_config):
     """
         Method used to stop currently running instances
     """
-    #Save current ASG descriptions:
-    print("Saving current auto scaling group configuration...")
-    response = client.describe_auto_scaling_groups(AutoScalingGroupNames=[endpoint,activities,vaultg])
-    try:
-        response['AutoScalingGroups'][0]
-        save_obj(response,'ASGdescriptions')
-        print("Successfully saved ASG descriptions")
-    except IndexError as e:
-        utils.console.fail("Failed while saving ASG descriptions")
-        print("Error: %s" % e)
-        exit()
+    filename = VAULT_FILE.format(bosslet_config.names.dns.vault)
 
-    #Export vault content:
-    print("Exporting vault content...") 
-    try:
-        with vault_tunnel(bosslet_config.ssh_key, bastions): 
-            vaultB.vault_export(vault_client, REAL_PATH+'/config/vault_export.json')
-        utils.console.warning("Please protect the vault_pexport.json file as it contains personal passwords.")
-        utils.console.okgreen("Successful vaul export")
-    except Exception as e:
-        utils.console.fail("Unsuccessful vault export")
-        print("Error: %s" % e)
-        exit()
+    asg_problem = False
 
-    #Switch off:
-    print("Stopping all Instances...")
-    client.update_auto_scaling_group(AutoScalingGroupName=endpoint, MinSize = 0 , MaxSize = 0 , DesiredCapacity = 0)
-    client.suspend_processes(AutoScalingGroupName=endpoint,ScalingProcesses=['HealthCheck'])
+    asgs = load_aws(bosslet_config, 'off')
+    for asg in asgs:
+        print(asg.name)
+    for asg in asgs:
+        ##############################
+        # Pre-stop actions or checks #
+        ##############################
 
-    client.update_auto_scaling_group(AutoScalingGroupName=activities, MinSize = 0 , MaxSize = 0 , DesiredCapacity = 0)
-    client.suspend_processes(AutoScalingGroupName=activities,ScalingProcesses=['HealthCheck'])
+        if 'Vault' in asg.name:
+            if DRY_RUN:
+                print("Export Vault data into {}".format(filename))
+            else:
+                print("Exporting current Vault data")
+                try:
+                    with bosslet_config.call.vault() as vault:
+                        # TODO: figure out what configuration information should be exported
+                        data = vault.export("secret/")
 
-    client.update_auto_scaling_group(AutoScalingGroupName=vaultg, MinSize = 0 , MaxSize = 0 , DesiredCapacity = 0)
-    client.suspend_processes(AutoScalingGroupName=vaultg,ScalingProcesses=['HealthCheck'])
+                        with open(filename, 'w') as fh:
+                            json.dump(data, fh, indent=3, sort_keys=True)
 
-    utils.console.fail("TheBoss is off")
+                    utils.console.warning("Please protect {} as it contains personal passwords".format(filename))
+                    utils.console.okgreen("Successful Vault export")
+                except Exception as e:
+                    utils.console.fail("Unsuccessful vault export")
+                    print(ex)
+                    print("Cannot continue")
+                    return
+        elif 'Auth' in asg.name:
+            if not bosslet_config.AUTH_RDS:
+                utils.console.warning("Cannot turn off Auth ASG without an external RDS database")
+                continue
 
-def save_obj(obj, name ):
-    """
-        Method to save objects as .pkl files
+        ##################
+        # Stop Instances #
+        ##################
 
-        Args:
-            obj : The object that will be saved
-            name : The .pkl file name under which the object will be saved
-    """
-    with open(REAL_PATH + '/' + name + '.pkl', 'wb') as f:
-        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+        print("Turning off {}".format(asg.name))
+        try:
+            asg.stop()
+            utils.console.okgreen("{} is off".format(asg.name))
+        except Exception as ex:
+            asg_problem = True
+            utils.console.warning("{} is not off".format(asg.name))
+            print(ex)
+            # XXX: What to do?
 
-def load_obj(name):
-    """
-        Method to load saved objects in .pkl file
+        ###############################
+        # Post-stop actions or checks #
+        ###############################
+        # None right now
 
-        Args:
-            name : The .pkl file name to open
-        
-        Returns:
-            object saved within .pkl file
-    """
-    with open(REAL_PATH + '/' + name + '.pkl', 'rb') as f:
-        return pickle.load(f)
+    if asg_problem:
+        # XXX: The problem is that if 'off' is re-run the ASGs that were previously
+        #      turned off will have 0/0/0 saved to the DEFINITION_FILE and mess up
+        #      turning ASGs back on
+        utils.console.warning("Problem turning off bosslet")
+    else:
+        utils.console.okblue("TheBoss is off")
 
 if __name__ == '__main__':
-
-    #Grab files path to use as reference.
-    REAL_PATH = constants.repo_path()
-
     def create_help(header, options):
         """Create formated help."""
         return "\n" + header + "\n" + \
@@ -182,6 +357,9 @@ if __name__ == '__main__':
     parser = BossParser(description = "Script to turn the boss on and off by stopping and restarting EC2 instances.",
                         formatter_class=argparse.RawDescriptionHelpFormatter,
                         epilog=actions_help)
+    parser.add_argument("--dry-run", "-n",
+                        action = "store_true",
+                        help = "If the actions should be dry runned")
     parser.add_argument("--config",
                         metavar = "<config>",
                         default ="asg-cfg-dev",
@@ -191,30 +369,24 @@ if __name__ == '__main__':
                         metavar = "action",
                         help = "Action to execute")
     parser.add_bosslet()
+
     args = parser.parse_args()
 
+    DRY_RUN = args.dry_run
     bosslet_config = args.bosslet_config
 
-    # Lookup bosslet bastion information and add any outbound bastion
-    bastion = aws.machine_lookup(bosslet_config.session,
-                                 bosslet_config.names.dns.bastion) 
-    bastions = [SSHTarget(bosslet_config.ssh_key, bastion, 22, 'ec2-user')]
-    if bosslet_config.outbound_bastion:
-        bastions.insert(0, bosslet_config.outbound_bastion)
+    choice = utils.get_user_confirm("Are you sure you want to proceed?")
+    if not choice:
+        sys.exit(0)
 
-    # Lookup vault information and create client
-    vault_ip = aws.machine_lookup(bosslet_config.session,
-                                  bosslet_config.names.dns.vault) 
-    vault_client = vault.Vault(bosslet_config.names.dns.vault, vault_ip)
+    print("Turning the {} bosslet {}...".format(args.bosslet_name,
+                                                args.action))
 
-    # Create Boto3 session
-    client = bosslet_config.session.client('autoscaling')
-
-    #Loading ASG configuration files. Please specify your ASG names on asg-cfg found in the config file.
-    asg = json.load(open(str(REAL_PATH + '/config/' + args.config)))
-    activities = asg["activities"]
-    endpoint = asg["endpoint"]
-    vaultg = asg["vault"]
-    auth = asg["auth"]
-
-    main()
+    try:
+        if args.action == "on":
+            startInstances(bosslet_config)
+        elif args.action == "off":
+            stopInstances(bosslet_config)
+    except Exception as ex:
+        print("Error due to %s" % e)
+        sys.exit(1)
