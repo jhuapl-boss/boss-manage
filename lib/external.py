@@ -82,13 +82,13 @@ class ExternalCalls:
     def vault(self):
         class ContextVault(object):
             @staticmethod
-            def initialize():
+            def initialize(account_id):
                 """Initialize and configure all of the vault servers.
 
                 Lookup all vault IPs for the VPC, initialize and configure the first server
                 and then unseal any other servers.
                 """
-                self.vaults[0].initialize()
+                self.vaults[0].initialize(account_id)
                 for vault in self.vaults[1:]:
                     vault.unseal()
 
