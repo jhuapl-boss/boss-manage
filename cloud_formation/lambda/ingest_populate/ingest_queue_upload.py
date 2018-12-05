@@ -3,12 +3,16 @@ import json
 import time
 import hashlib
 import pprint
+from botocore.exceptions import ClientError
+
 
 class FailedToSendMessages(Exception):
     pass
 
+
 SQS_BATCH_SIZE = 10
 SQS_RETRY_TIMEOUT = 15
+
 
 def handler(args, context):
     """Populate the ingest upload SQS Queue with tile information
@@ -42,7 +46,8 @@ def handler(args, context):
             'z_tile_size': 0,
 
             'z_chunk_size': 16,
-            'MAX_NUM_TILES_PER_LAMBDA': 20000
+            'MAX_NUM_ITEMS_PER_LAMBDA': 20000
+            'items_to_skip': 0
         }
 
     Returns:
@@ -51,9 +56,10 @@ def handler(args, context):
     print("Starting to populate upload queue")
     pprint.pprint(args)
 
+    msgs = create_messages(args)
+    # trying creating this resource after we find the first message to return.
     queue = boto3.resource('sqs').Queue(args['upload_queue'])
 
-    msgs = create_messages(args)
     sent = 0
 
     while True:
@@ -73,21 +79,30 @@ def handler(args, context):
 
         retry = 3
         while retry > 0:
-            resp = queue.send_messages(Entries=batch)
-            sent += len(resp['Successful'])
+            try:
+                try_again = False
+                resp = queue.send_messages(Entries=batch)
+                if 'Successful' in resp:
+                    sent += len(resp['Successful'])
 
-            if 'Failed' in resp and len(resp['Failed']) > 0:
-                print("Batch failed to enqueue messages")
-                print("Retries left: {}".format(retry))
-                print("Boto3 send_messages response: {}".format(resp))
-                time.sleep(SQS_RETRY_TIMEOUT)
+                if 'Failed' in resp and len(resp['Failed']) > 0:
+                    try_again = True
+                    print("Batch failed to enqueue messages")
+                    print("Retries left: {}".format(retry))
+                    print("Boto3 send_messages response: {}".format(resp))
+                    # shorten the batch to only those ids that failed.
+                    ids = [f['Id'] for f in resp['Failed']]
+                    batch = [b for b in batch if b['Id'] in ids]
+            except ClientError as err:
+                try_again = True
+                print('ClientError while sending messages: {}  batch: {}'.format(err, batch))
 
-                ids = [f['Id'] for f in resp['Failed']]
-                batch = [b for b in batch if b['Id'] in ids]
+            if try_again:
                 retry -= 1
                 if retry == 0:
                     print("Exhausted retry count, stopping")
-                    raise FailedToSendMessages(batch) # SFN will relaunch the activity
+                    raise FailedToSendMessages(batch)  # SFN will relaunch the activity
+                time.sleep(SQS_RETRY_TIMEOUT)
                 continue
             else:
                 break
@@ -120,7 +135,7 @@ def create_messages(args):
 
         return '&'.join([digest, base])
 
-    tiles_to_skip = args['tiles_to_skip']
+    tiles_to_skip = args['items_to_skip']
     count_in_offset = 0
 
     for t in range_('t'):
@@ -151,7 +166,7 @@ def create_messages(args):
                                                t)
 
                         count_in_offset += 1
-                        if count_in_offset > args['MAX_NUM_TILES_PER_LAMBDA']:
+                        if count_in_offset > args['MAX_NUM_ITEMS_PER_LAMBDA']:
                             return  # end the generator
                         tile_key = hashed_key(args['project_info'][0],
                                               args['project_info'][1],
