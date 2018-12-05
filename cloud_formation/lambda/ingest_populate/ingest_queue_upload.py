@@ -11,7 +11,7 @@ class FailedToSendMessages(Exception):
 
 
 SQS_BATCH_SIZE = 10
-SQS_RETRY_TIMEOUT = 15
+SQS_RETRY_TIMEOUT = 3
 
 
 def handler(args, context):
