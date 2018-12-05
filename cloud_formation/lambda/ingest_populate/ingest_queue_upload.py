@@ -46,7 +46,7 @@ def handler(args, context):
             'z_tile_size': 0,
 
             'z_chunk_size': 16,
-            'MAX_NUM_ITEMS_PER_LAMBDA': 20000
+            'MAX_NUM_ITEMS_PER_LAMBDA': 20000,
             'items_to_skip': 0
         }
 
