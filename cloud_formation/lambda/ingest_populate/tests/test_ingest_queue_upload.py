@@ -45,7 +45,7 @@ class TestIngestQueueUploadLambda(unittest.TestCase):
         Test_all_messages_are_there tests() first it creates
         set of messages that all fit into a single lambda populating a dictionary with all the values returned.
         Then it runs the create_messages 4 more times each time with the appropriate tiles_to_skip and
-        MAX_NUM_TILES_PER_LAMBDA set. It pulls the tile key out of the dictionary to verify that all the tiles were
+        MAX_NUM_ITEMS_PER_LAMBDA set. It pulls the tile key out of the dictionary to verify that all the tiles were
         accounted for.  In the end there should be no tiles left in the dictionary.
 
         This test can with many different values for tile sizes and starts and stop vaules and num_lambdas can be
@@ -80,8 +80,8 @@ class TestIngestQueueUploadLambda(unittest.TestCase):
             "t_tile_size": 1,
             "z_tile_size": 1,
             "resolution": 0,
-            "tiles_to_skip": 0,
-            'MAX_NUM_TILES_PER_LAMBDA': 500000,
+            "items_to_skip": 0,
+            'MAX_NUM_ITEMS_PER_LAMBDA': 500000,
             'z_chunk_size': 16
         }
 
@@ -104,9 +104,9 @@ class TestIngestQueueUploadLambda(unittest.TestCase):
 
         # loop through create_messages() num_lambda times pulling out each tile from the dictionary.
         num_lambdas = 4
-        args["MAX_NUM_TILES_PER_LAMBDA"] = math.ceil(dict_length / num_lambdas)
-        for skip in range(0, dict_length, args["MAX_NUM_TILES_PER_LAMBDA"]):
-            args["tiles_to_skip"] = skip
+        args["MAX_NUM_ITEMS_PER_LAMBDA"] = math.ceil(dict_length / num_lambdas)
+        for skip in range(0, dict_length, args["MAX_NUM_ITEMS_PER_LAMBDA"]):
+            args["items_to_skip"] = skip
             #print("Skip: " + str(skip))
             msgs = iqu.create_messages(args)
             for msg_json in msgs:

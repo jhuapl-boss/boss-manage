@@ -1,4 +1,8 @@
-"""Populate an ingest upload queue with message for each tile to be processed"""
+"""Populate an ingest upload queue with message for each tile to be processed.
+******
+This one has not bee used since March 2017.
+******
+"""
 
 Activity('PopulateQueue')
     # Automatically purges the queue so retry works correctly

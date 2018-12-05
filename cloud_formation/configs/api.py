@@ -110,6 +110,7 @@ def create_config(session, domain, keypair=None, db_config={}):
 
     user_data['sfn']['populate_upload_queue'] = names.ingest_queue_populate
     user_data['sfn']['upload_sfn'] = names.ingest_queue_upload
+    user_data['sfn']['volumetric_upload_sfn'] = names.volumetric_ingest_queue_upload
     user_data['sfn']['downsample_sfn'] = names.resolution_hierarchy
 
     # Prepare user data for parsing by CloudFormation.
