@@ -1,0 +1,47 @@
+@startuml
+
+header Last updated 7Dec2018
+footer Generated from ingest_sequence.uml by PlantUML
+title Ingest Sequence Diagram at the System Level
+
+actor IngestClient as IC
+control UploadQueue as UQ
+collections TileBucket as TB
+entity TileUploadedLambda as TULamb
+database TileIndex as TI
+control IngestQueue as IQ
+entity TileIngestLambda as TILamb
+collections CuboidBucket as CB
+database S3Index as SI
+
+loop While UploadQueue is not empty
+    IC->UQ: Get message
+    IC->TB: Upload tile
+    TB->>TULamb: Trigger
+    activate TULamb
+    TULamb->TI: Mark tile as uploaded to chunk
+    TULamb->TI: Check if chunk is complete\n(all 16 tiles present?)
+    alt Incomplete (chunk not ready)
+        TULamb->UQ: Remove tile upload message
+    else Complete (chunk has all its tiles)
+        TULamb->IQ: Enqueue message to ingest chunk 
+        TULamb->>TILamb: Asynchronously invoke
+        activate TILamb
+        TULamb->UQ: Remove tile upload message
+        deactivate TULamb
+        TILamb->IQ: Get message
+        TILamb->TI: Get chunk key and tile keys
+        TILamb->TB: Get tiles
+        TILamb->TILamb: Convert tiles to cuboids
+        loop foreach cuboid
+            TILamb->CB: Upload cuboid
+            TILamb->SI: Add cuboid's object key
+        end
+        TILamb->>TB: Mark tiles for deletion via asynchronous lambda
+        TILamb->>TI: Delete chunk's entry via asynchronous lambda
+        TILamb->IQ: Delete message
+        deactivate TILamb
+    end
+end
+
+@enduml
