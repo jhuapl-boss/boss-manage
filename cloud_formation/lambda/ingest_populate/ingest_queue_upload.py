@@ -11,7 +11,7 @@ class FailedToSendMessages(Exception):
 
 
 SQS_BATCH_SIZE = 10
-SQS_RETRY_TIMEOUT = 3
+SQS_RETRY_TIMEOUT = 15 
 
 
 def handler(args, context):
@@ -46,8 +46,8 @@ def handler(args, context):
             'z_tile_size': 0,
 
             'z_chunk_size': 16,
-            'MAX_NUM_ITEMS_PER_LAMBDA': 20000,
-            'items_to_skip': 0
+            'MAX_NUM_TILES_PER_LAMBDA': 20000,  # will become MAX_NUM_ITEMS_PER_LAMBDA after the volumetric ingest merge.
+            'tiles_to_skip': 0  # will become 'items_to_skip' after the volumetric ingest merge.
         }
 
     Returns:
@@ -135,7 +135,7 @@ def create_messages(args):
 
         return '&'.join([digest, base])
 
-    tiles_to_skip = args['items_to_skip']
+    tiles_to_skip = args['tiles_to_skip']
     count_in_offset = 0
 
     for t in range_('t'):
@@ -166,7 +166,7 @@ def create_messages(args):
                                                t)
 
                         count_in_offset += 1
-                        if count_in_offset > args['MAX_NUM_ITEMS_PER_LAMBDA']:
+                        if count_in_offset > args['MAX_NUM_TILES_PER_LAMBDA']:   # will become MAX_NUM_ITEMS_PER_LAMBDA after volumetric ingest merge
                             return  # end the generator
                         tile_key = hashed_key(args['project_info'][0],
                                               args['project_info'][1],
