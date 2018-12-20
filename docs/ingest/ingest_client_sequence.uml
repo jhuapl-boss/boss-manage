@@ -1,13 +1,14 @@
 @startuml
 
-header Last updated 7Dec2018
-footer Generated from ingest_client_sequence.uml by PlantUML
+header Last updated 11Dec2018
+footer Generated from ingest_client_sequence_proposed.uml by PlantUML
 title Ingest Client Sequence Diagram
 
 actor IngestClient as IC
 collections Workers as W
 entity Endpoint as E
 control UploadQueue as UQ
+control TileIndexQueue as TIQ
 collections TileBucket as TB
 
 IC->E: Create ingest job
@@ -23,6 +24,8 @@ loop While workers alive
         W->E: Update creds if near timeout
         W->UQ: Get message
         W->TB: Upload tile
+        W->UQ: Delete message
+        W->TIQ: Put message
     end
     deactivate W
 end
@@ -30,3 +33,4 @@ end
 IC->E: Complete job
 
 @enduml
+
