@@ -37,13 +37,50 @@ class AWSNameAccumulator(object):
         return self.__getattr__(key)
 
 class AWSNames(object):
-    def __init__(self, bosslet_config):
-        self.bosslet_config = bosslet_config
+    def __init__(self, internal_domain, external_domain=None, external_format=None, ami_suffix=None):
+        self.internal_domain = internal_domain
+        self.external_domain = external_domain
+        self.external_format = external_format
+        self.ami_suffix = ami_suffix
+
+    @classmethod
+    def from_bosslet(cls, bosslet_config):
+        cls(bosslet_config.INTERNAL_DOMAIN,
+            bosslet_config.EXTERNAL_DOMAIN,
+            bosslet_config.EXTERNAL_FORMAT,
+            bosslet_config.AMI_SUFFIX)
+
+    @classmethod
+    def from_lambda(cls, name):
+        """
+        Instantiate AWSNames from the name of a lambda function.  Used by
+        lambdas so they can look up names of other resources.
+
+        Args:
+            name (str): Name of lambda function (ex: multiLambda-integration-boss)
+
+        Returns:
+            (AWSNames)
+
+        """
+        # NOTE: This will only allow looking up internal resource names
+        #       external names or amis cannot be resolved
+
+        # NOTE: Assume the format <lambda_name>-<internal_domain>
+        #       where <lambda_name> doesn't have a - (or '.')
+        # Lambdas names can't have periods; restore proper name.
+        dotted_name = name.replace('-', '.')
+        domain = dotted_name.split('.', 1)[1]
+        return cls(domain)
 
     def public_dns(self, name):
-        name = self.bosslet_config.EXTERNAL_FORMAT.format(machine = name)
+        if not self.external_domain:
+            raise ValueError("external_domain not provided")
 
-        return name + '.' + self.bosslet_config.EXTERNAL_DOMAIN
+        if self.external_format:
+            name = self.external_format.format(machine = name)
+
+        return name + '.' + self.external_domain
 
     def __getattr__(self, key):
         return AWSNameAccumulator(key, self.build)
@@ -173,11 +210,12 @@ class AWSNames(object):
         if self.TYPES[resource_type] is False:
             return self.RESOURCES[name]
         elif resource_type == 'ami':
-            suffix = self.bosslet_config.AMI_SUFFIX
-            return self.RESOURCES[name] + suffix
+            if not self.ami_suffix:
+                raise ValueError("ami_suffix not provided")
+
+            return self.RESOURCES[name] + self.ami_suffix
         else:
-            domain = self.bosslet_config.INTERNAL_DOMAIN
-            fqdn = self.RESOURCES[name] + '.' + domain
+            fqdn = self.RESOURCES[name] + '.' + self.internal_domain
 
             transform = self.TYPES[resource_type]
             if transform:

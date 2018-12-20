@@ -96,7 +96,7 @@ class BossConfiguration(object):
         else:
             self._call = None
 
-        self.names = AWSNames(self)
+        self.names = AWSNames.from_bosslet(self)
 
         # Use __getattr__ to get the __DEFAULT value if not specified
         if not self.VERIFY_SSL:
