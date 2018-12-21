@@ -190,13 +190,13 @@ def get_common_args(bosslet_config):
             "index_cuboids_keys_queue": 'https://queue.amazonaws.com/{}/{}'.format(account, n.sqs.index_cuboids_keys)
           },
           "kv_config": {
-            "cache_host": n.dns.cache,
+            "cache_host": n.redis.cache,
             "read_timeout": 86400,
             "cache_db": "0"
           },
           "state_config": {
             "cache_state_db": "0",
-            "cache_state_host": n.dns.cache_state
+            "cache_state_host": n.redis.cache_state
           }
         },
         "max_write_id_index_lambdas": 599,
