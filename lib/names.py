@@ -34,6 +34,16 @@ class AWSNameAccumulator(object):
     def __getitem__(self, key):
         return self.__getattr__(key)
 
+    def __dir__(self):
+        rtn = []
+        # Assumes that the initial value is the resource name
+        cfg = AWSNames.RESOURCES[self.acc[0]]
+        if 'types' in cfg:
+            rtn.extend(cfg['types'])
+        if 'type' in cfg:
+            rtn.append(cfg['type'])
+        return rtn
+
 class AWSNames(object):
     def __init__(self, internal_domain, external_domain=None, external_format=None, ami_suffix=None):
         self.internal_domain = internal_domain
@@ -85,6 +95,15 @@ class AWSNames(object):
 
     def __getitem__(self, key): # For dynamically building names from input
         return self.__getattr__(key)
+
+    def __dir__(self):
+        rtn = ['RESOURCES', 'TYPES',
+               'public_dns', 'build',
+               #'__getattr__', '__getitem__',
+               'internal_domain', 'external_domain',
+               'external_format', 'ami_suffix']
+        rtn.extend(self.RESOURCES.keys())
+        return rtn
 
     TYPES = {
         'stack': format_capitalize,
