@@ -130,28 +130,32 @@ class AWSNames(object):
 
     RESOURCES = {
         # Ordered by name to make it easy to find an entry
-        'activities': {'types': ['dns', 'ami']},
+        'activities': {'types': ['dns', 'ami', 'stack']},
+        'api': {'type': 'stack'},
         'auth': {'types': ['dns', 'ami', 'sg']},
         'auth_db': {'name': 'auth-db',
                     'type': 'rds'},
         'bastion': {'type': 'dns'},
-        'backup': {'types': ['ami', 's3']},
+        'backup': {'types': ['ami', 's3', 'stack']},
         'cache': {'name': 'cache', # Redis server to cache cuboids
                   'type': 'redis'},
+        'cachedb': {'type': 'stack'},
         'cache_manager': {'name': 'cachemanager',
                           'types': ['dns', 'ami']},
         'cache_session': {'name': 'cache-session', # Redis server for Django sessions
                           'type': 'redis'},
         'cache_state': {'name': 'cache-state',
                         'type': 'redis'},
+        'cloudwatch': {'type': 'stack'},
         'consul': {'types': ['dns', 'ami']},
         'consul_monitor': {'name': 'consulMonitor',
                            'types': 'lambda_'},
+        'copycuboid': {'type': 'stack'},
         'copy_cuboid_dlq': {'name': 'copyCuboidDlq',
                             'type': 'sqs'},
         'copy_cuboid_lambda': {'name': 'copyCuboidLambda',
                                'type': 'lambda_'},
-        'core': {'types': []},
+        'core': {'type': 'stack'},
         'cuboid_bucket': {'name': 'cuboids',
                           'type': 's3'},
         "cuboid_ids_bucket": {'name': "cuboid-ids",
@@ -182,6 +186,7 @@ class AWSNames(object):
                               'type': 'lambda_'},
         'dynamodb_autoscale': {'name': 'dynamodb_autoscale',
                                'type': 'zip'},
+        'dynamolambda': {'type': 'stack'},
         'dynamo_lambda': {'name': 'dynamoLambda',
                           'type': 'lambda_'},
         'endpoint_db': {'name': 'endpoint-db',
@@ -195,6 +200,7 @@ class AWSNames(object):
                            'type': 'ddb'},
         'id_index': {'name': 'idIndex',
                      'type': 'ddb'},
+        'idindexing': {'type': 'stack'},
         'index_batch_enqueue_cuboids': {'name': 'indexBatchEnqueueCuboidsLambda',
                                         'type': 'lambda_'},
         'index_check_for_throttling': {'name': 'indexCheckForThrottlingLambda',
@@ -261,6 +267,7 @@ class AWSNames(object):
                          'types': ['lambda_', 'zip']},
         'query_deletes': {'name': 'Query.Deletes',
                           'type': 'sfn'},
+        'redis': {'type': 'stack'},
         'resolution_hierarchy': {'name': 'Resolution.Hierarchy',
                                  'type': 'sfn'},
         's3flush': {'name': 'S3flush',
@@ -294,7 +301,7 @@ class AWSNames(object):
         if name not in self.RESOURCES:
             raise AttributeError("'{}' is not a valid resource name".format(name))
 
-        cfg = self.RESOURCES:
+        cfg = self.RESOURCES
         if resource_type != cfg.get('type') and \
            resource_type not in cfg.get('types', []):
             raise AttributeError("'{}' is not a valid resource type for '{}'".format(resource_type, name))

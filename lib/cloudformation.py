@@ -369,14 +369,13 @@ class CloudFormationConfiguration:
         self.region = bosslet_config.REGION
         self.keypairs = {}
 
-        domain = bosslet_config.INTERNAL_DOMAIN
-        self.stack_name = "".join([x.capitalize() for x in [config, *domain.split('.')]])
+        self.stack_name = bosslet_config.names[config].stack
 
         self.bosslet_config = bosslet_config
         self.session = bosslet_config.session
         self.hosts = hosts.Hosts(bosslet_config)
 
-        self.vpc_domain = domain
+        self.vpc_domain = bosslet_config.INTERNAL_DOMAIN
         self.vpc_subnet = bosslet_config.NETWORK
 
 
