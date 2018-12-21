@@ -29,8 +29,8 @@ from lib import aws
 from lib import configuration
 
 def freshen_lambda(bosslet_config, lambda_name):
-    zip_name = bosslet_config.names.zip.multi_lambda
-    full_name = bosslet_config.names.lambda_[lambda_name]
+    zip_name = bosslet_config.names.multi_lambda.zip
+    full_name = bosslet_config.names[lambda_name].lambda_
     client = bosslet_config.session.client('lambda')
     resp = client.update_function_code(
         FunctionName=full_name,

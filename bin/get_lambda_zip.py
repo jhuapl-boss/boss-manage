@@ -31,7 +31,7 @@ from lib import configuration
 
 def download_lambda_zip(bosslet_config, path):
     s3 = bosslet_config.session.client('s3')
-    zip_name = bosslet_config.names.zip.multi_lambda
+    zip_name = bosslet_config.names.multi_lambda.zip
     full_path = '{}/{}'.format(path, zip_name)
     resp = s3.get_object(Bucket=bosslet_config.LAMBDA_BUCKET, Key=zip_name)
 

@@ -62,14 +62,14 @@ class ExternalCalls:
         self.session = bosslet_config.session
         self.keypair_file = bosslet_config.ssh_key
 
-        bastion_ip = aws.machine_lookup(self.session, self.names.dns.bastion)
+        bastion_ip = aws.machine_lookup(self.session, self.names.bastion.dns)
 
         self.bastions = [ SSHTarget(self.keypair_file, bastion_ip) ]
 
         if bosslet_config.outbound_bastion:
             self.bastions.insert(0, bosslet_config.outbound_bastion)
 
-        self.vault_hostname = self.names.dns.vault
+        self.vault_hostname = self.names.vault.dns
         ips = aws.machine_lookup_all(self.session,
                                      self.vault_hostname,
                                      public_ip=False)
@@ -192,7 +192,7 @@ class ExternalCalls:
         time.sleep(30)
 
         # TODO Handle if there is an error with establishing the tunnel
-        with self.tunnel(self.names.dns.auth, 8080) as port:
+        with self.tunnel(self.names.auth.dns, 8080) as port:
             # Could move to connecting through the ELB, but then KC will have to be healthy
             URL = "http://localhost:{}/auth/".format(port)
 

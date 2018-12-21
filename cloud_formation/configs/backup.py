@@ -51,17 +51,17 @@ def create_config(bosslet_config):
     azs = aws.azs_lookup(bosslet_config, 'datapipeline')
     az = random.choice(azs)[1] + '-'
     internal_subnet = aws.subnet_id_lookup(bosslet_config.session,
-                                           az + bosslet_config.names.subnet.internal)
-    backup_image = aws.ami_lookup(bosslet_config, names.ami.backup)[0]
+                                           az + bosslet_config.names.internal.subnet)
+    backup_image = aws.ami_lookup(bosslet_config, names.backup.ami)[0]
 
-    s3_backup = "s3://" + names.s3.backup + "/#{format(@scheduledStartTime, 'YYYY-ww')}"
-    s3_logs = "s3://" + names.s3.backup + "/logs"
+    s3_backup = "s3://" + names.backup.s3 + "/#{format(@scheduledStartTime, 'YYYY-ww')}"
+    s3_logs = "s3://" + names.backup.s3 + "/logs"
 
     # DP TODO: Create all BOSS S3 buckets as part of the account setup
     #          as the Cloud Formation delete doesn't delete the bucket,
     #          making this a conditional add
     BUCKET_DEPENDENCY = None # Needed as the pipelines try to execute when launched
-    if not aws.s3_bucket_exists(session, names.s3.backup):
+    if not aws.s3_bucket_exists(session, names.backup.s3):
         life_cycle = {
             'Rules': [{
                 'Id': 'Delete Data',
@@ -77,14 +77,14 @@ def create_config(bosslet_config):
             }]
         }
         config.add_s3_bucket("BackupBucket",
-                             names.s3.backup,
+                             names.backup.s3,
                              life_cycle_config=life_cycle,
                              encryption=encryption)
         BUCKET_DEPENDENCY = "BackupBucket"
 
     # Consul Backup
     # DP NOTE: Currently having issue with Consul restore, hence both Consul and Vault backups
-    cmd = "/usr/local/bin/consulate --api-host {} kv backup -b -f ${{OUTPUT1_STAGING_DIR}}/export.json".format(names.dns.consul)
+    cmd = "/usr/local/bin/consulate --api-host {} kv backup -b -f ${{OUTPUT1_STAGING_DIR}}/export.json".format(names.consul.dns)
     pipeline = DataPipeline(log_uri = s3_logs, resource_role="backup")
     pipeline.add_shell_command("ConsulBackup",
                                cmd,
@@ -118,11 +118,11 @@ def create_config(bosslet_config):
 
     # DynamoDB Backup
     tables = {
-        "BossMeta": names.ddb.meta,
-        "S3Index": names.ddb.s3_index,
-        "TileIndex": names.ddb.tile_index,
-        "IdIndex": names.ddb.id_index,
-        "IdCountIndex": names.ddb.id_count_index,
+        "BossMeta": names.meta.ddb,
+        "S3Index": names.s3_index.ddb,
+        "TileIndex": names.tile_index.ddb,
+        "IdIndex": names.id_index.ddb,
+        "IdCountIndex": names.id_count_index.ddb,
     }
 
     pipeline = DataPipeline(log_uri = s3_logs)
@@ -145,7 +145,7 @@ def create_config(bosslet_config):
 
 
     # Endpoint RDS Backup
-    pipeline = rds_copy(names.rds.endpoint_db, internal_subnet, backup_image, s3_logs, s3_backup)
+    pipeline = rds_copy(names.endpoint_db.rds, internal_subnet, backup_image, s3_logs, s3_backup)
     config.add_data_pipeline("EndpointPipeline",
                              "endpoint-backup."+bosslet_config.INTERNAL_DOMAIN,
                              pipeline.objects,
@@ -154,7 +154,7 @@ def create_config(bosslet_config):
 
     # Auth RDS Backup
     if bosslet_config.AUTH_RDS:
-        pipeline = rds_copy(names.rds.auth_db, internal_subnet, backup_image, s3_logs, s3_backup)
+        pipeline = rds_copy(names.auth_db.rds, internal_subnet, backup_image, s3_logs, s3_backup)
         config.add_data_pipeline("AuthPipeline",
                                  "auth-backup."+bosslet_config.INTERNAL_DOMAIN,
                                  pipeline.objects,

@@ -222,7 +222,7 @@ class BossParser(ArgumentParser):
                     bosslet_name = a.bosslet
 
                 bosslet_config = BossConfiguration(bosslet_name)
-                hostname = bosslet_config.names.dns[machine]
+                hostname = bosslet_config.names[machine].dns
                 if idx is not None:
                     hostname = str(idx) + "." + hostname
 

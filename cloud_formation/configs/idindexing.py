@@ -38,7 +38,7 @@ def create_config(bosslet_config):
     role = aws.role_arn_lookup(session, "lambda_cache_execution")
     config.add_arg(Arg.String(
         "LambdaCacheExecutionRole", role,
-        "IAM role for " + names.lambda_.multi_lambda))
+        "IAM role for " + names.multi_lambda.lambda_))
 
     def add_lambda(key, name, handler, timeout, memory):
         """A method for defining the common arguments for adding a lambda"""
@@ -46,84 +46,84 @@ def create_config(bosslet_config):
                           name,
                           Ref('LambdaCacheExecutionRole'),
                           s3=(bosslet_config.LAMBDA_BUCKET,
-                              names.zip.multi_lambda,
+                              names.multi_lambda.zip,
                               handler),
                           timeout = timeout,
                           memory = memory,
                           runtime='python3.6')
 
     add_lambda("indexS3WriterLambda",
-               names.lambda_.index_s3_writer,
+               names.index_s3_writer.lambda_,
                "write_s3_index_lambda.handler",
                timeout=120, memory=1024)
 
     add_lambda("indexFanoutIdWriterLambda",
-               names.lambda_.index_fanout_id_writer,
+               names.index_fanout_id_writer.lambda_,
                "fanout_write_id_index_lambda.handler",
                timeout=120, memory=256)
 
     add_lambda("indexWriteIdLambda",
-               names.lambda_.index_write_id,
+               names.index_write_id.lambda_,
                "write_id_index_lambda.handler",
                timeout=120, memory=512)
 
     add_lambda("indexWriteFailedLambda",
-               names.lambda_.index_write_failed,
+               names.index_write_failed.lambda_,
                "write_index_failed_lambda.handler",
                timeout=60, memory=128)
 
     add_lambda("indexFindCuboidsLambda",
-               names.lambda_.index_find_cuboids,
+               names.index_find_cuboids.lambda_,
                "index_find_cuboids_lambda.handler",
                timeout=120, memory=256)
 
     add_lambda("indexFanoutEnqueueCuboidsKeysLambda",
-               names.lambda_.index_fanout_enqueue_cuboid_keys,
+               names.index_fanout_enqueue_cuboid_keys.lambda_,
                "fanout_enqueue_cuboid_keys_lambda.handler",
                timeout=120, memory=256)
 
     add_lambda("indexBatchEnqueueCuboidsLambda",
-               names.lambda_.index_batch_enqueue_cuboids,
+               names.index_batch_enqueue_cuboids.lambda_,
                "batch_enqueue_cuboids_lambda.handler",
                timeout=60, memory=128)
 
     add_lambda("startSfnLambda",
-               names.lambda_.start_sfn,
+               names.start_sfn.lambda_,
                "start_sfn_lambda.handler",
                timeout=60, memory=128)
 
     add_lambda("indexFanoutDequeueCuboidKeysLambda",
-               names.lambda_.index_fanout_dequeue_cuboid_keys,
+               names.index_fanout_dequeue_cuboid_keys.lambda_,
                "fanout_dequeue_cuboid_keys_lambda.handler",
                timeout=60, memory=128)
 
     add_lambda("indexDequeueCuboidKeysLambda",
-               names.lambda_.index_dequeue_cuboid_keys,
+               names.index_dequeue_cuboid_keys.lambda_,
                "dequeue_cuboid_keys_lambda.handler",
                timeout=60, memory=128)
 
     add_lambda("indexGetNumCuboidKeysMsgsLambda",
-               names.lambda_.index_get_num_cuboid_keys_msgs,
+               names.index_get_num_cuboid_keys_msgs.lambda_,
                "get_num_msgs_cuboid_keys_queue_lambda.handler",
                timeout=60, memory=128)
 
     add_lambda("indexCheckForThrottlingLambda",
-               names.lambda_.index_check_for_throttling,
+               names.index_check_for_throttling.lambda_,
                "check_for_index_throttling_lambda.handler",
                timeout=60, memory=128)
 
     add_lambda("indexInvokeIndexSupervisorLambda",
-               names.lambda_.index_invoke_index_supervisor,
+               names.index_invoke_index_supervisor.lambda_,
                "invoke_index_supervisor_lambda.handler",
                timeout=60, memory=128)
 
     add_lambda("indexSplitCuboidsLambda",
-               names.lambda_.index_split_cuboids,
+               names.index_split_cuboids.lambda_,
                "split_cuboids_lambda.handler",
                timeout=120, memory=128)
 
     add_lambda("indexLoadIdsFromS3Lambda",
-               names.lambda_.index_load_ids_from_s3,
+               names.index_load_ids_from_s3.lambda_,
                "load_ids_from_s3_lambda.handler",
                timeout=120, memory=128)
 
@@ -152,31 +152,31 @@ def pre_init(bosslet_config):
 
 def post_init(bosslet_config):
     """Create step functions."""
-    names = bosslet_config.names.sfn
+    names = bosslet_config.names
 
     sfn.create(
-        bosslet_config, names.index_supervisor,
+        bosslet_config, names.index_supervisor.sfn,
         'index_supervisor.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        bosslet_config, names.index_cuboid_supervisor,
+        bosslet_config, names.index_cuboid_supervisor.sfn,
         'index_cuboid_supervisor.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        bosslet_config, names.index_id_writer,
+        bosslet_config, names.index_id_writer.sfn,
         'index_id_writer.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        bosslet_config, names.index_find_cuboids,
+        bosslet_config, names.index_find_cuboids.sfn,
         'index_find_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        bosslet_config, names.index_enqueue_cuboids,
+        bosslet_config, names.index_enqueue_cuboids.sfn,
         'index_enqueue_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        bosslet_config, names.index_fanout_enqueue_cuboids,
+        bosslet_config, names.index_fanout_enqueue_cuboids.sfn,
         'index_fanout_enqueue_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        bosslet_config, names.index_dequeue_cuboids,
+        bosslet_config, names.index_dequeue_cuboids.sfn,
         'index_dequeue_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(
-        bosslet_config, names.index_fanout_id_writers,
+        bosslet_config, names.index_fanout_id_writers.sfn,
         'index_fanout_id_writers.hsd', 'StatesExecutionRole-us-east-1 ')
 
 
@@ -205,13 +205,13 @@ def delete(bosslet_config):
 
 
 def delete_sfns(bosslet_config):
-    names = bosslet_config.names.sfn
-    sfn.delete(bosslet_config, names.index_fanout_id_writers)
-    sfn.delete(bosslet_config, names.index_dequeue_cuboids)
-    sfn.delete(bosslet_config, names.index_fanout_enqueue_cuboids)
-    sfn.delete(bosslet_config, names.index_enqueue_cuboids)
-    sfn.delete(bosslet_config, names.index_find_cuboids)
-    sfn.delete(bosslet_config, names.index_id_writer)
-    sfn.delete(bosslet_config, names.index_cuboid_supervisor)
-    sfn.delete(bosslet_config, names.index_supervisor)
+    names = bosslet_config.names
+    sfn.delete(bosslet_config, names.index_fanout_id_writers.sfn)
+    sfn.delete(bosslet_config, names.index_dequeue_cuboids.sfn)
+    sfn.delete(bosslet_config, names.index_fanout_enqueue_cuboids.sfn)
+    sfn.delete(bosslet_config, names.index_enqueue_cuboids.sfn)
+    sfn.delete(bosslet_config, names.index_find_cuboids.sfn)
+    sfn.delete(bosslet_config, names.index_id_writer.sfn)
+    sfn.delete(bosslet_config, names.index_cuboid_supervisor.sfn)
+    sfn.delete(bosslet_config, names.index_supervisor.sfn)
 

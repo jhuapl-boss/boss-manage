@@ -178,7 +178,7 @@ def startInstances(bosslet_config):
     """
 
     # Verify Vault data exists before continuing
-    filename = VAULT_FILE.format(bosslet_config.names.dns.vault)
+    filename = VAULT_FILE.format(bosslet_config.names.vault.dns)
     if not os.path.exists(filename):
         msg = "File {} doesn't exist, cannot reimport Vault data".format(filename)
         if DRY_RUN:
@@ -251,7 +251,7 @@ def startInstances(bosslet_config):
                     try:
                         vault.initialize(bosslet_config.ACCOUNT_ID)
                     except Exception as ex:
-                        filename = VAULT_FILE.format(bosslet_config.names.dns.vault)
+                        filename = VAULT_FILE.format(bosslet_config.names.vault.dns)
                         print(ex)
                         print("Could not initialize Vault")
                         print("Call the following commands before trying to turn the bosslet back on")
@@ -281,7 +281,7 @@ def stopInstances(bosslet_config):
     """
         Method used to stop currently running instances
     """
-    filename = VAULT_FILE.format(bosslet_config.names.dns.vault)
+    filename = VAULT_FILE.format(bosslet_config.names.vault.dns)
 
     asg_problem = False
 

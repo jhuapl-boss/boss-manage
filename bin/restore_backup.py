@@ -45,7 +45,7 @@ def subnet_id_lookup(bosslet_config):
     az = random.choice(azs)[1] + '-'
 
     internal_subnet = aws.subnet_id_lookup(bosslet_config.session,
-                                           az + bosslet_config.names.subnet.internal)
+                                           az + bosslet_config.names.internal.subnet)
     return internal_subnet
 
 def consul_pipeline(bosslet_config, directory):
@@ -61,11 +61,11 @@ def consul_pipeline(bosslet_config, directory):
     internal_subnet = subnet_id_lookup(bosslet_config)
 
     names = bosslet_config.names
-    s3_backup = "s3://" + names.s3.backup + "/" + directory
-    s3_log = "s3://" + names.s3.backup + "/restore-logs/"
-    cmd = "/usr/local/bin/consulate --api-host {} kv restore -b -f ${{INPUT1_STAGING_DIR}}/export.json".format(names.dns.consul)
+    s3_backup = "s3://" + names.backup.s3 + "/" + directory
+    s3_log = "s3://" + names.backup.s3 + "/restore-logs/"
+    cmd = "/usr/local/bin/consulate --api-host {} kv restore -b -f ${{INPUT1_STAGING_DIR}}/export.json".format(names.consul.dns)
 
-    _, data = list_s3_bucket(bosslet_config.session, names.s3.backup, directory + "/vault")
+    _, data = list_s3_bucket(bosslet_config.session, names.backup.s3, directory + "/vault")
     if len(data) == 0:
         print("No consul data backed up on {}, skipping restore".format(directory))
         return None
@@ -77,7 +77,7 @@ def consul_pipeline(bosslet_config, directory):
                                runs_on = Ref("ConsulInstance"))
     pipeline.add_ec2_instance("ConsulInstance",
                               subnet = internal_subnet,
-                              image = aws.ami_lookup(bosslet_config, names.ami.backup)[0])
+                              image = aws.ami_lookup(bosslet_config, names.backup.ami)[0])
     pipeline.add_s3_bucket("ConsulBucket", s3_backup + "/consul")
     return pipeline
 
@@ -85,11 +85,11 @@ def vault_pipeline(bosslet_config, directory):
     internal_subnet = subnet_id_lookup(bosslet_config)
 
     names = bosslet_config.names
-    s3_backup = "s3://" + names.s3.backup + "/" + directory
-    s3_log = "s3://" + names.s3.backup + "/restore-logs/"
+    s3_backup = "s3://" + names.backup.s3 + "/" + directory
+    s3_log = "s3://" + names.backup.s3 + "/restore-logs/"
     cmd = "/usr/local/bin/python3 ~/vault.py restore {}".format(bosslet_config.INTERNAL_DOMAIN)
 
-    _, data = list_s3_bucket(bosslet_config.session, names.s3.backup, directory + "/vault")
+    _, data = list_s3_bucket(bosslet_config.session, names.backup.s3, directory + "/vault")
     if len(data) == 0:
         print("No vault data backed up on {}, skipping restore".format(directory))
         return None
@@ -101,7 +101,7 @@ def vault_pipeline(bosslet_config, directory):
                                runs_on = Ref("VaultInstance"))
     pipeline.add_ec2_instance("VaultInstance",
                               subnet = internal_subnet,
-                              image = aws.ami_lookup(bosslet_config, names.ami.backup)[0])
+                              image = aws.ami_lookup(bosslet_config, names.backup.ami)[0])
     pipeline.add_s3_bucket("VaultBucket", s3_backup + "/vault")
     return pipeline
 
@@ -129,13 +129,13 @@ def ddb_delete_data(session, table_name):
 
 def ddb_pipeline(bosslet_config, directory):
     names = bosslet_config.names
-    s3_backup = "s3://" + names.s3.backup + "/" + directory
-    s3_log = "s3://" + names.s3.backup + "/restore-logs/"
+    s3_backup = "s3://" + names.backup.s3 + "/" + directory
+    s3_log = "s3://" + names.backup.s3 + "/restore-logs/"
 
     pipeline = DataPipeline(fmt="DP", log_uri = s3_log)
     pipeline.add_emr_cluster("RestoreCluster", region = bosslet_config.REGION)
 
-    tables, _ = list_s3_bucket(bosslet_config.session, names.s3.backup, directory + "/DDB")
+    tables, _ = list_s3_bucket(bosslet_config.session, names.backup.s3, directory + "/DDB")
     for table in tables:
         name = table.split('.', 1)[0]
         pipeline.add_s3_bucket(name + "Bucket", s3_backup + "/DDB/" + table)
@@ -159,11 +159,11 @@ def rds_pipeline(bosslet_config, directory, component, rds_name):
     names = bosslet_config.names
     subnet = subnet_id_lookup(bosslet_config)
 
-    s3_backup = "s3://" + names.s3.backup + "/" + directory
-    s3_log = "s3://" + names.s3.backup + "/restore-logs/"
+    s3_backup = "s3://" + names.backup.s3 + "/" + directory
+    s3_log = "s3://" + names.backup.s3 + "/restore-logs/"
 
 
-    _, data = list_s3_bucket(bosslet_config.session, names.s3.backup, directory + "/RDS/" + rds_name)
+    _, data = list_s3_bucket(bosslet_config.session, names.backup.s3, directory + "/RDS/" + rds_name)
     if len(data) == 0:
         print("No {} table data backed up on {}, skipping restore".format(component, directory))
         return None
@@ -175,7 +175,7 @@ def rds_pipeline(bosslet_config, directory, component, rds_name):
                                runs_on = Ref("RDSInstance"))
     pipeline.add_ec2_instance("RDSInstance",
                               subnet = subnet,
-                              image = aws.ami_lookup(bosslet_config, names.ami.backup)[0])
+                              image = aws.ami_lookup(bosslet_config, names.backup.ami)[0])
     pipeline.add_s3_bucket("RDSBucket", s3_backup + "/RDS/" + rds_name)
 
     return pipeline
@@ -184,13 +184,13 @@ def endpoint_rds_pipeline(bosslet_config, directory):
     return rds_pipeline(bosslet_config,
                         directory,
                         "Endpoint",
-                        bosslet_config.names.rds.endpoint_db)
+                        bosslet_config.names.endpoint_db.rds)
 
 def auth_rds_pipeline(bosslet_config, directory):
     return rds_pipeline(bosslet_config,
                         directory,
                         "Auth",
-                        bosslet_config.names.rds.auth_db)
+                        bosslet_config.names.auth_db.rds)
 
 if __name__ == '__main__':
     types = ['consul', 'vault', 'dynamo', 'endpoint', 'auth']

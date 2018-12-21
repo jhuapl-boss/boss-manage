@@ -77,7 +77,7 @@ def migrations_off(bosslet_config):
         Nothing
     """
     (api, _) = get_api_auth_names(bosslet_config)
-    api_elb = aws.elb_public_lookup(session, bosslet_config.names.dns.endpoint_elb)
+    api_elb = aws.elb_public_lookup(session, bosslet_config.names.endpoint_elb.dns)
 
     print("Setting Route53 for: ")
     print("{}: {}".format(api, api_elb))

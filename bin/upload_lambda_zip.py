@@ -32,7 +32,7 @@ def upload_lambda_zip(bosslet_config, path):
     s3 = bosslet_config.session.client('s3')
     with open(path, 'rb') as in_file:
         resp = s3.put_object(Bucket=bosslet_config.LAMBDA_BUCKET,
-                             Key=bosslet_config.names.zip.multi_lambda,
+                             Key=bosslet_config.names.multi_lambda.zip,
                              Body=in_file)
     print(resp)
 

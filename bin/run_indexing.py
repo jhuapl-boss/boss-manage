@@ -94,7 +94,7 @@ def get_mysql_params(bosslet_config):
     with bosslet_config.call.vault() as vault:
         params = vault.read('secret/endpoint/django/db')
 
-    return DbParams(bosslet_config.names.rds.endpoint_db,
+    return DbParams(bosslet_config.names.endpoint_db.rds,
                     params['port'],
                     params['name'],
                     params['user'],
@@ -222,7 +222,7 @@ def get_find_cuboid_args(bosslet_config, lookup_key):
 
     sfn_arn_prefix = SFN_ARN_PREFIX_FORMAT.format(bosslet_config.REGION,
                                                   bosslet_config.ACCOUNT_ID)
-    arn = '{}{}'.format(sfn_arn_prefix, bosslet_config.names.sfn.index_find_cuboids)
+    arn = '{}{}'.format(sfn_arn_prefix, bosslet_config.names.index_find_cuboids.sfn)
 
     find_cuboid_args = get_common_args(bosslet_config)
     find_cuboid_args['lookup_key'] = lookup_key

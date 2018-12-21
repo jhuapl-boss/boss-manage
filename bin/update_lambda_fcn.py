@@ -70,28 +70,28 @@ def update_lambda_code(bosslet_config):
     """
     names = AWSNames(bosslet_config)
     uses_multilambda = [
-        names.lambda_.multi_lambda, 
-        names.lambda_.downsample_volume,
-        names.lambda_.delete_tile_objs,
-        names.lambda_.delete_tile_index_entry,
-        names.lambda_.index_s3_writer, 
-        names.lambda_.index_fanout_id_writer,
-        names.lambda_.index_write_id,
-        names.lambda_.index_write_failed,
-        names.lambda_.index_find_cuboids,
-        names.lambda_.index_split_cuboids,
-        names.lambda_.index_fanout_enqueue_cuboid_keys,
-        names.lambda_.index_batch_enqueue_cuboids,
-        names.lambda_.index_fanout_dequeue_cuboid_keys,
-        names.lambda_.index_dequeue_cuboid_keys,
-        names.lambda_.index_get_num_cuboid_keys_msgs,
-        names.lambda_.index_check_for_throttling,
-        names.lambda_.index_invoke_index_supervisor,
-        names.lambda_.start_sfn,
-        names.lambda_.downsample_volume,
-        names.lambda_.copy_cuboid_lambda,
-        names.lambda_.tile_uploaded
-        names.lambda_.tile_ingest
+        names.multi_lambda.lambda_, 
+        names.downsample_volume.lambda_,
+        names.delete_tile_objs.lambda_,
+        names.delete_tile_index_entry.lambda_,
+        names.index_s3_writer.lambda_, 
+        names.index_fanout_id_writer.lambda_,
+        names.index_write_id.lambda_,
+        names.index_write_failed.lambda_,
+        names.index_find_cuboids.lambda_,
+        names.index_split_cuboids.lambda_,
+        names.index_fanout_enqueue_cuboid_keys.lambda_,
+        names.index_batch_enqueue_cuboids.lambda_,
+        names.index_fanout_dequeue_cuboid_keys.lambda_,
+        names.index_dequeue_cuboid_keys.lambda_,
+        names.index_get_num_cuboid_keys_msgs.lambda_,
+        names.index_check_for_throttling.lambda_,
+        names.index_invoke_index_supervisor.lambda_,
+        names.start_sfn.lambda_,
+        names.downsample_volume.lambda_,
+        names.copy_cuboid_lambda.lambda_,
+        names.tile_uploaded.lambda_,
+        names.tile_ingest.lambda_,
     ]
     client = bosslet_config.session.client('lambda')
     for lambda_name in uses_multilambda:
@@ -99,7 +99,7 @@ def update_lambda_code(bosslet_config):
             resp = client.update_function_code(
                 FunctionName=lambda_name,
                 S3Bucket=bosslet_config.LAMBDA_BUCKET,
-                S3Key=names.zip.multi_lambda,
+                S3Key=names.multi_lambda.zip,
                 Publish=True)
             print(resp)
         except botocore.exceptions.ClientError as ex:
@@ -149,7 +149,6 @@ def load_lambdas_on_s3(bosslet_config):
 
     # Let lambdas look up names by creating a bossnames module.
     zip.write_to_zip('names.py', zipname, arcname='bossnames/names.py')
-    zip.write_to_zip('hosts.py', zipname, arcname='bossnames/hosts.py')
     zip.write_to_zip('bucket_object_tags.py', zipname, arcname='bossnames/bucket_object_tags.py')
     zip.write_to_zip('__init__.py', zipname, arcname='bossnames/__init__.py')
     os.chdir(cwd)
@@ -191,10 +190,10 @@ def create_ndingest_settings(bosslet_config, fp):
 
     parser['boss']['domain'] = bosslet_config.INTERNAL_DOMAIN
 
-    parser['aws']['tile_bucket'] = names.s3.tile_bucket
-    parser['aws']['cuboid_bucket'] = names.s3.cuboid_bucket
-    parser['aws']['tile_index_table'] = names.ddb.tile_index
-    parser['aws']['cuboid_index_table'] = names.ddb.s3_index
+    parser['aws']['tile_bucket'] = names.tile_bucket.s3
+    parser['aws']['cuboid_bucket'] = names.cuboid_bucket.s3
+    parser['aws']['tile_index_table'] = names.tile_index.ddb
+    parser['aws']['cuboid_index_table'] = names.s3_index.ddb
     parser['aws']['max_task_id_suffix'] = str(const.MAX_TASK_ID_SUFFIX)
 
     # parser['spdb']['SUPER_CUBOID_SIZE'] = CUBOIDSIZE[0]

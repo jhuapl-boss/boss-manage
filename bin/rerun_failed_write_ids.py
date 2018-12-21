@@ -80,8 +80,8 @@ def start(bosslet_config, spacing):
     """
     sfn_arn_prefix = 'arn:aws:states:{}:{}:stateMachine:'.format(bosslet_config.REGION,
                                                                  bosslet_config.ACCOUNT_ID)
-    arn = '{}{}'.format(sfn_arn_prefix, bosslet_config.names.sfn.index_id_writer)
-    queue_name = names.sqs.index_deadletter
+    arn = '{}{}'.format(sfn_arn_prefix, bosslet_config.names.index_id_writer.sfn)
+    queue_name = names.index_deadletter.sqs
 
     sqs = bosslet_config.session.client('sqs')
     resp = sqs.get_queue_url(QueueName=queue_name)

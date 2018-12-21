@@ -43,9 +43,9 @@ def create_config(bosslet_config):
     vpc_id = config.find_vpc()
     lambda_subnets, _ = config.find_all_subnets(compatibility = 'lambda')
 
-    internal_sg = aws.sg_lookup(session, vpc_id, names.sg.internal)
+    internal_sg = aws.sg_lookup(session, vpc_id, names.internal.sg)
 
-    loadbalancer_name = names.dns.endpoint_elb
+    loadbalancer_name = names.endpoint_elb.dns
     if not aws.lb_lookup(session, loadbalancer_name):
         raise Exception("Invalid load balancer name: " + loadbalancer_name)
 
@@ -65,7 +65,7 @@ def create_config(bosslet_config):
         'IAM role for vault/consul health check'))
 
     config.add_lambda('VaultLambda',
-                      names.lambda_.vault_monitor,
+                      names.vault_monitor.lambda_,
                       description='Check health of vault instances.',
                       timeout=30,
                       role=Ref('VaultConsulHealthChecker'),
@@ -75,7 +75,7 @@ def create_config(bosslet_config):
                       file=const.VAULT_LAMBDA)
 
     config.add_lambda('ConsulLambda',
-                      names.lambda_.consul_monitor,
+                      names.consul_monitor.lambda_,
                       description='Check health of vault instances.',
                       timeout=30,
                       role=Ref('VaultConsulHealthChecker'),
@@ -92,17 +92,17 @@ def create_config(bosslet_config):
     })
 
     config.add_cloudwatch_rule('VaultConsulCheck',
-                               name=names.cw.vault_consul_check,
+                               name=names.vault_consul_check.cw,
                                description='Check health of vault and consul instances.',
                                targets=[
                                    {
                                        'Arn': Arn('VaultLambda'),
-                                       'Id': names.lambda_.vault_monitor,
+                                       'Id': names.vault_monitor.lambda_,
                                        'Input': json_str
                                    },
                                    {
                                        'Arn': Arn('ConsulLambda'),
-                                       'Id': names.lambda_.consul_monitor,
+                                       'Id': names.consul_monitor.lambda_,
                                        'Input': json_str
                                    },
                                ],
@@ -110,12 +110,12 @@ def create_config(bosslet_config):
                                depends_on=['VaultLambda', 'ConsulLambda'])
 
     config.add_lambda_permission('VaultPerms',
-                                 names.lambda_.vault_monitor,
+                                 names.vault_monitor.lambda_,
                                  principal='events.amazonaws.com',
                                  source=Arn('VaultConsulCheck'))
 
     config.add_lambda_permission('ConsulPerms',
-                                 names.lambda_.consul_monitor,
+                                 names.consul_monitor.lambda_,
                                  principal='events.amazonaws.com',
                                  source=Arn('VaultConsulCheck'))
 

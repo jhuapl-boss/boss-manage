@@ -74,11 +74,11 @@ def create_config(bosslet_config):
 
     role = aws.role_arn_lookup(session, "lambda_cache_execution")
     config.add_arg(Arg.String("LambdaCacheExecutionRole", role,
-                              "IAM role for " + names.lambda_.multi_lambda))
+                              "IAM role for " + names.multi_lambda.lambda_))
 
     lambda_key = generate_lambda_key(domain)
     config.add_lambda(DYNAMO_LAMBDA_KEY,
-                      names.lambda_.dynamo_lambda,
+                      names.dynamo_lambda.lambda_,
                       Ref("LambdaCacheExecutionRole"),
                       s3=(bosslet_config.LAMBDA_BUCKET,
                           lambda_key,
@@ -89,19 +89,19 @@ def create_config(bosslet_config):
                       reserved_executions=1)
 
     config.add_cloudwatch_rule(TRIGGER_KEY,
-                               name=names.cw.trigger_dynamo_autoscale,
+                               name=names.trigger_dynamo_autoscale.cw,
                                description='Run DynamoDB table autoscaler',
                                targets=[
                                    {
                                        'Arn': Arn(DYNAMO_LAMBDA_KEY),
-                                       'Id': names.lambda_.vault_monitor,
+                                       'Id': names.vault_monitor.lambda_,
                                    }
                                ],
                                schedule='rate(1 minute)',
                                depends_on=[DYNAMO_LAMBDA_KEY])
 
     config.add_lambda_permission('TriggerPerms',
-                                 names.lambda_.dynamo_lambda,
+                                 names.dynamo_lambda.lambda_,
                                  principal='events.amazonaws.com',
                                  source=Arn(TRIGGER_KEY))
 
@@ -241,5 +241,5 @@ def generate_lambda_key(bosslet_config):
     Returns:
         (str)
     """
-    return bosslet_config.names.zip.dynamodb_autoscale
+    return bosslet_config.names.dynamodb_autoscale.zip
 

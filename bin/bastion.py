@@ -94,7 +94,7 @@ if __name__ == "__main__":
     bosslet_config = args.bosslet_config
 
     bastion = aws.machine_lookup(bosslet_config.session,
-                                 bosslet_config.names.dns.bastion) 
+                                 bosslet_config.names.bastion.dns) 
 
     ssh_target = SSHTarget(bosslet_config.ssh_key, args.ip, args.port, args.user)
     bastions = [SSHTarget(bosslet_config.ssh_key, bastion, 22, 'ec2-user')]

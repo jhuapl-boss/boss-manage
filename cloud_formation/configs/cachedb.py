@@ -139,7 +139,7 @@ def create_config(bosslet_config, user_data=None):
     #       increase cost and cleans up subnet creation
 
     # Create several subnets for all the lambdas to use.
-    internal_route_table_id = aws.rt_lookup(session, vpc_id, names.rt.internal)
+    internal_route_table_id = aws.rt_lookup(session, vpc_id, names.internal.rt)
 
     lambda_subnets = config.add_all_lambda_subnets()
     for lambda_subnet in lambda_subnets:
@@ -150,21 +150,21 @@ def create_config(bosslet_config, user_data=None):
 
     # Lookup the External Subnet, Internal Security Group IDs that are
     # needed by other resources
-    internal_subnet_id = aws.subnet_id_lookup(session, names.subnet.internal)
+    internal_subnet_id = aws.subnet_id_lookup(session, names.internal.subnet)
     config.add_arg(Arg.Subnet("InternalSubnet",
                               internal_subnet_id,
                               "ID of Internal Subnet to create resources in"))
 
-    internal_sg_id = aws.sg_lookup(session, vpc_id, names.sg.internal)
+    internal_sg_id = aws.sg_lookup(session, vpc_id, names.internal.sg)
     config.add_arg(Arg.SecurityGroup("InternalSecurityGroup",
                                      internal_sg_id,
                                      "ID of internal Security Group"))
 
     role = aws.role_arn_lookup(session, "lambda_cache_execution")
     config.add_arg(Arg.String("LambdaCacheExecutionRole", role,
-                              "IAM role for " + names.lambda_.multi_lambda))
+                              "IAM role for " + names.multi_lambda.lambda_))
 
-    index_bucket_name = names.s3.cuboid_bucket
+    index_bucket_name = names.cuboid_bucket.s3
     if not aws.s3_bucket_exists(session, index_bucket_name):
         config.add_s3_bucket("cuboidBucket", index_bucket_name)
     config.add_s3_bucket_policy(
@@ -172,7 +172,7 @@ def create_config(bosslet_config, user_data=None):
         ['s3:GetObject', 's3:PutObject'],
         { 'AWS': role})
 
-    delete_bucket_name = names.s3.delete_bucket
+    delete_bucket_name = names.delete_bucket.s3
     if not aws.s3_bucket_exists(session, delete_bucket_name):
         config.add_s3_bucket("deleteBucket", delete_bucket_name)
     config.add_s3_bucket_policy(
@@ -181,7 +181,7 @@ def create_config(bosslet_config, user_data=None):
         { 'AWS': role})
 
     creating_tile_bucket = False
-    tile_bucket_name = names.s3.tile_bucket
+    tile_bucket_name = names.tile_bucket.s3
     if not aws.s3_bucket_exists(session, tile_bucket_name):
         creating_tile_bucket = True
         life_cycle_cfg = get_cf_bucket_life_cycle_rules()
@@ -193,7 +193,7 @@ def create_config(bosslet_config, user_data=None):
         ['s3:GetObject', 's3:PutObject'],
         { 'AWS': role})
 
-    ingest_bucket_name = names.s3.ingest_bucket
+    ingest_bucket_name = names.ingest_bucket.s3
     if not aws.s3_bucket_exists(session, ingest_bucket_name):
         config.add_s3_bucket("ingestBucket", ingest_bucket_name)
     # Uncomment when merging volumetric ingest back in.
@@ -203,8 +203,8 @@ def create_config(bosslet_config, user_data=None):
     #    { 'AWS': cuboid_import_role})
 
     config.add_ec2_instance("CacheManager",
-                            names.dns.cache_manager,
-                            aws.ami_lookup(bosslet_config, names.ami.cache_manager),
+                            names.cache_manager.dns,
+                            aws.ami_lookup(bosslet_config, names.cache_manager.ami),
                             keypair,
                             subnet=Ref("InternalSubnet"),
                             public_ip=False,
@@ -214,13 +214,13 @@ def create_config(bosslet_config, user_data=None):
                             role="cachemanager")
 
     config.add_sqs_queue(
-        names.sqs.ingest_cleanup_dlq, names.sqs.ingest_cleanup_dlq, 30, 20160)
+        names.ingest_cleanup_dlq.sqs, names.ingest_cleanup_dlq.sqs, 30, 20160)
 
     config.add_lambda("MultiLambda",
-                      names.lambda_.multi_lambda,
+                      names.multi_lambda.lambda_,
                       Ref("LambdaCacheExecutionRole"),
                       s3=(bosslet_config.LAMBDA_BUCKET,
-                          names.zip.multi_lambda,
+                          names.multi_lambda.zip,
                           "lambda_loader.handler"),
                       timeout=120,
                       memory=1536,
@@ -228,53 +228,53 @@ def create_config(bosslet_config, user_data=None):
                       subnets=lambda_subnets,
                       runtime='python3.6')
     config.add_lambda("TileUploadedLambda",
-                      names.lambda_.tile_uploaded,
+                      names.tile_uploaded.lambda_,
                       Ref("LambdaCacheExecutionRole"),
                       s3=(bosslet_config.LAMBDA_BUCKET,
-                          names.zip.multi_lambda,
+                          names.multi_lambda.zip,
                           "tile_uploaded_lambda.handler"),
                       timeout=30,
                       memory=256,
                       runtime='python3.6')
     config.add_lambda("TileIngestLambda",
-                      names.lambda_.tile_ingest,
+                      names.tile_ingest.lambda_,
                       Ref("LambdaCacheExecutionRole"),
                       s3=(bosslet_config.LAMBDA_BUCKET,
-                          names.zip.multi_lambda,
+                          names.multi_lambda.zip,
                           "tile_ingest_lambda.handler"),
                       timeout=120,
                       memory=1024,
                       runtime='python3.6')
     config.add_lambda("DeleteTileObjsLambda",
-                      names.lambda_.delete_tile_objs,
+                      names.delete_tile_objs.lambda_,
                       Ref("LambdaCacheExecutionRole"),
                       s3=(bosslet_config.LAMBDA_BUCKET,
-                          names.zip.multi_lambda,
+                          names.multi_lambda.zip,
                           "delete_tile_objs_lambda.handler"),
                       timeout=90,
                       memory=128,
                       runtime='python3.6',
-                      dlq=Arn(names.sqs.ingest_cleanup_dlq))
+                      dlq=Arn(names.ingest_cleanup_dlq.sqs))
     config.add_lambda("DeleteTileEntryLambda",
-                      names.lambda_.delete_tile_index_entry,
+                      names.delete_tile_index_entry.lambda_,
                       Ref("LambdaCacheExecutionRole"),
                       s3=(bosslet_config.LAMBDA_BUCKET,
-                          names.zip.multi_lambda,
+                          names.multi_lambda.zip,
                           "delete_tile_index_entry_lambda.handler"),
                       timeout=90,
                       memory=128,
                       runtime='python3.6',
-                      dlq=Arn(names.sqs.ingest_cleanup_dlq))
+                      dlq=Arn(names.ingest_cleanup_dlq.sqs))
 
     if creating_tile_bucket:
         config.add_lambda_permission('tileBucketInvokeTileUploadLambda',
-                                     names.lambda_.tile_uploaded,
+                                     names.tile_uploaded.lambda_,
                                      principal='s3.amazonaws.com',
                                      source={ 'Fn::Join': [':', ['arn', 'aws', 's3', '', '', tile_bucket_name]]},
                                      depends_on=['tileBucket', 'TileUploadedLambda'])
     else:
         config.add_lambda_permission('tileBucketInvokeMultiLambda',
-                                     names.lambda_.tile_uploaded,
+                                     names.tile_uploaded.lambda_,
                                      principal='s3.amazonaws.com',
                                      source={ 'Fn::Join': [':', ['arn', 'aws', 's3', '', '', tile_bucket_name]]},
                                      depends_on='TileUploadedLambda')
@@ -300,21 +300,21 @@ def create(bosslet_config):
     session = bosslet_config.session
 
     user_data = UserData()
-    user_data["system"]["fqdn"] = names.dns.cache_manager
+    user_data["system"]["fqdn"] = names.cache_manager.dns
     user_data["system"]["type"] = "cachemanager"
-    user_data["aws"]["cache"] = names.redis.cache
-    user_data["aws"]["cache-state"] = names.redis.cache_state
+    user_data["aws"]["cache"] = names.cache.redis
+    user_data["aws"]["cache-state"] = names.cache_state.redis
     user_data["aws"]["cache-db"] = "0"
     user_data["aws"]["cache-state-db"] = "0"
 
-    user_data["aws"]["s3-flush-queue"] = aws.sqs_lookup_url(session, names.sqs.s3flush)
-    user_data["aws"]["s3-flush-deadletter-queue"] = aws.sqs_lookup_url(session, names.sqs.deadletter)
+    user_data["aws"]["s3-flush-queue"] = aws.sqs_lookup_url(session, names.s3flush.sqs)
+    user_data["aws"]["s3-flush-deadletter-queue"] = aws.sqs_lookup_url(session, names.deadletter.sqs)
 
-    user_data["aws"]["cuboid_bucket"] = names.s3.cuboid_bucket
-    user_data["aws"]["ingest_bucket"] = names.s3.ingest_bucket
-    user_data["aws"]["s3-index-table"] = names.ddb.s3_index
-    user_data["aws"]["id-index-table"] = names.ddb.id_index
-    user_data["aws"]["id-count-table"] = names.ddb.id_count_index
+    user_data["aws"]["cuboid_bucket"] = names.cuboid_bucket.s3
+    user_data["aws"]["ingest_bucket"] = names.ingest_bucket.s3
+    user_data["aws"]["s3-index-table"] = names.s3_index.ddb
+    user_data["aws"]["id-index-table"] = names.id_index.ddb
+    user_data["aws"]["id-count-table"] = names.id_count_index.ddb
 
     #user_data["aws"]["sns-write-locked"] = str(Ref('WriteLock'))
 
@@ -324,8 +324,8 @@ def create(bosslet_config):
         raise Exception(msg)
     user_data["aws"]["sns-write-locked"] = mailing_list_arn
 
-    user_data["lambda"]["flush_function"] = names.lambda_.multi_lambda
-    user_data["lambda"]["page_in_function"] = names.lambda_.multi_lambda
+    user_data["lambda"]["flush_function"] = names.multi_lambda.lambda_
+    user_data["lambda"]["page_in_function"] = names.multi_lambda.lambda_
 
     pre_init(bosslet_config)
 
@@ -358,17 +358,17 @@ def post_init(bosslet_config):
 
     print('adding tile bucket trigger of tile_uploaded_lambda')
     add_bucket_trigger(bosslet_config.session,
-                       bosslet_config.names.lambda_.tile_uploaded,
-                       bosslet_config.names.s3.tile_bucket,
+                       bosslet_config.names.tile_uploaded.lambda_,
+                       bosslet_config.names.tile_bucket.s3,
                        TILE_BUCKET_TRIGGER)
 
     print('setting tile bucket expiration policy')
     set_bucket_life_cycle_policy(bosslet_config.session,
-                                 bosslet_config.names.s3.tile_bucket)
+                                 bosslet_config.names.tile_bucket.s3)
 
     print('setting ingest bucket expiration policy')
     set_bucket_life_cycle_policy(bosslet_config.session,
-                                 bosslet_config.names.s3.ingest_bucket)
+                                 bosslet_config.names.ingest_bucket.s3)
 
 def set_bucket_life_cycle_policy(session, bucket_name):
     """
@@ -423,7 +423,7 @@ def delete(bosslet_config):
     domain = bosslet_config.INTERNAL_DOMAIN
     names = bosslet_config.names
 
-    aws.route53_delete_records(session, domain, names.dns.cache_manager)
+    aws.route53_delete_records(session, domain, names.cache_manager.dns)
 
     config = CloudFormationConfiguration("cachedb", bosslet_config)
     config.delete()

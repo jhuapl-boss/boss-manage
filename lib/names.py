@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import hosts
-
 def format_capitalize(fqdn):
     return "".join([x.capitalize() for x in fqdn.split('.')])
 
@@ -96,7 +94,7 @@ class AWSNames(object):
         'lambda_': format_dash, # Need '_' as lambda is a keyword
                                  # XXX: not all lambdas used dashes
         'rds': None,
-        'sns': None,
+        'sns': format_dash,
         'sqs': format_capitalize,
         'sg': None, # Security Group
         'rt': None, # Route Table
@@ -158,7 +156,7 @@ class AWSNames(object):
                                     'type': 'lambda_'},
         'delete_tile_objs': {'name': 'deleteTileObjsLambda',
                              'type': 'lambda_'},
-        'dns': {'type': 'sns'},
+        'dns': {'types': ['sns', 'lambda_']},
         'downsample_dlq': {'name': 'downsample-dlq',
                            'type': 'sqs'},
         'downsample_volume': {'name': 'downsample.volume',
@@ -270,7 +268,7 @@ class AWSNames(object):
         'vault': {'types': ['dns', 'ami']},
     }
 
-    def build(self, resource_type, name):
+    def build(self, name, resource_type):
         if resource_type not in self.TYPES:
             raise AttributeError("'{}' is not a valide resource type".format(resource_type))
 

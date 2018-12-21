@@ -46,18 +46,18 @@ def create_config(bosslet_config):
     }
 
     config.add_redis_replication("Cache",
-                                 names.redis.cache,
+                                 names.cache.redis,
                                  internal_subnets,
-                                 [sgs[names.sg.internal]],
+                                 [sgs[names.internal.sg]],
                                  type_=const.REDIS_CACHE_TYPE,
                                  version="3.2.4",
                                  clusters=const.REDIS_CLUSTER_SIZE,
                                  parameters=REDIS_PARAMETERS)
 
     config.add_redis_replication("CacheState",
-                                 names.redis.cache_state,
+                                 names.cache_state.redis,
                                  internal_subnets,
-                                 [sgs[names.sg.internal]],
+                                 [sgs[names.internal.sg]],
                                  type_=const.REDIS_TYPE,
                                  version="3.2.4",
                                  clusters=const.REDIS_CLUSTER_SIZE)
@@ -65,9 +65,9 @@ def create_config(bosslet_config):
     # This one may not be created depending on the scenario type.
     if const.REDIS_SESSION_TYPE is not None:
         config.add_redis_replication("CacheSession",
-                                     names.redis.cache_session,
+                                     names.cache_session.redis,
                                      internal_subnets,
-                                     [sgs[names.sg.internal]],
+                                     [sgs[names.internal.sg]],
                                      type_=const.REDIS_SESSION_TYPE,
                                      version="3.2.4",
                                      clusters=1)

@@ -83,14 +83,14 @@ def create_config(bosslet_config):
     config.add_vpc()
 
     # Create the internal and external subnets
-    config.add_subnet('InternalSubnet', names.subnet.internal)
-    config.add_subnet('ExternalSubnet', names.subnet.external)
+    config.add_subnet('InternalSubnet', names.internal.subnet)
+    config.add_subnet('ExternalSubnet', names.external.subnet)
     internal_subnets, external_subnets = config.add_all_subnets()
     internal_subnets_asg, external_subnets_asg = config.find_all_subnets('asg')
 
     user_data = const.BASTION_USER_DATA.format(bosslet_config.NETWORK)
     config.add_ec2_instance("Bastion",
-                            names.dns.bastion,
+                            names.bastion.dns,
                             aws.ami_lookup(bosslet_config, const.BASTION_AMI),
                             keypair,
                             subnet = Ref("ExternalSubnet"),
@@ -100,12 +100,12 @@ def create_config(bosslet_config):
                             depends_on = "AttachInternetGateway")
 
     user_data = UserData()
-    user_data["system"]["fqdn"] = names.dns.consul
+    user_data["system"]["fqdn"] = names.consul.dns
     user_data["system"]["type"] = "consul"
     user_data["consul"]["cluster"] = str(const.CONSUL_CLUSTER_SIZE)
     config.add_autoscale_group("Consul",
-                               names.dns.consul,
-                               aws.ami_lookup(bosslet_config, names.ami.consul),
+                               names.consul.dns,
+                               aws.ami_lookup(bosslet_config, names.consul.ami),
                                keypair,
                                subnets = internal_subnets_asg,
                                security_groups = [Ref("InternalSecurityGroup")],
@@ -118,11 +118,11 @@ def create_config(bosslet_config):
                                depends_on = ["DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
     user_data = UserData()
-    user_data["system"]["fqdn"] = names.dns.vault
+    user_data["system"]["fqdn"] = names.vault.dns
     user_data["system"]["type"] = "vault"
     config.add_autoscale_group("Vault",
-                               names.dns.vault,
-                               aws.ami_lookup(bosslet_config, names.ami.vault),
+                               names.vault.dns,
+                               aws.ami_lookup(bosslet_config, names.vault.ami),
                                keypair,
                                subnets = internal_subnets_asg,
                                security_groups = [Ref("InternalSecurityGroup")],
@@ -135,7 +135,7 @@ def create_config(bosslet_config):
 
 
     user_data = UserData()
-    user_data["system"]["fqdn"] = names.dns.auth
+    user_data["system"]["fqdn"] = names.auth.dns
     user_data["system"]["type"] = "auth"
     deps = ["AuthSecurityGroup",
             "AttachInternetGateway",
@@ -156,8 +156,8 @@ def create_config(bosslet_config):
     cert = aws.cert_arn_lookup(session, names.public_dns('auth'))
     create_asg_elb(config,
                    "Auth",
-                   names.dns.auth,
-                   aws.ami_lookup(bosslet_config, names.ami.auth),
+                   names.auth.dns,
+                   aws.ami_lookup(bosslet_config, names.auth.ami),
                    keypair,
                    str(user_data),
                    const.AUTH_CLUSTER_SIZE,
@@ -170,7 +170,7 @@ def create_config(bosslet_config):
 
     if USE_DB:
         config.add_rds_db("AuthDB",
-                          names.dns.auth_db,
+                          names.auth_db.dns,
                           "3306",
                           "keycloak",
                           "keycloak",
@@ -181,7 +181,7 @@ def create_config(bosslet_config):
 
 
     config.add_lambda("DNSLambda",
-                      names.lambda_.dns,
+                      names.dns.lambda_,
                       aws.role_arn_lookup(session, 'UpdateRoute53'),
                       const.DNS_LAMBDA,
                       handler="index.handler",
@@ -191,32 +191,32 @@ def create_config(bosslet_config):
     config.add_lambda_permission("DNSLambdaExecute", Ref("DNSLambda"))
 
     config.add_sns_topic("DNSSNS",
-                         names.sns.dns,
-                         names.sns.dns,
+                         names.dns.sns,
+                         names.dns.sns,
                          [("lambda", Arn("DNSLambda"))])
 
 
     config.add_security_group("InternalSecurityGroup",
-                              names.sg.internal,
+                              names.internal.sg,
                               [("-1", "-1", "-1", "10.0.0.0/8")])
 
     # Allow SSH access to bastion from anywhere
     incoming_subnet = bosslet_config.SSH_INBOUND
     config.add_security_group("BastionSecurityGroup",
-                              names.sg.ssh,
+                              names.ssh.sg,
                               [("tcp", "22", "22", incoming_subnet)])
 
     incoming_subnet = bosslet_config.HTTPS_INBOUND
     config.add_security_group("AuthSecurityGroup",
-                              #names.sg.https, DP XXX: hack until we can get production updated correctly
-                              names.sg.auth,
+                              #names.https.sg, DP XXX: hack until we can get production updated correctly
+                              names.auth.sg,
                               [("tcp", "443", "443", incoming_subnet)])
 
     # Create the internal route table to route traffic to the NAT Bastion
     all_internal_subnets = internal_subnets.copy()
     all_internal_subnets.append(Ref("InternalSubnet"))
     config.add_route_table("InternalRouteTable",
-                           names.rt.internal,
+                           names.internal.rt,
                            subnets = all_internal_subnets)
 
     config.add_route_table_route("InternalNatRoute",
@@ -228,7 +228,7 @@ def create_config(bosslet_config):
     all_external_subnets = external_subnets.copy()
     all_external_subnets.append(Ref("ExternalSubnet"))
     config.add_route_table("InternetRouteTable",
-                           names.rt.internet,
+                           names.internet.rt,
                            subnets = all_external_subnets)
 
     config.add_route_table_route("InternetRoute",
@@ -236,7 +236,7 @@ def create_config(bosslet_config):
                                  gateway = Ref("InternetGateway"),
                                  depends_on = "AttachInternetGateway")
 
-    config.add_internet_gateway("InternetGateway", names.gw.internet)
+    config.add_internet_gateway("InternetGateway", names.internet.gw)
     config.add_endpoint("S3Endpoint", "s3", [Ref("InternalRouteTable")])
     config.add_nat("NAT", Ref("ExternalSubnet"), depends_on="AttachInternetGateway")
 
@@ -273,7 +273,7 @@ def post_init(bosslet_config):
     auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_domain)
 
     # Configure external DNS
-    auth_elb = aws.elb_public_lookup(session, names.dns.auth)
+    auth_elb = aws.elb_public_lookup(session, names.auth.dns)
     hosted_zone = bosslet_config.EXTERNAL_DOMAIN
     aws.set_domain_to_dns_name(session, auth_domain, auth_elb, hosted_zone)
 
@@ -342,7 +342,7 @@ def post_init(bosslet_config):
     ##          Also need to guard the writes to vault with the admin password
     #######
 
-    with call.ssh(names.dns.auth) as ssh:
+    with call.ssh(names.auth.dns) as ssh:
         print("Creating initial Keycloak admin user")
         ssh("/srv/keycloak/bin/add-user.sh -r master -u {} -p {}".format(username, password))
 
@@ -357,7 +357,7 @@ def post_init(bosslet_config):
     print("Waiting for Keycloak to restart")
     call.check_keycloak(const.TIMEOUT_KEYCLOAK)
 
-    with call.tunnel(names.dns.auth, 8080) as port:
+    with call.tunnel(names.auth.dns, 8080) as port:
         URL = "http://localhost:{}".format(port) # TODO move out of tunnel and use public address
 
         with KeyCloakClient(URL, username, password) as kc:
@@ -377,7 +377,7 @@ def post_init(bosslet_config):
             kc.create_realm(realm)
 
     # Tell Scalyr to get CloudWatch metrics for these instances.
-    instances = [ names.dns.vault ]
+    instances = [ names.vault.dns ]
     scalyr.add_instances_to_scalyr(session, bosslet_config.REGION, instances)
 
 def update(bosslet_config):
@@ -432,7 +432,7 @@ def update(bosslet_config):
         # launch the new instance, and have the instance cluster
         tpe.submit(aws.asg_restart,
                    session,
-                   names.dns.consul,
+                   names.consul.dns,
                    consul_update_timeout * 60)
 
 def delete(bosslet_config):
@@ -444,11 +444,11 @@ def delete(bosslet_config):
     domain = bosslet_config.INTERNAL_DOMAIN
     names = bosslet_config.names
 
-    aws.route53_delete_records(session, domain, names.dns.auth)
-    aws.route53_delete_records(session, domain, names.dns.consul)
-    aws.route53_delete_records(session, domain, names.dns.vault)
+    aws.route53_delete_records(session, domain, names.auth.dns)
+    aws.route53_delete_records(session, domain, names.consul.dns)
+    aws.route53_delete_records(session, domain, names.vault.dns)
 
-    aws.sns_unsubscribe_all(bosslet_config, names.sns.dns)
+    aws.sns_unsubscribe_all(bosslet_config, names.dns.sns)
 
     config = CloudFormationConfiguration('core', bosslet_config)
     config.delete()

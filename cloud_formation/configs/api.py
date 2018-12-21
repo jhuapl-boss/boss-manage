@@ -47,9 +47,9 @@ def create_config(bosslet_config, db_config={}):
     # Lookup IAM Role and SNS Topic ARNs for used later in the config
     endpoint_role_arn = aws.role_arn_lookup(session, "endpoint")
     cachemanager_role_arn = aws.role_arn_lookup(session, 'cachemanager')
-    dns_arn = aws.sns_topic_lookup(session, names.sns.dns.replace(".", "-"))
+    dns_arn = aws.sns_topic_lookup(session, names.dns.sns)
     if dns_arn is None:
-        raise Exception("SNS topic named " + names.sns.dns + " does not exist.")
+        raise Exception("SNS topic named " + names.dns.sns + " does not exist.")
 
     mailing_list_arn = aws.sns_topic_lookup(session, const.PRODUCTION_MAILING_LIST)
     if mailing_list_arn is None:
@@ -59,13 +59,13 @@ def create_config(bosslet_config, db_config={}):
     # Configure Vault and create the user data config that the endpoint will
     # use for connecting to Vault and the DB instance
     user_data = UserData()
-    user_data["system"]["fqdn"] = names.dns.endpoint
+    user_data["system"]["fqdn"] = names.endpoint.dns
     user_data["system"]["type"] = "endpoint"
-    user_data["aws"]["db"] = names.rds.endpoint_db # XXX: rds type?
-    user_data["aws"]["cache"] = names.redis.cache
-    user_data["aws"]["cache-state"] = names.redis.cache_state
+    user_data["aws"]["db"] = names.endpoint_db.rds
+    user_data["aws"]["cache"] = names.cache.redis
+    user_data["aws"]["cache-state"] = names.cache_state.redis
     if const.REDIS_SESSION_TYPE is not None:
-        user_data["aws"]["cache-session"] = names.redis.cache_session
+        user_data["aws"]["cache-session"] = names.cache_session.redis
     else:
         # Don't create a Redis server for dev stacks.
         user_data["aws"]["cache-session"] = ''
@@ -74,36 +74,36 @@ def create_config(bosslet_config, db_config={}):
     user_data["aws"]["cache-db"] = "0"
     user_data["aws"]["cache-state-db"] = "0"
     user_data["aws"]["cache-session-db"] = "0"
-    user_data["aws"]["meta-db"] = names.ddb.meta
+    user_data["aws"]["meta-db"] = names.meta.ddb
 
     # Use CloudFormation's Ref function so that queues' URLs are placed into
     # the Boss config file.
-    user_data["aws"]["s3-flush-queue"] = str(Ref(names.sqs.s3flush)) # str(Ref("S3FlushQueue")) DP XXX
-    user_data["aws"]["s3-flush-deadletter-queue"] = str(Ref(names.sqs.deadletter)) #str(Ref("DeadLetterQueue")) DP XXX
-    user_data["aws"]["cuboid_bucket"] = names.s3.cuboid_bucket
-    user_data["aws"]["tile_bucket"] = names.s3.tile_bucket
-    user_data["aws"]["ingest_bucket"] = names.s3.ingest_bucket
-    user_data["aws"]["s3-index-table"] = names.ddb.s3_index
-    user_data["aws"]["tile-index-table"] = names.ddb.tile_index
-    user_data["aws"]["id-index-table"] = names.ddb.id_index
-    user_data["aws"]["id-count-table"] = names.ddb.id_count_index
+    user_data["aws"]["s3-flush-queue"] = str(Ref(names.s3flush.sqs)) # str(Ref("S3FlushQueue")) DP XXX
+    user_data["aws"]["s3-flush-deadletter-queue"] = str(Ref(names.deadletter.sqs)) #str(Ref("DeadLetterQueue")) DP XXX
+    user_data["aws"]["cuboid_bucket"] = names.cuboid_bucket.s3
+    user_data["aws"]["tile_bucket"] = names.tile_bucket.s3
+    user_data["aws"]["ingest_bucket"] = names.ingest_bucket.s3
+    user_data["aws"]["s3-index-table"] = names.s3_index.ddb
+    user_data["aws"]["tile-index-table"] = names.tile_index.ddb
+    user_data["aws"]["id-index-table"] = names.id_index.ddb
+    user_data["aws"]["id-count-table"] = names.id_count_index.ddb
     user_data["aws"]["prod_mailing_list"] = mailing_list_arn
     user_data["aws"]["max_task_id_suffix"] = str(const.MAX_TASK_ID_SUFFIX)
     user_data["aws"]["id-index-new-chunk-threshold"] = str(const.DYNAMO_ID_INDEX_NEW_CHUNK_THRESHOLD)
-    user_data["aws"]["index-deadletter-queue"] = str(Ref(names.sqs.index_deadletter))
-    user_data["aws"]["index-cuboids-keys-queue"] = str(Ref(names.sqs.index_cuboids_keys))
+    user_data["aws"]["index-deadletter-queue"] = str(Ref(names.index_deadletter.sqs))
+    user_data["aws"]["index-cuboids-keys-queue"] = str(Ref(names.index_cuboids_keys.sqs))
 
     user_data["auth"]["OIDC_VERIFY_SSL"] = bosslet_config.VERIFY_SSL
-    user_data["lambda"]["flush_function"] = names.lambda_.multi_lambda
-    user_data["lambda"]["page_in_function"] = names.lambda_.multi_lambda
-    user_data["lambda"]["ingest_function"] = names.lambda_.tile_ingest
-    user_data["lambda"]["downsample_volume"] = names.lambda_.downsample_volume
+    user_data["lambda"]["flush_function"] = names.multi_lambda.lambda_
+    user_data["lambda"]["page_in_function"] = names.multi_lambda.lambda_
+    user_data["lambda"]["ingest_function"] = names.tile_ingest.lambda_
+    user_data["lambda"]["downsample_volume"] = names.downsample_volume.lambda_
 
-    user_data['sfn']['populate_upload_queue'] = names.sfn.ingest_queue_populate
-    user_data['sfn']['upload_sfn'] = names.sfn.ingest_queue_upload
-    user_data['sfn']['downsample_sfn'] = names.sfn.resolution_hierarchy
-    user_data['sfn']['index_id_writer_sfn'] = names.sfn.index_id_writer
-    user_data['sfn']['index_cuboid_supervisor_sfn'] = names.sfn.index_cuboid_supervisor
+    user_data['sfn']['populate_upload_queue'] = names.ingest_queue_populate.sfn
+    user_data['sfn']['upload_sfn'] = names.ingest_queue_upload.sfn
+    user_data['sfn']['downsample_sfn'] = names.resolution_hierarchy.sfn
+    user_data['sfn']['index_id_writer_sfn'] = names.index_id_writer.sfn
+    user_data['sfn']['index_cuboid_supervisor_sfn'] = names.index_cuboid_supervisor.sfn
 
     # Prepare user data for parsing by CloudFormation.
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
@@ -117,44 +117,44 @@ def create_config(bosslet_config, db_config={}):
     sgs = aws.sg_lookup_all(session, vpc_id)
 
     # DP XXX: hack until we can get productio updated correctly
-    config.add_security_group('AllHTTPSSecurityGroup', names.sg.https, [('tcp', '443', '443', bosslet_config.HTTPS_INBOUND)])
-    sgs[names.sg.https] = Ref('AllHTTPSSecurityGroup')
+    config.add_security_group('AllHTTPSSecurityGroup', names.https.sg, [('tcp', '443', '443', bosslet_config.HTTPS_INBOUND)])
+    sgs[names.https.sg] = Ref('AllHTTPSSecurityGroup')
 
 
     # Create SQS queues and apply access control policies.
     # Deadletter queue for indexing operations.  This one is populated
     # manually by states in the indexing step functions.
-    config.add_sqs_queue(names.sqs.index_deadletter, names.sqs.index_deadletter, 30, 20160)
+    config.add_sqs_queue(names.index_deadletter.sqs, names.index_deadletter.sqs, 30, 20160)
 
     # Queue that holds S3 object keys of cuboids to be indexed.
-    config.add_sqs_queue(names.sqs.index_cuboids_keys, names.sqs.index_cuboids_keys, 120, 20160)
+    config.add_sqs_queue(names.index_cuboids_keys.sqs, names.index_cuboids_keys.sqs, 120, 20160)
 
-    #config.add_sqs_queue("DeadLetterQueue", names.deadletter_queue, 30, 20160) DP XXX
-    config.add_sqs_queue(names.sqs.deadletter, names.sqs.deadletter, 30, 20160)
+    #config.add_sqs_queue("DeadLetterQueue", names.deadletter.sqs, 30, 20160) DP XXX
+    config.add_sqs_queue(names.deadletter.sqs, names.deadletter.sqs, 30, 20160)
 
     max_receives = 3
     #config.add_sqs_queue("S3FlushQueue", DP XXX
-    config.add_sqs_queue(names.sqs.s3flush,
-                         names.sqs.s3flush,
+    config.add_sqs_queue(names.s3flush.sqs,
+                         names.s3flush.sqs,
                          30,
-                         dead=(Arn(names.sqs.deadletter), max_receives))
+                         dead=(Arn(names.deadletter.sqs), max_receives))
 
     config.add_sqs_policy("sqsEndpointPolicy", 'sqsEndpointPolicy', # DP XXX
-                          [Ref(names.sqs.deadletter), Ref(names.sqs.s3flush)],
+                          [Ref(names.deadletter.sqs), Ref(names.s3flush.sqs)],
                           endpoint_role_arn)
 
     config.add_sqs_policy("sqsCachemgrPolicy", 'sqsCachemgrPolicy', # DP XXX
-                          [Ref(names.sqs.deadletter), Ref(names.sqs.s3flush)],
+                          [Ref(names.deadletter.sqs), Ref(names.s3flush.sqs)],
                           cachemanager_role_arn)
 
     # Create the endpoint ASG, ELB, and RDS instance
     config.add_autoscale_group("Endpoint",
-                               names.dns.endpoint,
-                               aws.ami_lookup(bosslet_config, names.ami.endpoint),
+                               names.endpoint.dns,
+                               aws.ami_lookup(bosslet_config, names.endpoint.ami),
                                keypair,
                                subnets=az_subnets_asg,
                                type_=const.ENDPOINT_TYPE,
-                               security_groups=[sgs[names.sg.internal]],
+                               security_groups=[sgs[names.internal.sg]],
                                user_data=parsed_user_data,
                                min=const.ENDPOINT_CLUSTER_MIN,
                                max=const.ENDPOINT_CLUSTER_MAX,
@@ -167,10 +167,10 @@ def create_config(bosslet_config, db_config={}):
 
     cert = aws.cert_arn_lookup(session, names.public_dns("api"))
     config.add_loadbalancer("EndpointLoadBalancer",
-                            names.dns.endpoint_elb,
+                            names.endpoint_elb.dns,
                             [("443", "80", "HTTPS", cert)],
                             subnets=external_subnets_asg,
-                            security_groups=[sgs[names.sg.internal], sgs[names.sg.https]],
+                            security_groups=[sgs[names.internal.sg], sgs[names.https.sg]],
                             public=True)
 
     # Endpoint servers are not CPU bound typically, so react quickly to load
@@ -196,35 +196,35 @@ def create_config(bosslet_config, db_config={}):
                                 period=50)
 
     config.add_rds_db("EndpointDB",
-                      names.dns.endpoint_db,
+                      names.endpoint_db.dns,
                       db_config.get("port"),
                       db_config.get("name"),
                       db_config.get("user"),
                       db_config.get("password"),
                       internal_subnets,
                       type_ = const.RDS_TYPE,
-                      security_groups=[sgs[names.sg.internal]])
+                      security_groups=[sgs[names.internal.sg]])
 
     # Create the Meta, s3Index, tileIndex, annotation Dynamo tables
     with open(const.DYNAMO_METADATA_SCHEMA, 'r') as fh:
         dynamo_cfg = json.load(fh)
-    config.add_dynamo_table_from_json("EndpointMetaDB", names.ddb.meta, **dynamo_cfg)
+    config.add_dynamo_table_from_json("EndpointMetaDB", names.meta.ddb, **dynamo_cfg)
 
     with open(const.DYNAMO_S3_INDEX_SCHEMA, 'r') as s3fh:
         dynamo_s3_cfg = json.load(s3fh)
-    config.add_dynamo_table_from_json('s3Index', names.ddb.s3_index, **dynamo_s3_cfg)  # DP XXX
+    config.add_dynamo_table_from_json('s3Index', names.s3_index.ddb, **dynamo_s3_cfg)  # DP XXX
 
     with open(const.DYNAMO_TILE_INDEX_SCHEMA, 'r') as tilefh:
         dynamo_tile_cfg = json.load(tilefh)
-    config.add_dynamo_table_from_json('tileIndex', names.ddb.tile_index, **dynamo_tile_cfg)  # DP XXX
+    config.add_dynamo_table_from_json('tileIndex', names.tile_index.ddb, **dynamo_tile_cfg)  # DP XXX
 
     with open(const.DYNAMO_ID_INDEX_SCHEMA, 'r') as id_ind_fh:
         dynamo_id_ind__cfg = json.load(id_ind_fh)
-    config.add_dynamo_table_from_json('idIndIndex', names.ddb.id_index, **dynamo_id_ind__cfg)  # DP XXX
+    config.add_dynamo_table_from_json('idIndIndex', names.id_index.ddb, **dynamo_id_ind__cfg)  # DP XXX
 
     with open(const.DYNAMO_ID_COUNT_SCHEMA, 'r') as id_count_fh:
         dynamo_id_count_cfg = json.load(id_count_fh)
-    config.add_dynamo_table_from_json('idCountIndex', names.ddb.id_count_index, **dynamo_id_count_cfg)  # DP XXX
+    config.add_dynamo_table_from_json('idCountIndex', names.id_count_index.ddb, **dynamo_id_count_cfg)  # DP XXX
 
     return config
 
@@ -282,7 +282,7 @@ def post_init(bosslet_config):
     # Configure external DNS
     # DP ???: Can this be moved into the CloudFormation template?
     dns = names.public_dns("api")
-    dns_elb = aws.elb_public_lookup(session, names.dns.endpoint_elb)
+    dns_elb = aws.elb_public_lookup(session, names.endpoint_elb.dns)
     hosted_zone = bosslet_config.EXTERNAL_DOMAIN
     aws.set_domain_to_dns_name(session, dns, dns_elb, hosted_zone)
 
@@ -302,7 +302,7 @@ def post_init(bosslet_config):
     call.check_keycloak(const.TIMEOUT_KEYCLOAK)
 
     # Add the API servers to the list of OIDC valid redirects
-    with call.tunnel(names.dns.auth, 8080) as auth_port:
+    with call.tunnel(names.auth.dns, 8080) as auth_port:
         print("Update KeyCloak Client Info")
         auth_url = "http://localhost:{}".format(auth_port)
         with KeyCloakClient(auth_url, **creds) as kc:
@@ -337,7 +337,7 @@ def post_init(bosslet_config):
     print("Collections: {}".format(resp))
 
     # Tell Scalyr to get CloudWatch metrics for these instances.
-    instances = [names.dns.endpoint]
+    instances = [names.endpoint.dns]
     scalyr.add_instances_to_scalyr(
         session, bosslet_config.REGION, instances)
 
@@ -356,7 +356,7 @@ def delete(bosslet_config):
     if not utils.get_user_confirm("All data will be lost. Are you sure you want to proceed?"):
         raise BossManageCanceled()
 
-    aws.route53_delete_records(session, domain, names.dns.endpoint)
+    aws.route53_delete_records(session, domain, names.endpoint.dns)
     # Other configs may define SQS queues and we shouldn't delete them
     aws.sqs_delete_all(session, domain) # !!! TODO FIX this so it doesn't bork the stack
     aws.policy_delete_all(session, domain, '/ingest/')

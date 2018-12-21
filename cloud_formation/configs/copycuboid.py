@@ -39,18 +39,18 @@ def create_config(bosslet_config):
         "LambdaCacheExecutionRole", role,
         "IAM role for multilambda." + domain))
 
-    config.add_sqs_queue(names.sqs.copy_cuboid_dlq, names.sqs.copy_cuboid_dlq, 30, 20160)
+    config.add_sqs_queue(names.copy_cuboid_dlq.sqs, names.copy_cuboid_dlq.sqs, 30, 20160)
 
     config.add_lambda("CopyCuboidLambda",
-                      names.lambda_.copy_cuboid_lambda,
+                      names.copy_cuboid_lambda.lambda_,
                       Ref("LambdaCacheExecutionRole"),
                       s3=(bosslet_config.LAMBDA_BUCKET,
-                          names.zip.multi_lambda,
+                          names.multi_lambda.zip,
                           "copy_cuboid_lambda.handler"),
                       timeout=60,
                       memory=128,
                       runtime='python3.6',
-                      dlq=Arn(names.sqs.copy_cuboid_dlq))
+                      dlq=Arn(names.copy_cuboid_dlq.sqs))
 
     return config
 
