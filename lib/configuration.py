@@ -19,6 +19,7 @@ import importlib
 import warnings
 import glob
 from argparse import ArgumentParser
+from pprint import pformat
 
 from boto3.session import Session
 
@@ -39,6 +40,33 @@ def list_bosslets():
     return [os.path.basename(f)[:-3].replace('_','.') for f in glob.glob(CONFIGS_GLOB)]
 
 class BossConfiguration(object):
+    __EXPECTED_KEYS = [
+        'EXTERNAL_DOMAIN',
+        'EXTERNAL_FORMAT', # Optional
+        'INTERNAL_DOMAIN',
+        'NETWORK', # Optional
+        'SUBNET_CIDR', # Optional
+        'AMI_SUFFIX',
+        'SCENARIO', # Optional, no default ??? <<<<<<<
+        'VERIFY_SSL', # Optional
+        'AUTH_RDS',
+        'LAMBDA_BUCKET',
+        'LAMBDA_SERVER',
+        'LAMBDA_SERVER_KEY',
+        'REGION',
+        'AVAILABILITY_ZONE_USAGE',
+        'ACCOUNT_ID',
+        'PROFILE',
+        'OUTBOUND_BASTION',
+        'OUTBOUND_IP', # Conditional
+        'OUTBOUND_PORT', # Conditional
+        'OUTBOUND_USER', # Conditional
+        'OUTBOUND_KEY', # Conditional
+        'HTTPS_INBOUND',
+        'SSH_INBOUND',
+        'SSH_KEY',
+    ]
+
     __DEFAULTS = {
         "EXTERNAL_FORMAT": "{machine}",
         "NETWORK": "10.0.0.0/16",
@@ -60,6 +88,10 @@ class BossConfiguration(object):
             self._config = importlib.import_module('config.' + bosslet)
         except ImportError:
             raise exceptions.BossManageError("Problem importing 'config/{}.py'".format(bosslet))
+
+        if not self.verify():
+            raise exceptions.BossManageError("Bosslet config is not valid")
+
         # Create the session object
         if self._config.PROFILE:
             self.session = Session(profile_name = self._config.PROFILE,
@@ -128,6 +160,47 @@ class BossConfiguration(object):
 
     def __repr__(self):
         return "BossConfiguration('{}')".format(self.bosslet)
+
+    def verify(self, fh=sys.stdout):
+        ret = True
+        for key in self.__EXPECTED_KEYS:
+            if not hasattr(self._config, key):
+                if key not in self.__DEFAULTS:
+                    if key == 'SCENARIO':
+                        pass
+                    elif key in ('OUTBOUND_IP',
+                                 'OUTBOUND_PORT',
+                                 'OUTBOUND_USER',
+                                 'OUTBOUND_KEY') and \
+                         self._config.OUTBOUND_BASTION == False:
+                        pass
+                    else:
+                        print("Error: Variable '{}' not defined".format(key), file=fh)
+                        ret = False
+
+        for key in dir(self._config):
+            if key not in self.__EXPECTED_KEYS:
+                if not key.startswith('__'):
+                    print("Warning: Extra variable '{}' defined".format(key), file=fh)
+
+        return ret
+
+    def display(self, fh = sys.stdout):
+        for key in self.__EXPECTED_KEYS:
+            try:
+                val = pformat(self.__getattr__(key))
+                print("{} = {}".format(key, val), file=fh)
+            except AttributeError:
+                if key == 'SCENARIO':
+                    pass
+                elif key in ('OUTBOUND_IP',
+                             'OUTBOUND_PORT',
+                             'OUTBOUND_USER',
+                             'OUTBOUND_KEY') and \
+                     self._config.OUTBOUND_BASTION == False:
+                    pass
+                else:
+                    raise
 
 class BossParser(ArgumentParser):
     """A custom argument parser that provides common handling of looking up a
