@@ -105,8 +105,8 @@ def create_messages(args):
         list: List of strings containing Json data
     """
 
-    tile_size = lambda v: args[v + "_tile_size"]
-    range_ = lambda v: range(args[v + '_start'], args[v + '_stop'], tile_size(v))
+    # tile_size = lambda v: args[v + "_tile_size"]
+    # range_ = lambda v: range(args[v + '_start'], args[v + '_stop'], tile_size(v))
 
     # DP NOTE: generic version of
     # BossBackend.encode_chunk_key and BiossBackend.encode.tile_key
@@ -120,47 +120,105 @@ def create_messages(args):
 
         return '&'.join([digest, base])
 
+
+    tile_size = lambda v: args[v + "_tile_size"]
+    
+    # CF  New algorithm to calculate the new starting values for T Z Y X , given # of tiles to skip
+
+    # Helper functions 
+
+    new_range = lambda v, vns, First : range(vns, args[v + '_stop'] , args[v + '_tile_size']) if First else range(args[v + '_start'], args[v + '_stop'] , args[v + '_tile_size'])
+    new_range_z = lambda zns, First : range(zns, args['z_stop'] , args['z_chunk_size']) if First else range(args['z_start'], args['z_stop'] , args['z_chunk_size'])
+    new_range_tile = lambda t2s,z,First,nt : range(z + t2s, z + nt) if First else range(z, z + nt)
+
+    iter_ = lambda v: int((args[v + '_stop'] - args[v + '_start'] - 1) / args[v + '_tile_size']) + 1
+    ns = lambda v,n: args[v + '_start'] + args[v + '_tile_size'] * n
+    ns_z = lambda v,n: args[v + '_start'] + args[v + '_chunk_size'] * n
+
+    #  Calculate new ( Tns Znz Yns Xns ) values 
+
+    xIt = iter_('x')
+    yIt = iter_('y')
+    zIt = args['z_stop'] - args['z_start']
+
     tiles_to_skip = args['tiles_to_skip']
+
+    kt = int(tiles_to_skip/(xIt*yIt*zIt))
+    Tns = ns('t',kt)
+    tiles_to_skip -= kt*xIt*yIt*zIt
+
+    kz = int(tiles_to_skip/(args['z_chunk_size']*xIt*yIt))
+    Zns = ns_z('z',kz)
+    tiles_to_skip -= kz*args['z_chunk_size']*xIt*yIt
+
+    nt = min(args['z_chunk_size'], args['z_stop'] - Zns)
+    ky = int(tiles_to_skip/(nt*xIt))
+    Yns = ns('y',ky)
+    tiles_to_skip -= ky*nt*xIt
+
+    kx = int(tiles_to_skip/nt)
+    Xns = ns('x',kx)
+    tiles_to_skip -= kx*nt
+
+    num = 0 
+    bFirst = True
+
+    # print ("\n =====================   Next RUN of Create Messages ========================= \n")
+    #print ("TEST4::  Tns: {}, Zns: {}, Yns: {}, Xns: {}".format(Tns, Zns, Yns, Xns))
+
     count_in_offset = 0
 
-    for t in range_('t'):
-        for z in range(args['z_start'], args['z_stop'], args['z_chunk_size']):
-            for y in range_('y'):
-                for x in range_('x'):
-                    num_of_tiles = min(args['z_chunk_size'], args['z_stop'] - z)
+    #Use the new T Z Y X values to loop --- 
 
-                    for tile in range(z, z + num_of_tiles):
-                        if tiles_to_skip > 0:
-                            tiles_to_skip -= 1
-                            continue
+    for t in new_range('t',Tns,bFirst):
+        for z in new_range_z(Zns,bFirst):
+            num_of_tiles = min(args['z_chunk_size'], args['z_stop'] - z)
+
+            for y in new_range('y',Yns,bFirst):
+                for x in new_range('x',Xns,bFirst):
+
+                    for tile in new_range_tile(tiles_to_skip, z, bFirst, num_of_tiles):
+                        if bFirst:
+                            bFirst = False
+                            # print ("First POS:{:4d}, // t:{:3d}, z:{:3d}, y:{:3d}, x:{:3d}, // tile:{:3d}\n---------------- ".format(num, t, z, y, x,tile))
+
+                        # print (" Next POS:{:4d}, // t:{:3d}, z:{:3d}, y:{:3d}, x:{:3d}, // tile:{:3d}\n---------------- ".format(num, t, z, y, x,tile))
+
+                        num += 1
 
                         if count_in_offset == 0:
-                            print("Finished skipping tiles")
+                            print("\n *** FINISHED SKIPPING tiles *** \n")
+
+                        #print ("TileNum: {:4d}, t:{:3d}, // z:{:3d}, y:{:3d}, x:{:3d}, tile:{:3d}".format(num, t, z, y, x,tile))
 
                         chunk_x = int(x / tile_size('x'))
                         chunk_y = int(y / tile_size('y'))
                         chunk_z = int(z / args['z_chunk_size'])
                         chunk_key = hashed_key(num_of_tiles,
-                                               args['project_info'][0],
-                                               args['project_info'][1],
-                                               args['project_info'][2],
-                                               args['resolution'],
-                                               chunk_x,
-                                               chunk_y,
-                                               chunk_z,
-                                               t)
+                                                args['project_info'][0],
+                                                args['project_info'][1],
+                                                args['project_info'][2],
+                                                args['resolution'],
+                                                chunk_x,
+                                                chunk_y,
+                                                chunk_z,
+                                                t)
 
                         count_in_offset += 1
                         if count_in_offset > args['MAX_NUM_TILES_PER_LAMBDA']:
+                            #print ("  --- END GENERATOR --- count: {}".format(count_in_offset))
                             return  # end the generator
+
+                        #print ("NOT returning .... {} , [{}, {}, {}] \n".format(count_in_offset, chunk_z, chunk_y, chunk_x))
+
                         tile_key = hashed_key(args['project_info'][0],
-                                              args['project_info'][1],
-                                              args['project_info'][2],
-                                              args['resolution'],
-                                              chunk_x,
-                                              chunk_y,
-                                              tile,
-                                              t)
+                                                args['project_info'][1],
+                                                args['project_info'][2],
+                                                args['resolution'],
+                                                chunk_x,
+                                                chunk_y,
+                                                tile,
+                                                t)
 
                         msg = {
                             'job_id': args['job_id'],
