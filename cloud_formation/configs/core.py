@@ -198,7 +198,7 @@ def create_config(bosslet_config):
 
     config.add_security_group("InternalSecurityGroup",
                               names.internal.sg,
-                              [("-1", "-1", "-1", "10.0.0.0/8")])
+                              [("-1", "-1", "-1", bosslet_config.NETWORK)])
 
     # Allow SSH access to bastion from anywhere
     incoming_subnet = bosslet_config.SSH_INBOUND
