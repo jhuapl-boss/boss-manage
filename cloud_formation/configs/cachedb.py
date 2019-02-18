@@ -329,22 +329,6 @@ def create_config(session, domain, keypair=None, user_data=None):
                       memory=1024,
                       runtime='python3.6')
 
-
-    if creating_tile_bucket:
-        config.add_lambda_permission(
-            'tileBucketInvokeTileUploadLambda', names.tile_uploaded_lambda,
-            principal='s3.amazonaws.com', source={
-                'Fn::Join': [':', ['arn', 'aws', 's3', '', '', tile_bucket_name]]}, #DP TODO: move into constants
-            depends_on=['tileBucket', 'TileUploadedLambda']
-        )
-    else:
-        config.add_lambda_permission(
-            'tileBucketInvokeMultiLambda', names.tile_uploaded_lambda,
-            principal='s3.amazonaws.com', source={
-                'Fn::Join': [':', ['arn', 'aws', 's3', '', '', tile_bucket_name]]},
-            depends_on='TileUploadedLambda'
-        )
-
     if creating_ingest_bucket:
         config.add_lambda_permission(
             'ingestBucketInvokeCuboidImportLambda', names.cuboid_import_lambda,
@@ -461,16 +445,12 @@ def post_init(session, domain):
 
     names = AWSNames(domain)
 
-
     print('adding ingest bucket trigger of import-cuboid lambda')
     add_bucket_trigger(session, names.cuboid_import_lambda, names.ingest_bucket, INGEST_BUCKET_TRIGGER)
 
     print('checking for tile bucket expiration policy')
     check_bucket_life_cycle_policy(session, names.tile_bucket)
     
-    print('adding tile bucket trigger of tile_uploaded_lambda')
-    add_bucket_trigger(session, names.tile_uploaded_lambda, names.tile_bucket, TILE_BUCKET_TRIGGER)
-
     print('checking for ingest bucket expiration policy')
     check_bucket_life_cycle_policy(session, names.ingest_bucket)
 
