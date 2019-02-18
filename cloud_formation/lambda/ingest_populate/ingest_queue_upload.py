@@ -123,43 +123,74 @@ def create_messages(args):
 
     tile_size = lambda v: args[v + "_tile_size"]
     
-    # CF  New algorithm to calculate the new starting values for T Z Y X , given # of tiles to skip
+    # CF  New algorithm follows
 
-    # Helper functions 
+    #  Goal is to PRE-COMPUTE the starting values for T Z Y X , given # of tiles to skip
+    #  Having the starting values will be more efficient than iterating for every TZYX
+
+    # Tns:  T's new start position
+    # Zns:  Z's new start position
+    # Yns:  Y's new start position
+    # Xns:  X's new start position
+
+    # Let's create some Helper functions 
 
     new_range = lambda v, vns, First : range(vns, args[v + '_stop'] , args[v + '_tile_size']) if First else range(args[v + '_start'], args[v + '_stop'] , args[v + '_tile_size'])
     new_range_z = lambda zns, First : range(zns, args['z_stop'] , args['z_chunk_size']) if First else range(args['z_start'], args['z_stop'] , args['z_chunk_size'])
     new_range_tile = lambda t2s,z,First,nt : range(z + t2s, z + nt) if First else range(z, z + nt)
 
+    # generic iterator func factoring tile_size (use ceiling)
     iter_ = lambda v: int((args[v + '_stop'] - args[v + '_start'] - 1) / args[v + '_tile_size']) + 1
+
+    # new start func (for tile_size cases)
     ns = lambda v,n: args[v + '_start'] + args[v + '_tile_size'] * n
+    # new start func (for chunk_size cases)
     ns_z = lambda v,n: args[v + '_start'] + args[v + '_chunk_size'] * n
 
-    #  Calculate new ( Tns Znz Yns Xns ) values 
+    # Now Let's start the actual calculations for new ( Tns Znz Yns Xns ) values 
 
+    # iterators for x, y, z 
     xIt = iter_('x')
     yIt = iter_('y')
     zIt = args['z_stop'] - args['z_start']
 
+    # read in this param
     tiles_to_skip = args['tiles_to_skip']
 
+    #constant for tracking tiles to skip over the iterations (for T)
     kt = int(tiles_to_skip/(xIt*yIt*zIt))
+    #compute T's new start
     Tns = ns('t',kt)
+    #decr tiles to skip
     tiles_to_skip -= kt*xIt*yIt*zIt
 
+    #constant for tracking tiles to skip over the iterations (for Z)
     kz = int(tiles_to_skip/(args['z_chunk_size']*xIt*yIt))
+    # compute Z's new start
     Zns = ns_z('z',kz)
+    # decr tiles to skip
     tiles_to_skip -= kz*args['z_chunk_size']*xIt*yIt
 
+    #compute for y and x, factoring by nt
     nt = min(args['z_chunk_size'], args['z_stop'] - Zns)
+
+    #Y 
+    #y constant factor for Y
     ky = int(tiles_to_skip/(nt*xIt))
+    # compute Y's new start pos
     Yns = ns('y',ky)
+    # decr tiles to skip
     tiles_to_skip -= ky*nt*xIt
 
+    #X
+    # constant factor for X
     kx = int(tiles_to_skip/nt)
+    # compute X's new start pos
     Xns = ns('x',kx)
+    # decr tiles to skip
     tiles_to_skip -= kx*nt
 
+    #initialize vars for next loop
     num = 0 
     bFirst = True
 
@@ -172,6 +203,7 @@ def create_messages(args):
 
     for t in new_range('t',Tns,bFirst):
         for z in new_range_z(Zns,bFirst):
+            #Factor in Z chunk size
             num_of_tiles = min(args['z_chunk_size'], args['z_stop'] - z)
 
             for y in new_range('y',Yns,bFirst):
