@@ -93,7 +93,7 @@ def create_config(bosslet_config, db_config={}):
     user_data["aws"]["index-deadletter-queue"] = str(Ref(names.index_deadletter.sqs))
     user_data["aws"]["index-cuboids-keys-queue"] = str(Ref(names.index_cuboids_keys.sqs))
 
-    user_data["auth"]["OIDC_VERIFY_SSL"] = bosslet_config.VERIFY_SSL
+    user_data["auth"]["OIDC_VERIFY_SSL"] = str(bosslet_config.VERIFY_SSL)
     user_data["lambda"]["flush_function"] = names.multi_lambda.lambda_
     user_data["lambda"]["page_in_function"] = names.multi_lambda.lambda_
     user_data["lambda"]["ingest_function"] = names.tile_ingest.lambda_
