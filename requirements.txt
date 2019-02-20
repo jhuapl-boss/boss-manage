@@ -6,3 +6,4 @@ mysql-connector-python
 pyminifier
 funcparserlib
 iso8601
+colorama
