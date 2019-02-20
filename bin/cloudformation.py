@@ -29,6 +29,7 @@ from lib import aws
 from lib import utils
 from lib import configuration
 from lib import constants
+from lib import console
 from lib.cloudformation import CloudFormationConfiguration
 from lib.stepfunctions import heaviside
 
@@ -83,6 +84,27 @@ def build_dependency_graph(action, bosslet_config, modules):
         for stack in client.list_stacks()['StackSummaries']
         if stack['StackName'].endswith(suffix) and stack['StackStatus'] not in invalid
     }
+
+    stop = False
+    for name, status in existing.items():
+        if status.endswith('_IN_PROGRESS'):
+            console.warning("Config '{}' is in progress".format(name))
+            stop = True
+        elif status.endswith('_FAILED'):
+            if name not in nodes:
+                console.fail("Config '{}' is failed and should be acted upon".format(name))
+                stop = True
+            else:
+                if action == 'delete':
+                    console.info("Config '{}' is failed, deleting".format(name))
+                elif status == 'UPDATE_ROLLBACK_FAILED':
+                    console.fail("Config '{}' needs to be manually resolved in the AWS console".format(name))
+                    stop = True
+                else: # CREATE, DELETE, or ROLLBACK FAILED
+                    console.fail("Config '{}' is failed, needs to be deleted".format(name))
+                    stop = True
+    if stop:
+        raise exceptions.BossManageError('Problems with existing stacks')
 
     # Create dependency graph and locate root nodes
     for config, module in modules:
