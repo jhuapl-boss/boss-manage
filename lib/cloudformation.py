@@ -601,6 +601,25 @@ class CloudFormationConfiguration:
                 # Stack doesn't exist anymore
                 print(" done")
 
+    def get_failed_reasons(self):
+        client = self.session.client("cloudformation")
+
+        events = []
+        args = {'StackName': self.stack_name}
+        while 'NextToken' not in args or args['NextToken'] is not None:
+            resp = client.describe_stack_events(**args)
+
+            events.extend(['{}: {}'.format(e['LogicalResourceId'], e['ResourceStatusReason'])
+                           for e in resp['StackEvents']
+                           if e['ResourceStatus'].endswith('_FAILED')])
+
+            if 'NextToken' in resp:
+                args['NextToken'] = resp['NextToken']
+            else:
+                args['NextToken'] = None
+
+        return events
+
     def add_arg(self, arg):
         """Add an Arg class instance to the internal configuration.
 
