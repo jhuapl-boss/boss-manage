@@ -67,6 +67,7 @@ Stopping:
     Exporting Vault data - 
     Stopping Auth without RDS - 
 """
+KEY_PREFIX = 'boss_switch.'
 
 VAULT_FILE = constants.repo_path('vault', 'private', '{}', 'export.json')
 
@@ -158,18 +159,78 @@ class AutoScalingGroup(object):
                                           ScalingProcesses = ['HealthCheck'])
 
     def save_tags(self):
-        pass # TODO Luis
-        # Create tags to store current self.min / self.max / self.desired
-        # use self.client to interact with AWS
+        if self.min == 0 and \
+           self.max == 0 and \
+           self.desired == 0:
+            console.debug("{} already turned off")
+            return
 
-        # Non-standard situations to think about
-        # Saving tags when tags already exist and have different values
-        # Loading tags when self.min / self.max / self.desired are not 0/0/0
-        # Saving tags when self.min / self.max / self.desired are already 0/0/0
+        values = {'min': self.min,
+                  'max': self.max,
+                  'desired': self.desired}
+        self.write_tags(values)
+
     def load_tags(self):
-        pass # TODO Luis
-        # set self.min / self.max / self.desired based on tags in self.definition
-        # Should there be a call to AWS to remove the tags?
+        values = self.read_tags()
+        for key in ('min', 'max', 'desired'):
+            try:
+                # Check to see if the loaded value is a number
+                value = int(values[key])
+            except ValueError: # Not int
+                msg = '{} value for {} is not an integer'.format(key,self.name)
+                console.warning(msg)
+
+                value = 0
+            except IndexError: # Doesn't exist
+                value = 0
+
+            # ??? Is Zero a valid value? (use -1 instead?)
+
+            # If loaded value is invalid, warn and set to 1
+            if key not in values or value == 0:
+                if key not in values:
+                    fmt = 'No saved {} value for {}, setting to 1'
+                else:
+                    fmt = 'Save {} value is zero, setting to 1'
+                msg = fmt.format(key, self.name)
+                console.warning(msg)
+
+                value = 1
+
+            # Verify we won't override another value
+            current = getattr(self, key)
+            if current > 0 and current != value:
+                fmt = 'Override curent {} value ({}) with loaded value ({}) ?'
+                msg = fmt.format(key, current, value)
+                if not console.confirm(msg):
+                    value = current
+
+            setattr(self, key, value)
+
+    def read_tags(self):
+        resp = self.client.describe_tags(Filters=[{'Name': 'auto-scaling-group',
+                                                   'Values': [self.name]}])
+
+        values = {tag['Key'][len(KEY_PREFIX):]: tag['Value']
+                  for tag in resp['Tags']
+                  if tag['Key'].startswith(KEY_PREFIX)}
+        return values
+
+    def write_tags(self, values):
+        tags = [{'ResourceId': self.name,
+                 'ResourceType': 'auto-scaling-group',
+                 'Key': KEY_PREFIX + key,
+                 'Value': str(value),
+                 'PropagateAtLaunch': False}
+                for key, value in values.items()]
+        self.client.create_or_update_tags(Tags=tags)
+
+    def delete_tags(self, keys):
+        tags = [{'ResourceId': self.name,
+                 'ResourceType': 'auto-scaling-group',
+                 'Key': KEY_PREFIX + key}
+                for key in keys]
+        self.client.delete_tags(Tags=tags)
 
 #Executed actions
 def startInstances(bosslet_config):
