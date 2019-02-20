@@ -155,12 +155,13 @@ class status_line(object):
                           partial line that was written and is currently displayed
     """
 
-    def __init__(self, initial=None, spin=False, dots=False):
+    def __init__(self, initial=None, spin=False, dots=False, print_status=False):
         """
         Args:
             initial (optional[str]): The initial status line to display
             spin (bool): If there should be a spinner prefix to the status line
             dots (bool): If there should be moving dots at the end of the status line
+            print_status (bool): If the status line should also be printed when set
         """
         columns = shutil.get_terminal_size().columns
 
@@ -177,6 +178,7 @@ class status_line(object):
             self.dots = [' .', ' ..', ' ...', ' ....']
             self.idx = 0
 
+        self.print_status = print_status
         self.running = False
         self.displayed = True # True so that a status line can be set before
                               # printing any other data
@@ -274,6 +276,8 @@ class status_line(object):
                 self.stdout.write(self.status_line)
                 self.stdout.write('\n')
                 self.stdout.flush()
+        elif self.print_status:
+            print(value) # will also update the displayed status line
         else:
             if self.displayed: # Only display the status line if we are currently displaying one
                 self.stdout.write(self.clear_line)
