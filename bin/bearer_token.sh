@@ -3,7 +3,7 @@ if [ "$#" -lt 1 ] ; then
     exit 1
 fi
 
-hostname=`./bosslet_eval.py $1 "bosslet.names.public_dns('auth')"`
+hostname=`./boss-config.py $1 -e "bosslet.names.public_dns('auth')"`
 
 echo "Getting bearer token for $hostname"
 

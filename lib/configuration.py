@@ -202,12 +202,67 @@ class BossConfiguration(object):
                 else:
                     raise
 
+def create_help(header, options):
+    """Create formated help
+
+    Args:
+        header (str): The header for the help
+        options (list[str]): The options that are available for argument
+
+    Returns:
+        str: Formated argument help
+    """
+    return "\n" + header + "\n" + \
+           "\n".join(map(lambda x: "  " + x, options)) + "\n"
+
 class BossParser(ArgumentParser):
     """A custom argument parser that provides common handling of looking up a
     specific hostname
     """
     _bosslet = False
     _hostname = False
+    __subparsers = {}
+
+    def __init__(self, *args, **kwargs):
+        if 'help' in kwargs:
+            # Remove 'help' from the arguments, as it is a valid keyword argument
+            # for subparsers, but not the initial parser
+            del kwargs['help']
+
+        super().__init__(*args, **kwargs)
+
+    def create_subparser(self, dest, **kwargs):
+        """Create a subparser definition that can be populated with `add_subcommand()`
+
+        Args:
+            dest (str): The name of the argument where the selected subcommand is stored
+            kwargs (dict): Any other arguments for the `add_subparser()` call
+        """
+        subparser = self.add_subparsers(dest=dest,
+                                        parser_class=BossParser,
+                                        **kwargs)
+        subparser.required = True
+
+        self.__subparsers[dest] = subparser
+
+    def add_subcommand(self, dest, subcommand):
+        """Add a subcommand to a previously defined subparser
+
+        Args:
+            dest (str): The `dest` value passed to `create_subparser()`
+            subcommand (str): The name of the subcommand that is being defined
+
+        Returns:
+            function: A function that acts like BossParser and can be used to
+                      to create the parser for the given subcommand
+        """
+        def add_parser(**kwargs):
+            # BossParser / ArgumentParser __init__ doesn't have a 'help' argument
+            # but a sub-parser requires 'help' for it to be displayed in --help
+            if 'description' in kwargs and 'help' not in kwargs:
+                kwargs['help'] = kwargs['description']
+            return self.__subparsers[dest].add_parser(subcommand, **kwargs)
+        return add_parser
 
     def add_hostname(self, private_ip = False, help = "Hostname of the target EC2 instance"):
         """Called to add arguments to the parser
@@ -264,12 +319,19 @@ class BossParser(ArgumentParser):
         """
         a = super().parse_args(*args, **kwargs)
 
-        if self._bosslet:
+        # Note: Using `'<variable>' in a` instead of using the self._bosslet
+        #       or self._hostname variables because with a nested parser the
+        #       parent parser will not see those variables for the subparser
+
+        # Note: Using `self.print_usage()` will not necessarly print the correct
+        #       usage if the problem is with arguments from a subparser
+
+        if 'bosslet_name' in a:
             a.bosslet_config = BossConfiguration(a.bosslet_name)
 
-        elif self._hostname:
+        elif  'hostname' in a:
             finished = False
-            if self._private_ip:
+            if 'private_ip' in a:
                 if a.private_ip:
                     if not a.bosslet:
                         self.print_usage()
@@ -311,3 +373,92 @@ class BossParser(ArgumentParser):
                     a.ip = ip
 
         return a
+
+class BossCLI(object):
+    """Interface for defining a CLI application / script"""
+    def get_parser(self, ParentParser=BossParser):
+        """Create and return the parser for this application
+
+        Args:
+            ParentParser: If this application is a subcommand ParentParser will
+                          be the results from `BossParser.add_subcommand`. If
+                          this is not provided, use BossParser.
+
+        Returns:
+            BossParser: The parser instance created and populated
+        """
+        raise NotImplemented()
+
+    def run(self, args):
+        """The main entrpoint for the application
+
+        Args:
+            args (Namespace): The parsed results for the application to use
+
+        Returns:
+            optional[int]: Return code
+        """
+        raise NotImplemented()
+
+    def main(self): # just put into if __name__ ...
+        """Application entrypoint that parsers the arguments and calls `run()`"""
+        parser = self.get_parser()
+        args = parser.parse_args()
+        self.run(args)
+
+class NestedBossCLI(BossCLI):
+    """Implementation of a nested CLI
+    A nested CLI contains common arguments and a set of subcommands that will be executed
+
+    To use:
+     * Define the COMMANDS, PARSER_ARGS, SUBPARSER_ARGS variables
+     * Optionally implement the `add_common_arguments()` method
+
+    Attributes:
+        COMMANDS: Mapping of subcommands and the implementing BossCLI reference
+        PARSER_ARGS: BossParser arguments
+        SUBPARSER_ARGS: BossParser.create_subparser
+                        The key 'dest' must be defined
+    """
+    COMMANDS = {
+        # 'command_name': BossCLI,
+    }
+
+    PARSER_ARGS = {
+        # 'description': '',
+    }
+
+    SUBPARSER_ARGS = {
+        # 'dest': 'nested_command',
+        # 'metavar': 'command',
+        # 'help': 'nested commands',
+    }
+
+    def __init__(self):
+        self.subcommands = { name: cli()
+                             for name, cli in self.COMMANDS.items() }
+        self.dest = self.SUBPARSER_ARGS['dest']
+
+    def add_common_arguments(self, parser):
+        """Method for adding the common arguments for all of the nested commands
+
+        Note: Called before add the subcommands so that non optional arguments
+              will appear before the subcommands
+
+        Args:
+            parser (BossParser): Parser instance to add common arguments to
+        """
+        pass
+
+    def get_parser(self, ParentParser=BossParser):
+        self.parser = ParentParser(**self.PARSER_ARGS)
+        self.add_common_arguments(self.parser)
+        self.parser.create_subparser(**self.SUBPARSER_ARGS)
+        for subcommand in self.subcommands.keys():
+            parser_ = self.parser.add_subcommand(self.dest, subcommand)
+            self.subcommands[subcommand].get_parser(parser_)
+
+        return self.parser
+
+    def run(self, args):
+        return self.subcommands[getattr(args, self.dest)].run(args)

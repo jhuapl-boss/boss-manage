@@ -17,10 +17,22 @@
 import alter_path
 from lib import configuration
 
+class ConfigCLI(configuration.BossCLI):
+    def get_parser(self, ParentParser=configuration.BossParser):
+        self.parser = ParentParser(description = 'Command for interacting with bosslet configuration files')
+        self.parser.add_bosslet()
+        self.parser.add_argument('--expression', '-e',
+                                 metavar = '<expression>',
+                                 help = 'Expression to evaluate (Variable `bosslet` is the loaded config)')
+        return self.parser
+
+    def run(self, args):
+        if args.expression is None:
+            args.bosslet_config.display()
+        else:
+            results = eval(args.expression, {'bosslet': args.bosslet_config})
+            print(results)
+
 if __name__ == '__main__':
-    parser = configuration.BossParser(description='Script for displaying the parsed bosslet config')
-    parser.add_bosslet()
-
-    args = parser.parse_args()
-
-    args.bosslet_config.display()
+    cli = ConfigCLI()
+    cli.main()
