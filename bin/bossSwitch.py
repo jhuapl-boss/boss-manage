@@ -451,5 +451,5 @@ if __name__ == '__main__':
         elif args.action == "off":
             stopInstances(bosslet_config)
     except Exception as ex:
-        print("Error due to %s" % e)
+        print("Error due to {}".format(ex))
         sys.exit(1)
