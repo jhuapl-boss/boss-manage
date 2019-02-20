@@ -40,13 +40,14 @@ from concurrent.futures import ThreadPoolExecutor
 
 keypair = None
 
-def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, public=True, depends_on=None):
+def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, type_="t2.micro", public=True, depends_on=None):
     security_groups = [Ref("InternalSecurityGroup")]
     config.add_autoscale_group(key,
                                hostname,
                                ami,
                                keypair,
                                subnets = isubnets,
+                               type_= type_,
                                security_groups = security_groups,
                                user_data = user_data,
                                min = size,
@@ -160,6 +161,7 @@ def create_config(session, domain):
                    [("443", "8080", "HTTPS", cert)],
                    "HTTP:8080/index.html",
                    sgs = [Ref("AuthSecurityGroup")],
+                   type_=const.AUTH_TYPE,
                    depends_on=deps)
 
     if USE_DB:
