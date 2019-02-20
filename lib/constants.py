@@ -127,7 +127,7 @@ REDIS_SESSION_TYPE = {
 
 REDIS_TYPE = {
     "development": "cache.t2.small",
-    "production": "cache.m4.xlarge",
+    "production": "cache.m5.xlarge",
     "ha-development": "cache.t2.small",
 }
 
@@ -143,6 +143,11 @@ ACTIVITIES_TYPE = {
     "ha-development": "m5.large",
 }
 
+AUTH_TYPE = {
+    "development": "t2.micro",
+    "production": "m5.xlarge",
+    "ha-development": "t2.micro",
+}
 
 ########################
 # Machine Cluster Sizes
