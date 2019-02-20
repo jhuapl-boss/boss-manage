@@ -53,10 +53,10 @@ class AWSNames(object):
 
     @classmethod
     def from_bosslet(cls, bosslet_config):
-        cls(bosslet_config.INTERNAL_DOMAIN,
-            bosslet_config.EXTERNAL_DOMAIN,
-            bosslet_config.EXTERNAL_FORMAT,
-            bosslet_config.AMI_SUFFIX)
+        return cls(bosslet_config.INTERNAL_DOMAIN,
+                   bosslet_config.EXTERNAL_DOMAIN,
+                   bosslet_config.EXTERNAL_FORMAT,
+                   bosslet_config.AMI_SUFFIX)
 
     @classmethod
     def from_lambda(cls, name):
@@ -190,7 +190,7 @@ class AWSNames(object):
         'dynamo_lambda': {'name': 'dynamoLambda',
                           'type': 'lambda_'},
         'endpoint_db': {'name': 'endpoint-db',
-                        'types': 'rds'},
+                        'types': ['rds', 'dns']},
         'endpoint_elb': {'name': 'elb',
                          'type': 'dns'}, # XXX: elb type?
         'endpoint': {'types': ['dns', 'ami']},
@@ -277,6 +277,7 @@ class AWSNames(object):
         'ssh': {'type': 'sg'},
         'start_sfn': {'name': 'startSfnLambda',
                       'type': 'lambda_'},
+        'test': {'type': 'stack'},
         'tile_bucket': {'name': 'tiles',
                         'type': 's3'},
         'tile_index': {'name': 'tileindex',
@@ -301,7 +302,7 @@ class AWSNames(object):
         if name not in self.RESOURCES:
             raise AttributeError("'{}' is not a valid resource name".format(name))
 
-        cfg = self.RESOURCES
+        cfg = self.RESOURCES[name]
         if resource_type != cfg.get('type') and \
            resource_type not in cfg.get('types', []):
             raise AttributeError("'{}' is not a valid resource type for '{}'".format(resource_type, name))

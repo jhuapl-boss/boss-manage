@@ -192,7 +192,7 @@ class Vault(object):
             try:
                 client.enable_auth_backend('aws')
             except Exception as e:
-                msg = "Error while enabling AWS auth backend: " + e
+                msg = "Error while enabling AWS auth backend: " + str(e)
                 raise VaultError(msg)
         else:
             print("aws auth backend already created.")
@@ -213,7 +213,7 @@ class Vault(object):
             try:
                 client.enable_secret_backend('aws')
             except Exception as e:
-                msg = "Error while enabling AWS secret backend: " + e
+                msg = "Error while enabling AWS secret backend: " + str(e)
                 raise VaultError(msg)
         else:
             print("aws secret backend already created.")

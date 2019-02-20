@@ -68,7 +68,7 @@ def update_lambda_code(bosslet_config):
     Args:
         bosslet_config: Bosslet configuration object
     """
-    names = AWSNames(bosslet_config)
+    names = bosslet_config.names
     uses_multilambda = [
         names.multi_lambda.lambda_, 
         names.downsample_volume.lambda_,
@@ -184,7 +184,7 @@ def create_ndingest_settings(bosslet_config, fp):
         domain (str): The VPC's domain name such as integration.boss.
         fp (file-like object): File like object to read settings.ini template from.
     """
-    names = AWSNames(bosslet_config)
+    names = bosslet_config.names
     parser = configparser.ConfigParser()
     parser.read_file(fp)
 

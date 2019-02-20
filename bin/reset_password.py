@@ -22,6 +22,7 @@ import botocore
 
 import alter_path
 from lib import aws
+from lib import configuration
 
 def read_password(show_password = False):
     if show_password:
