@@ -34,7 +34,7 @@ import pickle
 
 import alter_path
 import vault as vaultB
-from lib import utils, constants
+from lib import utils, constants, console
 from lib.configuration import BossParser
 
 # Cannot stop consul without losing data
@@ -182,9 +182,9 @@ def startInstances(bosslet_config):
     if not os.path.exists(filename):
         msg = "File {} doesn't exist, cannot reimport Vault data".format(filename)
         if DRY_RUN:
-            utils.console.warning(msg)
+            console.warning(msg)
         else:
-            utils.console.fail(msg)
+            console.fail(msg)
             return
 
     asg_problem = False
@@ -204,7 +204,7 @@ def startInstances(bosslet_config):
 
         if 'Auth' in asg.name:
             if not bosslet_config.AUTH_RDS:
-                utils.console.warning("Skipping starting Auth ASG, as it was not stopped")
+                console.warning("Skipping starting Auth ASG, as it was not stopped")
                 continue
 
         ###################
@@ -214,10 +214,10 @@ def startInstances(bosslet_config):
         print("Turning on {}".format(asg.name))
         try:
             asg.start()
-            utils.console.okgreen("{} is on".format(asg.name))
+            console.green("{} is on".format(asg.name))
         except Exception as ex:
             asg_problem = True
-            utils.console.warning("{} is not on".format(asg.name))
+            console.warning("{} is not on".format(asg.name))
             print(ex)
 
         ################################
@@ -264,17 +264,17 @@ def startInstances(bosslet_config):
                     with open(filename) as fh:
                         data = json.load(fh)
                     vault.import_(data)
-                    utils.console.okgreen("Successful import")
+                    console.green("Successful import")
                 except Exception as e:
-                    utils.console.fail("Unsuccessful import")
+                    console.fail("Unsuccessful import")
                     print(ex)
                     print("Cannot continue restore")
                     return
 
     if asg_problem:
-        utils.console.warning("Problems turning on bosslet")
+        console.warning("Problems turning on bosslet")
     else:
-        utils.console.okblue("Bosslet is on")
+        console.blue("Bosslet is on")
 
 
 def stopInstances(bosslet_config):
@@ -306,16 +306,16 @@ def stopInstances(bosslet_config):
                         with open(filename, 'w') as fh:
                             json.dump(data, fh, indent=3, sort_keys=True)
 
-                    utils.console.warning("Please protect {} as it contains personal passwords".format(filename))
-                    utils.console.okgreen("Successful Vault export")
+                    console.warning("Please protect {} as it contains personal passwords".format(filename))
+                    console.green("Successful Vault export")
                 except Exception as e:
-                    utils.console.fail("Unsuccessful vault export")
+                    console.fail("Unsuccessful vault export")
                     print(ex)
                     print("Cannot continue")
                     return
         elif 'Auth' in asg.name:
             if not bosslet_config.AUTH_RDS:
-                utils.console.warning("Cannot turn off Auth ASG without an external RDS database")
+                console.warning("Cannot turn off Auth ASG without an external RDS database")
                 continue
 
         ##################
@@ -325,10 +325,10 @@ def stopInstances(bosslet_config):
         print("Turning off {}".format(asg.name))
         try:
             asg.stop()
-            utils.console.okgreen("{} is off".format(asg.name))
+            console.green("{} is off".format(asg.name))
         except Exception as ex:
             asg_problem = True
-            utils.console.warning("{} is not off".format(asg.name))
+            console.warning("{} is not off".format(asg.name))
             print(ex)
             # XXX: What to do?
 
@@ -341,9 +341,9 @@ def stopInstances(bosslet_config):
         # XXX: The problem is that if 'off' is re-run the ASGs that were previously
         #      turned off will have 0/0/0 saved to the DEFINITION_FILE and mess up
         #      turning ASGs back on
-        utils.console.warning("Problem turning off bosslet")
+        console.warning("Problem turning off bosslet")
     else:
-        utils.console.okblue("TheBoss is off")
+        console.blue("TheBoss is off")
 
 if __name__ == '__main__':
     def create_help(header, options):
@@ -375,9 +375,11 @@ if __name__ == '__main__':
     DRY_RUN = args.dry_run
     bosslet_config = args.bosslet_config
 
-    choice = utils.get_user_confirm("Are you sure you want to proceed?")
+    choice = console.confirm("Are you sure you want to proceed?", timeout=30)
     if not choice:
         sys.exit(0)
+
+    console.init()
 
     print("Turning the {} bosslet {}...".format(args.bosslet_name,
                                                 args.action))
