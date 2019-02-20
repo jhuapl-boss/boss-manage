@@ -252,85 +252,85 @@ def startInstances(bosslet_config):
     consul_started = False
 
     asgs = load_aws(bosslet_config, 'on')
-    for asg in asgs:
-        print(asg.name)
-    for asg in asgs:
-        # TODO: Add error handling
-        # If Vault error, stop
-        # If error starting ASG log error and continue
+    with console.status_line(spin=True) as status:
+        for asg in asgs:
+            status('Working on {}'.format(asg.name))
+            # TODO: Add error handling
+            # If Vault error, stop
+            # If error starting ASG log error and continue
 
-        ###############################
-        # Pre-start actions or checks #
-        ###############################
+            ###############################
+            # Pre-start actions or checks #
+            ###############################
 
-        if 'Auth' in asg.name:
-            if not bosslet_config.AUTH_RDS:
-                console.warning("Skipping starting Auth ASG, as it was not stopped")
-                continue
+            if 'Auth' in asg.name:
+                if not bosslet_config.AUTH_RDS:
+                    console.warning("Skipping starting Auth ASG, as it was not stopped")
+                    continue
 
-        ###################
-        # Start Instances #
-        ###################
+            ###################
+            # Start Instances #
+            ###################
 
-        print("Turning on {}".format(asg.name))
-        try:
-            asg.start()
-            console.green("{} is on".format(asg.name))
-        except Exception as ex:
-            asg_problem = True
-            console.warning("{} is not on".format(asg.name))
-            print(ex)
+            print("Turning on {}".format(asg.name))
+            try:
+                asg.start()
+                console.green("{} is on".format(asg.name))
+            except Exception as ex:
+                asg_problem = True
+                console.warning("{} is not on".format(asg.name))
+                print(ex)
 
-        ################################
-        # Post-start actions or checks #
-        ################################
+            ################################
+            # Post-start actions or checks #
+            ################################
 
-        if 'Consul' in asg.name:
-            consul_started = True
-        if 'Vault' in asg.name:
-            if DRY_RUN:
+            if 'Consul' in asg.name:
+                consul_started = True
+            if 'Vault' in asg.name:
+                if DRY_RUN:
+                    print("Waiting for Vault to start")
+                    if not consul_started:
+                        print("Vault unseal")
+                    else:
+                        print("Vault initialize")
+                        print("Vault unseal")
+                        print("Vault configure")
+                    print("Vault import {}".format(filename))
+                    continue
+
                 print("Waiting for Vault to start")
-                if not consul_started:
-                    print("Vault unseal")
-                else:
-                    print("Vault initialize")
-                    print("Vault unseal")
-                    print("Vault configure")
-                print("Vault import {}".format(filename))
-                continue
+                # XXX: May need to wait a little before creating call, so that
+                #      vault instances are named and can be resolved
+                bosslet_config.call.check_vault(constants.TIMEOUT_VAULT)
 
-            print("Waiting for Vault to start")
-            # XXX: May need to wait a little before creating call, so that
-            #      vault instances are named and can be resolved
-            bosslet_config.call.check_vault(constants.TIMEOUT_VAULT)
+                with bosslet_config.call.vault() as vault:
+                    if not consul_started:
+                        vault.unseal()
+                    else:
+                        print("Initializing Vault...")
+                        try:
+                            vault.initialize(bosslet_config.ACCOUNT_ID)
+                        except Exception as ex:
+                            filename = VAULT_FILE.format(bosslet_config.names.vault.dns)
+                            print(ex)
+                            print("Could not initialize Vault")
+                            print("Call the following commands before trying to turn the bosslet back on")
+                            print(" > bin/bastion.py vault.<bosslet> vault-initialize")
+                            print(" > bin/bastion.py vault.<bosslet> vault-import {}".format(filename))
+                            return
 
-            with bosslet_config.call.vault() as vault:
-                if not consul_started:
-                    vault.unseal()
-                else:
-                    print("Initializing Vault...")
+                    print("Importing previous Vault data")
                     try:
-                        vault.initialize(bosslet_config.ACCOUNT_ID)
-                    except Exception as ex:
-                        filename = VAULT_FILE.format(bosslet_config.names.vault.dns)
+                        with open(filename) as fh:
+                            data = json.load(fh)
+                        vault.import_(data)
+                        console.green("Successful import")
+                    except Exception as e:
+                        console.fail("Unsuccessful import")
                         print(ex)
-                        print("Could not initialize Vault")
-                        print("Call the following commands before trying to turn the bosslet back on")
-                        print(" > bin/bastion.py vault.<bosslet> vault-initialize")
-                        print(" > bin/bastion.py vault.<bosslet> vault-import {}".format(filename))
+                        print("Cannot continue restore")
                         return
-
-                print("Importing previous Vault data")
-                try:
-                    with open(filename) as fh:
-                        data = json.load(fh)
-                    vault.import_(data)
-                    console.green("Successful import")
-                except Exception as e:
-                    console.fail("Unsuccessful import")
-                    print(ex)
-                    print("Cannot continue restore")
-                    return
 
     if asg_problem:
         console.warning("Problems turning on bosslet")
@@ -347,56 +347,56 @@ def stopInstances(bosslet_config):
     asg_problem = False
 
     asgs = load_aws(bosslet_config, 'off')
-    for asg in asgs:
-        print(asg.name)
-    for asg in asgs:
-        ##############################
-        # Pre-stop actions or checks #
-        ##############################
+    with console.status_line(spin=True) as status:
+        for asg in asgs:
+            status('Working on ASG {}'.format(asg.name))
+            ##############################
+            # Pre-stop actions or checks #
+            ##############################
 
-        if 'Vault' in asg.name:
-            if DRY_RUN:
-                print("Export Vault data into {}".format(filename))
-            else:
-                print("Exporting current Vault data")
-                try:
-                    with bosslet_config.call.vault() as vault:
-                        # TODO: figure out what configuration information should be exported
-                        data = vault.export("secret/")
+            if 'Vault' in asg.name:
+                if DRY_RUN:
+                    print("Export Vault data into {}".format(filename))
+                else:
+                    print("Exporting current Vault data")
+                    try:
+                        with bosslet_config.call.vault() as vault:
+                            # TODO: figure out what configuration information should be exported
+                            data = vault.export("secret/")
 
-                        with open(filename, 'w') as fh:
-                            json.dump(data, fh, indent=3, sort_keys=True)
+                            with open(filename, 'w') as fh:
+                                json.dump(data, fh, indent=3, sort_keys=True)
 
-                    console.warning("Please protect {} as it contains personal passwords".format(filename))
-                    console.green("Successful Vault export")
-                except Exception as e:
-                    console.fail("Unsuccessful vault export")
-                    print(ex)
-                    print("Cannot continue")
-                    return
-        elif 'Auth' in asg.name:
-            if not bosslet_config.AUTH_RDS:
-                console.warning("Cannot turn off Auth ASG without an external RDS database")
-                continue
+                        console.warning("Please protect {} as it contains personal passwords".format(filename))
+                        console.green("Successful Vault export")
+                    except Exception as e:
+                        console.fail("Unsuccessful vault export")
+                        print(ex)
+                        print("Cannot continue")
+                        return
+            elif 'Auth' in asg.name:
+                if not bosslet_config.AUTH_RDS:
+                    console.warning("Cannot turn off Auth ASG without an external RDS database")
+                    continue
 
-        ##################
-        # Stop Instances #
-        ##################
+            ##################
+            # Stop Instances #
+            ##################
 
-        print("Turning off {}".format(asg.name))
-        try:
-            asg.stop()
-            console.green("{} is off".format(asg.name))
-        except Exception as ex:
-            asg_problem = True
-            console.warning("{} is not off".format(asg.name))
-            print(ex)
-            # XXX: What to do?
+            print("Turning off {}".format(asg.name))
+            try:
+                asg.stop()
+                console.green("{} is off".format(asg.name))
+            except Exception as ex:
+                asg_problem = True
+                console.warning("{} is not off".format(asg.name))
+                print(ex)
+                # XXX: What to do?
 
-        ###############################
-        # Post-stop actions or checks #
-        ###############################
-        # None right now
+            ###############################
+            # Post-stop actions or checks #
+            ###############################
+            # None right now
 
     if asg_problem:
         # XXX: The problem is that if 'off' is re-run the ASGs that were previously
