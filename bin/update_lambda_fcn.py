@@ -94,7 +94,7 @@ def update_lambda_code(session, domain, bucket):
         names.index_write_failed_lambda, names.index_find_cuboids_lambda,
         names.copy_cuboid_lambda,
         names.tile_uploaded_lambda,
-        names.tile_ingest_lambda
+        names.tile_ingest_lambda,
         names.index_fanout_enqueue_cuboid_keys_lambda,
         names.index_batch_enqueue_cuboids_lambda,
         names.index_fanout_dequeue_cuboid_keys_lambda,
