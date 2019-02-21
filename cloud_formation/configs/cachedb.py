@@ -189,6 +189,8 @@ def create_config(session, domain, keypair=None, user_data=None):
 
     config.add_capabilities(['CAPABILITY_IAM'])
  
+    # Allow updating S3 index table with cuboid's object key during
+    # volumetric ingest.
     config.add_iam_policy_to_role(
         'S3IndexPutItem{}'.format(domain).replace('.', ''),
         get_s3_index_arn(session, domain),
@@ -213,10 +215,8 @@ def create_config(session, domain, keypair=None, user_data=None):
         ['s3:GetObject', 's3:PutObject'],
         { 'AWS': role})
 
-    creating_tile_bucket = False
     tile_bucket_name = names.tile_bucket
     if not aws.s3_bucket_exists(session, tile_bucket_name):
-        creating_tile_bucket = True
         life_cycle_cfg = get_cf_bucket_life_cycle_rules()
         config.add_s3_bucket(
             "tileBucket", tile_bucket_name, life_cycle_config=life_cycle_cfg)
@@ -237,7 +237,7 @@ def create_config(session, domain, keypair=None, user_data=None):
 
     config.add_s3_bucket_policy(
         "ingestBucketPolicy", ingest_bucket_name,
-        ['s3:GetObject', 's3:PutObject', 's3:DeleteObject'],
+        ['s3:GetObject', 's3:PutObject', 's3:PutObjectTagging'],
         { 'AWS': cuboid_import_role})
 
     config.add_ec2_instance("CacheManager",
