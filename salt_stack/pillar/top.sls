@@ -1,25 +1,18 @@
-base:
-  '*':
-    - scalyr
-
+base:   
   'endpoint*':
     - endpoint
-    - chrony
 
   'cachemanager*':
     - cachemanager
-    - chrony
 
   'activities*':
     - activities
-    - chrony
 
   'ep-jenkins*':
     - endpoint-jenkins
 
   'proofreader-web*':
     - proofreader-web
-    - chrony
 
   # Jenkins server for Django proofreader tests.
   'pr-jenkins*':

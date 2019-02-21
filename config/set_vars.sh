@@ -4,3 +4,4 @@ export SSH_KEY=~/.ssh/theboss.io-20160518.pem
 export BASTION_KEY=~/.ssh/microns-bastion20151117.pem
 export BASTION_IP=52.3.13.189
 export BASTION_USER=ubuntu
+export AWS_ACCOUNT=256215146792
