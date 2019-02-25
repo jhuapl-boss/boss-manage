@@ -1,6 +1,6 @@
 boto3>=1.4.3
 botocore>=1.4.93
-hvac==0.6.0 #Pinned due to is_initialized call to check vault status being deprecated. Check: https://hvac.readthedocs.io/en/stable/source/hvac_v1.html
+hvac#==0.6.0 #Pinned due to is_initialized call to check vault status being deprecated. Check: https://hvac.readthedocs.io/en/stable/source/hvac_v1.html
 mysql-connector-python
 pyminifier
 funcparserlib
