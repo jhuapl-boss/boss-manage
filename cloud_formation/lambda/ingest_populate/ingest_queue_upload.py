@@ -3,6 +3,7 @@ import json
 import time
 import hashlib
 import pprint
+import math
 
 class FailedToSendMessages(Exception):
     pass
@@ -146,7 +147,7 @@ def create_messages(args):
     new_range_tile = lambda t2s,z,First,nt : range(z + t2s, z + nt) if First else range(z, z + nt)
 
     # generic helper lambda func factoring tile_size (use ceiling)
-    factor_ = lambda v: int((args[v + '_stop'] - args[v + '_start'] - 1) / args[v + '_tile_size']) + 1
+    factor_ = lambda v: math.ceil((args[v + '_stop'] - args[v + '_start'] - 1) / args[v + '_tile_size'])
 
     # new start helper func (for tile_size cases)
     ns = lambda v,n: args[v + '_start'] + args[v + '_tile_size'] * n
