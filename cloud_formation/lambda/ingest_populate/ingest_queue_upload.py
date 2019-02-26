@@ -125,7 +125,7 @@ def create_messages(args):
     
     # CF  New algorithm follows
 
-    #  Goal is to PRE-COMPUTE the starting values for T Z Y X , given # of tiles to skip
+    #  Goal is to PRE-COMPUTE the new starting values for T Z Y X , given # of tiles to skip
     #  Having the starting values will be more efficient than iterating for every TZYX
 
     # Tns:  T's new start position
@@ -133,95 +133,101 @@ def create_messages(args):
     # Yns:  Y's new start position
     # Xns:  X's new start position
 
-    # Let's create some Helper functions 
+    #########################
+    # 
+    #  First, Let's create some Helper lambda functions 
+    #
 
+    # range helper function for X and Y dimensions
     new_range = lambda v, vns, First : range(vns, args[v + '_stop'] , args[v + '_tile_size']) if First else range(args[v + '_start'], args[v + '_stop'] , args[v + '_tile_size'])
+    # range helper function for Z dimension
     new_range_z = lambda zns, First : range(zns, args['z_stop'] , args['z_chunk_size']) if First else range(args['z_start'], args['z_stop'] , args['z_chunk_size'])
+    # range helper function for tiles
     new_range_tile = lambda t2s,z,First,nt : range(z + t2s, z + nt) if First else range(z, z + nt)
 
-    # generic iterator func factoring tile_size (use ceiling)
-    iter_ = lambda v: int((args[v + '_stop'] - args[v + '_start'] - 1) / args[v + '_tile_size']) + 1
+    # generic helper lambda func factoring tile_size (use ceiling)
+    factor_ = lambda v: int((args[v + '_stop'] - args[v + '_start'] - 1) / args[v + '_tile_size']) + 1
 
-    # new start func (for tile_size cases)
+    # new start helper func (for tile_size cases)
     ns = lambda v,n: args[v + '_start'] + args[v + '_tile_size'] * n
-    # new start func (for chunk_size cases)
+    # new start helper func for special case Z (which uses chunk_size)
     ns_z = lambda v,n: args[v + '_start'] + args[v + '_chunk_size'] * n
 
-    # Now Let's start the actual calculations for new ( Tns Znz Yns Xns ) values 
+    ##########################
+    #
+    # Now Let's start the actual calculations to compute the new ( Tns Znz Yns Xns ) values 
+    #
 
-    # iterators for x, y, z 
-    xIt = iter_('x')
-    yIt = iter_('y')
-    zIt = args['z_stop'] - args['z_start']
+    # first, factor in  (x, y, z dimensions)
+    Xf = factor_('x')
+    Yf = factor_('y')
+    Zf = args['z_stop'] - args['z_start']
 
-    # read in this param
+    # counter to keep track of # tiles to skip, used decrementally throughout the rest of the calcs below
     tiles_to_skip = args['tiles_to_skip']
 
-    #constant for tracking tiles to skip over the iterations (for T)
-    kt = int(tiles_to_skip/(xIt*yIt*zIt))
+    ############### T
+    # T pos, factoring in X, Y, Z
+    Tk = int(tiles_to_skip/(Xf*Yf*Zf))
     #compute T's new start
-    Tns = ns('t',kt)
+    Tns = ns('t',Tk)
     #decr tiles to skip
-    tiles_to_skip -= kt*xIt*yIt*zIt
+    tiles_to_skip -= Tk*Xf*Yf*Zf
 
-    #constant for tracking tiles to skip over the iterations (for Z)
-    kz = int(tiles_to_skip/(args['z_chunk_size']*xIt*yIt))
+    ############### Z
+    # Z pos, factoring in X, Y
+    Zk = int(tiles_to_skip/(args['z_chunk_size']*Xf*Yf))
     # compute Z's new start
-    Zns = ns_z('z',kz)
+    Zns = ns_z('z',Zk)
     # decr tiles to skip
-    tiles_to_skip -= kz*args['z_chunk_size']*xIt*yIt
+    tiles_to_skip -= Zk*args['z_chunk_size']*Xf*Yf
 
-    #compute for y and x, factoring by nt
-    nt = min(args['z_chunk_size'], args['z_stop'] - Zns)
+    #set the number of tiles (to be used for X and Y calculations)
+    num_tiles = min(args['z_chunk_size'], args['z_stop'] - Zns)
 
-    #Y 
-    #y constant factor for Y
-    ky = int(tiles_to_skip/(nt*xIt))
+    ############### Y
+    # Y pos, factoring in X
+    Yk = int(tiles_to_skip/(num_tiles*Xf))
     # compute Y's new start pos
-    Yns = ns('y',ky)
+    Yns = ns('y',Yk)
     # decr tiles to skip
-    tiles_to_skip -= ky*nt*xIt
+    tiles_to_skip -= Yk*num_tiles*Xf
 
-    #X
-    # constant factor for X
-    kx = int(tiles_to_skip/nt)
+    ############### X
+    # X pos, factoring in num tiles
+    Xk = int(tiles_to_skip/num_tiles)
     # compute X's new start pos
-    Xns = ns('x',kx)
+    Xns = ns('x',Xk)
     # decr tiles to skip
-    tiles_to_skip -= kx*nt
+    tiles_to_skip -= Xk*num_tiles
 
-    #initialize vars for next loop
+
+    #######################################
+    # 
+    #  Now that we've computed the new start values (Tns, Zns, Yns, Xns) and the tiles_to_skip, 
+    # ... let's begin our "efficient" LOOPING! 
+    #
+
+    #first, initialize vars 
     num = 0 
     bFirst = True
+    count_in_offset = 0    
 
-    # print ("\n =====================   Next RUN of Create Messages ========================= \n")
-    #print ("TEST4::  Tns: {}, Zns: {}, Yns: {}, Xns: {}".format(Tns, Zns, Yns, Xns))
-
-    count_in_offset = 0
-
-    #Use the new T Z Y X values to loop --- 
-
-    for t in new_range('t',Tns,bFirst):
-        for z in new_range_z(Zns,bFirst):
+    for t in new_range('t', Tns, bFirst):
+        for z in new_range_z(Zns, bFirst):
             #Factor in Z chunk size
             num_of_tiles = min(args['z_chunk_size'], args['z_stop'] - z)
 
-            for y in new_range('y',Yns,bFirst):
-                for x in new_range('x',Xns,bFirst):
+            for y in new_range('y', Yns, bFirst):
+                for x in new_range('x', Xns, bFirst):
 
                     for tile in new_range_tile(tiles_to_skip, z, bFirst, num_of_tiles):
                         if bFirst:
                             bFirst = False
-                            # print ("First POS:{:4d}, // t:{:3d}, z:{:3d}, y:{:3d}, x:{:3d}, // tile:{:3d}\n---------------- ".format(num, t, z, y, x,tile))
-
-                        # print (" Next POS:{:4d}, // t:{:3d}, z:{:3d}, y:{:3d}, x:{:3d}, // tile:{:3d}\n---------------- ".format(num, t, z, y, x,tile))
-
                         num += 1
 
                         if count_in_offset == 0:
-                            print("\n *** FINISHED SKIPPING tiles *** \n")
-
-                        #print ("TileNum: {:4d}, t:{:3d}, // z:{:3d}, y:{:3d}, x:{:3d}, tile:{:3d}".format(num, t, z, y, x,tile))
+                            print(" **** FINISHED SKIPPING tiles *** \n")
 
                         chunk_x = int(x / tile_size('x'))
                         chunk_y = int(y / tile_size('y'))
@@ -238,10 +244,7 @@ def create_messages(args):
 
                         count_in_offset += 1
                         if count_in_offset > args['MAX_NUM_TILES_PER_LAMBDA']:
-                            #print ("  --- END GENERATOR --- count: {}".format(count_in_offset))
                             return  # end the generator
-
-                        #print ("NOT returning .... {} , [{}, {}, {}] \n".format(count_in_offset, chunk_z, chunk_y, chunk_x))
 
                         tile_key = hashed_key(args['project_info'][0],
                                                 args['project_info'][1],
