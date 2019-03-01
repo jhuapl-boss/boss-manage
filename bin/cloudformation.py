@@ -93,19 +93,16 @@ if __name__ == '__main__':
                         choices = config_names,
                         metavar = "config_name",
                         help="Configuration to act upon (imported from configs/)")
-    parser.add_argument("--internal",
-                        action = "store_true",
-                        help="Attemps to execute cloudformation script without any credentials. Meant to use from internal aws instances")
     args = parser.parse_args()
 
-    if args.internal:
-        session = aws.use_iam_role()
-
-    else:
-        if args.aws_credentials is None:
+    if args.aws_credentials is None:
+        try:
+            print("AWS credentials not provided and AWS_CREDENTIALS is not defined, assuming IAM role")
+            session = aws.use_iam_role()
+        except Exception as e:
             parser.print_usage()
-            print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
-            sys.exit(1)
+            print('Error: Could not assume IAM role')
+    else:
         session = aws.create_session(args.aws_credentials)
     
     os.environ["AMI_VERSION"] = args.ami_version
