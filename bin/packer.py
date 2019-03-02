@@ -65,15 +65,16 @@ def locate_ami(aws_config):
                 return False
         return True
 
-    if aws_config == None:
-        session = aws.use_iam_role()
-
-    else:
+    try: 
         with open(aws_config) as fh:
             cred = json.load(fh)
             session = Session(aws_access_key_id = cred["aws_access_key"],
                             aws_secret_access_key = cred["aws_secret_key"],
                             region_name = 'us-east-1')
+    except Exception as e:
+        print(e)
+        print("Session could not be established with credentials file, attempting to use iam role")
+        session = aws.use_iam_role()
 
     client = session.client('ec2')
     response = client.describe_images(Filters=[
@@ -146,10 +147,6 @@ if __name__ == '__main__':
                         metavar = "<config>",
                         nargs = "+",
                         help="Packer variable to build a machine image for")
-    parser.add_argument("--internal",
-                    action = "store_true",
-                    help="Attemps to execute cloudformation script without any credentials. Meant to use from internal aws instances")
-
     args = parser.parse_args()
 
     if "all" in args.config:
@@ -158,9 +155,6 @@ if __name__ == '__main__':
     bastion_config = "-var-file=" + repo_path("config", "aws-bastion")
     credentials_config = repo_path("config", "aws-credentials")
     packer_file = repo_path("packer", "vm.packer")
-
-    if args.internal:
-        credentials_config = None
 
     elif not os.path.exists(credentials_config):
         print("Could not locate AWS credentials file at '{}', required...".format(credentials_config))
