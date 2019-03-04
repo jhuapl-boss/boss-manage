@@ -170,14 +170,14 @@ if __name__ == '__main__':
         ami = locate_ami(credentials_config)
 
     cmd = """{packer} build
-            {bastion} -var-file={credentials}
+            {bastion} {credentials}
             -var-file={machine} -var 'name_suffix={name}'
             -var 'commit={commit}' -var 'force_deregister={deregister}'
             -var 'aws_source_ami={ami}' -only={only} {packer_file}"""
     cmd_args = {
         "packer" : "packer",
         "bastion" : bastion_config if args.bastion else "",
-        "credentials" : credentials_config,
+        "credentials" : "-var-file=" + credentials_config if args.bastion else "",
         "only" : args.only,
         "packer_file" : packer_file,
         "name" : "-" + args.name,
