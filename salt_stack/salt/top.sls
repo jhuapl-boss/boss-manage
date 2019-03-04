@@ -7,6 +7,8 @@ base:
     'vault*':
         - vault.server
         - boss-tools.bossutils
+        - scalyr
+        - scalyr.update_host
         - chrony
 
     'auth*':
@@ -20,6 +22,8 @@ base:
         - django.rest-framework # install first and patch
         - boss.django
         - django.login # patch, expects django to already be installed
+        - scalyr
+        - scalyr.update_host
         - git
         - ingest-client.ingest
         - chrony
@@ -42,6 +46,8 @@ base:
         - django.rest-framework # install first and patch
         - proofreader-web
         - django.login # patch, expects django to already be installed
+        - scalyr
+        - scalyr.update_host
 
     'workstation*':
         - python.python35
@@ -53,10 +59,14 @@ base:
     'cachemanager*':
         - boss-tools.bossutils
         - boss-tools.cachemanager
+        - scalyr
+        - scalyr.update_host
         - git
         - chrony
 
     'activities*':
+        - scalyr
+        - scalyr.update_host
         - open-files.increase-open-files
         - boss-tools.activities
 
