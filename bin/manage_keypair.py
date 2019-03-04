@@ -95,7 +95,7 @@ if __name__ == '__main__':
                 print('The keypair was deleted from aws but it was not in your .ssh/ directory')
                 pass
             except FileNotFoundError:
-                print('Could not find the PEM key to delete under ' + key_file_path)
+                print('Could not find the PEM key to delete under ' + str(key_file_path))
                 pass
         else:
             print(response['ResponseMetadata'])
