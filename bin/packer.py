@@ -156,7 +156,7 @@ if __name__ == '__main__':
     credentials_config = repo_path("config", "aws-credentials")
     packer_file = repo_path("packer", "vm.packer")
 
-    elif not os.path.exists(credentials_config):
+    if not os.path.exists(credentials_config):
         print("Could not locate AWS credentials file at '{}', required...".format(credentials_config))
         sys.exit(1)
 
