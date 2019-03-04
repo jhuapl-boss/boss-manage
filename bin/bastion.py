@@ -103,8 +103,12 @@ if __name__ == "__main__":
 
     if args.aws_credentials is None:
         parser.print_usage()
-        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
-        sys.exit(1)
+        try:
+            print("AWS credentials not provided and AWS_CREDENTIALS is not defined, assuming IAM role")
+            session = aws.use_iam_role()
+        except Exception as e:
+            parser.print_usage()
+            print('Error: Could not assume IAM role due to:{}'.format(e))
     if args.ssh_key is None:
         parser.print_usage()
         print("Error: SSH key not provided and SSH_KEY is not defined")
