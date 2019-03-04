@@ -85,16 +85,16 @@ cd salt_stack/salt/boss-tools/files/boss-tools.git
 git checkout vault_update
 cd ../../../../../
 
-# Set-up log records on Cloudwatch:
-export EC2_REGION=`curl --silent http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region`
-curl https://s3.amazonaws.com/aws-cloudwatch/downloads/latest/awslogs-agent-setup.py -O
-(echo
- echo
- echo
- echo /var/log/cloud_init_output.log
- echo 1
- echo 1
- echo N) | python3 ./awslogs-agent-setup.py --region $EC2_REGION
+# # Set-up log records on Cloudwatch:
+# export EC2_REGION=`curl --silent http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region`
+# curl https://s3.amazonaws.com/aws-cloudwatch/downloads/latest/awslogs-agent-setup.py -O
+# (echo
+#  echo
+#  echo
+#  echo /var/log/cloud_init_output.log
+#  echo 1
+#  echo 1
+#  echo N) | python3 ./awslogs-agent-setup.py --region $EC2_REGION
 
 #Make vault private directory
 mkdir vault/private
@@ -152,23 +152,15 @@ echo " "
 
 #Endpoint tests:
 echo 'Performing tests...'
-cd /srv/www/django
-python3 manage.py test
-python3 manage.py test -- -c inttest.cfg
+python3.5 ./bin/bastion.py endpoint.test.boss ssh-cmd cd /srv/www/django && python3 manage.py test --ssh-key ~/.ssh/auto-build-keypair.pem 
+# python3 manage.py test -- -c inttest.cfg
 
 #ndingest library
-python3 -m pip install pytest
-cd /usr/local/lib/python3/site-packages/ndingest
-export NDINGEST_TEST=1
-pytest -c test_apl.cfg
-#Exit endpoint
-exit
+python3.5 ./bin/bastion.py endpoint.test.boss ssh-cmd python3 -m pip install pytest --ssh-key ~/.ssh/auto-build-keypair.pem
+python3.5 ./bin/bastion.py endpoint.test.boss ssh-cmd cd /usr/local/lib/python3/site-packages/ndingest && export NDINGEST_TEST=1 && pytest -c test_apl.cfg --ssh-key ~/.ssh/auto-build-keypair.pem
 
 #cachemanage VM
-cd /srv/salt/boss-tools/files/boss-tools.git/cachemgr
-sudo nose2
-sudo nose2 -c inttest.cfg
-exit
+python3.5 ./bin/bastion.py cachemanager.test.boss ssh-cmd cd /srv/salt/boss-tools/files/boss-tools.git/cachemgr && sudo nose2 && sudo nose2 -c inttest.cfg --ssh-key ~/.ssh/auto-build-keypair.pem
 
 echo " "
 echo "----------------------Delete Stacks----------------------"
