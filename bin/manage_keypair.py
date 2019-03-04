@@ -80,7 +80,7 @@ if __name__ == '__main__':
             try:
                 key_file_path.touch()
                 key_file_path.open('w').write(response['KeyMaterial'])
-                print('KeyPair saved in ' + '~/.ssh/')
+                print('KeyPair saved in ~/.ssh/')
             except FileExistsError:
                 print('Directory {} already existed'.format(key_dir))
                 pass
