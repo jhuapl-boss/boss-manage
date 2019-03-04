@@ -14,9 +14,10 @@
 
 """ Lambda to launch ec2-instances """
 import boto3
+import os
 
-REGION = 'us-east-1' # region to launch instance.
-AMI = 'ami-456b493a'
+REGION = os.environ['AWS_REGION'] # region to launch instanc leveraging lambda env var.
+AMI = 'ami-456b493a' # Ubuntu 16.04 AWS provided base image.
 INSTANCE_TYPE = 't2.micro' # instance type to launch.
 
 EC2 = boto3.client('ec2', region_name=REGION)
@@ -35,14 +36,14 @@ echo ' '
 echo 'echo "----------------------Init_Script----------------------'
 echo ' '
 
+set -e 
+
 #Install python3.5 and guide pip to it
-yes | add-apt-repository ppa:fkrull/deadsnakes
 yes | apt-get update
-yes | apt-get install openssh-server
 yes | ufw allow 22
 yes | apt-get install python3.5
 yes | apt-get install zip unzip
-
+yes | apt-get install jq
 yes | apt-get install python3-pip
 
 cd /home/ubuntu/
@@ -72,40 +73,41 @@ wait
 
 #Checkout the right branch
 cd boss-manage/
-git checkout rodrilm2_integ_merge_test
+git checkout auto-build-test
 # git checkout 8a55840
 
 #Install all requirements
 git submodule init
 git submodule update
-python3.5 -m pip install boto3
 python3.5 -m pip install -r requirements.txt
-python3.5 -m pip install heaviside
 
 cd salt_stack/salt/boss-tools/files/boss-tools.git
 git checkout vault_update
 cd ../../../../../
 
 # Set-up log records on Cloudwatch:
+export EC2_REGION=`curl --silent http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region`
 curl https://s3.amazonaws.com/aws-cloudwatch/downloads/latest/awslogs-agent-setup.py -O
-python3 ./awslogs-agent-setup.py --region us-east-1 < ./cw-log-config.txt
+(echo
+ echo
+ echo
+ echo /var/log/cloud_init_output.log
+ echo 1
+ echo 1
+ echo N) | python3 ./awslogs-agent-setup.py --region $EC2_REGION
 
 #Make vault private directory
-cd vault/
-mkdir private
-cd ..
+mkdir vault/private
 
 #Make empty aws-creds file so that cloudformation script works properly.
 cd config/
 touch aws-credentials
 source set_vars-auto_build_test.sh
-echo "Check that Bastion IP is correct"
-env
 cd ../bin/
 
 #Create  keypair to attach to ec2 instances made by cloudformation.
-python3.5 ./manage_keypair.py delete auto-build-keypair --internal
-python3.5 ./manage_keypair.py create auto-build-keypair --internal
+python3.5 ./manage_keypair.py delete auto-build-keypair
+python3.5 ./manage_keypair.py create auto-build-keypair
 export SSH_KEY="~/.ssh/auto-build-keypair.pem"
 chmod 400 ~/.ssh/auto-build-keypair.pem
 # ssh-add ~/.ssh/auto-build-keypair.pem
@@ -115,34 +117,32 @@ wait
 echo " "
 echo "----------------------Building AMIs----------------------"
 echo " " 
-python3.5 ./packer.py auth vault consul endpoint cachemanager activities --name test_ami --internal
+python3.5 ./packer.py auth vault consul endpoint cachemanager activities --name autotest --no-bastion
 wait
 
 echo " "
 echo "----------------------Create Stack----------------------"
 echo " " 
 
-#Set up keys:
-export SSH_KEY=~/.ssh/auto-build-keypair.pem
 echo "Env:"
 env
 
 #Run building cloudformation
-yes | python3.5 ./cloudformation.py create test.boss core --ami-version test_ami --internal
+yes | python3.5 ./cloudformation.py create test.boss core --ami-version autotest
 wait 
 sleep 60
-yes | python3.5 ./cloudformation.py post-init test.boss core --ami-version test_ami --internal
+yes | python3.5 ./cloudformation.py post-init test.boss core --ami-version autotest
 wait
 sleep 30
-yes | python3.5 ./cloudformation.py create test.boss redis --ami-version test_ami --internal
+yes | python3.5 ./cloudformation.py create test.boss redis --ami-version autotest
 wait
-yes | python3.5 ./cloudformation.py create test.boss api --ami-version test_ami --internal
+yes | python3.5 ./cloudformation.py create test.boss api --ami-version autotest
 wait
-yes | python3.5 ./cloudformation.py create test.boss activities --ami-version test_ami --internal
+yes | python3.5 ./cloudformation.py create test.boss activities --ami-version autotest
 wait
-yes | python3.5 ./cloudformation.py create test.boss cloudwatch --ami-version test_ami --internal
+yes | python3.5 ./cloudformation.py create test.boss cloudwatch --ami-version autotest
 wait
-# yes  | python3.5 ./cloudformation.py create test.boss dynamolambda --ami-version test_ami --internal
+# yes  | python3.5 ./cloudformation.py create test.boss dynamolambda --ami-version autotest
 
 echo " "
 echo "----------------------Performing Tests----------------------"
@@ -152,7 +152,6 @@ echo " "
 
 #Endpoint tests:
 echo 'Performing tests...'
-python3.5 ./bastion.py endpoint.test.boss ssh
 cd /srv/www/django
 python3 manage.py test
 python3 manage.py test -- -c inttest.cfg
@@ -166,7 +165,6 @@ pytest -c test_apl.cfg
 exit
 
 #cachemanage VM
-python3.5 ./bastion.py cachemanager.test.boss
 cd /srv/salt/boss-tools/files/boss-tools.git/cachemgr
 sudo nose2
 sudo nose2 -c inttest.cfg
@@ -176,17 +174,17 @@ echo " "
 echo "----------------------Delete Stacks----------------------"
 echo " " 
 
-# yes | python3.5 ./cloudformation.py delete test.boss dynamolambda --internal
+# yes | python3.5 ./cloudformation.py delete test.boss dynamolambda
 # wait
-yes | python3.5 ./cloudformation.py delete test.boss cloudwatch --internal
+yes | python3.5 ./cloudformation.py delete test.boss cloudwatch
 wait
-yes | python3.5 ./cloudformation.py delete test.boss activities --internal
+yes | python3.5 ./cloudformation.py delete test.boss activities
 wait
-yes | python3.5 ./cloudformation.py delete test.boss api --internal
+yes | python3.5 ./cloudformation.py delete test.boss api
 wait
-yes | python3.5 ./cloudformation.py delete test.boss redis --internal
+yes | python3.5 ./cloudformation.py delete test.boss redis
 wait
-yes | python3.5 ./cloudformation.py delete test.boss core --internal
+yes | python3.5 ./cloudformation.py delete test.boss core
 wait
 
 # echo " "
@@ -194,7 +192,7 @@ wait
 # echo " " 
 
 #Delete keypairs from aws
-python3.5 ./manage_keypair.py delete auto-build-keypair --internal
+python3.5 ./manage_keypair.py delete auto-build-keypair
 Shutdown the instance an hour after script executes.
 shutdown -h +3600"""
 
