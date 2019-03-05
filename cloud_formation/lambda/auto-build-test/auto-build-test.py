@@ -99,6 +99,12 @@ cd ../../../../../
 #Make vault private directory
 mkdir vault/private
 
+#Manage scalyr formula:
+touch salt_stack/pillar/scalyr.sls
+rm -r salt_stack/salt/scalyr
+mkdir salt_stack/salt/scalyr
+touch salt_stack/salt/scalyr/init.sls && touch salt_stack/salt/scalyr/map.jinja && touch salt_stack/salt/scalyr/update_host.sls
+
 #Make empty aws-creds file so that cloudformation script works properly.
 cd config/
 touch aws-credentials
