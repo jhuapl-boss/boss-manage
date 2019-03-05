@@ -102,7 +102,6 @@ def machine_lookup_all(session, hostname, public_ip = True):
                               {"Name":"instance-state-name", "Values":["running"]}])
 
     addresses = []
-    items = response['Reservations']
     if len(items) > 0:
         for i in items:
             item = i['Instances'][0]
