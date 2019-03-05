@@ -20,22 +20,9 @@ developing and small changes need to be made to a lambda function, but a full
 rebuild of the entire zip file isn't required.
 """
 
-import argparse
-import boto3
-import os
-import sys
-
 import alter_path
 from lib import configuration
-
-def upload_lambda_zip(bosslet_config, path):
-    s3 = bosslet_config.session.client('s3')
-    with open(path, 'rb') as in_file:
-        resp = s3.put_object(Bucket=bosslet_config.LAMBDA_BUCKET,
-                             Key=bosslet_config.names.multi_lambda.zip,
-                             Body=in_file)
-    print(resp)
-
+from lib.lambdas import upload_lambda_zip
 
 if __name__ == '__main__':
     parser = configuration.BossParser(

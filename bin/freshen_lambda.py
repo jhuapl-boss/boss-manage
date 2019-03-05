@@ -21,24 +21,9 @@ Useful when developing and small changes need to be made to a lambda function,
 but a full rebuild of the entire zip file isn't required.
 """
 
-import os
-import sys
-
 import alter_path
-from lib import aws
 from lib import configuration
-
-def freshen_lambda(bosslet_config, lambda_name):
-    zip_name = bosslet_config.names.multi_lambda.zip
-    full_name = bosslet_config.names[lambda_name].lambda_
-    client = bosslet_config.session.client('lambda')
-    resp = client.update_function_code(
-        FunctionName=full_name,
-        S3Bucket=bosslet_config.LAMBDA_BUCKET,
-        S3Key=zip_name,
-        Publish=True)
-    print(resp)
-
+from lib.lambdas import freshen_lambda
 
 if __name__ == '__main__':
     parser = configuration.BossParser(description = "Script for freshening lambda " +

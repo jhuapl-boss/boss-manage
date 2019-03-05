@@ -34,7 +34,7 @@ from lib import utils
 from lib import aws
 from lib import constants as const
 from lib import stepfunctions as sfn
-from update_lambda_fcn import load_lambdas_on_s3, update_lambda_code
+from lib.lambdas import load_lambdas_on_s3, update_lambda_code
 
 def create_config(bosslet_config, lookup=True):
     """Create the CloudFormationConfiguration object."""

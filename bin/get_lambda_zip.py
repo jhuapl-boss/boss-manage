@@ -20,28 +20,9 @@ developing and small changes need to be made to a lambda function, but a full
 rebuild of the entire zip file isn't required.
 """
 
-import argparse
-import boto3
-import os
-import sys
-
 import alter_path
-from lib import aws
 from lib import configuration
-
-def download_lambda_zip(bosslet_config, path):
-    s3 = bosslet_config.session.client('s3')
-    zip_name = bosslet_config.names.multi_lambda.zip
-    full_path = '{}/{}'.format(path, zip_name)
-    resp = s3.get_object(Bucket=bosslet_config.LAMBDA_BUCKET, Key=zip_name)
-
-    bytes = resp['Body'].read()
-
-    with open(full_path , 'wb') as out:
-        out.write(bytes)
-
-    print('Saved zip to {}'.format(full_path))
-
+from lib.lambdas import download_lambda_zip
 
 if __name__ == '__main__':
     parser = configuration.BossParser(description='Script for downloading lambda ' +

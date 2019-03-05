@@ -32,8 +32,8 @@ from lib.userdata import UserData
 from lib import aws
 from lib import constants as const
 from lib import utils
+from lib.lambdas import load_lambdas_on_s3, update_lambda_code
 
-from update_lambda_fcn import load_lambdas_on_s3, update_lambda_code
 import botocore
 
 # Number of days until objects expire in the tile bucket.

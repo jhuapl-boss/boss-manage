@@ -21,7 +21,7 @@ from lib import aws
 from lib import utils
 from lib import constants as const
 from lib import stepfunctions as sfn
-from update_lambda_fcn import load_lambdas_on_s3, update_lambda_code
+from lib.lambdas import load_lambdas_on_s3, update_lambda_code
 
 """
 This CloudFormation config file creates resources for copying cuboids from
