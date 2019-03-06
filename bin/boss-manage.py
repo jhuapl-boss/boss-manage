@@ -26,6 +26,7 @@ def ref(module, cli):
 class ManageCLI(configuration.NestedBossCLI):
     COMMANDS = {
         'config': ref('boss-config', 'ConfigCLI'),
+        'lambda': ref('boss-lambda', 'LambdaCLI'),
     }
 
     PARSER_ARGS = {
