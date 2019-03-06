@@ -66,7 +66,7 @@ if __name__ == '__main__':
     client = session.client('ec2')
 
     #Define key pair path
-    key_file_path = Path(str(Path.home()) + '/.ssh/' + str(args.keypairName) + '.pem')
+    key_file_path = Path.home() / '.ssh' / (args.keypairName + '.pem')
 
     if args.action == 'create':
         try:
@@ -79,7 +79,9 @@ if __name__ == '__main__':
         if response:   
             try:
                 key_file_path.touch()
-                key_file_path.open('w').write(response['KeyMaterial'])
+                with key_file_path.open('w') as fh:
+                    fh.write(response['KeyMaterial'])
+                key_file_path.chmod(0o444)
                 print('KeyPair saved in ~/.ssh/')
             except FileExistsError:
                 print('Directory {} already existed'.format(key_dir))
@@ -89,13 +91,13 @@ if __name__ == '__main__':
         response = aws.delete_keypair(session, args.keypairName)
         if response['ResponseMetadata']['HTTPStatusCode'] == 200:
             try:
-                 os.remove(str(key_file_path))
+                 key_file_path.unlink()
                  print('KeyPair deleted successfully')
             except NameError:
                 print('The keypair was deleted from aws but it was not in your .ssh/ directory')
                 pass
             except FileNotFoundError:
-                print('Could not find the PEM key to delete under ' + str(key_file_path))
+                print('Could not find the PEM key to delete under {}'.format(key_file_path))
                 pass
         else:
             print(response['ResponseMetadata'])
