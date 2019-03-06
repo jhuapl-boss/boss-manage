@@ -102,7 +102,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.aws_credentials is None:
-        parser.print_usage()
         try:
             print("AWS credentials not provided and AWS_CREDENTIALS is not defined, assuming IAM role")
             session = aws.use_iam_role()
@@ -111,7 +110,7 @@ if __name__ == "__main__":
             print('Error: Could not assume IAM role due to:{}'.format(e))
     elif args.aws_credentials is not None:
         session = aws.create_session(args.aws_credentials)
-        
+
     if args.ssh_key is None:
         parser.print_usage()
         print("Error: SSH key not provided and SSH_KEY is not defined")

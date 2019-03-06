@@ -144,6 +144,8 @@ yes | python3.5 ./cloudformation.py create test.boss redis --ami-version autotes
 wait
 yes | python3.5 ./cloudformation.py create test.boss api --ami-version autotest
 wait
+yes | python3.5 ./cloudformation.py post-init test.boss api --ami-version autotest
+wait
 yes | python3.5 ./cloudformation.py create test.boss activities --ami-version autotest
 wait
 yes | python3.5 ./cloudformation.py create test.boss cloudwatch --ami-version autotest
@@ -158,15 +160,14 @@ echo " "
 
 #Endpoint tests:
 echo 'Performing tests...'
-python3.5 ./bin/bastion.py endpoint.test.boss ssh-cmd cd /srv/www/django && python3 manage.py test --ssh-key ~/.ssh/auto-build-keypair.pem 
-# python3 manage.py test -- -c inttest.cfg
+python3.5 ./bastion.py --ssh-key ~/.ssh/auto-build-keypair.pem endpoint.test.boss ssh-cmd "cd /srv/www/django && python3 manage.py test"# python3 manage.py test -- -c inttest.cfg
 
 #ndingest library
-python3.5 ./bin/bastion.py endpoint.test.boss ssh-cmd python3 -m pip install pytest --ssh-key ~/.ssh/auto-build-keypair.pem
-python3.5 ./bin/bastion.py endpoint.test.boss ssh-cmd cd /usr/local/lib/python3/site-packages/ndingest && export NDINGEST_TEST=1 && pytest -c test_apl.cfg --ssh-key ~/.ssh/auto-build-keypair.pem
+python3.5 ./bastion.py --ssh-key ~/.ssh/auto-build-keypair.pem endpoint.test.boss ssh-cmd "python3 -m pip install pytest"
+python3.5 ./bastion.py --ssh-key ~/.ssh/auto-build-keypair.pem endpoint.test.boss ssh-cmd "cd /usr/local/lib/python3/site-packages/ndingest && export NDINGEST_TEST=1 && pytest -c test_apl.cfg"
 
 #cachemanage VM
-python3.5 ./bin/bastion.py cachemanager.test.boss ssh-cmd cd /srv/salt/boss-tools/files/boss-tools.git/cachemgr && sudo nose2 && sudo nose2 -c inttest.cfg --ssh-key ~/.ssh/auto-build-keypair.pem
+python3.5 ./bastion.py --ssh-key ~/.ssh/auto-build-keypair.pem cachemanager.test.boss ssh-cmd "cd /srv/salt/boss-tools/files/boss-tools.git/cachemgr && sudo nose2 && sudo nose2 -c inttest.cfg"
 
 echo " "
 echo "----------------------Delete Stacks----------------------"
@@ -190,9 +191,9 @@ wait
 # echo " " 
 
 #Delete keypairs from aws
-python3.5 ./manage_keypair.py delete auto-build-keypair
-Shutdown the instance an hour after script executes.
-shutdown -h +3600"""
+# python3.5 ./manage_keypair.py delete auto-build-keypair
+# Shutdown the instance an hour after script executes.
+# shutdown -h +3600"""
 
     print('Running script...')
     instance = EC2.run_instances(
