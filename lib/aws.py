@@ -50,6 +50,37 @@ def create_session(credentials):
                       region_name = credentials.get('aws_region', const.REGION))
     return session
 
+def get_all(to_wrap, key):
+    """Utility helper method for requesting all results from AWS
+
+    Usage:
+        items = get_all(session.client('ec2').describe_instances, 'Reservations') \
+                (Filters=[...])
+        items # => List of Reservations returned by describe_instances
+
+    Args:
+        to_wrap (method): AWS client method to execute to get results
+        key (str): The dictionary key in the `to_wrap` response where results
+                   are stored
+
+    Returns:
+        function: Function that takes arguments for `to_wrap` and will continue to call
+                  `to_wrap` until there is not a valid 'NextToken' in the response. The
+                  result is a list of values that were stored under `key` in the original
+                  response from AWS
+    """
+    def wrapper(*args, **kwargs):
+        rtn = []
+        while True:
+            resp = to_wrap(*args, **kwargs)
+            rtn.extend(resp[key])
+
+            if 'NextToken' in resp and resp['NextToken'] is not None:
+                kwargs['NextToken'] = resp['NextToken']
+            else:
+                return rtn
+    return wrapper
+
 def machine_lookup_all(session, hostname, public_ip = True):
     """Lookup all of the IP addresses for a given AWS instance name.
 
@@ -66,11 +97,11 @@ def machine_lookup_all(session, hostname, public_ip = True):
         (list) : List of IP addresses
     """
     client = session.client('ec2')
-    response = client.describe_instances(Filters=[{"Name":"tag:Name", "Values":[hostname]},
-                                                  {"Name":"instance-state-name", "Values":["running"]}])
+    items = get_all(client.describe_instances, 'Reservations') \
+                    (Filters=[{"Name":"tag:Name", "Values":[hostname]},
+                              {"Name":"instance-state-name", "Values":["running"]}])
 
     addresses = []
-    items = response['Reservations']
     if len(items) > 0:
         for i in items:
             item = i['Instances'][0]
@@ -108,10 +139,10 @@ def machine_lookup(session, hostname, public_ip = True):
         idx = 0
 
     client = session.client('ec2')
-    response = client.describe_instances(Filters=[{"Name":"tag:Name", "Values":[hostname]},
-                                                  {"Name":"instance-state-name", "Values":["running"]}])
+    item = get_all(client.describe_instances, 'Reservations') \
+                    (Filters=[{"Name":"tag:Name", "Values":[hostname]},
+                              {"Name":"instance-state-name", "Values":["running"]}])
 
-    item = response['Reservations']
     if len(item) == 0:
         print("Could not find IP address for '{}'".format(hostname))
         return None
