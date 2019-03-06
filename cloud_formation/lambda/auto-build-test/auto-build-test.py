@@ -16,7 +16,7 @@
 import boto3
 import os
 
-REGION = os.environ['AWS_REGION'] # region to launch instanc leveraging lambda env var.
+REGION = os.environ['AWS_REGION'] # region to launch instance leveraging lambda env var.
 AMI = 'ami-456b493a' # Ubuntu 16.04 AWS provided base image.
 INSTANCE_TYPE = 't2.micro' # instance type to launch.
 
@@ -144,8 +144,6 @@ yes | python3.5 ./cloudformation.py create test.boss redis --ami-version autotes
 wait
 yes | python3.5 ./cloudformation.py create test.boss api --ami-version autotest
 wait
-yes | python3.5 ./cloudformation.py post-init test.boss api --ami-version autotest
-wait
 yes | python3.5 ./cloudformation.py create test.boss activities --ami-version autotest
 wait
 yes | python3.5 ./cloudformation.py create test.boss cloudwatch --ami-version autotest
@@ -190,10 +188,10 @@ wait
 # echo "----------------------Cleanup environment----------------------"
 # echo " " 
 
-#Delete keypairs from aws
-# python3.5 ./manage_keypair.py delete auto-build-keypair
-# Shutdown the instance an hour after script executes.
-# shutdown -h +3600"""
+Delete keypairs from aws
+python3.5 ./manage_keypair.py delete auto-build-keypair
+Shutdown the instance an hour after script executes.
+shutdown -h +3600"""
 
     print('Running script...')
     instance = EC2.run_instances(
