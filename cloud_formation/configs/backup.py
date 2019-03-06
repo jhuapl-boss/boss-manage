@@ -27,6 +27,7 @@ from lib import constants as const
 from lib.vault import POLICY_DIR as VAULT_POLICY_DIR
 
 import os
+import random
 
 def rds_copy(rds_name, subnet, image, s3_logs, s3_backup):
     pipeline = DataPipeline(log_uri = s3_logs, resource_role="backup")

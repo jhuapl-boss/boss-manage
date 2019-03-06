@@ -29,6 +29,7 @@ import sys
 
 from . import hosts
 from .utils import deprecated
+from .exceptions import BossManageError
 
 def machine_lookup_all(session, hostname, public_ip = True):
     """Lookup all of the IP addresses for a given AWS instance name.
@@ -304,8 +305,7 @@ def ami_lookup(bosslet_config, ami_name, version = None):
             print("Could not locate AMI '{}', trying to find the latest '{}' AMI".format(ami_search, ami_name))
             return ami_lookup(bosslet_config, ami_name, version = "latest")
         else:
-            print("Could not locate AMI '{}'".format(ami_name))
-            return None
+            raise BossManageError("Could not locate AMI '{}'".format(ami_name))
     else:
         response['Images'].sort(key=lambda x: x["CreationDate"], reverse=True)
         image = response['Images'][0]

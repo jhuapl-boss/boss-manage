@@ -51,7 +51,6 @@ DEFAULT_POLICY_FILE = os.path.join(IAM_CONFIG_DIR, "policies.json")
 DEFAULT_GROUP_FILE = os.path.join(IAM_CONFIG_DIR, "groups.json")
 DEFAULT_ROLES_FILE = os.path.join(IAM_CONFIG_DIR, "roles.json")
 DEFAULT_NAMES_FILE = os.path.join(IAM_CONFIG_DIR, "names.json")
-COMMANDS=["import", "export"]
 
 class AllResources(object):
     """Class that always returns True for any `obj in AllResources()`"""

@@ -37,7 +37,7 @@ def create_config(bosslet_config):
     role = aws.role_arn_lookup(session, "lambda_cache_execution")
     config.add_arg(Arg.String(
         "LambdaCacheExecutionRole", role,
-        "IAM role for multilambda." + domain))
+        "IAM role for multilambda." + bosslet_config.INTERNAL_DOMAIN))
 
     config.add_sqs_queue(names.copy_cuboid_dlq.sqs, names.copy_cuboid_dlq.sqs, 30, 20160)
 
