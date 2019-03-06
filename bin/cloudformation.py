@@ -183,23 +183,17 @@ def call_configs(bosslet_config, configs, func_name):
     for config, module in modules:
         print("\t{}".format(config))
 
-    for config, module in modules:
-        print()
-        print("======================================================================")
-        print("== Working on {}".format(config))
-        try:
+    with console.status_line(spin=True, print_status=True) as status:
+        for config, module in modules:
+            print()
+            status('Working on {}'.format(config))
+
             if func_name in module.__dict__:
                 module.__dict__[func_name](bosslet_config)
             elif func_name == 'delete':
                 CloudFormationConfiguration(config, bosslet_config).delete()
             else:
                 print("Configuration '{}' doesn't implement function '{}', skipping".format(config, func_name))
-
-        except:
-            msg = "== Error with {} {}".format(config, func_name)
-            print(msg)
-            print()
-            raise
 
 if __name__ == '__main__':
     os.chdir(os.path.join(cur_dir, "..", "cloud_formation"))
