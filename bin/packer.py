@@ -133,6 +133,9 @@ if __name__ == '__main__':
                         default = True,
                         dest="bastion",
                         help = "Don't use the aws-bastion file when building. (default: Use the bastion)")
+    parser.add_argument("--base-ami",
+                        metavar = "<base-ami>",
+                        help = "Base AMI to build the new Image from")
     parser.add_argument("config",
                         choices = config_help_names,
                         metavar = "<config>",
@@ -156,7 +159,10 @@ if __name__ == '__main__':
     if not os.path.isdir(packer_logs):
         os.mkdir(packer_logs)
 
-    ami = locate_ami(credentials_config)
+    if args.base_ami:
+        ami = args.base_ami
+    else:
+        ami = locate_ami(credentials_config)
 
     cmd = """{packer} build
              {bastion} -var-file={credentials}
@@ -172,7 +178,7 @@ if __name__ == '__main__':
         "name" : "-" + args.name,
         "commit" : git_hash,
         "ami" : ami,
-        "deregister" : "true" if args.name in ["test", "sandy", "dean"] else "false",
+        "deregister" : "true" if args.name in ["test", "sandy", "dean", "prodtest"] else "false",
         "machine" : "" # replace for each call
     }
 

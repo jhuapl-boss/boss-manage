@@ -90,6 +90,7 @@ class AWSNames(object):
         "tile_bucket": "tiles",
         "delete_tile_objs_lambda": 'deleteTileObjsLambda',
         "tile_index": "tileindex",
+        "cuboid_ids_bucket": "cuboid-ids",
         "delete_tile_index_entry_lambda": 'deleteTileEntryLambda',
         "ingest_cleanup_dlq": "IngestCleanupDlq",
         "id_index": "idIndex",
@@ -118,10 +119,38 @@ class AWSNames(object):
         'ingest_lambda': 'IngestUpload',
         'dynamo_lambda': 'dynamoLambda',
         'trigger_dynamo_autoscale': 'triggerDynamoAutoscale',
+        'start_sfn_lambda': 'startSfnLambda',
+        'index_id_writer_sfn': 'Index.IdWriter',
         'downsample_status': 'downsample-status',
         'downsample_dlq': 'downsample-dlq',
+        'index_cuboid_supervisor_sfn': 'Index.CuboidSupervisor',
+        'index_find_cuboids_sfn': 'Index.FindCuboids',
+        'index_supervisor_sfn': 'Index.Supervisor',
+        'index_enqueue_cuboids_sfn': 'Index.EnqueueCuboids',
+        'index_fanout_enqueue_cuboids_sfn': 'Index.FanoutEnqueueCuboids',
+        'index_dequeue_cuboids_sfn': 'Index.DequeueCuboids',
+        'index_fanout_dequeue_cuboids_sfn': 'Index.FanoutDequeueCuboids',
+        'index_fanout_id_writers_sfn': 'Index.FanoutIdWriters',
+        'index_s3_writer_lambda': 'indexS3WriterLambda',
+        'index_fanout_id_writer_lambda': 'indexFanoutIdWriterLambda',
+        'index_write_id_lambda': 'indexWriteIdLambda',
+        'index_deadletter_queue': 'indexDeadLetter',
+        'index_write_failed_lambda': 'indexWriteFailedLambda',
+        'index_find_cuboids_lambda': 'indexFindCuboidsLambda',
+        'index_split_cuboids_lambda': 'indexSplitCuboidsLambda',
+        'index_fanout_enqueue_cuboid_keys_lambda': 'indexFanoutEnqueueCuboidsKeysLambda',
+        'index_batch_enqueue_cuboids_lambda': 'indexBatchEnqueueCuboidsLambda',
+        'index_fanout_dequeue_cuboid_keys_lambda': 'indexFanoutDequeueCuboidsKeysLambda',
+        'index_dequeue_cuboid_keys_lambda': 'indexDequeueCuboidsLambda',
+        'index_get_num_cuboid_keys_msgs_lambda': 'indexGetNumCuboidKeysMsgsLambda',
+        'index_check_for_throttling_lambda': 'indexCheckForThrottlingLambda',
+        'index_invoke_index_supervisor_lambda': 'indexInvokeIndexSupervisorLambda',
+        'index_load_ids_from_s3_lambda': 'indexLoadIdsFromS3Lambda',
+        'index_cuboids_keys_queue': 'cuboidsKeys',
         'copy_cuboid_lambda': 'copyCuboidLambda',
-        'copy_cuboid_dlq': 'copyCuboidDlq'
+        'copy_cuboid_dlq': 'copyCuboidDlq',
+        'tile_uploaded_lambda': 'tileUploadLambda',
+        'tile_ingest_lambda': 'tileIngestLambda'
     }
 
     def __getattr__(self, name):
@@ -134,15 +163,37 @@ class AWSNames(object):
 
         fq_hostname = hostname + self.base_dot
 
+        # Lambda names cannot have periods, so we use dashes, instead.
         if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'consul_monitor', 'vault_consul_check',
+                    'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 
+                    'index_s3_writer_lambda', 'index_fanout_id_writer_lambda',
+                    'downsample_dlq', 'downsample_volume_lambda',
+                    'delete_tile_objs_lambda', 'delete_tile_index_entry_lambda',
+                    'index_write_id_lambda', 'index_write_failed_lambda',
+                    'index_find_cuboids_lambda', 
+                    'index_fanout_enqueue_cuboid_keys_lambda',
+                    'index_batch_enqueue_cuboids_lambda', 
+                    'index_fanout_dequeue_cuboid_keys_lambda',
+                    'index_dequeue_cuboid_keys_lambda',
+                    'index_get_num_cuboid_keys_msgs_lambda',
+                    'index_check_for_throttling_lambda',
+                    'index_invoke_index_supervisor_lambda',
+                    'index_split_cuboids_lambda',
+                    'index_load_ids_from_s3_lambda',
+                    'start_sfn_lambda',
                     'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 'downsample_dlq', 'downsample_volume_lambda',
                     'delete_tile_objs_lambda', 'delete_tile_index_entry_lambda',
-                    'copy_cuboids_lambda']:
+                    'copy_cuboid_lambda', 'cuboid_import_lambda',
+                    'volumetric_ingest_queue_upload_lambda', 'tile_ingest_lambda',
+                    'tile_uploaded_lambda'
+                    ]:
             fq_hostname = fq_hostname.replace('.','-')
 
+        # Queue names cannot have periods, so we capitalize each word, instead.
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
                     'ingest_queue_populate', 'ingest_queue_upload', 'resolution_hierarchy',
                     'downsample_volume', 'delete_experiment', 'delete_collection', 'delete_coord_frame',
+                    'index_deadletter_queue', 'index_cuboids_keys_queue',
                     'ingest_cleanup_dlq', 'copy_cuboid_dlq']:
             fq_hostname = "".join(map(lambda x: x.capitalize(), fq_hostname.split('.')))
 

@@ -1,0 +1,130 @@
+"""State machine responsible for indexing of a single cuboid.
+
+* Writes all unique ids to the id-set attribute in the S3 index table.
+
+* Writes the cuboid's morton id to the cuboid-set attribute of each id in the 
+  id index table.
+
+Sample input:
+{
+    "id_index_step_fcn": "arn:aws:states:us-east-1:...",
+    "cuboid_object_key": "...",
+    "version": 0,
+    "config": {
+      "object_store_config": {
+        "id_count_table": "idCount.domain.boss",
+        "page_in_lambda_function": "multiLambda-domain-boss",
+        "page_out_lambda_function": "multiLambda-domain-boss",
+        "cuboid_bucket": "cuboids.domain.boss",
+        "s3_index_table": "s3index.domain.boss",
+        "id_index_table": "idIndex.domain.boss",
+        "s3_flush_queue": "https://queue.amazonaws.com/...",
+        "id_index_new_chunk_threshold": 100,
+        "index_deadletter_queue": "https://queue.amazonaws.com/..."
+      },
+      "kv_config": {
+        "cache_host": "cache.domain.boss",
+        "read_timeout": 86400,
+        "cache_db": "0"
+      },
+      "state_config": {
+        "cache_state_db": "0",
+        "cache_state_host": "cache-state.domain.boss"
+      }
+    }
+}
+"""
+
+version: '1.0'
+
+# Timeout based on lambda timeout (120s), retry settings of the lambda task
+# and the Wait setting of the while loop.
+timeout: 3600
+
+Lambda('indexS3WriterLambda')
+    """WriteS3Index
+
+    write_s3_lambda_index.py
+
+    Write the ids in the cuboid to the S3 index.
+    """
+    retry ['NoSuchKey'] 1 0 1.0    # Object doesn't exist in S3 bucket.
+    retry ['KeyError'] 1 0 1.0
+    retry [] 20 3 2.0
+    catch []: '$.result'
+        Lambda('indexWriteFailedLambda')
+            """S3WriteFailed
+            """
+            retry ['KeyError'] 1 0 1.0
+            retry [] 10 2 2.0
+            catch []: '$.dlqresult'
+                Fail('Exception', 'Failed to write to dead letter queue')
+                    """FailedSendingS3UpdateToDeadLetterQueue
+                    """
+        Fail('Exception', 'Failed updating S3 index')
+            """FailedUpdatingS3Index
+            """
+
+Pass()
+    """UpdateOperationField
+    Simply adds the name of the operation so it can be logged properly in the
+    deadletter queue in case of a failure when fanning out.
+    """
+    result: '$.operation'
+    data: 
+        ['split_cuboid']
+
+Pass()
+    """SetSplitCuboidFanoutParameters
+    """
+    result: '$.fanout_params'
+    data:
+        {
+            "max_concurrent": 4,
+            "rampup_delay": 4,
+            "rampup_backoff": 0.5,
+            "status_delay": 1
+        }
+
+while '$.finished' == False:
+    """WhileNotDone
+    """
+    Lambda('indexSplitCuboidsLambda')
+        """SplitCuboid
+
+        split_cuboids_lambda.py
+
+        Split job of writing cuboid's ids into n step functions to ensure data
+        volume stays within step function limits when passing between states.
+        """
+        retry ['KeyError', 'Lambda.ResourceNotFoundException'] 1 0 1.0
+        retry [] 30 4 3.0
+        catch []: '$.result'
+            Lambda('indexWriteFailedLambda')
+                """FanoutFailed
+                """
+                retry ['KeyError'] 1 0 1.0
+                retry [] 10 2 2.0
+                catch []: '$.dlqresult'
+                    Fail('Exception', 'Failed to write to dead letter queue')
+                        """FailedSendingFanoutToDeadLetterQueue
+                        """
+            Fail('Exception', 'Failed fanning out write id index step functions')
+                """FailedFanningOut
+                """
+
+
+    if '$.finished' == False:
+        """IfNotFinished
+
+        This state exists because wait_secs may not be present when finished
+        set to True.
+        """
+        Wait(seconds_path='$.wait_secs')
+            """WaitAtLeast10Seconds
+            """
+
+Success()
+    """Success
+    """
+

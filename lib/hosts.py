@@ -98,6 +98,7 @@ VPCS = {
     "manavpj1" : 107,
     "davismj1" : 108,
     "rodrilm2" : 109,
+    "fernac1"  : 110
 
 }
 
