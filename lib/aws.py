@@ -31,6 +31,36 @@ from . import hosts
 from .utils import deprecated
 from .exceptions import BossManageError
 
+def get_all(to_wrap, key):
+    """Utility helper method for requesting all results from AWS
+    Usage:
+        items = get_all(session.client('ec2').describe_instances, 'Reservations') \
+                       (Filters=[...])
+        items # => List of Reservations returned by describe_instances
+
+    Args:
+        to_wrap (method): AWS client method to execute to get results
+        key (str): The dictionary key in the `to_wrap` response where results
+                   are stored
+
+    Returns:
+        function: Function that takes arguments for `to_wrap` and will continue to call
+                  `to_wrap` until there is not a valid 'NextToken' in the response. The
+                  result is a list of values that were stored under `key` in the original
+                  response from AWS
+    """
+    def wrapper(*args, **kwargs):
+        rtn = []
+        while True:
+            resp = to_wrap(*args, **kwargs)
+            rtn.extend(resp[key])
+
+            if 'NextToken' in resp and resp['NextToken'] is not None:
+                kwargs['NextToken'] = resp['NextToken']
+            else:
+                return rtn
+    return wrapper
+
 def machine_lookup_all(session, hostname, public_ip = True):
     """Lookup all of the IP addresses for a given AWS instance name.
 
@@ -1140,3 +1170,13 @@ def activate_data_pipeline(session, id):
     client.activate_pipeline(pipelineId = id,
                              startTimestamp = datetime.utcnow())
 
+def get_existing_stacks(bosslet_config):
+    client = bosslet_config.session.client('cloudformation')
+    suffix = "".join([x.capitalize() for x in bosslet_config.INTERNAL_DOMAIN.split('.')])
+    invalid = ("DELETE_COMPLETE", )
+    existing = {
+        stack['StackName'][:-len(suffix)].lower(): stack
+        for stack in get_all(client.list_stacks, 'StackSummaries')()
+        if stack['StackName'].endswith(suffix) and stack['StackStatus'] not in invalid
+    }
+    return existing

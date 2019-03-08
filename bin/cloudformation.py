@@ -76,14 +76,8 @@ def build_dependency_graph(action, bosslet_config, modules):
 
     # lookup the existing stacks to so we can verify that all dependencies will
     # be satisfied (by either existing or being launched)
-    client = bosslet_config.session.client('cloudformation')
-    suffix = "".join([x.capitalize() for x in bosslet_config.INTERNAL_DOMAIN.split('.')])
-    invalid = ("DELETE_COMPLETE", )
-    existing = {
-        stack['StackName'][:-len(suffix)].lower(): stack['StackStatus']
-        for stack in client.list_stacks()['StackSummaries']
-        if stack['StackName'].endswith(suffix) and stack['StackStatus'] not in invalid
-    }
+    existing = { k : v['StackStatus']
+                 for k, v in aws.get_existing_stacks(bosslet_config).items() }
 
     stop = False
     for name, status in existing.items():
