@@ -318,9 +318,9 @@ def create(bosslet_config):
 
     #user_data["aws"]["sns-write-locked"] = str(Ref('WriteLock'))
 
-    mailing_list_arn = aws.sns_topic_lookup(session, const.PRODUCTION_MAILING_LIST)
+    mailing_list_arn = aws.sns_topic_lookup(session, bosslet_config.ALERT_TOPIC)
     if mailing_list_arn is None:
-        msg = "MailingList {} needs to be created before running config".format(const.PRODUCTION_MAILING_LIST)
+        msg = "MailingList {} needs to be created before running config".format(bosslet_config.ALERT_TOPIC)
         raise Exception(msg)
     user_data["aws"]["sns-write-locked"] = mailing_list_arn
 

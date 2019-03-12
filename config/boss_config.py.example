@@ -43,6 +43,14 @@ SSH_INBOUND = "0.0.0.0/32" # Network CIDR of traffic allowed for SSH
                            # Should include the OUTBOUND_IP if used
 SSH_KEY = "stack-key" # only keypair name
 
+BILLING_TOPIC = "BossBillingList" # (Optional) SNS topic for receiving billing cost alerts
+BILLING_THREASHOLDS = "range(1000, 100001, 1000)" # (Optional) Required if creating billing alerts
+                                                  # Example creates alarms every $1,000 upto $100,000
+                                                  # You can also use "[10000, 50000, 100000]" if you only want a few alert levels
+BILLING_CURRENCY = "USD" # (Optional) Currency that the threasholds are set for
+
+ALERT_TOPIC = "BossMailingList" # (Optional) SNS topic for receiving alerts or error messages from a running Boss process
+
 # cloudformation configs - add verify command for post create / update
 # cloudformation.py allow passing multiple configs
 # dependency graph for parallel operations?

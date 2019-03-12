@@ -51,9 +51,9 @@ def create_config(bosslet_config, db_config={}):
     if dns_arn is None:
         raise Exception("SNS topic named " + names.dns.sns + " does not exist.")
 
-    mailing_list_arn = aws.sns_topic_lookup(session, const.PRODUCTION_MAILING_LIST)
+    mailing_list_arn = aws.sns_topic_lookup(session, bosslet_config.ALERT_TOPIC)
     if mailing_list_arn is None:
-        msg = "MailingList {} needs to be created before running config".format(const.PRODUCTION_MAILING_LIST)
+        msg = "MailingList {} needs to be created before running config".format(bosslet_config.ALERT_TOPIC)
         raise Exception(msg)
 
     # Configure Vault and create the user data config that the endpoint will

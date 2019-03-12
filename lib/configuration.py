@@ -65,6 +65,10 @@ class BossConfiguration(object):
         'HTTPS_INBOUND',
         'SSH_INBOUND',
         'SSH_KEY',
+        'BILLING_TOPIC', # Optional
+        'BILLING_THREASHOLDS', # Conditional, required if setting up account
+        'BILLING_CURRENCY', # Optional
+        'ALERT_TOPIC', # Optional
     ]
 
     __DEFAULTS = {
@@ -74,6 +78,9 @@ class BossConfiguration(object):
         "VERIFY_SSL": True,
         "OUTBOUND_BASTION": False,
         "HTTPS_INBOUND": "0.0.0.0/0",
+        "BILLING_TOPIC": "BossBillingList",
+        "BILLING_CURRENCY": "USD",
+        "ALERT_TOPIC": "BossMailingList",
     }
 
     def __init__(self, bosslet, **kwargs):
@@ -166,7 +173,7 @@ class BossConfiguration(object):
         for key in self.__EXPECTED_KEYS:
             if not hasattr(self._config, key):
                 if key not in self.__DEFAULTS:
-                    if key == 'SCENARIO':
+                    if key in ('SCENARIO', 'BILLING_THREASHOLDS'):
                         pass
                     elif key in ('OUTBOUND_IP',
                                  'OUTBOUND_PORT',
@@ -191,7 +198,7 @@ class BossConfiguration(object):
                 val = pformat(self.__getattr__(key))
                 print("{} = {}".format(key, val), file=fh)
             except AttributeError:
-                if key == 'SCENARIO':
+                if key in ('SCENARIO', 'BILLING_THREASHOLDS'):
                     pass
                 elif key in ('OUTBOUND_IP',
                              'OUTBOUND_PORT',

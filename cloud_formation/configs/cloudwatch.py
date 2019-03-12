@@ -50,12 +50,12 @@ def create_config(bosslet_config):
         raise Exception("Invalid load balancer name: " + loadbalancer_name)
 
     # TODO Test that MailingListTopic is working.
-    production_mailing_list = const.PRODUCTION_MAILING_LIST
+    production_mailing_list = bosslet_config.ALERT_TOPIC
     mailing_list_arn = aws.sns_topic_lookup(session, production_mailing_list)
     if mailing_list_arn is None:
         #config.add_sns_topic("topicList", production_mailing_list)
         msg = "MailingList {} needs to be created before running config"
-        raise Exception(msg.format(const.PRODUCTION_MAILING_LIST))
+        raise Exception(msg.format(bosslet_config.ALERT_TOPIC))
 
     config.add_cloudwatch(loadbalancer_name, [mailing_list_arn])
 

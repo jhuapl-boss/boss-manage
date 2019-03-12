@@ -16,11 +16,6 @@ import os
 import sys
 import yaml
 
-PRODUCTION_MAILING_LIST = "ProductionMicronsMailingList"
-PRODUCTION_BILLING_TOPIC = "ProductionBillingList"
-MAX_ALARM_DOLLAR = 200  # Maximum size of alarms in $1,000s
-
-
 ##################
 # Scenario Support
 def load_scenario(scenario):

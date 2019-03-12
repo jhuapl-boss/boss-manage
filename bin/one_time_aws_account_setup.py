@@ -18,58 +18,112 @@
 import argparse
 import sys
 import os
-import iam_utils
 
 import alter_path
 from lib import aws
-from lib import constants as const
 from lib import configuration
+from lib import console
 
-def create_billing_alarms(session):
-    print("creating billing alarms")
-    billing_topic_arn = aws.sns_topic_lookup(session, const.PRODUCTION_BILLING_TOPIC)
-    client = session.client("cloudwatch")
-    alarm_parms = {
-        'AlarmName': 'Billing_1k',
-        'AlarmDescription': 'Alarm when spending reaches 1k',
-        'ActionsEnabled': True,
-        'OKActions': [],
-        'AlarmActions': [billing_topic_arn],
-        'InsufficientDataActions': [],
-        'MetricName': 'EstimatedCharges',
-        'Namespace': 'AWS/Billing',
-        'Statistic': 'Maximum',
-        'Dimensions': [{'Name': 'Currency', 'Value': 'USD'}],
-        'Period': 10,
-        'EvaluationPeriods': 1,
-        'Threshold': 1000.0,
-        'ComparisonOperator': 'GreaterThanOrEqualToThreshold'
-    }
+try:
+    import simpleeval
+    eval = simpleeval.EvalWithCompoundTypes(functions={'range': range}).eval
+except ImportError:
+    console.warning("Library 'simpleeval' not available, using the default python implementation")
 
-    for num in range(1, const.MAX_ALARM_DOLLAR + 1):
-        print("   {}k".format(str(num)))
-        alarm_parms['AlarmName'] = "Billing_{}k".format(str(num))
-        alarm_parms['AlarmDescription'] = "Alarm when spending reaches {}k".format(str(num))
-        alarm_parms['Threshold'] = float(num * 1000)
-        response = client.put_metric_alarm(**alarm_parms)
+class SubscriptionList(object):
+    def __init__(self, bosslet_config, topic):
+        self.bosslet_config = bosslet_config
+        self.client = bosslet_config.session.client('sns')
+        self.topic = topic
+        self.arn = self.to_arn(topic)
 
-def create_initial_sns_accounts(session):
-    print("Creating SNS Topics.")
-    topic_arn = aws.sns_create_topic(session, const.PRODUCTION_MAILING_LIST)
-    if topic_arn == None:
-        print("Failed to create {} topic".format(const.PRODUCTION_MAILING_LIST))
+    def to_arn(self, topic):
+        return 'arn:aws:sns:{}:{}:{}'.format(self.bosslet_config.REGION,
+                                             self.bosslet_config.ACCOUNT_ID,
+                                             topic)
 
-    topic_arn = aws.sns_create_topic(session, const.PRODUCTION_BILLING_TOPIC)
-    if topic_arn == None:
-        print("Failed to create {} topic".format(const.PRODUCTION_BILLING_TOPIC))
+    def create(self):
+        console.info("Creating {} SNS topic".format(self.topic))
+        session = self.bosslet_config.session
+        arn = aws.sns_create_topic(session, self.topic)
+        if arn == None:
+            console.fail("Could not create {} SNS toppic".format(self.topic))
+            return False
+        return True
 
+    def exists(self):
+        topics = self.client.list_topics()['Topics']
+        for topic in topics:
+            if topic['TopicArn'] == self.arn:
+                return True
+        return False
 
-def import_iam_details_from_files(bosslet_config):
-    iam = iam_utils.IamUtils(bosslet_config)
-    iam.get_iam_details_from_aws()
-    iam.load_from_files()
-    print("Importing iam details to aws..")
-    iam.import_to_aws()
+    def list(self):
+        console.info("Subscriptions for {}".format(self.topic))
+        subs = self.client.list_subscriptions_by_topic(TopicArn = self.arn)['Subscriptions']
+        for sub in subs:
+            console.info("    {}".format(sub['Endpoint']))
+
+    def subscribe(self, endpoint, protocol='email'):
+        try:
+            resp = self.client.subscribe(TopicArn = self.arn,
+                                    Protocol = 'email',
+                                    Endpoint = address)
+        except Exception as ex:
+            console.warning("Could not subscribe address {} ({})".format(address, ex))
+
+    def unsubscribe(self, endpoint):
+        subs = self.client.list_subscriptions_by_topic(TopicArn = self.arn)['Subscriptions']
+        for sub in subs:
+            if sub['Endpoint'] == endpoint:
+                try:
+                    resp = self.client.unsubscribe(SubscriptionArn = sub['SubscriptionArn'])
+                except Exception as ex:
+                    console.warning("Could not unsubscribe address {} ({})".format(sub['Endpoint'], ex))
+
+class BillingList(SubscriptionList):
+    def __init__(self, bosslet_config):
+        super().__init__(bosslet_config, bosslet_config.BILLING_TOPIC)
+
+    def create(self):
+        if super().create() is False:
+            return False
+
+        try:
+            thresholds = eval(self.bosslet_config.BILLING_THREASHOLDS)
+            console.info("Creating {} billing alarms".format(len(thresholds)))
+        except AttributeError: # Assume BILLING_THREASHOLDS is not provided
+            console.error("Bosslet value 'BILLING_THREASHOLDS' needs to be defined before creating alarms")
+            return False
+
+        currency = self.bosslet_config.BILLING_CURRENCY
+        alarm_parms = {
+            'AlarmName': None,
+            'AlarmDescription': None,
+            'ActionsEnabled': True,
+            'OKActions': [],
+            'AlarmActions': [self.arn],
+            'InsufficientDataActions': [],
+            'MetricName': 'EstimatedCharges',
+            'Namespace': 'AWS/Billing',
+            'Statistic': 'Maximum',
+            'Dimensions': [{'Name': 'Currency', 'Value': currency}],
+            'Period': 10,
+            'EvaluationPeriods': 1,
+            'Threshold': None,
+            'ComparisonOperator': 'GreaterThanOrEqualToThreshold'
+        }
+
+        for threashold in threasholds:
+            console.debug("\tAlert level: {:,}".format(threashold))
+            alarm_parms['AlarmName'] = "Billing_{}".format(str(threashold))
+            alarm_parms['AlarmDescription'] = "Alarm when spending reaches {:,}".format(threashold)
+            alarm_parms['Threshold'] = float(threashold)
+            response = self.client.put_metric_alarm(**alarm_parms)
+
+class AlertList(SubscriptionList):
+    def __init__(self, bosslet_config):
+        super().__init__(bosslet_config, bosslet_config.ALERT_TOPIC)
 
 
 if __name__ == '__main__':
@@ -80,9 +134,46 @@ if __name__ == '__main__':
                                       formatter_class=argparse.RawDescriptionHelpFormatter,
                                       epilog='one time setup for new AWS Account')
     parser.add_bosslet()
+    parser.add_argument('command',
+                        choices = ['billing', 'alerts'],
+                        help = 'The account setting to configure')
+    parser.add_argument('--create',
+                        action = 'store_true',
+                        help = 'Setup the given setting in the AWS account')
+    parser.add_argument('--add',
+                        nargs = '+',
+                        help = 'Email addresses to add to the target SNS topic')
+    parser.add_argument('--rem',
+                        nargs = '+',
+                        help = 'Email addresses to remove from the target SNS topic')
+    parser.add_argument('--ls',
+                        action = 'store_true',
+                        help = 'List current subscriptions to the target SNS topic')
 
     args = parser.parse_args()
 
-    create_initial_sns_accounts(args.bosslet_config.session)
-    create_billing_alarms(args.bosslet_config.session)
-    import_iam_details_from_files(args.bosslet_config)
+    if args.command == 'billing':
+        list = BillingList(args.bosslet_config)
+    elif args.command == 'alerts':
+        list = AlertList(args.bosslet_config)
+
+    if args.create:
+        if list.exists():
+            console.warning("List already exists, not creating")
+        else:
+            if list.create() is False:
+                sys.exit(1)
+    elif not list.exists():
+        console.error("List doesn't exists, create it first")
+        sys.exit(2)
+
+    if args.add:
+        for address in args.add:
+            list.subscribe(address)
+
+    if args.rem:
+        for address in args.rem:
+            list.unsubscribe(address)
+
+    if args.ls:
+        list.list()
