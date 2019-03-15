@@ -198,7 +198,7 @@ shutdown -h +3600"""
         ImageId=AMI,
         KeyName='microns-bastion20151117',
         SecurityGroupIds=[
-            "sg-04bed83d9ddde98a1"
+            "sg-00d308289c6e2baac"
         ],
         InstanceType=INSTANCE_TYPE,
         MinCount=1,
