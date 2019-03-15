@@ -230,7 +230,8 @@ def create_config(session, domain):
                                  depends_on = "AttachInternetGateway")
 
     config.add_internet_gateway("InternetGateway", names.internet)
-    config.add_endpoint("S3Endpoint", "s3", [Ref("InternalRouteTable")])
+    config.add_endpoint("S3Endpoint", "s3", [Ref("InternalRouteTable"), Ref('InternetRouteTable')])
+    config.add_endpoint("DynamoDBEndpoint", "dynamodb", [Ref("InternalRouteTable"), Ref('InternetRouteTable')])
     config.add_nat("NAT", Ref("ExternalSubnet"), depends_on="AttachInternetGateway")
 
     return config
