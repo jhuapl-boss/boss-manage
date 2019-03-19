@@ -58,14 +58,12 @@ cd ..
 #Install git
 yes | apt-get install git
 
-# Compile Packer binary from source
+# Download Packer
 wget https://releases.hashicorp.com/packer/0.12.0/packer_0.12.0_linux_amd64.zip
 unzip packer_0.12.0_linux_amd64.zip -d packer
 wait
-echo sudo mv packer /usr/bin/
-sudo mv packer /usr/bin/
-echo export PATH="/usr/bin/packer:$PATH"
-export PATH="/usr/bin/packer:$PATH"
+echo moving packer
+sudo mv packer/packer /usr/bin/
 
 #Clone github repo and install requirements
 git clone https://github.com/jhuapl-boss/boss-manage.git
