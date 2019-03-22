@@ -188,14 +188,17 @@ class Vault(object):
             provisioner_policies.append(name)
 
         # AWS Authentication Backend
-        if 'aws' not in client.list_auth_backends():
-            try:
-                client.enable_auth_backend('aws')
-            except Exception as e:
+        # Enable AWS auth in Vault
+        try:
+            print('Enabling AWS auth backend')
+            client.enable_auth_backend('aws')
+        except Exception as e:
+            if str(e) == "path is already in use":
+                print('The path is already in use, continuing...')
+                pass
+            else:
                 msg = "Error while enabling AWS auth backend: " + str(e)
                 raise VaultError(msg)
-        else:
-            print("aws auth backend already created.")
 
         #Define policies and arn                                     
         policies = [p for p in provisioner_policies if p not in ('provisioner',)]
