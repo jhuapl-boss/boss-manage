@@ -22,6 +22,7 @@ from pprint import pformat
 import alter_path
 from lib import aws
 from lib import configuration
+from lib import cloudformation
 
 def columnize(s, header=None, width=40):
     """Dump an object and make each line the given width
@@ -70,7 +71,8 @@ class StatusCLI(configuration.BossCLI):
         print("Detecting drift .", end="", flush=True)
         drift_ids = { name: client.detect_stack_drift(StackName = obj['StackName'])['StackDriftDetectionId']
                       for name, obj in existing.items()
-                      if obj['StackStatus'].endswith('_COMPLETE') }
+                      if obj['StackStatus'].endswith('_COMPLETE') and 
+                         obj['StackStatus'] not in ('ROLLBACK_COMPLETE', ) }
 
         # Wait untils all of the detections have finished
         status = {}
@@ -109,6 +111,16 @@ class StatusCLI(configuration.BossCLI):
                                 for e,a in itertools.zip_longest(expected, actual, fillvalue=fill):
                                     print("\t\t{} | {}".format(e,a))
                             print()
+
+            # DP ???: Should this be if 'ROLLBACK' in obj['StackStatus']: so that UPDATE_ROLLBACK_COMPLETE
+            #         will also have the error messages printed
+            elif obj['StackStatus'] == 'ROLLBACK_COMPLETE':
+                config = cloudformation.CloudFormationConfiguration(config, bosslet_config)
+
+                for reason in config.get_failed_reasons():
+                    if 'cancelled' in reason:
+                        continue
+                    print('\t{}'.format(reason))
 
 if __name__ == '__main__':
     cli = StatusCLI()
