@@ -33,6 +33,7 @@ from lib import aws
 from lib import utils
 from lib import scalyr
 from lib import constants as const
+from lib import console
 
 import json
 import uuid
@@ -172,6 +173,7 @@ def create_config(bosslet_config, db_config={}):
                             subnets=external_subnets_asg,
                             security_groups=[sgs[names.internal.sg], sgs[names.https.sg]],
                             public=True)
+    config.add_public_dns('EndpointLoadBalancer', names.public_dns('api'))
 
     # Endpoint servers are not CPU bound typically, so react quickly to load
     config.add_autoscale_policy("EndpointScaleUp",
@@ -242,6 +244,17 @@ def generate(bosslet_config):
     config = create_config(bosslet_config, db_config)
     config.generate()
 
+def pre_init(bosslet_config):
+    # DP NOTE: DEPRECATED, used for transitioning public DNS records from
+    #          being manually created in post-init into records that are
+    #          created / managed by CloudFormation
+    session = bosslet_config.session
+    ext_domain = bosslet_config.EXTERNAL_DOMAIN
+    names = bosslet_config.names
+
+    console.warning("Removing existing API public DNS entry, so CloudFormation can manage the DNS record")
+    aws.route53_delete_records(session, ext_domain, names.public_dns('api'))
+
 def create(bosslet_config):
     """Configure Vault, create the configuration, and launch it"""
     db_config = const.ENDPOINT_DB_CONFIG.copy()
@@ -256,6 +269,8 @@ def create(bosslet_config):
         vault.update(const.VAULT_ENDPOINT_AUTH, public_uri = uri)
 
     config = create_config(bosslet_config, db_config)
+
+    pre_init(bosslet_config)
 
     try:
         config.create()
@@ -279,17 +294,11 @@ def post_init(bosslet_config):
     call = bosslet_config.call
     names = bosslet_config.names
 
-    # Configure external DNS
-    # DP ???: Can this be moved into the CloudFormation template?
-    dns = names.public_dns("api")
-    dns_elb = aws.elb_public_lookup(session, names.endpoint_elb.dns)
-    hosted_zone = bosslet_config.EXTERNAL_DOMAIN
-    aws.set_domain_to_dns_name(session, dns, dns_elb, hosted_zone)
-
     # Write data into Vault
     # DP TODO: Move into the pre-launch Vault writes, so it is available when the
     #          machines initially start
     with call.vault() as vault:
+        dns = names.public_dns("api")
         uri = "https://{}".format(dns)
         #vault.update(const.VAULT_ENDPOINT_AUTH, public_uri = uri)
 
@@ -346,6 +355,8 @@ def update(bosslet_config):
         db_config = vault.read(const.VAULT_ENDPOINT_DB)
 
     config = create_config(bosslet_config, db_config)
+
+    pre_init(bosslet_config)
     config.update()
 
 def delete(bosslet_config):

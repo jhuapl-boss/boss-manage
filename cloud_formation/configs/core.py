@@ -40,6 +40,7 @@ from lib import aws
 from lib import utils
 from lib import scalyr
 from lib import constants as const
+from lib import console
 
 import os
 import sys
@@ -167,6 +168,7 @@ def create_config(bosslet_config):
                    "HTTP:8080/index.html",
                    sgs = [Ref("AuthSecurityGroup")],
                    depends_on=deps)
+    config.add_public_dns('AuthLoadBalancer', names.public_dns('auth'))
 
     if USE_DB:
         config.add_rds_db("AuthDB",
@@ -247,10 +249,22 @@ def generate(bosslet_config):
     config = create_config(bosslet_config)
     config.generate()
 
+def pre_init(bosslet_config):
+    # DP NOTE: DEPRECATED, used for transitioning public DNS records from
+    #          being manually created in post-init into records that are
+    #          created / managed by CloudFormation
+    session = bosslet_config.session
+    ext_domain = bosslet_config.EXTERNAL_DOMAIN
+    names = bosslet_config.names
+
+    console.warning("Removing existing Auth public DNS entry, so CloudFormation can manage the DNS record")
+    aws.route53_delete_records(session, ext_domain, names.public_dns('auth'))
+
 def create(bosslet_config):
     """Create the configuration, launch it, and initialize Vault"""
     config = create_config(bosslet_config)
 
+    pre_init(bosslet_config)
     config.create()
 
     # NOTE: rename the default route table that is automatically created by AWS
@@ -266,16 +280,9 @@ def post_init(bosslet_config):
     call = bosslet_config.call
     names = bosslet_config.names
 
-    # Figure out the external domain name of the auth server(s), matching the SSL cert
-    auth_domain = names.public_dns("auth")
-
     # OIDC Discovery URL
+    auth_domain = names.public_dns("auth")
     auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_domain)
-
-    # Configure external DNS
-    auth_elb = aws.elb_public_lookup(session, names.auth.dns)
-    hosted_zone = bosslet_config.EXTERNAL_DOMAIN
-    aws.set_domain_to_dns_name(session, auth_domain, auth_elb, hosted_zone)
 
     # Generate initial user accounts
     username = "admin"
@@ -403,6 +410,8 @@ def update(bosslet_config):
         raise BossManageCanceled()
 
     config = create_config(bosslet_config)
+
+    post_init(bosslet_config)
     config.update()
 
     session = bosslet_config.session

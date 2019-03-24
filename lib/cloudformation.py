@@ -1818,6 +1818,37 @@ class CloudFormationConfiguration:
             }
         }
 
+    def add_public_dns(self, target_key, public_hostname, elb=True):
+        """Add a CNAME RecordSet to the configuration
+
+        Adds a CNAME RecordSet to the EXTERNAL_DOMAIN Route53 Hosted Zone
+
+        Args:
+            target_key (str) : Unique name for the resource in the template to create the RecordSet for
+            public_hostname (str) : The DNS hostname to map to the resource
+            elb (bool) : The key is an ELB
+        """
+        address_key = None
+        if elb:
+            address_key = "DNSName"
+
+        if address_key is None:
+            raise Exception("Unknown type of CNAME record to create")
+
+        zone = self.bosslet_config.EXTERNAL_DOMAIN + "."
+        target = { "Fn::GetAtt" : [ target_key, address_key ] }
+
+        self.resources[target_key + "Record"] = {
+            "Type": "AWS::Route53::RecordSet",
+            "Properties": {
+                "HostedZoneName": zone,
+                'Name': public_hostname,
+                'Type': 'CNAME',
+                'ResourceRecords': [target],
+                'TTL': 300,
+            }
+        }
+
     def add_cloudwatch_rule(
         self, key, targets, name=None, event=None, schedule=None, role_arn=None, description=None, depends_on=None, enable=True):
         """Add an rule that routes CloudWatch Events to target(s).
