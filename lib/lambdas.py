@@ -54,10 +54,10 @@ def update_lambda_code(bosslet_config):
         names.index_check_for_throttling.lambda_,
         names.index_invoke_index_supervisor.lambda_,
         names.start_sfn.lambda_,
-        names.downsample_volume.lambda_,
         names.copy_cuboid_lambda.lambda_,
         names.tile_uploaded.lambda_,
         names.tile_ingest.lambda_,
+        names.delete_tile_index_entry_lambda.lambda_,
     ]
     client = bosslet_config.session.client('lambda')
     for lambda_name in uses_multilambda:
