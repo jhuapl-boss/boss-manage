@@ -76,6 +76,7 @@
     },
     "AttachedManagedPolicies": [
       "arn:aws:iam::aws:policy/IAMFullAccess",
+      "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
       "arn:aws:iam::451493790433:policy/aplVaultAttachUserPolicy",
       "arn:aws:iam::451493790433:policy/aplVaultPolicy"
     ],
