@@ -13,7 +13,12 @@
 
 IP=`ifconfig eth0 | awk '/inet addr/{print substr($2,6)}'`
 KEY=`grep /etc/vault/vault.cfg | grep kms_key | cut -d'=' -f2 | tr -d [:blank:]`
-ARGS="-N -n vault -u root -r -o /tmp/vault.log -e VAULT_ADVERTISE_ADDR=http://$IP:8200 -e VAULT_AWSKMS_SEAL_KEY_ID=$KEY"
+TBL=`grep /etc/vault/vault.cfg | grep ddb_table | cut -d'=' -f2 | tr -d [:blank:]`
+ARGS="-N -n vault -u root -r
+      -o /tmp/vault.log
+      -e VAULT_ADVERTISE_ADDR=http://$IP:8200
+      -e VAULT_AWSKMS_SEAL_KEY_ID=$KEY
+      -e VAULT_DYNAMODB_TABLE=$TBL"
 
 case "$1" in
  start)

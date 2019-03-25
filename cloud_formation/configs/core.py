@@ -102,6 +102,7 @@ def create_config(session, domain):
     user_data["system"]["fqdn"] = names.vault
     user_data["system"]["type"] = "vault"
     user_data["vault"]["kms_key"] = str(Ref("VaultKey"))
+    user_data["vault"]["ddb_table"] = names.vault
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
     config.add_autoscale_group("Vault",
                                names.vault,
