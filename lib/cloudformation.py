@@ -2025,17 +2025,14 @@ class CloudFormationConfiguration:
         if description is not None:
             self.resources[key]["Properties"]["Description"] = description
 
-    def add_kms_key(self, key, policy_id, key_users, user_actions)
-        if description is None:
-            description = "KMS Key for {}".format(policy['Id'])
-
+    def add_kms_key(self, key, policy_id, key_users, user_actions):
         # DP HACK: replace with reference to bosslet_config when refactored
         account_id = os.environ['AWS_ACCOUNT']
 
         self.resources[key] = {
             "Type": "AWS::KMS::Key",
             "Properties": {
-                "Description": "Policy for {}".format(policy_id),
+                "Description": "KMS Key for {}".format(policy_id),
                 "KeyPolicy": {
                     "Id": policy_id,
                     "Version": "2012-10-17",
