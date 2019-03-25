@@ -72,16 +72,6 @@ def create_config(session, domain):
                       handler='index.lambda_handler',
                       file=const.VAULT_LAMBDA)
 
-    config.add_lambda('ConsulLambda',
-                      names.consul_monitor,
-                      description='Check health of vault instances.',
-                      timeout=30,
-                      role=Ref('VaultConsulHealthChecker'),
-                      security_groups=[internal_sg],
-                      subnets=lambda_subnets,
-                      handler='index.lambda_handler',
-                      file=const.CONSUL_LAMBDA)
-
     # Lambda input data
     json_str = json.dumps({
         'vpc_id': vpc_id,
@@ -98,22 +88,12 @@ def create_config(session, domain):
                                        'Id': names.vault_monitor,
                                        'Input': json_str
                                    },
-                                   {
-                                       'Arn': Arn('ConsulLambda'),
-                                       'Id': names.consul_monitor,
-                                       'Input': json_str
-                                   },
                                ],
                                schedule='rate(1 minute)',
-                               depends_on=['VaultLambda', 'ConsulLambda'])
+                               depends_on=['VaultLambda'])
 
     config.add_lambda_permission('VaultPerms',
                                  names.vault_monitor,
-                                 principal='events.amazonaws.com',
-                                 source=Arn('VaultConsulCheck'))
-
-    config.add_lambda_permission('ConsulPerms',
-                                 names.consul_monitor,
                                  principal='events.amazonaws.com',
                                  source=Arn('VaultConsulCheck'))
 

@@ -53,7 +53,6 @@ LAMBDA_SUBNETS = 16
 LAMBDA_DIR = repo_path('cloud_formation', 'lambda')
 DNS_LAMBDA = LAMBDA_DIR + '/updateRoute53/index.py'
 VAULT_LAMBDA = LAMBDA_DIR + '/monitors/chk_vault.py'
-CONSUL_LAMBDA = LAMBDA_DIR + '/monitors/chk_consul.py'
 INGEST_LAMBDA = LAMBDA_DIR + '/ingest_populate/ingest_queue_upload.py'
 DOWNSAMPLE_DLQ_LAMBDA = LAMBDA_DIR + '/downsample/dlq.py'
 
@@ -154,12 +153,6 @@ AUTH_CLUSTER_SIZE = { # Auth Server Cluster is a fixed size
     "development" : 1,
     "production": 1, # should be an odd number
     "ha-development": 1,  # should be an odd number
-}
-
-CONSUL_CLUSTER_SIZE = { # Consul Cluster is a fixed size
-    "development" : 1,
-    "production": 5, # can tolerate 2 failures
-    "ha-development": 3,  # can tolerate 1 failures
 }
 
 VAULT_CLUSTER_SIZE = { # Vault Cluster is a fixed size

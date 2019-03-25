@@ -116,7 +116,7 @@ if __name__ == "__main__":
 
     session = aws.create_session(args.aws_credentials)
 
-    # This next step will make bastion work with 1.consul or 1.vault internal names.
+    # This next step will make bastion work with 1.endpoint or 1.vault internal names.
     boss_position = 1
     try:
         int(args.internal.split(".", 1)[0])

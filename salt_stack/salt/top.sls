@@ -1,9 +1,4 @@
 base:
-    'consul*':
-        - consul
-        - boss-tools.bossutils
-        - chrony
-
     'vault*':
         - vault.server
         - boss-tools.bossutils

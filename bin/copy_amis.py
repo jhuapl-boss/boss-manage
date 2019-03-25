@@ -30,7 +30,7 @@ from lib import aws
 from lib import hosts
 from lib.names import AWSNames
 
-AMIS = ["endpoint.boss", "cachemanager.boss", "proofreader-web.boss", "auth.boss", "vault.boss", "consul.boss", "activities.boss"]
+AMIS = ["endpoint.boss", "cachemanager.boss", "proofreader-web.boss", "auth.boss", "vault.boss", "activities.boss"]
 
 
 def copy_amis(session, ami_ending, new_ami_ending):

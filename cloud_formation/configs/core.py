@@ -95,24 +95,6 @@ def create_config(session, domain):
                             depends_on = "AttachInternetGateway")
 
     user_data = UserData()
-    user_data["system"]["fqdn"] = names.consul
-    user_data["system"]["type"] = "consul"
-    user_data["consul"]["cluster"] = str(get_scenario(const.CONSUL_CLUSTER_SIZE))
-    config.add_autoscale_group("Consul",
-                               names.consul,
-                               aws.ami_lookup(session, "consul.boss"),
-                               keypair,
-                               subnets = internal_subnets_lambda,
-                               security_groups = [Ref("InternalSecurityGroup")],
-                               user_data = str(user_data),
-                               min = const.CONSUL_CLUSTER_SIZE,
-                               max = const.CONSUL_CLUSTER_SIZE,
-                               notifications = Ref("DNSSNS"),
-                               role = aws.instance_profile_arn_lookup(session, 'consul'),
-                               support_update = False, # Update will restart the instances manually
-                               depends_on = ["DNSLambda", "DNSSNS", "DNSLambdaExecute"])
-
-    user_data = UserData()
     user_data["system"]["fqdn"] = names.vault
     user_data["system"]["type"] = "vault"
     config.add_autoscale_group("Vault",
@@ -126,7 +108,7 @@ def create_config(session, domain):
                                max = const.VAULT_CLUSTER_SIZE,
                                notifications = Ref("DNSSNS"),
                                role = aws.instance_profile_arn_lookup(session, 'apl-vault'),
-                               depends_on = ["Consul", "DNSLambda", "DNSSNS", "DNSLambdaExecute"])
+                               depends_on = ["DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
 
     user_data = UserData()
@@ -278,7 +260,7 @@ def post_init(session, domain, startup_wait=False):
 
     # Initialize Vault
     print("Waiting for Vault...")
-    call.check_vault(const.TIMEOUT_VAULT)  # Expecting this to also check Consul
+    call.check_vault(const.TIMEOUT_VAULT)
 
     with call.vault() as vault:
         print("Initializing Vault...")
@@ -363,23 +345,6 @@ def post_init(session, domain, startup_wait=False):
     scalyr.add_instances_to_scalyr(session, const.REGION, instances)
 
 def update(session, domain):
-    # Only in the production scenario will data be preserved over the update
-    if os.environ["SCENARIO"] not in ("production", "ha-development",):
-        print("Can only update the production and ha-development scenario")
-        return None
-
-    consul_update_timeout = 5 # minutes
-    consul_size = int(get_scenario(const.CONSUL_CLUSTER_SIZE))
-    min_time = consul_update_timeout * consul_size
-    max_time = min_time + 5 # add some time to allow the CF update to happen
-
-    print("Update command will take {} - {} minutes to finish".format(min_time, max_time))
-    print("Stack will be available during that time")
-    resp = input("Update? [N/y] ")
-    if len(resp) == 0 or resp[0] not in ('y', 'Y'):
-        print("Canceled")
-        return
-
     config = create_config(session, domain)
     success = config.update(session)
 
@@ -388,7 +353,8 @@ def update(session, domain):
         call = ExternalCalls(session, keypair, domain)
         names = AWSNames(domain)
 
-        # Unseal Vault first, so the rest of the system can continue working
+        # DP TODO: Remove when Vault auto-unseal is configured
+        # Unseal Vault, so the rest of the system can continue working
         print("Waiting for Vault...")
         if not call.check_vault(90, exception=False):
             print("Could not contact Vault, check networking and run the following command")
@@ -399,18 +365,6 @@ def update(session, domain):
             vault.unseal()
 
         print("Stack should be ready for use")
-        print("Starting to cycle consul cluster instances")
-
-        # DP NOTE: Cycling the instances is done manually (outside of CF)
-        #          so that Vault can be unsealed first, else the whole stacks
-        #          would not be usable until all consul instance were restarted
-        with ThreadPoolExecutor(max_workers=3) as tpe:
-            # Need time for the ASG to detect the terminated instance,
-            # launch the new instance, and have the instance cluster
-            tpe.submit(aws.asg_restart,
-                            session,
-                            names.consul,
-                            consul_update_timeout * 60)
 
     return success
 
@@ -419,7 +373,6 @@ def delete(session, domain):
     if utils.get_user_confirm("All data will be lost. Are you sure you want to proceed?"):
         names = AWSNames(domain)
         aws.route53_delete_records(session, domain, names.auth)
-        aws.route53_delete_records(session, domain, names.consul)
         aws.route53_delete_records(session, domain, names.vault)
         aws.sns_unsubscribe_all(session, names.dns)
         CloudFormationConfiguration('core', domain).delete(session)
