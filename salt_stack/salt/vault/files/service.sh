@@ -12,7 +12,8 @@
 ### END INIT INFO
 
 IP=`ifconfig eth0 | awk '/inet addr/{print substr($2,6)}'`
-ARGS="-N -n vault -u root -r -e VAULT_ADVERTISE_ADDR=http://$IP:8200"
+KEY=`grep /etc/vault/vault.cfg | grep kms_key | cut -d'=' -f2 | tr -d [:blank:]`
+ARGS="-N -n vault -u root -r -o /tmp/vault.log -e VAULT_ADVERTISE_ADDR=http://$IP:8200 -e VAULT_AWSKMS_SEAL_KEY_ID=$KEY"
 
 case "$1" in
  start)

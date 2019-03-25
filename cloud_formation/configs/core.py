@@ -94,20 +94,26 @@ def create_config(session, domain):
                             security_groups = [Ref("InternalSecurityGroup"), Ref("BastionSecurityGroup")],
                             depends_on = "AttachInternetGateway")
 
+    vault_role = aws.instance_profile_arn_lookup(session, 'apl-vault')
+    vault_actions = ['kms:Encrypt', 'kms:Decrypt', 'kms:DescribeKey']
+    config.add_kms_key("VaultKey", names.vault, vault_role, vault_actions)
+
     user_data = UserData()
     user_data["system"]["fqdn"] = names.vault
     user_data["system"]["type"] = "vault"
+    user_data["vault"]["kms_key"] = str(Ref("VaultKey"))
+    parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
     config.add_autoscale_group("Vault",
                                names.vault,
                                aws.ami_lookup(session, "vault.boss"),
                                keypair,
                                subnets = internal_subnets_lambda,
                                security_groups = [Ref("InternalSecurityGroup")],
-                               user_data = str(user_data),
+                               user_data = parsed_user_data,
                                min = const.VAULT_CLUSTER_SIZE,
                                max = const.VAULT_CLUSTER_SIZE,
                                notifications = Ref("DNSSNS"),
-                               role = aws.instance_profile_arn_lookup(session, 'apl-vault'),
+                               role = vault_role,
                                depends_on = ["DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
 
