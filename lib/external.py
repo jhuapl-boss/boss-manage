@@ -99,6 +99,18 @@ class ExternalCalls:
                 data = self.vaults[0].read(path)
                 return data['data'] if data else None
 
+            @staticmethod
+            def export(path):
+                """Export data from vault and return just the dict of data"""
+                data = self.vaults[0].export(path)
+                return data if data else None
+            
+            @staticmethod
+            def import_(path):
+                """Import data from vault and return just the dict of data"""
+                data = self.vaults[0].import_(path)
+                return data if data else None
+
             # DP NOTE: Bind basic methods to the Vault object methods
             write = self.vaults[0].write
             update = self.vaults[0].update

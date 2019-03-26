@@ -352,12 +352,20 @@ def post_init(session, domain, startup_wait=False):
     scalyr.add_instances_to_scalyr(session, const.REGION, instances)
 
 def update(session, domain):
+    script_path = os.path.abspath(__file__)
+    export_path = script_path + "../../vault/vault-export.json"
+    
     config = create_config(session, domain)
+    keypair = aws.keypair_lookup(session)
+    call = ExternalCalls(session, keypair, domain)
+    with call.vault() as vault:
+        response = vault.export("secret/")
+        print(response)
+        with open(export_path, 'w') as outfile:
+            json.dump(response, outfile, indent=3, sort_keys=True)
     success = config.update(session)
 
     if success:
-        keypair = aws.keypair_lookup(session)
-        call = ExternalCalls(session, keypair, domain)
         names = AWSNames(domain)
 
         # DP TODO: Remove when Vault auto-unseal is configured
@@ -369,7 +377,10 @@ def update(session, domain):
             return
 
         with call.vault() as vault:
-            vault.unseal()
+            vault.initialize()
+            # vault.unseal()
+            backup = json.load(export_path)
+            vault.import_(backup)
 
         print("Stack should be ready for use")
 
