@@ -187,16 +187,13 @@ class Vault(object):
 
         # AWS Authentication Backend
         # Enable AWS auth in Vault
-        try:
-            print('Enabling AWS auth backend')
-            client.enable_auth_backend('aws')
-        except Exception as e:
-            if str(e) == "path is already in use":
-                print('The path is already in use, continuing...')
-                pass
-            else:
+        if 'aws/' not in client.list_auth_backends():
+            try:
+                client.enable_auth_backend('aws')
+            except Exception as e:
                 raise Exception("Error while enabling auth back end. {}".format(e))
-
+        else:
+            print("aws auth backend already created.")
         #Define policies and arn                                     
         policies = [p for p in provisioner_policies if p not in ('provisioner',)]
         arn = 'arn:aws:iam::{}:instance-profile/'.format(os.environ['AWS_ACCOUNT'])
@@ -207,11 +204,11 @@ class Vault(object):
             print('Successful write to aws/role/' + policy)
         
         # AWS Secret Backend
-        if 'aws' not in client.list_secret_backends():
+        if 'aws/' not in client.list_secret_backends():
             try:
                 client.enable_secret_backend('aws')
             except Exception as e:
-                raise Exception('Error while enabling secret back end. ' + str(e))
+                raise Exception('Error while enabling secret back end. {}'.format(e))
         else:
             print("aws secret backend already created.")
 
