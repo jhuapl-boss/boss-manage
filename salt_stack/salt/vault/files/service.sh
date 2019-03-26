@@ -12,8 +12,8 @@
 ### END INIT INFO
 
 IP=`ifconfig eth0 | awk '/inet addr/{print substr($2,6)}'`
-KEY=`grep /etc/vault/vault.cfg | grep kms_key | cut -d'=' -f2 | tr -d [:blank:]`
-TBL=`grep /etc/vault/vault.cfg | grep ddb_table | cut -d'=' -f2 | tr -d [:blank:]`
+KEY=`grep kms_key /etc/boss/boss.config | cut -d'=' -f2 | tr -d [:blank:]`
+TBL=`grep ddb_table /etc/boss/boss.config | cut -d'=' -f2 | tr -d [:blank:]`
 ARGS="-N -n vault -u root -r
       -o /tmp/vault.log
       -e VAULT_ADVERTISE_ADDR=http://$IP:8200

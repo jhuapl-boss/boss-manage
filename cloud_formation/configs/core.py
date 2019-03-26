@@ -94,7 +94,7 @@ def create_config(session, domain):
                             security_groups = [Ref("InternalSecurityGroup"), Ref("BastionSecurityGroup")],
                             depends_on = "AttachInternetGateway")
 
-    vault_role = aws.instance_profile_arn_lookup(session, 'apl-vault')
+    vault_role = aws.role_arn_lookup(session, 'apl-vault')
     vault_actions = ['kms:Encrypt', 'kms:Decrypt', 'kms:DescribeKey']
     config.add_kms_key("VaultKey", names.vault, vault_role, vault_actions)
 
@@ -114,7 +114,7 @@ def create_config(session, domain):
                                min = const.VAULT_CLUSTER_SIZE,
                                max = const.VAULT_CLUSTER_SIZE,
                                notifications = Ref("DNSSNS"),
-                               role = vault_role,
+                               role = aws.instance_profile_arn_lookup(session, 'apl-vault'),
                                depends_on = ["DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
 
