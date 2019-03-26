@@ -530,8 +530,7 @@
         {
           "Action": [
             "iam:AttachUserPolicy",
-            "iam:DetachUserPolicy",
-            "iam:ListAttachedUserPolicies"
+            "iam:DetachUserPolicy"
           ],
           "Effect": "Allow",
           "Resource": [
@@ -867,7 +866,24 @@
             "iam:DetachUserPolicy",
             "iam:DeleteUserPolicy",
             "iam:RemoveUserFromGroup",
-            "iam:DeleteUser"
+            "iam:DeleteUser",
+            "dynamodb:DescribeLimits",
+            "dynamodb:DescribeTimeToLive",
+            "dynamodb:ListTagsOfResource",
+            "dynamodb:DescribeReservedCapacityOfferings",
+            "dynamodb:DescribeReservedCapacity",
+            "dynamodb:ListTables",
+            "dynamodb:BatchGetItem",
+            "dynamodb:BatchWriteItem",
+            "dynamodb:CreateTable",
+            "dynamodb:DeleteItem",
+            "dynamodb:GetItem",
+            "dynamodb:GetRecords",
+            "dynamodb:PutItem",
+            "dynamodb:Query",
+            "dynamodb:UpdateItem",
+            "dynamodb:Scan",
+            "dynamodb:DescribeTable"
           ],
           "Effect": "Allow",
           "Resource": [
