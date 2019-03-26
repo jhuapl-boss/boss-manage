@@ -2061,7 +2061,7 @@ class CloudFormationConfiguration:
         self.resources[key + "Alias"] = {
             "Type": "AWS::KMS::Alias",
             "Properties": {
-                "AliasName": "alias/" + alias,
+                "AliasName": "alias/" + alias.replace('.', '-'),
                 "TargetKeyId": Ref(key),
             }
         }
