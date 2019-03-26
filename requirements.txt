@@ -1,6 +1,9 @@
 boto3>=1.4.3
 botocore>=1.4.93
-hvac
+# Logic bug in hvac 0.7.3
+# Manually edit /usr/local/lib/python3.5/dist-packages/hvac/api/system_backend/init.py:89
+# So that it read `if recovery_threshold > recovery_shares:`
+hvac>=0.7.3
 mysql-connector-python
 pyminifier
 funcparserlib
