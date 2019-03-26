@@ -18,7 +18,7 @@ ARGS="-N -n vault -u root -r
       -o /tmp/vault.log
       -e VAULT_ADVERTISE_ADDR=http://$IP:8200
       -e VAULT_AWSKMS_SEAL_KEY_ID=$KEY
-      -e VAULT_DYNAMODB_TABLE=$TBL"
+      -e AWS_DYNAMODB_TABLE=$TBL"
 
 case "$1" in
  start)
