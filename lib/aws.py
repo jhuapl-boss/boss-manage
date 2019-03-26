@@ -1270,5 +1270,25 @@ def dynamo_scan(session, table_name):
     else:
         return response
 
+def dynamodb_delete_table(session, table_name, wait=True):
+    """Deletes the given DynamoDB table, optionally waiting until it has been deleted
 
+    Args:
+        session (Session): boto3.session.Session object
+        table_name (str): name of the DynamoDB Table
+        wait (optional[bool]): If the function should poll AWS until the table is removed
+    """
+    client = session.client("dynamodb")
 
+    client.delete_table(TableName = table_name)
+
+    if wait:
+        print("Deleting {} .".format(table_name), end='', flush=True)
+        while True:
+            print(".", end='', flush=True)
+            time.sleep(10)
+
+            tables = client.list_tables()['TableNames']
+            if table_name not in tables:
+                print(". done")
+                break

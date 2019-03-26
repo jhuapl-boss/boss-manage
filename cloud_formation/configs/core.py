@@ -389,4 +389,7 @@ def delete(session, domain):
         aws.route53_delete_records(session, domain, names.auth)
         aws.route53_delete_records(session, domain, names.vault)
         aws.sns_unsubscribe_all(session, names.dns)
+
         CloudFormationConfiguration('core', domain).delete(session)
+
+        aws.dynamodb_delete_table(session, names.vault)
