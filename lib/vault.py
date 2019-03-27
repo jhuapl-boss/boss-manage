@@ -171,6 +171,8 @@ class Vault(object):
             print(".", end='', flush=True)
             remaining -= step
             time.sleep(step)
+        if remaining > 0:
+            raise Exception("Vault not finished initializing")
         print(" done")
 
         self.configure()
