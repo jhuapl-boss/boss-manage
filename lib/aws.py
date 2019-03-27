@@ -1280,6 +1280,10 @@ def dynamodb_delete_table(session, table_name, wait=True):
     """
     client = session.client("dynamodb")
 
+    tables = client.list_tables()['TableNames']
+    if table_name not in tables:
+        return
+
     client.delete_table(TableName = table_name)
 
     if wait:
