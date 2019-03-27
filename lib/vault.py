@@ -145,6 +145,33 @@ class Vault(object):
             print("= Vault root token and recovery keys were =")
             print("= written to disk. PROTECT these files.   =")
             print("========= WARNING WARNING WARNING =========")
+            print()
+
+        # DP NOTE: When using the DynamoDB backend it is common for right after
+        #          initializing for requests to Vault to response with the error
+        #          > local node not active but active cluster node not found <
+        #          If given a little bit of time Vault will respond successfully
+        #          to requests
+
+        def poll():
+            """Check to see if Vault responds to a request without an error"""
+            try:
+                self.connect(VAULT_TOKEN).sys.list_enabled_audit_devices()
+                return True
+            except:
+                return False
+
+        import time
+        print("Waiting for Vault to finish initialization ", end='', flush=True)
+        step, remaining = 10, 60
+        while remaining > 0:
+            if poll():
+                break
+
+            print(".", end='', flush=True)
+            remaining -= step
+            time.sleep(step)
+        print(" done")
 
         self.configure()
 
