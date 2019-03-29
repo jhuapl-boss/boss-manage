@@ -60,7 +60,7 @@ def create_config(session, domain):
     lambda_role = aws.role_arn_lookup(session, 'VaultConsulHealthChecker')
     config.add_arg(Arg.String(
         'VaultConsulHealthChecker', lambda_role,
-        'IAM role for vault/consul health check.' + domain))
+        'IAM role for vault health check.' + domain))
 
     config.add_lambda('VaultLambda',
                       names.vault_monitor,
@@ -74,14 +74,12 @@ def create_config(session, domain):
 
     # Lambda input data
     json_str = json.dumps({
-        'vpc_id': vpc_id,
-        'vpc_name': domain,
-        'topic_arn': mailing_list_arn,
+        'hostname': names.vault,
     })
 
-    config.add_cloudwatch_rule('VaultConsulCheck',
+    config.add_cloudwatch_rule('VaultCheck',
                                name=names.vault_consul_check,
-                               description='Check health of vault and consul instances.',
+                               description='Check health of vault instances.',
                                targets=[
                                    {
                                        'Arn': Arn('VaultLambda'),
@@ -89,13 +87,13 @@ def create_config(session, domain):
                                        'Input': json_str
                                    },
                                ],
-                               schedule='rate(1 minute)',
+                               schedule='rate(2 minutes)',
                                depends_on=['VaultLambda'])
 
     config.add_lambda_permission('VaultPerms',
                                  names.vault_monitor,
                                  principal='events.amazonaws.com',
-                                 source=Arn('VaultConsulCheck'))
+                                 source=Arn('VaultCheck'))
 
     return config
 
