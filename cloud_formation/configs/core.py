@@ -352,31 +352,43 @@ def post_init(session, domain, startup_wait=False):
     scalyr.add_instances_to_scalyr(session, const.REGION, instances)
 
 def update(session, domain):
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    export_path = dir_path + "/../../vault/vault-export.json"
-
-    config = create_config(session, domain)
+    names = AWSNames(domain)
     keypair = aws.keypair_lookup(session)
     call = ExternalCalls(session, keypair, domain)
+
+    export_path = const.repo_path('vault', 'private', names.vault, 'export.json')
     with call.vault() as vault:
-        response = vault.export("secret/")
+        vault_data = vault.export("secret/")
         with open(export_path, 'w') as outfile:
-            json.dump(response, outfile, indent=3, sort_keys=True)
+            json.dump(vault_data, outfile, indent=3, sort_keys=True)
+            print("Vault data exported to {}".format(export_path))
+
+    config = create_config(session, domain)
     success = config.update(session)
 
     if success:
-        names = AWSNames(domain)
+        aws.route53_delete_records(session, domain, 'consul.' + domain)
 
         print("Waiting for Vault...")
         if not call.check_vault(90, exception=False):
             print("Could not contact Vault, check networking and run the following command")
-            print("python3 bastion.py bastion.521.boss vault.521.boss vault-unseal")
-            return
+            print("python3 bastion.py {} vault-initialize".format(names.vault))
+            print("python3 bastion.py {} vault-import {}".format(names.vault, export_path))
+            return False
 
         with call.vault() as vault:
-            vault.initialize()
-            backup = json.load(export_path)
-            vault.import_(backup)
+            is_init = False
+            try:
+                vault.initialize()
+                is_init = True
+                vault.import_(vault_data)
+            except Exception as ex:
+                print("Problem updating Vault configuration: {}".format(ex))
+                print("Run the following commands to finalize the configuration")
+                if not is_init:
+                    print("python3 bastion.py {} vault-initialize".format(names.vault))
+                print("python3 bastion.py {} vault-import {}".format(names.vault, export_path))
+                return False
 
         print("Stack should be ready for use")
 
