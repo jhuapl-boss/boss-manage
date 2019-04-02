@@ -372,7 +372,7 @@ def update(session, domain):
         print("Waiting for Vault...")
         if not call.check_vault(90, exception=False):
             print("Could not contact Vault, check networking and run the following command")
-            print("python3 bastion.py {} vault-initialize".format(names.vault))
+            print("python3 bastion.py {} vault-init".format(names.vault))
             print("python3 bastion.py {} vault-import {}".format(names.vault, export_path))
             return False
 
@@ -386,7 +386,7 @@ def update(session, domain):
                 print("Problem updating Vault configuration: {}".format(ex))
                 print("Run the following commands to finalize the configuration")
                 if not is_init:
-                    print("python3 bastion.py {} vault-initialize".format(names.vault))
+                    print("python3 bastion.py {} vault-init".format(names.vault))
                 print("python3 bastion.py {} vault-import {}".format(names.vault, export_path))
                 return False
 
