@@ -164,7 +164,7 @@ class Vault(object):
         import time
         print("Waiting for Vault to finish initialization ", end='', flush=True)
         step, remaining = 10, 60
-        while remaining > 0:
+        while remaining >= 0:
             if poll():
                 break
 
