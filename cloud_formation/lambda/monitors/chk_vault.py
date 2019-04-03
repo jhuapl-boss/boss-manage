@@ -23,6 +23,9 @@ PROTOCOL = 'http://'
 PORT = ':8200'
 ENDPOINT = '/v1/sys/health'
 
+NORMAL_ROUTE53_WEIGHT = 1
+SICK_ROUTE53_WEIGHT = 0
+
 def lambda_handler(event, context):
     """Entry point to AWS lambda function.
 
@@ -31,9 +34,15 @@ def lambda_handler(event, context):
         context (Context): Unused.
     """
     hostname = event['hostname']
+    domain = hostname.split('.', 1)[1]
 
+    route53_client = boto3.client('route53')
     asg_client = boto3.client('autoscaling')
     ec2_client = boto3.client('ec2')
+
+    resp = route53_client.list_hosted_zones_by_name(DNSName=domain, MaxItems='1')
+    zone_id = resp['HostedZones'][0]['Id'].split('/')[-1]
+
     resp = ec2_client.describe_instances(Filters=[
             {
                 'Name': 'tag:Name',
@@ -56,18 +65,23 @@ def lambda_handler(event, context):
             url = PROTOCOL + ip + PORT + ENDPOINT
             print('Checking vault server {} at {}...'.format(url, str(datetime.now())))
 
+            set_weight = lambda w: update_route53_weight(route53_client, zone_id, hostname, inst, w)
+
             try:
                 raw = urlopen(url, timeout=10).read()
             except HTTPError as err:
                 if err.getcode() == 500:
                     # Vault returns a status code of 500 if sealed or not
                     # initialized.
+                    # Assume that Vault will be configured shortly
                     print('Vault sealed or uninitialized.')
+                    set_weight(NORMAL_ROUTE53_WEIGHT)
                     continue
                 elif err.getcode() == 429:
                     # Vault returns 429 if it's unsealed and in standby mode.
                     # This is not an error condition.
                     print('Unsealed and in standby mode.')
+                    set_weight(NORMAL_ROUTE53_WEIGHT)
                     continue
                 else:
                     raw = 'Status code: {}, reason: {}'.format(
@@ -76,7 +90,11 @@ def lambda_handler(event, context):
                 raw = 'Unknown error.'
             else:
                 if validate(raw):
-                    # Up and working
+                    # Set weight in Route53 to default to ensure it receives
+                    # traffic, normally. Only happens if the check happened
+                    # during the HealthCheck grace period and the instance
+                    # was not terminated
+                    set_weight(NORMAL_ROUTE53_WEIGHT)
                     continue
 
             # Health check failed.
@@ -86,6 +104,10 @@ def lambda_handler(event, context):
             asg_client.set_instance_health(InstanceId = inst['InstanceId'],
                                            HealthStatus = 'Unhealthy',
                                            ShouldRespectGracePeriod = True)
+
+            # Set weight in Route53 to 0 so instance gets no traffic, while
+            # waiting for the ASG to terminate and relaunch
+            set_weight(SICK_ROUTE53_WEIGHT)
 
 def validate(resp):
     """Check health status response from application.
@@ -111,3 +133,30 @@ def validate(resp):
         return False
 
     return True
+
+def update_route53_weight(route53_client, zone_id, hostname, inst, weight):
+    """Change weight for given instance in Route53 (DNS).
+
+    Args:
+        route53_client (boto3.Route53.Client): Client for interacting with Route53.
+        zone_id (str): ID of the HostedZone containing the DNS Record to update
+        hostname (str): The hostname of the DNS Record to update
+        inst (dict): Instance info as returned by describe_instances().
+        weight (int): New weight for instance.
+    """
+    route53_client.change_resource_record_sets(
+        HostedZoneId=zone_id,
+        ChangeBatch = {
+            'Changes': [{
+                'Action': 'UPSERT',
+                'ResourceRecordSet': {
+                    'Name': hostname,
+                    'Type': 'CNAME',
+                    'ResourceRecords': [{'Value': inst['PrivateDnsName']}],
+                    'TTL': 300,
+                    'SetIdentifier': inst['InstanceId'],
+                    'Weight': weight,
+                }
+            }]
+        }
+    )
