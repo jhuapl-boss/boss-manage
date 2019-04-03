@@ -66,7 +66,7 @@ to see if DNS has been changed to cloudfront servers.
 You can either create new AMIs:
 ```shell
 $ cd boss-manage/bin
-$  ./packer.py auth vault consul endpoint cachemanager activities --name sprintXX
+$  ./packer.py auth vault endpoint cachemanager activities --name sprintXX
 ```
 or copy the latest AMIs from the console to become sprintXX (this way is faster if the AMIs will end up being the same version of code.)
 
@@ -149,13 +149,6 @@ After completion check that vault still works, look for password:
 ```shell
 ./bastion.py vault.production.boss vault-read secret/auth/realm
 ```
-
-This will show the status of all the consul nodes:
-```shell
-$ ./bastion.py consul.production.boss ssh-all 'sudo consul operator raft -list-peers; sudo consul members'
-```
-You may have to manually remove entries in route53 for the old consuls and vaults.
-Its possible they will come back so keep deleting them until they stop coming back
 
 Try to update redis
 
@@ -432,7 +425,7 @@ Make sure your:
 Its best to create new hash versions of the AMIs like this:
 ```shell
 $ cd boss-manage/bin
-$  ./packer.py auth vault consul endpoint proofreader-web cachemanager
+$  ./packer.py auth vault endpoint proofreader-web cachemanager
 ```
 And then copy the latest AMIs from the console to become sprintXX 
 (this way developers can get the latest AMIs without explicitly specifying sprintXX)
