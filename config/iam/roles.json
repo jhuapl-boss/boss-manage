@@ -389,7 +389,7 @@
                 "dynamodb:PutItem"
               ],
               "Effect": "Allow",
-              "Resource": "arn:aws:dynamodb:us-east-1:451493790433:table/s3index.integration.boss"
+              "Resource": "arn:aws:dynamodb:us-east-1:451493790433:table/s3index.*.boss"
             }
           ],
           "Version": "2012-10-17"
