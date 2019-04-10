@@ -150,7 +150,7 @@ Make sure that the Packer executable is either in $PATH (you can call it by just
 calling packer) or in the `bin/` directory of the boss-manage repository.
 
 ```shell
-$ bin/packer.py auth vault endpoint proofreader-web consul cachemanager
+$ bin/packer.py auth vault endpoint proofreader-web cachemanager
 ```
 
 *Note: because the packer.py script is running builds in parallel it is redirecting
