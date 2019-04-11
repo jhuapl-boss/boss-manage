@@ -19,7 +19,7 @@ from .cloudformation import get_scenario
 # Region api is created in.  Later versions of boto3 should allow us to
 # extract this from the session variable.  Hard coding for now.
 REGION = 'us-east-1'
-INCOMING_SUBNET = "52.3.13.189/32"  # microns-bastion elastic IP
+INCOMING_SUBNET = os.environ.get('_BASTION_ALLOW_IP', '52.3.13.189') + '/32'  # microns-bastion elastic IP
 
 PRODUCTION_MAILING_LIST = "ProductionMicronsMailingList"
 PRODUCTION_BILLING_TOPIC = "ProductionBillingList"
@@ -123,6 +123,13 @@ REDIS_CACHE_TYPE = {
     "ha-development": "cache.t2.small",
 }
 
+# Django session cache using Redis.
+REDIS_SESSION_TYPE = {
+    "development": None,            # Don't use Redis for dev stack sessions.
+    "production": "cache.t2.medium",
+    "ha-development": "cache.t2.small",
+}
+
 REDIS_TYPE = {
     "development": "cache.t2.small",
     "production": "cache.m4.xlarge",
@@ -170,7 +177,7 @@ ENDPOINT_CLUSTER_MIN = { # Minimum and Default size of the ASG
 
 ENDPOINT_CLUSTER_MAX = { # Maximum number of instances in the ASG
     "development": 1,
-    "production": 20,
+    "production": 60,
     "ha-development": 3,
 }
 

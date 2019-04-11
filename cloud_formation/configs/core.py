@@ -74,7 +74,6 @@ def create_config(session, domain):
 
     global keypair
     keypair = aws.keypair_lookup(session)
-
     config.add_vpc()
 
     # Create the internal and external subnets
@@ -125,6 +124,7 @@ def create_config(session, domain):
                                min = const.VAULT_CLUSTER_SIZE,
                                max = const.VAULT_CLUSTER_SIZE,
                                notifications = Ref("DNSSNS"),
+                               role = aws.instance_profile_arn_lookup(session, 'apl-vault'),
                                depends_on = ["Consul", "DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
 

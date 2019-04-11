@@ -75,6 +75,16 @@ def create_config(session, domain, keypair=None):
                                  version="3.2.4",
                                  clusters=const.REDIS_CLUSTER_SIZE)
 
+    # This one may not be created depending on the scenario type.
+    if get_scenario(const.REDIS_SESSION_TYPE, None) is not None:
+        config.add_redis_replication("CacheSession",
+                                     names.cache_session,
+                                     az_subnets,
+                                     [sgs[names.internal]],
+                                     type_=const.REDIS_SESSION_TYPE,
+                                     version="3.2.4",
+                                     clusters=1)
+
     return config
 
 

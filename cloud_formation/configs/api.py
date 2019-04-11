@@ -75,10 +75,17 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["aws"]["db"] = names.endpoint_db
     user_data["aws"]["cache"] = names.cache
     user_data["aws"]["cache-state"] = names.cache_state
+    if get_scenario(const.REDIS_SESSION_TYPE, None) is not None:
+        user_data["aws"]["cache-session"] = names.cache_session
+    else:
+        # Don't create a Redis server for dev stacks.
+        user_data["aws"]["cache-session"] = ''
+
 
     ## cache-db and cache-stat-db need to be in user_data for lambda to access them.
     user_data["aws"]["cache-db"] = "0"
     user_data["aws"]["cache-state-db"] = "0"
+    user_data["aws"]["cache-session-db"] = "0"
     user_data["aws"]["meta-db"] = names.meta
 
     # Use CloudFormation's Ref function so that queues' URLs are placed into
@@ -101,15 +108,14 @@ def create_config(session, domain, keypair=None, db_config={}):
     user_data["auth"]["OIDC_VERIFY_SSL"] = 'True'
     user_data["lambda"]["flush_function"] = names.multi_lambda
     user_data["lambda"]["page_in_function"] = names.multi_lambda
-    user_data["lambda"]["ingest_function"] = names.multi_lambda
+    user_data["lambda"]["ingest_function"] = names.tile_ingest_lambda
     user_data["lambda"]["downsample_volume"] = names.downsample_volume_lambda
 
     user_data['sfn']['populate_upload_queue'] = names.ingest_queue_populate
     user_data['sfn']['upload_sfn'] = names.ingest_queue_upload
     user_data['sfn']['downsample_sfn'] = names.resolution_hierarchy
-    user_data['sfn']['index_id_writer_sfn'] = names.index_id_writer_sfn
     user_data['sfn']['index_cuboid_supervisor_sfn'] = names.index_cuboid_supervisor_sfn
-
+    
     # Prepare user data for parsing by CloudFormation.
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
 
