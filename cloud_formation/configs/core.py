@@ -74,7 +74,6 @@ def create_config(session, domain):
 
     global keypair
     keypair = aws.keypair_lookup(session)
-
     config.add_vpc()
 
     # Create the internal and external subnets

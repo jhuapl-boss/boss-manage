@@ -50,6 +50,13 @@ def create_session(credentials):
                       region_name = credentials.get('aws_region', const.REGION))
     return session
 
+def use_iam_role():
+    """Create a session with no credentials, meant to be used by internal instance
+    with assumed iam role.
+    """
+    session = Session(region_name='us-east-1')
+    return session 
+
 def machine_lookup_all(session, hostname, public_ip = True):
     """Lookup all of the IP addresses for a given AWS instance name.
 
@@ -527,7 +534,7 @@ def keypair_lookup(session):
 
     client = session.client('ec2')
     response = client.describe_key_pairs()
-
+    
     # If SSH_KEY exists and points to a valid Key Pair, use it
     key = os.environ.get("SSH_KEY", None)  # reuse bastion.py env vars
     if key is not None:
@@ -1228,5 +1235,44 @@ def lambda_arn_lookup(session, lambda_name):
     else:
         return response['Configuration']['FunctionArn']
 
+def create_keypair(session, KeyName, DryRun=False):
+    """
+    Returns dict with SHA-1 digest of the DER encoded private key
+    An unencrypted PEM encoded RSA private key
+    and the name of the key pair. 
+    Args:
+        session(Session): boto3.session.Session object
+        KeyName (str): Desired name of the keypair
+    
+    Returns:
+        (dict):
+    """
+    if session is None:
+        return None
+    
+    client = session.client('ec2')
+    response = client.create_key_pair(
+        KeyName = KeyName,
+        DryRun = DryRun
+    )
+    return response
 
-
+def delete_keypair(session, KeyName, DryRun=False):
+    """
+    Returns none
+    Args:
+        session(Session): boto3.session.Session object
+        KeyName (str): Desired name of the keypair
+    
+    Returns:
+        none
+    """
+    if session is None:
+        return None
+    
+    client = session.client('ec2')
+    response = client.delete_key_pair(
+        KeyName = KeyName,
+        DryRun = DryRun
+    )
+    return response
