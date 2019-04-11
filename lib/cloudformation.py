@@ -465,7 +465,6 @@ class CloudFormationConfiguration:
                 raise Exception("Could not determine argument '{}'".format(argument["ParameterKey"]))
 
         client = session.client('cloudformation')
-
         try:
             response = client.create_stack(
                 StackName = self.stack_name,
