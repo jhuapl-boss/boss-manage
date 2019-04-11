@@ -193,7 +193,7 @@ def create_config(session, domain, keypair=None, user_data=None):
     # volumetric ingest.
     config.add_iam_policy_to_role(
         'S3IndexPutItem{}'.format(domain).replace('.', ''),
-        get_s3_index_arn(session, domain),
+        get_s3_index_arn(session, domain).replace(domain,'*.') + domain.split('.')[1],
         [CUBOID_IMPORT_ROLE], ['dynamodb:PutItem'])
 
     cuboid_bucket_name = names.cuboid_bucket
