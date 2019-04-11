@@ -93,10 +93,12 @@ if __name__ == '__main__':
     base_dir = os.path.dirname(bossutils.configuration.CONFIG_FILE)
     os.makedirs(base_dir, exist_ok = True)
 
-    bossutils.configuration.download_and_save()
-    #read_vault_token() # Not currently supported when generating access tokens
-    set_hostname()
-
-
-    # Since the service is to be run once, disable it
-    bossutils.utils.stop_firstboot()
+    try:
+        bossutils.configuration.download_and_save()
+        #read_vault_token() # Not currently supported when generating access tokens
+        set_hostname()
+    except:
+        log.exception("Problem during initial configuration")
+    finally:
+        # Since the service is to be run once, disable it
+        bossutils.utils.stop_firstboot()
