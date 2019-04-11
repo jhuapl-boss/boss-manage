@@ -191,9 +191,10 @@ def create_config(session, domain, keypair=None, user_data=None):
  
     # Allow updating S3 index table with cuboid's object key during
     # volumetric ingest.
+    # Example of s3_index_arn form: arn:aws:dynamodb:us-east-1:12345678:table/s3index.*.boss
     config.add_iam_policy_to_role(
         'S3IndexPutItem{}'.format(domain).replace('.', ''),
-        get_s3_index_arn(session, domain),
+        get_s3_index_arn(session, domain).replace(domain,'*.') + domain.split('.')[1],
         [CUBOID_IMPORT_ROLE], ['dynamodb:PutItem'])
 
     cuboid_bucket_name = names.cuboid_bucket
