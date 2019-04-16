@@ -39,8 +39,8 @@ class TestIngestQueueUploadLambda(unittest.TestCase):
         Test_all_messages_are_there tests() first it creates
         the set of expected messages for the ingest.
 
-        Then it runs the create_messages() _n_ times each time with the appropriate tiles_to_skip and
-        MAX_NUM_TILES_PER_LAMBDA set. It pulls the tile key out of the set to verify that all the tiles were
+        Then it runs the create_messages() _n_ times each time with the appropriate items_to_skip and
+        MAX_NUM_ITEMS_PER_LAMBDA set. It pulls the tile key out of the set to verify that all the tiles were
         accounted for.  In the end there should be no tiles left in the set.
 
         This test can with many different values for tile sizes and starts and stop vaules and num_lambdas can be
@@ -75,8 +75,8 @@ class TestIngestQueueUploadLambda(unittest.TestCase):
                             "t_tile_size": 1,
                             "z_tile_size": 1,
                             "resolution": 0,
-                            "tiles_to_skip": 0,
-                            'MAX_NUM_TILES_PER_LAMBDA': 500000,
+                            "items_to_skip": 0,
+                            'MAX_NUM_ITEMS_PER_LAMBDA': 500000,
                             'z_chunk_size': 16
                         }
 
@@ -105,9 +105,9 @@ class TestIngestQueueUploadLambda(unittest.TestCase):
                             with self.subTest(num_lambdas=num_lambdas, x_stop=x_stop, y_stop=y_stop, z_stop=z_stop, t_stop=t_stop):
                                 # loop through create_messages() num_lambda times pulling out each tile from the set.
                                 msg_set_copy = msg_set.copy()
-                                args["MAX_NUM_TILES_PER_LAMBDA"] = math.ceil(set_length / num_lambdas)
-                                for skip in range(0, set_length, args["MAX_NUM_TILES_PER_LAMBDA"]):
-                                    args["tiles_to_skip"] = skip
+                                args["MAX_NUM_ITEMS_PER_LAMBDA"] = math.ceil(set_length / num_lambdas)
+                                for skip in range(0, set_length, args["MAX_NUM_ITEMS_PER_LAMBDA"]):
+                                    args["items_to_skip"] = skip
                                     #print("Skip: " + str(skip))
                                     msgs = iqu.create_messages(args)
                                     for msg_json in msgs:
@@ -194,7 +194,7 @@ def create_expected_messages(args):
                                                t)
 
                         count_in_offset += 1
-                        if count_in_offset > args['MAX_NUM_TILES_PER_LAMBDA']:
+                        if count_in_offset > args['MAX_NUM_ITEMS_PER_LAMBDA']:
                             return  # end the generator
                         tile_key = hashed_key(args['project_info'][0],
                                               args['project_info'][1],

@@ -166,47 +166,47 @@ def create_messages(args):
     Zf = args['z_stop'] - args['z_start']
 
     # counter to keep track of # tiles to skip, used decrementally throughout the rest of the calcs below
-    tiles_to_skip = args['tiles_to_skip']
+    items_to_skip = args['items_to_skip']
 
     ############### T
     # T pos, factoring in X, Y, Z
-    Tk = int(tiles_to_skip/(Xf*Yf*Zf))
+    Tk = int(items_to_skip/(Xf*Yf*Zf))
     #compute T's new start
     Tns = ns('t',Tk)
     #decr tiles to skip
-    tiles_to_skip -= Tk*Xf*Yf*Zf
+    items_to_skip -= Tk*Xf*Yf*Zf
 
     ############### Z
     # Z pos, factoring in X, Y
-    Zk = int(tiles_to_skip/(args['z_chunk_size']*Xf*Yf))
+    Zk = int(items_to_skip/(args['z_chunk_size']*Xf*Yf))
     # compute Z's new start
     Zns = ns_z('z',Zk)
     # decr tiles to skip
-    tiles_to_skip -= Zk*args['z_chunk_size']*Xf*Yf
+    items_to_skip -= Zk*args['z_chunk_size']*Xf*Yf
 
     #set the number of tiles (to be used for X and Y calculations)
     num_tiles = min(args['z_chunk_size'], args['z_stop'] - Zns)
 
     ############### Y
     # Y pos, factoring in X
-    Yk = int(tiles_to_skip/(num_tiles*Xf))
+    Yk = int(items_to_skip/(num_tiles*Xf))
     # compute Y's new start pos
     Yns = ns('y',Yk)
     # decr tiles to skip
-    tiles_to_skip -= Yk*num_tiles*Xf
+    items_to_skip -= Yk*num_tiles*Xf
 
     ############### X
     # X pos, factoring in num tiles
-    Xk = int(tiles_to_skip/num_tiles)
+    Xk = int(items_to_skip/num_tiles)
     # compute X's new start pos
     Xns = ns('x',Xk)
     # decr tiles to skip
-    tiles_to_skip -= Xk*num_tiles
+    items_to_skip -= Xk*num_tiles
 
 
     #######################################
     # 
-    #  Now that we've computed the new start values (Tns, Zns, Yns, Xns) and the tiles_to_skip, 
+    #  Now that we've computed the new start values (Tns, Zns, Yns, Xns) and the items_to_skip,
     # ... let's begin our "efficient" LOOPING! 
     #
 
@@ -223,7 +223,7 @@ def create_messages(args):
             for y in new_range('y', Yns, bFirst):
                 for x in new_range('x', Xns, bFirst):
 
-                    for tile in new_range_tile(tiles_to_skip, z, bFirst, num_of_tiles):
+                    for tile in new_range_tile(items_to_skip, z, bFirst, num_of_tiles):
                         if bFirst:
                             bFirst = False
                         num += 1
