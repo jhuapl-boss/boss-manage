@@ -87,6 +87,7 @@ def create_config(session, domain):
     user_data["aws"]["tile-index-table"] = names.tile_index
     user_data["aws"]["id-index-table"] = names.id_index
     user_data["aws"]["id-count-table"] = names.id_count_index
+    user_data["aws"]["max_task_id_suffix"] = str(const.MAX_TASK_ID_SUFFIX)
 
     config.add_autoscale_group("Activities",
                                names.activities,
@@ -207,6 +208,7 @@ def post_init(session, domain):
     #           'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.ingest_queue_populate, domain, 'ingest_queue_populate.hsd', 'StatesExecutionRole-us-east-1 ')
     sfn.create(session, names.ingest_queue_upload, domain, 'ingest_queue_upload.hsd', 'StatesExecutionRole-us-east-1 ')
+    sfn.create(session, names.volumetric_ingest_queue_upload, domain, 'volumetric_ingest_queue_upload.hsd', 'StatesExecutionRole-us-east-1')
     sfn.create(session, names.resolution_hierarchy, domain, 'resolution_hierarchy.hsd', 'StatesExecutionRole-us-east-1')
     #sfn.create(session, names.downsample_volume, domain, 'downsample_volume.hsd', 'StatesExecutionRole-us-east-1')
 

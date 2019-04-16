@@ -39,6 +39,15 @@
   },
   {
     "AttachedManagedPolicies": [
+      "arn:aws:iam::451493790433:policy/Prod-DynamoDB-DeleteTable-DENY",
+      "arn:aws:iam::451493790433:policy/Prod-RDS-DENY-Delete-Instance"
+    ],
+    "GroupName": "aplDenyProdDelete",
+    "GroupPolicyList": [],
+    "Path": "/"
+  },
+  {
+    "AttachedManagedPolicies": [
       "arn:aws:iam::aws:policy/IAMFullAccess"
     ],
     "GroupName": "aplIAMAdminGroup",
@@ -59,7 +68,8 @@
       "arn:aws:iam::aws:policy/CloudFrontFullAccess",
       "arn:aws:iam::aws:policy/AWSCloudTrailFullAccess",
       "arn:aws:iam::aws:policy/AmazonVPCFullAccess",
-      "arn:aws:iam::451493790433:policy/aplTestCloudFormation"
+      "arn:aws:iam::451493790433:policy/aplTestCloudFormation",
+      "arn:aws:iam::451493790433:policy/aplCloudFormationFullAccess"
     ],
     "GroupName": "aplNetworkGroup",
     "GroupPolicyList": [],
@@ -85,10 +95,19 @@
   },
   {
     "AttachedManagedPolicies": [
-      "arn:aws:iam::451493790433:policy/aplCloudFormationFullAccess",
-      "arn:aws:iam::aws:policy/AWSSupportAccess"
+      "arn:aws:iam::aws:policy/AWSSupportAccess",
+      "arn:aws:iam::451493790433:policy/aplCloudFormationFullAccess"
     ],
     "GroupName": "aplSWDevGroup",
+    "GroupPolicyList": [],
+    "Path": "/"
+  },
+  {
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/ReadOnlyAccess",
+      "arn:aws:iam::451493790433:policy/APLSelfAdminister"
+    ],
+    "GroupName": "readonly",
     "GroupPolicyList": [],
     "Path": "/"
   }

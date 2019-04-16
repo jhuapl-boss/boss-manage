@@ -86,7 +86,7 @@ class AWSNames(object):
         "cuboid_bucket": "cuboids",
         "multi_lambda": "multiLambda",
         "s3_index": "s3index",
-        "ingest_bucket": "ingest",
+        "ingest_bucket": "ingest",          # Cuboid staging area For volumetric ingests.
         "tile_bucket": "tiles",
         "delete_tile_objs_lambda": 'deleteTileObjsLambda',
         "tile_index": "tileindex",
@@ -115,11 +115,15 @@ class AWSNames(object):
         'downsample_volume_lambda': 'downsampleVolumeLambda',
         'ingest_queue_populate': 'Ingest.Populate',
         'ingest_queue_upload': 'Ingest.Upload',
+        'volumetric_ingest_queue_upload': 'Ingest.Volumetric.Upload',
+        'volumetric_ingest_queue_upload_lambda': 'VolumetricIngestUpload',
         'ingest_lambda': 'IngestUpload',
         'dynamo_lambda': 'dynamoLambda',
         'trigger_dynamo_autoscale': 'triggerDynamoAutoscale',
         'downsample_status': 'downsample-status',
         'downsample_dlq': 'downsample-dlq',
+        'cuboid_import_lambda': 'cuboidImportLambda',
+        'cuboid_import_dlq': 'cuboidImportDlq',
         'index_cuboid_supervisor_sfn': 'Index.CuboidSupervisor',
         'index_find_cuboids_sfn': 'Index.FindCuboids',
         'index_supervisor_sfn': 'Index.Supervisor',
@@ -189,7 +193,7 @@ class AWSNames(object):
                     'ingest_queue_populate', 'ingest_queue_upload', 'resolution_hierarchy',
                     'downsample_volume', 'delete_experiment', 'delete_collection', 'delete_coord_frame',
                     'index_deadletter_queue', 'index_cuboids_keys_queue',
-                    'ingest_cleanup_dlq', 'copy_cuboid_dlq']:
+                     'cuboid_import_dlq', 'ingest_cleanup_dlq', 'copy_cuboid_dlq', 'volumetric_ingest_queue_upload']:
             fq_hostname = "".join(map(lambda x: x.capitalize(), fq_hostname.split('.')))
 
         return fq_hostname

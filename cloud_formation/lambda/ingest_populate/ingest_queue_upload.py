@@ -43,7 +43,8 @@ def handler(args, context):
             'z_tile_size': 0,
 
             'z_chunk_size': 16,
-            'MAX_NUM_TILES_PER_LAMBDA': 20000
+            'MAX_NUM_ITEMS_PER_LAMBDA': 20000
+            'items_to_skip': 0
         }
 
     Returns:
@@ -244,7 +245,7 @@ def create_messages(args):
                                                 t)
 
                         count_in_offset += 1
-                        if count_in_offset > args['MAX_NUM_TILES_PER_LAMBDA']:
+                        if count_in_offset > args['MAX_NUM_ITEMS_PER_LAMBDA']:
                             return  # end the generator
 
                         tile_key = hashed_key(args['project_info'][0],
