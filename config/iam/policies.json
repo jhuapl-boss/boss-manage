@@ -5,6 +5,51 @@
       "Statement": [
         {
           "Action": [
+            "sns:*",
+            "ec2:*",
+            "cloudformation:*",
+            "sqs:*"
+          ],
+          "Effect": "Allow",
+          "Resource": "*",
+          "Sid": "VisualEditor0"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "apl-lambda-test-build"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "sns:*",
+            "iam:*",
+            "rds:*",
+            "s3:*",
+            "lambda:*",
+            "cloudformation:*",
+            "dynamodb:*",
+            "ec2:*",
+            "elasticloadbalancing:*"
+          ],
+          "Effect": "Allow",
+          "Resource": "*",
+          "Sid": "VisualEditor0"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "apl-auto-build"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
             "s3:ListBucket"
           ],
           "Effect": "Allow",
