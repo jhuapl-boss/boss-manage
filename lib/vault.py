@@ -483,12 +483,10 @@ class Vault(object):
         # DP NOTE: not using self.read becuase of the different token needed
         client = self.connect(VAULT_TOKEN)
         results =  client.read(path[:-1])
-        pprint(results)
         if results is not None:
             rtn[path[:-1]] = results['data']
 
         results = client.list(path)
-        pprint(results)
         for key in results['data']['keys']:
             key = path + key
             if key[-1] == '/':

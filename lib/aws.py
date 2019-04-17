@@ -1264,7 +1264,7 @@ def dynamo_scan(session, table_name):
         return None
     
     client = session.client("dynamodb")
-    response = aws.scan(TableName='vault-table-export')
+    response = aws.scan(TableName=table_name)
     if response is None:
         return None
     else:
