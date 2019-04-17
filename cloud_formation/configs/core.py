@@ -363,39 +363,51 @@ def update(session, domain):
     keypair = aws.keypair_lookup(session)
     call = ExternalCalls(session, keypair, domain)
 
-    export_path = const.repo_path('vault', 'private', names.vault, 'export.json')
-    with call.vault() as vault:
-        vault_data = vault.export("secret/")
-        with open(export_path, 'w') as outfile:
-            json.dump(vault_data, outfile, indent=3, sort_keys=True)
-            print("Vault data exported to {}".format(export_path))
+    transition_vault = aws.machine_lookup(session, 'consul.' + domain, public_ip = False)
+
+    if transition_vault:
+        if not utils.get_user_confirm("This updated will recreate the Vault cluster, proceed?"):
+            print("Canceled")
+            return False
+
+        export_path = const.repo_path('vault', 'private', names.vault, 'export.json')
+        with call.vault() as vault:
+            vault_data = vault.export("secret/")
+            with open(export_path, 'w') as outfile:
+                json.dump(vault_data, outfile, indent=3, sort_keys=True)
+                print("Vault data exported to {}".format(export_path))
 
     config = create_config(session, domain)
     success = config.update(session)
 
     if success:
-        aws.route53_delete_records(session, domain, 'consul.' + domain)
-
         print("Waiting for Vault...")
         if not call.check_vault(90, exception=False):
             print("Could not contact Vault, check networking and run the following command")
-            print("python3 bastion.py {} vault-init".format(names.vault))
-            print("python3 bastion.py {} vault-import {}".format(names.vault, export_path))
+            if transition_vault:
+                print("python3 bastion.py {} vault-init".format(names.vault))
+                print("python3 bastion.py {} vault-import {}".format(names.vault, export_path))
+            else:
+                print("\tpython3 bastion.py {} vault-status".format(names.vault))
+                print("To verify that Vault is working correctly")
             return False
 
-        with call.vault() as vault:
-            is_init = False
-            try:
-                vault.initialize()
-                is_init = True
-                vault.import_(vault_data)
-            except Exception as ex:
-                print("Problem updating Vault configuration: {}".format(ex))
-                print("Run the following commands to finalize the configuration")
-                if not is_init:
-                    print("python3 bastion.py {} vault-init".format(names.vault))
-                print("python3 bastion.py {} vault-import {}".format(names.vault, export_path))
-                return False
+        if transition_vault:
+            aws.route53_delete_records(session, domain, 'consul.' + domain)
+
+            with call.vault() as vault:
+                is_init = False
+                try:
+                    vault.initialize()
+                    is_init = True
+                    vault.import_(vault_data)
+                except Exception as ex:
+                    print("Problem updating Vault configuration: {}".format(ex))
+                    print("Run the following commands to finalize the configuration")
+                    if not is_init:
+                        print("python3 bastion.py {} vault-init".format(names.vault))
+                    print("python3 bastion.py {} vault-import {}".format(names.vault, export_path))
+                    return False
 
         print("Stack should be ready for use")
 
