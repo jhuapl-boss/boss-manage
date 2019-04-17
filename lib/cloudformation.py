@@ -1002,8 +1002,8 @@ class CloudFormationConfiguration:
         Args:
             key (str) : Unique name (within the configuration) for this instance
             name (str) : DynamoDB Table name to create
-            attributes (dict) : Dictionary of {'AttributeName' : 'AttributeType', ...}
-            key_schema (dict) : Dictionary of {'AttributeName' : 'KeyType', ...}
+            attributes (list[tuple]) : List of tuples containing [('AttributeName', 'AttributeType'), ...]
+            key_schema (list[tuple]) : List of tuples containing [('AttributeName', 'KeyType'), ...]
             throughput (tuple) : Tuple of (ReadCapacity, WriteCapacity)
                                  ReadCapacity is the minimum number of consistent reads of items per second
                                               before Amazon DynamoDB balances the loads
@@ -1011,12 +1011,12 @@ class CloudFormationConfiguration:
                                                before Amazon DynamoDB balances the loads
         """
         attr_defs = []
-        for key_ in attributes:
-            attr_defs.append({"AttributeName": key_, "AttributeType": attributes[key_]})
+        for key_, attr in attributes:
+            attr_defs.append({"AttributeName": key_, "AttributeType": attr})
 
         key_schema_ = []
-        for key_ in key_schema:
-            key_schema_.append({"AttributeName": key_, "KeyType": key_schema[key_]})
+        for key_, schema in key_schema:
+            key_schema_.append({"AttributeName": key_, "KeyType": schema})
 
         self.resources[key] = {
             "Type" : "AWS::DynamoDB::Table",

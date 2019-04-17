@@ -98,6 +98,13 @@ def create_config(session, domain):
     vault_actions = ['kms:Encrypt', 'kms:Decrypt', 'kms:DescribeKey']
     config.add_kms_key("VaultKey", names.vault, vault_role, vault_actions)
 
+    config.add_dynamo_table("VaultTable", names.vault,
+                            attributes = [('Path', 'S'),
+                                          ('Key', 'S')],
+                            key_schema = [('Path', 'HASH'),
+                                          ('Key', 'RANGE')],
+                            throughput = (5, 5))
+
     user_data = UserData()
     user_data["system"]["fqdn"] = names.vault
     user_data["system"]["type"] = "vault"
@@ -115,7 +122,7 @@ def create_config(session, domain):
                                max = const.VAULT_CLUSTER_SIZE,
                                notifications = Ref("DNSSNS"),
                                role = aws.instance_profile_arn_lookup(session, 'apl-vault'),
-                               depends_on = ["DNSLambda", "DNSSNS", "DNSLambdaExecute"])
+                               depends_on = ["VaultKey", "VaultTable", "DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
 
     user_data = UserData()
@@ -403,5 +410,3 @@ def delete(session, domain):
         aws.sns_unsubscribe_all(session, names.dns)
 
         CloudFormationConfiguration('core', domain).delete(session)
-
-        aws.dynamodb_delete_table(session, names.vault)
