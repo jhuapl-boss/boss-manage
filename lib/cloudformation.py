@@ -382,7 +382,7 @@ class CloudFormationConfiguration:
 
     # TODO DP: figure out if we can extract the region from the session used to
     #          create the stack and use a template argument
-    def __init__(self, config, domain, region = "us-east-1"):
+    def __init__(self, config, domain, region = "us-east-1", version="1"):
         """CloudFormationConfiguration constructor
 
         A domain name is in either <vpc>.<tld> or <subnet>.<vpc>.<tld> format and
@@ -391,8 +391,10 @@ class CloudFormationConfiguration:
         Note: region is used when creating the Hosted Zone for a new VPC.
 
         Args:
+            config (str) : Name of the configuration being constructed
             domain (str) : Domain that the CloudFormation template will work in.
-            region (str) : AWS region that the configuration will be created in.
+            region (optional[str]) : AWS region that the configuration will be created in.
+            version (optional[str]) : Version number for the configuration, used for update migration
         """
         self.resources = {}
         self.parameters = {}
@@ -400,6 +402,7 @@ class CloudFormationConfiguration:
         self.region = region
         self.keypairs = {}
         self.stack_name = "".join([x.capitalize() for x in [config, *domain.split('.')]])
+        self.stack_version = version
 
         self.vpc_domain = domain
         self.vpc_subnet = hosts.lookup(domain)
@@ -421,6 +424,34 @@ class CloudFormationConfiguration:
                            "Description" : description,
                            "Parameters": self.parameters,
                            "Resources": self.resources}, indent=indent)
+
+    def version(self):
+        """Get the version of this CloudFormationConfiguration object"""
+        return int(self.stack_version)
+
+    def existing_version(self, session):
+        """Get the version of this CloudFormationConfiguration stack running in AWS
+
+        Note: If the CloudFormation Stack was created before they were versioned the
+              default version (1) will be returned
+
+        Args:
+            session (Session) : Boto3 session used to launch the configuration
+
+        Returns:
+            (int|None) : The version of the running stack or None if the stack is not running
+        """
+        client = session.client('cloudformation')
+
+        try:
+            response = client.describe_stacks(StackName = self.stack_name)
+            tags = response['Stacks'][0]['Tags']
+            for tag in tags:
+                if tag['Key'] == 'StackVersion':
+                    return int(tag['Value'])
+            return 1 # Default value for Stacks that are not already versioned
+        except ClientError:
+            return None # Stack doesn't exist
 
     def generate(self):
         """Generate the CloudFormation template and arguments files """
@@ -472,6 +503,7 @@ class CloudFormationConfiguration:
                 TemplateBody = self._create_template(),
                 Parameters = self.arguments,
                 Tags = [
+                    {"Key": "StackVersion", "Value": self.stack_version},
                     {"Key": "Commit", "Value": utils.get_commit()}
                 ]
             )
@@ -519,6 +551,7 @@ class CloudFormationConfiguration:
                 TemplateBody = self._create_template(),
                 Parameters = self.arguments,
                 Tags = [
+                    {"Key": "StackVersion", "Value": self.stack_version},
                     {"Key": "Commit", "Value": utils.get_commit()}
                 ]
             )
@@ -530,6 +563,7 @@ class CloudFormationConfiguration:
                 TemplateBody = self._create_template(),
                 Parameters = self.arguments,
                 Tags = [
+                    {"Key": "StackVersion", "Value": self.stack_version},
                     {"Key": "Commit", "Value": commit}
                 ]
             )

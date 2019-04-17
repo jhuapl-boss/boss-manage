@@ -21,6 +21,13 @@ Create the core configuration which consists of
 The core configuration create all of the infrastructure that is required for
 the other production resources to function. In the furture this may include
 other servers for services like Authentication.
+
+CHANGELOG:
+    Version 1: Initial version of core config
+    Version 2: Vault updates
+               * Replaced Consul storage backend with DynamoDB storage backend
+               * Updated Vault configuration to use AWS KMS for key storage
+               * Code for migrating Vault data from Consul to DynamoDB
 """
 
 from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, get_scenario
@@ -69,7 +76,7 @@ def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnet
 
 def create_config(session, domain):
     """Create the CloudFormationConfiguration object."""
-    config = CloudFormationConfiguration('core', domain, const.REGION)
+    config = CloudFormationConfiguration('core', domain, const.REGION, version="2")
     names = AWSNames(domain)
 
     global keypair
@@ -363,11 +370,11 @@ def update(session, domain):
     keypair = aws.keypair_lookup(session)
     call = ExternalCalls(session, keypair, domain)
 
-    transition_vault = aws.machine_lookup(session, 'consul.' + domain, public_ip = False)
+    config = create_config(session, domain)
+    transition_vault = (1,2) == (config.existing_version(session), config.version())
 
     if transition_vault:
         if not utils.get_user_confirm("This updated will recreate the Vault cluster, proceed?"):
-            print("Canceled")
             return False
 
         export_path = const.repo_path('vault', 'private', names.vault, 'export.json')
@@ -377,7 +384,6 @@ def update(session, domain):
                 json.dump(vault_data, outfile, indent=3, sort_keys=True)
                 print("Vault data exported to {}".format(export_path))
 
-    config = create_config(session, domain)
     success = config.update(session)
 
     if success:
