@@ -1,9 +1,9 @@
 [
   {
     "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/AdministratorAccess"
+      "arn:aws:iam::451493790433:policy/aplInstanceOwnerPolicy"
     ],
-    "GroupName": "aplAdminGroup",
+    "GroupName": "aplInstanceOwnerGroup",
     "GroupPolicyList": [],
     "Path": "/"
   },
@@ -56,9 +56,9 @@
   },
   {
     "AttachedManagedPolicies": [
-      "arn:aws:iam::451493790433:policy/aplInstanceOwnerPolicy"
+      "arn:aws:iam::aws:policy/AdministratorAccess"
     ],
-    "GroupName": "aplInstanceOwnerGroup",
+    "GroupName": "aplAdminGroup",
     "GroupPolicyList": [],
     "Path": "/"
   },

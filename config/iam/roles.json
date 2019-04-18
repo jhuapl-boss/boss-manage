@@ -6,27 +6,16 @@
           "Action": "sts:AssumeRole",
           "Effect": "Allow",
           "Principal": {
-            "Service": "ec2.amazonaws.com"
+            "AWS": "arn:aws:iam::256215146792:root"
           }
         }
       ],
       "Version": "2012-10-17"
     },
-    "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/service-role/AWSQuickSightListIAM",
-      "arn:aws:iam::451493790433:policy/aplDeleteCuboid",
-      "arn:aws:iam::451493790433:policy/aplResolutionHierarchy",
-      "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess",
-      "arn:aws:iam::451493790433:policy/aplPopulateUploadQueue"
-    ],
-    "InstanceProfileList": [
-      {
-        "InstanceProfileName": "activities",
-        "Path": "/"
-      }
-    ],
+    "AttachedManagedPolicies": [],
+    "InstanceProfileList": [],
     "Path": "/",
-    "RoleName": "activities",
+    "RoleName": "DeveloperAccess",
     "RolePolicyList": []
   },
   {
@@ -526,16 +515,27 @@
           "Action": "sts:AssumeRole",
           "Effect": "Allow",
           "Principal": {
-            "AWS": "arn:aws:iam::256215146792:root"
+            "Service": "ec2.amazonaws.com"
           }
         }
       ],
       "Version": "2012-10-17"
     },
-    "AttachedManagedPolicies": [],
-    "InstanceProfileList": [],
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/service-role/AWSQuickSightListIAM",
+      "arn:aws:iam::451493790433:policy/aplDeleteCuboid",
+      "arn:aws:iam::451493790433:policy/aplResolutionHierarchy",
+      "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess",
+      "arn:aws:iam::451493790433:policy/aplPopulateUploadQueue"
+    ],
+    "InstanceProfileList": [
+      {
+        "InstanceProfileName": "activities",
+        "Path": "/"
+      }
+    ],
     "Path": "/",
-    "RoleName": "DeveloperAccess",
+    "RoleName": "activities",
     "RolePolicyList": []
   },
   {
