@@ -36,6 +36,77 @@
           "Action": "sts:AssumeRole",
           "Effect": "Allow",
           "Principal": {
+            "Service": "ecs.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/aws-service-role/AmazonECSServiceRolePolicy"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/aws-service-role/ecs.amazonaws.com/",
+    "RoleName": "AWSServiceRoleForECS",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "events.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/aws-service-role/CloudWatchEventsServiceRolePolicy"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/aws-service-role/events.amazonaws.com/",
+    "RoleName": "AWSServiceRoleForCloudWatchEvents",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "ec2.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/IAMFullAccess",
+      "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
+      "arn:aws:iam::451493790433:policy/aplVaultAttachUserPolicy",
+      "arn:aws:iam::451493790433:policy/aplVaultPolicy"
+    ],
+    "InstanceProfileList": [
+      {
+        "InstanceProfileName": "apl-vault",
+        "Path": "/"
+      }
+    ],
+    "Path": "/",
+    "RoleName": "apl-vault",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
             "Service": "ec2.amazonaws.com"
           }
         }

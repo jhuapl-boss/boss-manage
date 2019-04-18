@@ -25,6 +25,27 @@
       "Statement": [
         {
           "Action": [
+            "logs:CreateLogGroup",
+            "logs:CreateLogStream",
+            "logs:PutLogEvents",
+            "logs:DescribeLogStreams"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "arn:aws:logs:*:*:*"
+          ]
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "apl-cloudwatch-instance-logs"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
             "sns:*",
             "iam:*",
             "rds:*",
