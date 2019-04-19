@@ -80,23 +80,6 @@ def create_config(session, domain):
                              encryption=encryption)
         BUCKET_DEPENDENCY = "BackupBucket"
 
-    # Consul Backup
-    # DP NOTE: Currently having issue with Consul restore, hence both Consul and Vault backups
-    cmd = "/usr/local/bin/consulate --api-host consul.{} kv backup -b -f ${{OUTPUT1_STAGING_DIR}}/export.json".format(domain)
-    pipeline = DataPipeline(log_uri = s3_logs, resource_role="backup")
-    pipeline.add_shell_command("ConsulBackup",
-                               cmd,
-                               destination = Ref("ConsulBucket"),
-                               runs_on = Ref("ConsulInstance"))
-    pipeline.add_s3_bucket("ConsulBucket", s3_backup + "/consul")
-    pipeline.add_ec2_instance("ConsulInstance",
-                              subnet=internal_subnet,
-                              image = backup_image)
-    config.add_data_pipeline("ConsulBackupPipeline",
-                             "consul-backup."+domain,
-                             pipeline.objects,
-                             depends_on = BUCKET_DEPENDENCY)
-
     # Vault Backup
     cmd = "/usr/local/bin/python3 ~/vault.py backup {}".format(domain)
     pipeline = DataPipeline(log_uri = s3_logs, resource_role="backup")
@@ -115,6 +98,7 @@ def create_config(session, domain):
 
 
     # DynamoDB Backup
+    # TODO: Add support for Vault DynamoDB Table
     tables = {
         "BossMeta": names.meta,
         "S3Index": names.s3_index,

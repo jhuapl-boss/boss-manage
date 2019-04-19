@@ -120,7 +120,7 @@ if __name__ == "__main__":
         print("Error: SSH key '{}' does not exist".format(args.ssh_key))
         sys.exit(1)
 
-    # This next step will make bastion work with 1.consul or 1.vault internal names.
+    # This next step will make bastion work with 1.endpoint or 1.vault internal names.
     boss_position = 1
     try:
         int(args.internal.split(".", 1)[0])

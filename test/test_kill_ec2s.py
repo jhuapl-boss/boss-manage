@@ -38,7 +38,6 @@ from lib import aws
 from lib.external import ExternalCalls
 
 TARGET_MACHINES = [
-    "consul.",
     "vault.",
     "auth."
 ]
@@ -94,53 +93,11 @@ def kill_az(session, args):
     else:
         machine_terminate(session, ids)
 
-ITERATIONS = 5 # DP TODO: make optional argument
-def test_consul(session, args):
-    if args.ssh_key is None:
-        print("Error: SSH key not provided and SSH_KEY is not defined")
-        return 1
-    if not os.path.exists(args.ssh_key):
-        print("Error: SSH key '{}' does not exist".format(args.ssh_key))
-        return 1
-
-    global TARGET_MACHINES
-    TARGET_MACHINES = ['consul.'] # Limit to only consul
-    calls = ExternalCalls(session, args.ssh_key, args.domain)
-
-    azs = azs_lookup(session)
-    for i in range(ITERATIONS):
-        az = random.choice(azs)
-        print("Selecting Availability Zone ", az)
-
-        ids = machine_lookup(session, args.domain, az)
-        for id in ids:
-            print("Terminating instance ", id)
-        machine_terminate(session, ids)
-
-        print("Sleeping for 5 minutes")
-        time.sleep(5 * 60)
-
-        try:
-            with calls.vault() as vault:
-                result = vault.read("secret/auth/realm")
-                username = result['data']['username']
-                print("Read username '{}' from Vault".format(username))
-        except Exception as e:
-            print("Problem connecting to Vault on iteration ", i)
-            print(e)
-            return 1
-
-        print()
-
-    print("Complete")
-    return 0
-
 if __name__ == "__main__":
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
     tests = {
         'kill-az': kill_az,
-        'test-consul': test_consul,
     }
 
     def create_help(header, options):

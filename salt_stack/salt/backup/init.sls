@@ -21,14 +21,6 @@ creds-script:
         - group: ec2-user
         - mode: 555
 
-consulate-lib:
-    pip.installed:
-        - name: consulate
-        - bin_env: /usr/local/bin/pip3
-        - require:
-            - sls: python.python35
-            - sls: python.pip
-
 vault-script:
     file.managed:
         - name: /home/ec2-user/vault.py

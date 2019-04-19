@@ -2,6 +2,5 @@
     "activities": "ActivitiesBoss-Activities-ABC123",
     "endpoint": "ApiBoss-Endpoint-ABC123",
     "auth": "CoreBoss-Auth-ABC123",
-    "vault": "CoreBoss-Vault-ABC123",
-    "consul": "CoreBoss-Consul-ABC123"
+    "vault": "CoreBoss-Vault-ABC123"
 }

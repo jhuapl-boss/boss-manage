@@ -40,41 +40,9 @@ def list_s3_bucket(session, bucket, prefix):
 
     return dirs, files
 
-def consul_pipeline(session, domain, directory):
-    # DP NOTE: Currently having issues with Consul restore
-    #          For a restore certain kv paths shouldn't be restored
-    #          and all Vault instances must be shutdown, so they are not
-    #          interacting with Consul during the restore
-    #
-    # See
-    # https://groups.google.com/forum/#!msg/vault-tool/nTj0V9hC31E/0VT3Qq_CDQAJ
-    # https://groups.google.com/forum/#!msg/vault-tool/ISCbNmQVXms
-    names = AWSNames(domain)
-    # XXX: AZ `E` is incompatible with T2.Micro instances (used by backup)
-    internal_subnet = aws.subnet_id_lookup(session, 'b-' + names.internal)
-
-    s3_backup = "s3://backup." + domain + "/" + directory
-    s3_log = "s3://backup." + domain + "/restore-logs/"
-    cmd = "/usr/local/bin/consulate --api-host consul.{} kv restore -b -f ${{INPUT1_STAGING_DIR}}/export.json".format(domain)
-
-    _, data = list_s3_bucket(session, "backup." + domain, directory + "/vault")
-    if len(data) == 0:
-        print("No consul data backed up on {}, skipping restore".format(directory))
-        return None
-
-    pipeline = DataPipeline(fmt="DP", log_uri = s3_log, resource_role="backup")
-    pipeline.add_shell_command("ConsulRestore",
-                               cmd,
-                               source = Ref("ConsulBucket"),
-                               runs_on = Ref("ConsulInstance"))
-    pipeline.add_ec2_instance("ConsulInstance",
-                              subnet = internal_subnet,
-                              image = aws.ami_lookup(session, "backup.boss")[0])
-    pipeline.add_s3_bucket("ConsulBucket", s3_backup + "/consul")
-    return pipeline
-
 def vault_pipeline(session, domain, directory):
     names = AWSNames(domain)
+    # TODO: Create DDB Pipeline for backing up Vault DDB Table
     # XXX: AZ `E` is incompatible with T2.Micro instances (used by backup)
     internal_subnet = aws.subnet_id_lookup(session, 'b-' + names.internal)
 
@@ -191,7 +159,7 @@ def auth_rds_pipeline(session, domain, directory):
                         names.auth_db)
 
 if __name__ == '__main__':
-    types = ['consul', 'vault', 'dynamo', 'endpoint', 'auth']
+    types = ['vault', 'dynamo', 'endpoint', 'auth']
     parser = argparse.ArgumentParser(description = "Script the restoration of a backup")
     parser.add_argument("--aws-credentials", "-a",
                         metavar = "<file>",
@@ -230,9 +198,6 @@ if __name__ == '__main__':
     pipeline_args = (session, args.domain_name, args.backup_date)
     print("Creating and activating restoration data pipelines")
     for name, build in [
-                        # Currently having issues with Consul restore
-                        #('consul', consul_pipeline),
-
                         # NOTE: in some scenarios vault data may need to be be
                         #       restored before the other restores are executed
                         ('vault', vault_pipeline),

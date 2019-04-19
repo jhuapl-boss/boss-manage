@@ -121,7 +121,7 @@ wait
 echo " "
 echo "----------------------Building AMIs----------------------"
 echo " " 
-python3.5 ./packer.py auth vault consul endpoint cachemanager activities --name autotest --no-bastion
+python3.5 ./packer.py auth vault endpoint cachemanager activities --name autotest --no-bastion
 wait
 
 echo " "

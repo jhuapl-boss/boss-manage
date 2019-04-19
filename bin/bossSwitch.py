@@ -18,7 +18,7 @@
    The instances should first be stood up by building stacks through cloudformation.
    ASG are shut down. Only execute this code if you are certain the boss will not
    be running for another hour.
-   Currently not all of the ASGs are supported. The auth and consul ASGs could present problems
+   Currently not all of the ASGs are supported. The auth ASG could present problems
    if shut down, since all their data would be lost and would not be recovered upon turning the boss on. 
    Supporting Auth ASG could be done using the same check the core config uses to see ig an auth RDS should be create.
    If there is an auth db then you should be able to shut the ec2 instances down."""
