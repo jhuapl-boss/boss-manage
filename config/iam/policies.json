@@ -113,45 +113,6 @@
     "PolicyName": "AWSLambdaVPCAccessExecutionRole-b2075bb1-0254-4f5f-abe6-c012abd2a001"
   },
   {
-    "Path": "/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "iam:ListGroupsForUser",
-            "iam:ListUserPolicies",
-            "iam:ListAccessKeys",
-            "iam:DeleteAccessKey",
-            "iam:DeleteUserPolicy",
-            "iam:DeleteUser"
-          ],
-          "Effect": "Allow",
-          "Resource": "arn:aws:iam::*:user/vault*"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "aplRevokeVaultUserPolicy"
-  },
-  {
-    "Path": "/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "iam:CreateUser",
-            "iam:PutUserPolicy",
-            "iam:CreateAccessKey"
-          ],
-          "Effect": "Allow",
-          "Resource": "arn:aws:iam::*:user/vault*"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "aplDynamicVaultUserPolicy"
-  },
-  {
     "Path": "/service-role/",
     "PolicyDocument": {
       "Statement": [
@@ -425,26 +386,6 @@
       "Version": "2012-10-17"
     },
     "PolicyName": "mesh-bucket-policy"
-  },
-  {
-    "Path": "/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "iam:AttachUserPolicy",
-            "iam:DetachUserPolicy"
-          ],
-          "Effect": "Allow",
-          "Resource": [
-            "arn:aws:iam::*:user/vault-*"
-          ],
-          "Sid": "Stmt1473863272000"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "aplVaultAttachUserPolicy"
   },
   {
     "Path": "/",
