@@ -123,6 +123,7 @@ def create_config(session, domain):
                                aws.ami_lookup(session, "vault.boss"),
                                keypair,
                                subnets = internal_subnets_lambda,
+                               type_ = const.VAULT_TYPE,
                                security_groups = [Ref("InternalSecurityGroup")],
                                user_data = parsed_user_data,
                                min = const.VAULT_CLUSTER_SIZE,

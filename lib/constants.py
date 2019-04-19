@@ -141,6 +141,18 @@ CACHE_MANAGER_TYPE = {
     "ha-development": "t2.micro",
 }
 
+CONSUL_TYPE = {
+    "development": "t3.micro",
+    "production": "t3.medium",
+    "ha-development": "t3.large",
+}
+
+VAULT_TYPE = {
+    "development": "t3.micro",
+    "production": "t3.medium",
+    "ha-development": "t3.large",
+}
+
 ACTIVITIES_TYPE = {
     "development": "m5.large",
     "production": "m5.xlarge",
