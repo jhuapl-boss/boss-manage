@@ -806,34 +806,62 @@
       "Statement": [
         {
           "Action": [
-            "iam:CreateAccessKey",
-            "iam:CreateUser",
-            "iam:AttachUserPolicy",
-            "iam:PutUserPolicy",
-            "iam:ListGroupsForUser",
-            "iam:ListPolicies",
-            "iam:ListAttachedUserPolicies",
-            "iam:ListUserPolicies",
-            "iam:ListAccessKeys",
-            "iam:DeleteAccessKey",
-            "iam:DetachUserPolicy",
-            "iam:DeleteUserPolicy",
-            "iam:RemoveUserFromGroup",
-            "iam:DeleteUser"
+            "dynamodb:DescribeLimits",
+            "dynamodb:DescribeTimeToLive",
+            "dynamodb:ListTagsOfResource",
+            "dynamodb:DescribeReservedCapacityOfferings",
+            "dynamodb:DescribeReservedCapacity",
+            "dynamodb:ListTables",
+            "dynamodb:BatchGetItem",
+            "dynamodb:BatchWriteItem",
+            "dynamodb:CreateTable",
+            "dynamodb:DeleteItem",
+            "dynamodb:GetItem",
+            "dynamodb:GetRecords",
+            "dynamodb:PutItem",
+            "dynamodb:Query",
+            "dynamodb:UpdateItem",
+            "dynamodb:Scan",
+            "dynamodb:DescribeTable"
           ],
           "Effect": "Allow",
           "Resource": [
-            "arn:aws:iam::*:user/vault-*"
-          ]
+            "arn:aws:dynamodb:us-east-1:451493790433:table/vault.*"
+          ],
+          "Sid": "StorageBackend"
         },
         {
           "Action": [
-            "ec2:DescribeInstances"
+            "ec2:DescribeInstances",
+            "iam:GetInstanceProfile",
+            "iam:GetUser",
+            "iam:GetRole"
+          ],
+          "Effect": "Allow",
+          "Resource": "*",
+          "Sid": "AwsAuthBackend"
+        },
+        {
+          "Action": [
+            "iam:AttachUserPolicy",
+            "iam:CreateAccessKey",
+            "iam:CreateUser",
+            "iam:DeleteAccessKey",
+            "iam:DeleteUser",
+            "iam:DeleteUserPolicy",
+            "iam:DetachUserPolicy",
+            "iam:ListAccessKeys",
+            "iam:ListAttachedUserPolicies",
+            "iam:ListGroupsForUser",
+            "iam:ListUserPolicies",
+            "iam:PutUserPolicy",
+            "iam:RemoveUserFromGroup"
           ],
           "Effect": "Allow",
           "Resource": [
-            "*"
-          ]
+            "arn:aws:iam::451493790433:user/vault-*"
+          ],
+          "Sid": "AwsSecretBackend"
         }
       ],
       "Version": "2012-10-17"
