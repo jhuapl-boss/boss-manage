@@ -3,6 +3,7 @@ import json
 import time
 import hashlib
 import pprint
+import math
 
 class FailedToSendMessages(Exception):
     pass
@@ -42,7 +43,8 @@ def handler(args, context):
             'z_tile_size': 0,
 
             'z_chunk_size': 16,
-            'MAX_NUM_TILES_PER_LAMBDA': 20000
+            'MAX_NUM_ITEMS_PER_LAMBDA': 20000
+            'items_to_skip': 0
         }
 
     Returns:
@@ -105,8 +107,8 @@ def create_messages(args):
         list: List of strings containing Json data
     """
 
-    tile_size = lambda v: args[v + "_tile_size"]
-    range_ = lambda v: range(args[v + '_start'], args[v + '_stop'], tile_size(v))
+    # tile_size = lambda v: args[v + "_tile_size"]
+    # range_ = lambda v: range(args[v + '_start'], args[v + '_stop'], tile_size(v))
 
     # DP NOTE: generic version of
     # BossBackend.encode_chunk_key and BiossBackend.encode.tile_key
@@ -120,47 +122,140 @@ def create_messages(args):
 
         return '&'.join([digest, base])
 
-    tiles_to_skip = args['tiles_to_skip']
-    count_in_offset = 0
 
-    for t in range_('t'):
-        for z in range(args['z_start'], args['z_stop'], args['z_chunk_size']):
-            for y in range_('y'):
-                for x in range_('x'):
-                    num_of_tiles = min(args['z_chunk_size'], args['z_stop'] - z)
+    tile_size = lambda v: args[v + "_tile_size"]
+    
+    # CF  New algorithm follows
 
-                    for tile in range(z, z + num_of_tiles):
-                        if tiles_to_skip > 0:
-                            tiles_to_skip -= 1
-                            continue
+    #  Goal is to PRE-COMPUTE the new starting values for T Z Y X , given # of tiles to skip
+    #  Having the starting values will be more efficient than iterating for every TZYX
+
+    # Tns:  T's new start position
+    # Zns:  Z's new start position
+    # Yns:  Y's new start position
+    # Xns:  X's new start position
+
+    #########################
+    # 
+    #  First, Let's create some Helper lambda functions 
+    #
+
+    # range helper function for X and Y dimensions
+    new_range = lambda v, vns, First : range(vns, args[v + '_stop'] , args[v + '_tile_size']) if First else range(args[v + '_start'], args[v + '_stop'] , args[v + '_tile_size'])
+    # range helper function for Z dimension
+    new_range_z = lambda zns, First : range(zns, args['z_stop'] , args['z_chunk_size']) if First else range(args['z_start'], args['z_stop'] , args['z_chunk_size'])
+    # range helper function for tiles
+    new_range_tile = lambda t2s,z,First,nt : range(z + t2s, z + nt) if First else range(z, z + nt)
+
+    # generic helper lambda func factoring tile_size (use ceiling)
+    factor_ = lambda v: math.ceil((args[v + '_stop'] - args[v + '_start']) / args[v + '_tile_size'])
+
+    # new start helper func (for tile_size cases)
+    ns = lambda v,n: args[v + '_start'] + args[v + '_tile_size'] * n
+    # new start helper func for special case Z (which uses chunk_size)
+    ns_z = lambda v,n: args[v + '_start'] + args[v + '_chunk_size'] * n
+
+    ##########################
+    #
+    # Now Let's start the actual calculations to compute the new ( Tns Znz Yns Xns ) values 
+    #
+
+    # first, factor in  (x, y, z dimensions)
+    Xf = factor_('x')
+    Yf = factor_('y')
+    Zf = args['z_stop'] - args['z_start']
+
+    # counter to keep track of # tiles to skip, used decrementally throughout the rest of the calcs below
+    items_to_skip = args['items_to_skip']
+
+    ############### T
+    # T pos, factoring in X, Y, Z
+    Tk = int(items_to_skip/(Xf*Yf*Zf))
+    #compute T's new start
+    Tns = ns('t',Tk)
+    #decr tiles to skip
+    items_to_skip -= Tk*Xf*Yf*Zf
+
+    ############### Z
+    # Z pos, factoring in X, Y
+    Zk = int(items_to_skip/(args['z_chunk_size']*Xf*Yf))
+    # compute Z's new start
+    Zns = ns_z('z',Zk)
+    # decr tiles to skip
+    items_to_skip -= Zk*args['z_chunk_size']*Xf*Yf
+
+    #set the number of tiles (to be used for X and Y calculations)
+    num_tiles = min(args['z_chunk_size'], args['z_stop'] - Zns)
+
+    ############### Y
+    # Y pos, factoring in X
+    Yk = int(items_to_skip/(num_tiles*Xf))
+    # compute Y's new start pos
+    Yns = ns('y',Yk)
+    # decr tiles to skip
+    items_to_skip -= Yk*num_tiles*Xf
+
+    ############### X
+    # X pos, factoring in num tiles
+    Xk = int(items_to_skip/num_tiles)
+    # compute X's new start pos
+    Xns = ns('x',Xk)
+    # decr tiles to skip
+    items_to_skip -= Xk*num_tiles
+
+
+    #######################################
+    # 
+    #  Now that we've computed the new start values (Tns, Zns, Yns, Xns) and the items_to_skip,
+    # ... let's begin our "efficient" LOOPING! 
+    #
+
+    #first, initialize vars 
+    num = 0 
+    bFirst = True
+    count_in_offset = 0    
+
+    for t in new_range('t', Tns, bFirst):
+        for z in new_range_z(Zns, bFirst):
+            #Factor in Z chunk size
+            num_of_tiles = min(args['z_chunk_size'], args['z_stop'] - z)
+
+            for y in new_range('y', Yns, bFirst):
+                for x in new_range('x', Xns, bFirst):
+
+                    for tile in new_range_tile(items_to_skip, z, bFirst, num_of_tiles):
+                        if bFirst:
+                            bFirst = False
+                        num += 1
 
                         if count_in_offset == 0:
-                            print("Finished skipping tiles")
+                            print(" **** FINISHED SKIPPING tiles *** \n")
 
                         chunk_x = int(x / tile_size('x'))
                         chunk_y = int(y / tile_size('y'))
                         chunk_z = int(z / args['z_chunk_size'])
                         chunk_key = hashed_key(num_of_tiles,
-                                               args['project_info'][0],
-                                               args['project_info'][1],
-                                               args['project_info'][2],
-                                               args['resolution'],
-                                               chunk_x,
-                                               chunk_y,
-                                               chunk_z,
-                                               t)
+                                                args['project_info'][0],
+                                                args['project_info'][1],
+                                                args['project_info'][2],
+                                                args['resolution'],
+                                                chunk_x,
+                                                chunk_y,
+                                                chunk_z,
+                                                t)
 
                         count_in_offset += 1
-                        if count_in_offset > args['MAX_NUM_TILES_PER_LAMBDA']:
+                        if count_in_offset > args['MAX_NUM_ITEMS_PER_LAMBDA']:
                             return  # end the generator
+
                         tile_key = hashed_key(args['project_info'][0],
-                                              args['project_info'][1],
-                                              args['project_info'][2],
-                                              args['resolution'],
-                                              chunk_x,
-                                              chunk_y,
-                                              tile,
-                                              t)
+                                                args['project_info'][1],
+                                                args['project_info'][2],
+                                                args['resolution'],
+                                                chunk_x,
+                                                chunk_y,
+                                                tile,
+                                                t)
 
                         msg = {
                             'job_id': args['job_id'],

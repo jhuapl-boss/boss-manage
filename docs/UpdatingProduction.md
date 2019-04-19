@@ -240,6 +240,9 @@ to see if DNS has been changed back to ELB.
 Take the list of emails and phone numbers you created earlier and 
 add them back into the ProductionMicronsMailingList Topic in SNS.
 
+### Disable Cloudwatch Delete Rules
+Go Into Cloudwatch Rules and make sure the **deleteEventRule.production.boss** is disabled
+
 # Testing
 
 ### Run unit tests on Endpoint
@@ -282,7 +285,7 @@ sudo nose2 -c inttest.cfg
 Test while logged onto the Endpoint VM
 ```shell
 # Manual install for now.  Will likely remove use of pytest in the future.
-sudo pip3 install pytest
+sudo -H pip3 install pytest
 cd /usr/local/lib/python3/site-packages/ndingest
 # Use randomized queue names and prepend 'test_' to bucket/index names.
 export NDINGEST_TEST=1

@@ -19,7 +19,7 @@ from .cloudformation import get_scenario
 # Region api is created in.  Later versions of boto3 should allow us to
 # extract this from the session variable.  Hard coding for now.
 REGION = 'us-east-1'
-INCOMING_SUBNET = "52.3.13.189/32"  # microns-bastion elastic IP
+INCOMING_SUBNET = os.environ.get('_BASTION_ALLOW_IP', '52.3.13.189') + '/32'  # microns-bastion elastic IP
 
 PRODUCTION_MAILING_LIST = "ProductionMicronsMailingList"
 PRODUCTION_BILLING_TOPIC = "ProductionBillingList"
@@ -87,6 +87,7 @@ KEYCLOAK_REALM = SALT_DIR + '/keycloak/files/BOSS.realm'
 VAULT_AUTH = "secret/auth"
 VAULT_REALM = "secret/auth/realm"
 VAULT_KEYCLOAK = "secret/keycloak"
+VAULT_KEYCLOAK_DB = "secret/keycloak/db"
 VAULT_ENDPOINT = "secret/endpoint/django"
 VAULT_ENDPOINT_DB = "secret/endpoint/django/db"
 VAULT_ENDPOINT_AUTH = "secret/endpoint/auth"
@@ -105,7 +106,7 @@ TIMEOUT_KEYCLOAK = 150
 # Machine Instance Types
 ENDPOINT_TYPE = {
     "development": "t2.medium",
-    "production": "m4.2xlarge",
+    "production": "m5.2xlarge",
     "ha-development": "t2.medium",
 }
 
@@ -130,7 +131,7 @@ REDIS_SESSION_TYPE = {
 
 REDIS_TYPE = {
     "development": "cache.t2.small",
-    "production": "cache.m4.xlarge",
+    "production": "cache.m5.xlarge",
     "ha-development": "cache.t2.small",
 }
 
@@ -141,11 +142,16 @@ CACHE_MANAGER_TYPE = {
 }
 
 ACTIVITIES_TYPE = {
-    "development": "m4.large",
-    "production": "m4.xlarge",
-    "ha-development": "m4.large",
+    "development": "m5.large",
+    "production": "m5.xlarge",
+    "ha-development": "m5.large",
 }
 
+AUTH_TYPE = {
+    "development": "t2.micro",
+    "production": "m5.xlarge",
+    "ha-development": "t2.micro",
+}
 
 ########################
 # Machine Cluster Sizes

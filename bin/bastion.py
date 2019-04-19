@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.5
+#!/usr/bin/env python3
 
 # Copyright 2016 The Johns Hopkins University Applied Physics Laboratory
 #
@@ -102,9 +102,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.aws_credentials is None:
-        parser.print_usage()
-        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
-        sys.exit(1)
+        try:
+            print("AWS credentials not provided and AWS_CREDENTIALS is not defined, assuming IAM role")
+            session = aws.use_iam_role()
+        except Exception as e:
+            parser.print_usage()
+            print('Error: Could not assume IAM role due to:{}'.format(e))
+    elif args.aws_credentials is not None:
+        session = aws.create_session(args.aws_credentials)
+
     if args.ssh_key is None:
         parser.print_usage()
         print("Error: SSH key not provided and SSH_KEY is not defined")
@@ -114,9 +120,7 @@ if __name__ == "__main__":
         print("Error: SSH key '{}' does not exist".format(args.ssh_key))
         sys.exit(1)
 
-    session = aws.create_session(args.aws_credentials)
-
-    # This next step will make bastion work with 1.endpoint or 1.vault internal names.
+    # This next step will make bastion work with 1.consul or 1.vault internal names.
     boss_position = 1
     try:
         int(args.internal.split(".", 1)[0])

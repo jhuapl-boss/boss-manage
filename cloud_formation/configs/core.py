@@ -48,13 +48,14 @@ from concurrent.futures import ThreadPoolExecutor
 
 keypair = None
 
-def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, public=True, depends_on=None):
+def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, type_="t2.micro", public=True, depends_on=None):
     security_groups = [Ref("InternalSecurityGroup")]
     config.add_autoscale_group(key,
                                hostname,
                                ami,
                                keypair,
                                subnets = isubnets,
+                               type_= type_,
                                security_groups = security_groups,
                                user_data = user_data,
                                min = size,
@@ -81,7 +82,6 @@ def create_config(session, domain):
 
     global keypair
     keypair = aws.keypair_lookup(session)
-
     config.add_vpc()
 
     # Create the internal and external subnets
@@ -165,6 +165,7 @@ def create_config(session, domain):
                    [("443", "8080", "HTTPS", cert)],
                    "HTTP:8080/index.html",
                    sgs = [Ref("AuthSecurityGroup")],
+                   type_=const.AUTH_TYPE,
                    depends_on=deps)
 
     if USE_DB:
@@ -234,7 +235,8 @@ def create_config(session, domain):
                                  depends_on = "AttachInternetGateway")
 
     config.add_internet_gateway("InternetGateway", names.internet)
-    config.add_endpoint("S3Endpoint", "s3", [Ref("InternalRouteTable")])
+    config.add_endpoint("S3Endpoint", "s3", [Ref("InternalRouteTable"), Ref('InternetRouteTable')])
+    config.add_endpoint("DynamoDBEndpoint", "dynamodb", [Ref("InternalRouteTable"), Ref('InternetRouteTable')])
     config.add_nat("NAT", Ref("ExternalSubnet"), depends_on="AttachInternetGateway")
 
     return config
@@ -307,6 +309,17 @@ def post_init(session, domain, startup_wait=False):
         if not vault.read(const.VAULT_KEYCLOAK):
             print("Updating {}".format(const.VAULT_KEYCLOAK))
             vault.update(const.VAULT_KEYCLOAK, password = password, username = username, client_id = "admin-cli", realm = "master")
+
+        if not vault.read(const.VAULT_KEYCLOAK_DB):
+            print("Writing {}".format(const.VAULT_KEYCLOAK_DB))
+            # Values are hardcodded both here and in the add_rds
+            # as the values are also hardcodded in the Keycloak config
+            #
+            # These values are for use by the backup / restore process
+            vault.write(const.VAULT_KEYCLOAK_DB,
+                        name = "keycloak",
+                        user = "keycloak",
+                        password = "keycloak")
 
         if not vault.read(const.VAULT_ENDPOINT_AUTH):
             # DP TODO: Move this update call into the api config

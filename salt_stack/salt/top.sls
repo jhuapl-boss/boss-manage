@@ -22,6 +22,7 @@ base:
         - git
         - ingest-client.ingest
         - chrony
+        - open-files.increase-open-files
 
     'lambda*':
         - lambda-dev
@@ -75,3 +76,10 @@ base:
 
         # NTP
         - chrony
+
+    'backup*':
+        - sun-java
+        - sun-java.env
+        - unzip
+        - users.ec2-user
+        - backup

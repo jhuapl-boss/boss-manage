@@ -93,6 +93,8 @@ def update_lambda_code(session, domain, bucket):
         names.index_fanout_id_writer_lambda, names.index_write_id_lambda,
         names.index_write_failed_lambda, names.index_find_cuboids_lambda,
         names.copy_cuboid_lambda,
+        names.cuboid_import_lambda,
+        names.volumetric_ingest_queue_upload_lambda,
         names.tile_uploaded_lambda,
         names.tile_ingest_lambda,
         names.index_fanout_enqueue_cuboid_keys_lambda,
@@ -224,6 +226,9 @@ if __name__ == '__main__':
                         help = 'File with credentials for connecting to AWS (default: AWS_CREDENTIALS)')
     parser.add_argument('domain',
                         help = 'Domain that lambda functions live in, such as integration.boss.')
+    parser.add_argument('--refresh-only', '-r',
+                        action = 'store_true',
+                        help = 'Tell AWS to just reload the lambdas from S3')
 
     args = parser.parse_args()
 
@@ -235,5 +240,6 @@ if __name__ == '__main__':
     session = aws.create_session(args.aws_credentials)
     bucket = aws.get_lambda_s3_bucket(session)
 
-    load_lambdas_on_s3(session, args.domain, bucket)
+    if not args.refresh_only:
+        load_lambdas_on_s3(session, args.domain, bucket)
     update_lambda_code(session, args.domain, bucket)

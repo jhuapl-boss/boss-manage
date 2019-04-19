@@ -1,0 +1,36 @@
+@startuml
+
+header Last updated 11Dec2018
+footer Generated from ingest_client_sequence_proposed.uml by PlantUML
+title Ingest Client Sequence Diagram
+
+actor IngestClient as IC
+collections Workers as W
+entity Endpoint as E
+control UploadQueue as UQ
+control TileIndexQueue as TIQ
+collections TileBucket as TB
+
+IC->E: Create ingest job
+IC->E: Join job (wait for upload queue population and creds)
+activate W
+IC->W: Spawn worker(s)
+
+loop While workers alive
+    IC->E: Update creds if near timeout
+    IC->E: Check job status
+    IC->W: Check worker(s)
+    loop While upload queue is not empty
+        W->E: Update creds if near timeout
+        W->UQ: Get message
+        W->TB: Upload tile
+        W->UQ: Delete message
+        W->TIQ: Put message
+    end
+    deactivate W
+end
+
+IC->E: Complete job
+
+@enduml
+
