@@ -44,7 +44,6 @@ import os
 import sys
 import json
 import time
-from concurrent.futures import ThreadPoolExecutor
 
 keypair = None
 
@@ -441,4 +440,7 @@ def delete(session, domain):
         aws.route53_delete_records(session, domain, names.vault)
         aws.sns_unsubscribe_all(session, names.dns)
 
-        CloudFormationConfiguration('core', domain).delete(session)
+        config = CloudFormationConfiguration('core', domain)
+        if config.existing_version(session) == 1: # Deleting a stack that has not been updated
+            aws.route53_delete_records(session, domain, 'consul.' + domain)
+        config.delete(session)

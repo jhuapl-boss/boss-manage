@@ -16,6 +16,7 @@ import os
 import glob
 import hvac
 import json
+import time
 from pprint import pprint
 import traceback
 
@@ -104,10 +105,15 @@ class Vault(object):
 
     def initialize(self, secrets = 1, threashold = 1):
         """Initialize a Vault. Connect using get_client() and if the Vault is not
-        initialized then initialize it with 5 secrets and a threashold of 3. The
-        keys are stored as VAULT_KEY and root token is stored as VAULT_TOKEN.
+        initialized then initialize it with 1 recovery key (and only requiring the
+        1 key when used). The recovery key is stored as VAULT_KEY and root token
+        is stored as VAULT_TOKEN.
 
-        After initializing the Vault it is unsealed for use and vault-configure is called.
+        After initializing the Vault it is unsealed for use and vault-configure
+        is called.
+
+        Note: This expects Vault to be configured using a `seal` stanza. If it is
+              not initialization will fail.
 
         Args:
             secrets (int) : Total number of secrets to split the master key into
@@ -158,10 +164,11 @@ class Vault(object):
             try:
                 self.connect(VAULT_TOKEN).sys.list_enabled_audit_devices()
                 return True
-            except:
-                return False
+            except hvac.exceptions.InternalServerError as ex:
+                if str(ex) == 'local node not active but active cluster node not found':
+                    return False
+                raise
 
-        import time
         print("Waiting for Vault to finish initialization ", end='', flush=True)
         step, remaining = 10, 60
         while remaining >= 0:
