@@ -788,24 +788,6 @@
       "Statement": [
         {
           "Action": [
-            "cloudformation:Describe*",
-            "cloudformation:List*",
-            "cloudformation:Get*"
-          ],
-          "Effect": "Allow",
-          "Resource": "*"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "aplTestCloudFormation"
-  },
-  {
-    "Path": "/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
             "dynamodb:DescribeLimits",
             "dynamodb:DescribeTimeToLive",
             "dynamodb:ListTagsOfResource",
