@@ -2133,6 +2133,20 @@ class CloudFormationConfiguration:
             self.resources[key]["Properties"]["Description"] = description
 
     def add_kms_key(self, key, alias, key_users, user_actions):
+        """Add a KMS Key
+
+        Note: KMS Key permissions are a little different from the rest of AWS
+              resources. User's must be given permission to use a key and by
+              default they don't have permissions.
+
+        Args:
+            key (str): Unique name for the resource in the template
+            alias (str): Name of the key to be created
+            key_users (str|list[str]): ARN or list or ARNs of the users with permission
+                                       to use the key
+            user_actions (list[str]): List of KMS actions that the given user(s) are allows
+                                      to perform with the key
+        """
         # DP HACK: replace with reference to bosslet_config when refactored
         account_id = os.environ['AWS_ACCOUNT']
 
