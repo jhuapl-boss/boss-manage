@@ -37,8 +37,10 @@ import botocore
 # Number of days until objects expire in the tile bucket.
 EXPIRE_IN_DAYS = 21
 
+# Number of days to wait before deleting an object marked for deletion.
+MARKED_FOR_DELETION_DAYS = 3
+
 # Ids used for bucket lambda triggers.
-TILE_BUCKET_TRIGGER = 'tileBucketInvokeMultiLambda'
 INGEST_BUCKET_TRIGGER = 'ingestBucketInvokeCuboidImportLambda'
 
 CUBOID_IMPORT_ROLE = 'CuboidImportLambdaRole'
