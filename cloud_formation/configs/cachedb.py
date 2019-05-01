@@ -65,17 +65,15 @@ def get_cf_bucket_life_cycle_rules():
             {
                 'ExpirationInDays': EXPIRE_IN_DAYS,
                 'Status': 'Enabled',
-                'Filter': {}
             },
             {
                 # Marked for deletion rule.
                 'ExpirationInDays': MARKED_FOR_DELETION_DAYS,
                 'Status': 'Enabled',
-                'Filter': {
-                    'Tag': {
-                        'Key': TAG_DELETE_KEY,
-                        'Value': TAG_DELETE_VALUE }
-                }
+                'TagFilters': [{
+                    'Key': TAG_DELETE_KEY,
+                    'Value': TAG_DELETE_VALUE
+                }]
             }
         ]
     }
