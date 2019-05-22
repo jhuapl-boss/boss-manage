@@ -198,7 +198,6 @@ def get_common_args(domain, account, region):
         "batch_enqueue_cuboids_step_fcn": '{}{}'.format(sfn_arn_prefix, names.index_enqueue_cuboids_sfn),
         "fanout_enqueue_cuboids_step_fcn": '{}{}'.format(sfn_arn_prefix, names.index_fanout_enqueue_cuboids_sfn),
         "fanout_id_writers_step_fcn": '{}{}'.format(sfn_arn_prefix, names.index_fanout_id_writers_sfn),
-        "cuboid_ids_bucket": names.cuboid_ids_bucket,
         "config": {
           "object_store_config": {
             "id_count_table": names.id_count_index,
