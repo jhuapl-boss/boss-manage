@@ -95,8 +95,7 @@ while '$.queue_empty' == False:
                         "max_concurrent": 5,
                         "rampup_delay": 10,
                         "rampup_backoff": 0.8,
-                        "status_delay": 2,
-                        "operation": "FanoutDequeueCuboids"
+                        "status_delay": 2
                     }
 
             while '$.finished' == False:
