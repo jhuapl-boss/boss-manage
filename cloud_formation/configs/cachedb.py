@@ -366,8 +366,7 @@ def generate(session, domain):
     config.generate()
 
 
-def create(session, domain):
-    """Create the configuration, and launch it"""
+def build_user_data(session, domain):
     names = AWSNames(domain)
 
     user_data = UserData()
@@ -398,7 +397,14 @@ def create(session, domain):
     user_data["lambda"]["flush_function"] = names.multi_lambda
     user_data["lambda"]["page_in_function"] = names.multi_lambda
 
+    return user_data
+
+
+def create(session, domain):
+    """Create the configuration, and launch it"""
+
     keypair = aws.keypair_lookup(session)
+    user_data = build_user_data(session, domain)
 
     try:
         pre_init(session, domain)
@@ -426,8 +432,9 @@ def pre_init(session, domain):
 
 def update(session, domain):
     keypair = aws.keypair_lookup(session)
+    user_data = build_user_data(session, domain)
 
-    config = create_config(session, domain, keypair)
+    config = create_config(session, domain, keypair, user_data)
     success = config.update(session)
 
     resp = input('Rebuild multilambda: [Y/n]:')
