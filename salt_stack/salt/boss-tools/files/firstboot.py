@@ -99,8 +99,6 @@ if __name__ == '__main__':
         set_hostname()
     except Exception as ex:
         logging.exception('Problem during initial configuration: {}'.format(ex))
-    except:
-        logging.exception("Problem during initial configuration")
     finally:
         # Since the service is to be run once, disable it
         bossutils.utils.stop_firstboot()
