@@ -19,17 +19,13 @@
 COMMANDS : A dictionary of available commands and the functions to call
 """
 
-import alter_path
 import argparse
 import boto3
 from collections import namedtuple
-import json
 from lib import aws
 from lib.external import ExternalCalls
-from lib.hosts import PROD_ACCOUNT, DEV_ACCOUNT
 from lib.names import AWSNames
 from mysql import connector
-import os
 
 DB_HOST_NAME = 'endpoint-db'
 
