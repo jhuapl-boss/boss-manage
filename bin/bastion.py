@@ -48,6 +48,7 @@ import os
 import sys
 
 import vault
+import endpoint 
 
 import alter_path
 from lib import aws
@@ -62,6 +63,7 @@ if __name__ == "__main__":
 
     commands = ["ssh", "scp", "ssh-cmd", "ssh-tunnel", "ssh-all"]
     commands.extend(vault.COMMANDS.keys())
+    commands.extend(endpoint.COMMANDS.keys())
     commands_help = create_help("command supports the following:", commands)
 
     parser = argparse.ArgumentParser(description = "Script creating SSH Tunnels and connecting to internal VMs",
@@ -157,6 +159,9 @@ if __name__ == "__main__":
     elif args.command in vault.COMMANDS:
         with vault_tunnel(args.ssh_key, bastion):
             vault.COMMANDS[args.command](Vault(args.internal, private), *args.arguments)
+    elif args.command in endpoint.COMMANDS:
+        domain = args.internal.split("endpoint.")[1]
+        endpoint.COMMANDS[args.command](session, domain, *args.arguments)
     else:
         parser.print_usage()
         sys.exit(1)
