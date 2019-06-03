@@ -34,13 +34,10 @@ def sql_list(session, domain, db_table):
     call = ExternalCalls(session, keypair, domain)
 
     with call.connect_rds() as cursor:
-        try:
-            cursor.execute(query)
-            ans = cursor.fetchall()
-            for i in ans:
-                logging.info(i)
-        finally:
-            cursor.close()
+        cursor.execute(query)
+        ans = cursor.fetchall()
+        for i in ans:
+            logging.info(i)
 
 def sql_resource_lookup_key(session, domain, resource_params):
     """
@@ -77,36 +74,33 @@ def sql_resource_lookup_key(session, domain, resource_params):
     chan_query = "SELECT id FROM channel WHERE name = %s"
 
     with call.connect_rds() as cursor:
-        try:
-            if collection is not None:
-                cursor.execute(coll_query, (collection,))
-                coll_set = cursor.fetchall()
-                if len(coll_set) != 1:
-                    raise ResourceNotFoundException(
-                        "Can't find collection: {}".format(collection))
-                else:
-                    cuboid_str = "{}&".format(coll_set[0][0])
-                    logging.info("{} collection id: {}".format(collection, coll_set[0][0]))
-            if experiment is not None:
-                cursor.execute(exp_query, (experiment,))
-                exp_set = cursor.fetchall()
-                if len(exp_set) != 1:
-                    raise ResourceNotFoundException(
-                        "Can't find experiment: {}".format(experiment))
-                else:
-                    cuboid_str = cuboid_str + "{}&".format(exp_set[0][0])
-                    logging.info("{} experiment id: {}".format(experiment, exp_set[0][0]))
-            if channel is not None:
-                cursor.execute(chan_query, (channel,))
-                chan_set = cursor.fetchall()
-                if len(chan_set) != 1:
-                    raise ResourceNotFoundException(
-                        "Can't find channel: {}".format(channel))
-                else:
-                    cuboid_str = cuboid_str + "{}&".format(chan_set[0][0])
-                    logging.info("{} channel id: {}".format(channel, chan_set[0][0]))
-        finally:
-            cursor.close()
+        if collection is not None:
+            cursor.execute(coll_query, (collection,))
+            coll_set = cursor.fetchall()
+            if len(coll_set) != 1:
+                raise ResourceNotFoundException(
+                    "Can't find collection: {}".format(collection))
+            else:
+                cuboid_str = "{}&".format(coll_set[0][0])
+                logging.info("{} collection id: {}".format(collection, coll_set[0][0]))
+        if experiment is not None:
+            cursor.execute(exp_query, (experiment,))
+            exp_set = cursor.fetchall()
+            if len(exp_set) != 1:
+                raise ResourceNotFoundException(
+                    "Can't find experiment: {}".format(experiment))
+            else:
+                cuboid_str = cuboid_str + "{}&".format(exp_set[0][0])
+                logging.info("{} experiment id: {}".format(experiment, exp_set[0][0]))
+        if channel is not None:
+            cursor.execute(chan_query, (channel,))
+            chan_set = cursor.fetchall()
+            if len(chan_set) != 1:
+                raise ResourceNotFoundException(
+                    "Can't find channel: {}".format(channel))
+            else:
+                cuboid_str = cuboid_str + "{}&".format(chan_set[0][0])
+                logging.info("{} channel id: {}".format(channel, chan_set[0][0]))
     
     logging.info("Cuboid key: {} \n".format(cuboid_str))
     return cuboid_str
@@ -129,16 +123,12 @@ def sql_coordinate_frame_lookup_key(session, domain, coordinate_frame):
     call = ExternalCalls(session, keypair, domain)
 
     with call.connect_rds() as cursor:
-        try:
-            cursor.execute(query, (coordinate_frame,))
-            coordinate_set = cursor.fetchall()
-            if len(coordinate_set) != 1:
-                raise ResourceNotFoundException(
-                    "Can't find coordinate frame: {}".format(coordinate_frame))
-            else:
-                logging.info("{} coordinate frame id: {}".format(coordinate_frame, coordinate_set[0][0]))
-
-        finally:
-            cursor.close()
+        cursor.execute(query, (coordinate_frame,))
+        coordinate_set = cursor.fetchall()
+        if len(coordinate_set) != 1:
+            raise ResourceNotFoundException(
+                "Can't find coordinate frame: {}".format(coordinate_frame))
+        else:
+            logging.info("{} coordinate frame id: {}".format(coordinate_frame, coordinate_set[0][0]))
     
     return coordinate_set[0][0]
