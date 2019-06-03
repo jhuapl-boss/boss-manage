@@ -21,47 +21,6 @@ from lib.external import ExternalCalls
 from lib.names import AWSNames
 from lib import aws
 
-class ResourceNotFoundException(Exception):
-    """
-    Raised when unable to locate the id of collection, experiment, or 
-    resource.
-    """
-
-"""
-Container for MySQL connection parameters.
-
-Fields:
-    host (str): DB host name or ip address.
-    port (str|int): Port to connect to.
-    db (str): Name of DB.
-    user (str): DB user name.
-    password (str): User password.
-"""
-DbParams = namedtuple('DbParams', ['host', 'port', 'db', 'user', 'password'])
-
-def get_mysql_params(session, domain):
-    """
-    Get MySQL connection info from Vault.
-
-    Args:
-        session (Session): Open boto3 session.
-        domain (str): VPC such as integration.boss.
-
-    Returns:
-        (DbParams): Connection info from Vault.
-    """
-    keypair = aws.keypair_lookup(session)
-    call = ExternalCalls(session, keypair, domain)
-    names = AWSNames(domain)
-    DB_HOST_NAME = names.endpoint_db.split(".")[0]
-    logging.debug("DB Hostname is: {}".format(DB_HOST_NAME))
-
-    logging.info('Getting MySQL parameters from Vault (slow) . . .')
-    with call.vault() as vault:
-        params = vault.read('secret/endpoint/django/db')
-
-    return DbParams('{}.{}'.format(DB_HOST_NAME, domain),params['port'],params['name'], params['user'], params['password'])
-
 @contextmanager
 def connect_rds(session, domain):
     """
@@ -89,7 +48,30 @@ def connect_rds(session, domain):
             yield sql
         finally:
             sql.close()
-            
+
+def get_mysql_params(session, domain):
+    """
+    Get MySQL connection info from Vault.
+
+    Args:
+        session (Session): Open boto3 session.
+        domain (str): VPC such as integration.boss.
+
+    Returns:
+        (DbParams): Connection info from Vault.
+    """
+    keypair = aws.keypair_lookup(session)
+    call = ExternalCalls(session, keypair, domain)
+    names = AWSNames(domain)
+    DB_HOST_NAME = names.endpoint_db.split(".")[0]
+    logging.debug("DB Hostname is: {}".format(DB_HOST_NAME))
+
+    logging.info('Getting MySQL parameters from Vault (slow) . . .')
+    with call.vault() as vault:
+        params = vault.read('secret/endpoint/django/db')
+
+    return DbParams('{}.{}'.format(DB_HOST_NAME, domain),params['port'],params['name'], params['user'], params['password'])
+
 def sql_list(session, domain, db_table):
     """
     List all the available members of a given sql table.
@@ -104,7 +86,6 @@ def sql_list(session, domain, db_table):
     """
     query = "SELECT * FROM {}".format(db_table)
 
-    logging.info('Tunneling to DB (slow) . . .')
     with connect_rds(session, domain) as sql:
         try:
             cursor = sql.cursor()
@@ -197,7 +178,6 @@ def sql_coordinate_frame_lookup_key(session, domain, coordinate_frame):
 
     query = "SELECT id FROM coordinate_frame WHERE name = %s"
 
-    logging.info('Tunneling to DB (slow) . . .')
     with connect_rds(session, domain) as sql:
         try:
             cursor = sql.cursor()
@@ -214,3 +194,20 @@ def sql_coordinate_frame_lookup_key(session, domain, coordinate_frame):
     
     return coordinate_set[0][0]
     
+class ResourceNotFoundException(Exception):
+    """
+    Raised when unable to locate the id of collection, experiment, or 
+    resource.
+    """
+
+"""
+Container for MySQL connection parameters.
+
+Fields:
+    host (str): DB host name or ip address.
+    port (str|int): Port to connect to.
+    db (str): Name of DB.
+    user (str): DB user name.
+    password (str): User password.
+"""
+DbParams = namedtuple('DbParams', ['host', 'port', 'db', 'user', 'password'])
