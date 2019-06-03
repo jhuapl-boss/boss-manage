@@ -20,14 +20,17 @@ COMMANDS : A dictionary of available commands and the functions to call
 """
 
 import argparse
+import sys, os
+
 import boto3
 from collections import namedtuple
+from mysql import connector
+import logging
+import alter_path
+
 from lib import aws
 from lib.external import ExternalCalls
 from lib.names import AWSNames
-from mysql import connector
-import logging
-import os
 
 class ResourceNotFoundException(Exception):
     """
@@ -73,7 +76,7 @@ def get_mysql_params(session, domain):
     call = ExternalCalls(session, keypair, domain)
     names = AWSNames(domain)
     DB_HOST_NAME = names.endpoint_db.split(".")[0]
-    print(DB_HOST_NAME)
+    logging.debug("DB Hostname is: {}".format(DB_HOST_NAME))
 
     logging.info('Getting MySQL parameters from Vault (slow) . . .')
     with call.vault() as vault:
@@ -130,6 +133,7 @@ def sql_resource_lookup_key(session, domain, resource_params):
     Returns:
         (str): Lookup key.
     """
+    collection, experiment, channel = None, None, None
     mysql_params = get_mysql_params(session, domain)
     resource = resource_params.split("/")
     
@@ -264,10 +268,10 @@ if __name__ == '__main__':
                         default = os.environ.get("AWS_CREDENTIALS"),
                         type = argparse.FileType('r'),
                         help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
-    parser.add_argument("--verbose", "-v",
+    parser.add_argument("--quiet", "-q",
                         action='store_true',
                         default=False,
-                        help='Print endpoint_db INFO statements')
+                        help='Run the script quietly, no print statements will be displayed.')
     parser.add_argument("domain",
                     help="Domain in which to execute the configuration (example: subnet.vpc.boss)")
     parser.add_argument("command",
@@ -290,7 +294,7 @@ if __name__ == '__main__':
     session = aws.create_session(args.aws_credentials)
 
     # COnfigure logging if verbose
-    if args.verbose:
+    if not args.quiet:
         logging.basicConfig(level=logging.INFO)
         
     if args.command in COMMANDS:
