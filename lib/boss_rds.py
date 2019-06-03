@@ -153,7 +153,7 @@ def sql_resource_lookup_key(session, domain, resource_params):
                 chan_set = cursor.fetchall()
                 if len(chan_set) != 1:
                     raise ResourceNotFoundException(
-                        "Can't find channel: {}".format(experiment))
+                        "Can't find channel: {}".format(channel))
                 else:
                     cuboid_str = cuboid_str + "{}&".format(chan_set[0][0])
                     logging.info("{} channel id: {}".format(channel, chan_set[0][0]))
