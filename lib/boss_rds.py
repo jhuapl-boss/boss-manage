@@ -12,65 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from contextlib import contextmanager
-from collections import namedtuple
-from mysql import connector
 import logging
 
 from lib.external import ExternalCalls
-from lib.names import AWSNames
 from lib import aws
-
-@contextmanager
-def connect_rds(session, domain):
-    """
-    Context manager with established connection to rds
-
-    Args:
-        session (Session): Open boto3 session.
-        domain (str): VPC such as integration.boss.
-
-    Returns:
-        sql: connection context
-    """
-    mysql_params = get_mysql_params(session, domain)
-
-    keypair = aws.keypair_lookup(session)
-    call = ExternalCalls(session, keypair, domain)
-
-    logging.info('Tunneling to DB (slow) . . .')
-    with call.tunnel(mysql_params.host, mysql_params.port, 'rds') as local_port:
-        try:
-            sql = connector.connect(
-                user=mysql_params.user, password=mysql_params.password, 
-                port=local_port, database=mysql_params.db
-            )
-            yield sql
-        finally:
-            sql.close()
-
-def get_mysql_params(session, domain):
-    """
-    Get MySQL connection info from Vault.
-
-    Args:
-        session (Session): Open boto3 session.
-        domain (str): VPC such as integration.boss.
-
-    Returns:
-        (DbParams): Connection info from Vault.
-    """
-    keypair = aws.keypair_lookup(session)
-    call = ExternalCalls(session, keypair, domain)
-    names = AWSNames(domain)
-    DB_HOST_NAME = names.endpoint_db.split(".")[0]
-    logging.debug("DB Hostname is: {}".format(DB_HOST_NAME))
-
-    logging.info('Getting MySQL parameters from Vault (slow) . . .')
-    with call.vault() as vault:
-        params = vault.read('secret/endpoint/django/db')
-
-    return DbParams('{}.{}'.format(DB_HOST_NAME, domain),params['port'],params['name'], params['user'], params['password'])
 
 def sql_list(session, domain, db_table):
     """
@@ -85,10 +30,11 @@ def sql_list(session, domain, db_table):
         (str): Lookup key.
     """
     query = "SELECT * FROM {}".format(db_table)
+    keypair = aws.keypair_lookup(session)
+    call = ExternalCalls(session, keypair, domain)
 
-    with connect_rds(session, domain) as sql:
+    with call.connect_rds() as cursor:
         try:
-            cursor = sql.cursor()
             cursor.execute(query)
             ans = cursor.fetchall()
             for i in ans:
@@ -110,7 +56,10 @@ def sql_resource_lookup_key(session, domain, resource_params):
     """
     collection, experiment, channel = None, None, None
     resource = resource_params.split("/")
-    
+
+    keypair = aws.keypair_lookup(session)
+    call = ExternalCalls(session, keypair, domain)
+
     if len(resource) == 0:
         raise Exception("Incorrect number of arguments(Make sure the resource provided has at least a collection to lookup)")
     else:
@@ -127,9 +76,8 @@ def sql_resource_lookup_key(session, domain, resource_params):
     exp_query = "SELECT id FROM experiment WHERE name = %s"
     chan_query = "SELECT id FROM channel WHERE name = %s"
 
-    with connect_rds(session, domain) as sql:
+    with call.connect_rds() as cursor:
         try:
-            cursor = sql.cursor()
             if collection is not None:
                 cursor.execute(coll_query, (collection,))
                 coll_set = cursor.fetchall()
@@ -177,10 +125,11 @@ def sql_coordinate_frame_lookup_key(session, domain, coordinate_frame):
     """
 
     query = "SELECT id FROM coordinate_frame WHERE name = %s"
+    keypair = aws.keypair_lookup(session)
+    call = ExternalCalls(session, keypair, domain)
 
-    with connect_rds(session, domain) as sql:
+    with call.connect_rds() as cursor:
         try:
-            cursor = sql.cursor()
             cursor.execute(query, (coordinate_frame,))
             coordinate_set = cursor.fetchall()
             if len(coordinate_set) != 1:
@@ -193,21 +142,3 @@ def sql_coordinate_frame_lookup_key(session, domain, coordinate_frame):
             cursor.close()
     
     return coordinate_set[0][0]
-    
-class ResourceNotFoundException(Exception):
-    """
-    Raised when unable to locate the id of collection, experiment, or 
-    resource.
-    """
-
-"""
-Container for MySQL connection parameters.
-
-Fields:
-    host (str): DB host name or ip address.
-    port (str|int): Port to connect to.
-    db (str): Name of DB.
-    user (str): DB user name.
-    password (str): User password.
-"""
-DbParams = namedtuple('DbParams', ['host', 'port', 'db', 'user', 'password'])

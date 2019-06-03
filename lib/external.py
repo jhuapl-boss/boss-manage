@@ -13,15 +13,17 @@
 # limitations under the License.
 
 import time
+import logging
+
 from urllib.request import urlopen, HTTPError
 from contextlib import contextmanager
-
+from mysql import connector
 from . import exceptions
 from . import aws
 from .utils import keypair_to_file
 from .ssh import SSHConnection, vault_tunnel
 from .vault import Vault
-
+from .names import AWSNames
 
 def gen_timeout(total, step):
     """Break the total timeout value into steps
@@ -215,3 +217,31 @@ class ExternalCalls:
 
             return ret == 0 # 0 - no issues, 1 - problems
 
+    @contextmanager
+    def connect_rds(self):
+        """
+        Context manager with established connection to rds
+
+        Returns:
+            cursor object context
+        """
+        names = AWSNames(self.domain)
+        DB_HOST_NAME = names.endpoint_db
+        db = self.domain.split('.')[1]
+        logging.debug("DB Hostname is: {}".format(DB_HOST_NAME))
+
+        logging.info('Getting MySQL parameters from Vault (slow) . . .')
+        with self.vault() as vault:
+            mysql_params = vault.read('secret/endpoint/django/db')
+
+        logging.info('Tunneling to DB (slow) . . .')
+        with self.tunnel(DB_HOST_NAME, mysql_params['port'], 'rds') as local_port:
+            try:
+                sql = connector.connect(
+                    user=mysql_params['user'], password=mysql_params['password'], 
+                    port=local_port, database=db
+                )
+                cursor = sql.cursor()
+                yield cursor
+            finally:
+                sql.close()
