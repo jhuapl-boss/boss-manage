@@ -23,66 +23,11 @@ import argparse
 import sys, os
 
 import boto3
-from collections import namedtuple
-from mysql import connector
 import logging
 import alter_path
 
 from lib import aws
-from lib.external import ExternalCalls
-from lib.names import AWSNames
-
-class ResourceNotFoundException(Exception):
-    """
-    Raised when unable to locate the id of collection, experiment, or 
-    resource.
-    """
-
-"""
-Container for MySQL connection parameters.
-
-Fields:
-    host (str): DB host name or ip address.
-    port (str|int): Port to connect to.
-    db (str): Name of DB.
-    user (str): DB user name.
-    password (str): User password.
-"""
-DbParams = namedtuple('DbParams', ['host', 'port', 'db', 'user', 'password'])
-
-"""
-Container that identifies Boss channel.
-
-Fields:
-    collection (str): Collection name.
-    experiment (str): Experiment name.
-    channel (str): Channel name.
-"""
-ChannelParams = namedtuple(
-    'ChannelParams', ['collection', 'experiment', 'channel'])
-
-def get_mysql_params(session, domain):
-    """
-    Get MySQL connection info from Vault.
-
-    Args:
-        session (Session): Open boto3 session.
-        domain (str): VPC such as integration.boss.
-
-    Returns:
-        (DbParams): Connection info from Vault.
-    """
-    keypair = aws.keypair_lookup(session)
-    call = ExternalCalls(session, keypair, domain)
-    names = AWSNames(domain)
-    DB_HOST_NAME = names.endpoint_db.split(".")[0]
-    logging.debug("DB Hostname is: {}".format(DB_HOST_NAME))
-
-    logging.info('Getting MySQL parameters from Vault (slow) . . .')
-    with call.vault() as vault:
-        params = vault.read('secret/endpoint/django/db')
-
-    return DbParams('{}.{}'.format(DB_HOST_NAME, domain),params['port'],params['name'], params['user'], params['password'])
+from lib import boss_rds
 
 def sql_list(session, domain, db_table):
     """
@@ -96,30 +41,18 @@ def sql_list(session, domain, db_table):
     Returns:
         (str): Lookup key.
     """
-    mysql_params = get_mysql_params(session, domain)
-
-    keypair = aws.keypair_lookup(session)
-    call = ExternalCalls(session, keypair, domain)
-
     query = "SELECT * FROM {}".format(db_table)
 
     logging.info('Tunneling to DB (slow) . . .')
-    with call.tunnel(mysql_params.host, mysql_params.port, 'rds') as local_port:
+    with boss_rds.connect_rds(session, domain) as sql:
         try:
-            sql = connector.connect(
-                user=mysql_params.user, password=mysql_params.password, 
-                port=local_port, database=mysql_params.db
-            )
-            try:
-                cursor = sql.cursor()
-                cursor.execute(query)
-                ans = cursor.fetchall()
-                for i in ans:
-                    logging.info(i)
-            finally:
-                cursor.close()
+            cursor = sql.cursor()
+            cursor.execute(query)
+            ans = cursor.fetchall()
+            for i in ans:
+                logging.info(i)
         finally:
-            sql.close()
+            cursor.close()
 
 def sql_resource_lookup_key(session, domain, resource_params):
     """
@@ -134,7 +67,6 @@ def sql_resource_lookup_key(session, domain, resource_params):
         (str): Lookup key.
     """
     collection, experiment, channel = None, None, None
-    mysql_params = get_mysql_params(session, domain)
     resource = resource_params.split("/")
     
     if len(resource) == 0:
@@ -149,53 +81,42 @@ def sql_resource_lookup_key(session, domain, resource_params):
         elif len(resource) > 3:
             raise Exception("Only provide /coll/exp/chan")
 
-    keypair = aws.keypair_lookup(session)
-    call = ExternalCalls(session, keypair, domain)
-
     coll_query = "SELECT id FROM collection WHERE name = %s"
     exp_query = "SELECT id FROM experiment WHERE name = %s"
     chan_query = "SELECT id FROM channel WHERE name = %s"
 
-    logging.info('Tunneling to DB (slow) . . .')
-    with call.tunnel(mysql_params.host, mysql_params.port, 'rds') as local_port:
+    with boss_rds.connect_rds(session, domain) as sql:
         try:
-            sql = connector.connect(
-                user=mysql_params.user, password=mysql_params.password, 
-                port=local_port, database=mysql_params.db
-            )
-            try:
-                if collection is not None:
-                    cursor = sql.cursor()
-                    cursor.execute(coll_query, (collection,))
-                    coll_set = cursor.fetchall()
-                    if len(coll_set) != 1:
-                        raise ResourceNotFoundException(
-                            "Can't find collection: {}".format(collection))
-                    else:
-                        cuboid_str = "{}&".format(coll_set[0][0])
-                        logging.info("{} collection id: {}".format(collection, coll_set[0][0]))
-                if experiment is not None:
-                    cursor.execute(exp_query, (experiment,))
-                    exp_set = cursor.fetchall()
-                    if len(exp_set) != 1:
-                        raise ResourceNotFoundException(
-                            "Can't find experiment: {}".format(experiment))
-                    else:
-                        cuboid_str = cuboid_str + "{}&".format(exp_set[0][0])
-                        logging.info("{} experiment id: {}".format(experiment, exp_set[0][0]))
-                if channel is not None:
-                    cursor.execute(chan_query, (channel,))
-                    chan_set = cursor.fetchall()
-                    if len(chan_set) != 1:
-                        raise ResourceNotFoundException(
-                            "Can't find channel: {}".format(experiment))
-                    else:
-                        cuboid_str = cuboid_str + "{}&".format(chan_set[0][0])
-                        logging.info("{} channel id: {}".format(channel, chan_set[0][0]))
-            finally:
-                cursor.close()
+            cursor = sql.cursor()
+            if collection is not None:
+                cursor.execute(coll_query, (collection,))
+                coll_set = cursor.fetchall()
+                if len(coll_set) != 1:
+                    raise ResourceNotFoundException(
+                        "Can't find collection: {}".format(collection))
+                else:
+                    cuboid_str = "{}&".format(coll_set[0][0])
+                    logging.info("{} collection id: {}".format(collection, coll_set[0][0]))
+            if experiment is not None:
+                cursor.execute(exp_query, (experiment,))
+                exp_set = cursor.fetchall()
+                if len(exp_set) != 1:
+                    raise ResourceNotFoundException(
+                        "Can't find experiment: {}".format(experiment))
+                else:
+                    cuboid_str = cuboid_str + "{}&".format(exp_set[0][0])
+                    logging.info("{} experiment id: {}".format(experiment, exp_set[0][0]))
+            if channel is not None:
+                cursor.execute(chan_query, (channel,))
+                chan_set = cursor.fetchall()
+                if len(chan_set) != 1:
+                    raise ResourceNotFoundException(
+                        "Can't find channel: {}".format(experiment))
+                else:
+                    cuboid_str = cuboid_str + "{}&".format(chan_set[0][0])
+                    logging.info("{} channel id: {}".format(channel, chan_set[0][0]))
         finally:
-            sql.close()
+            cursor.close()
     
     logging.info("Cuboid key: {} \n".format(cuboid_str))
     return cuboid_str
@@ -212,34 +133,23 @@ def sql_coordinate_frame_lookup_key(session, domain, coordinate_frame):
     Returns:
         (str): Lookup key.
     """
-    mysql_params = get_mysql_params(session, domain)
-
-    keypair = aws.keypair_lookup(session)
-    call = ExternalCalls(session, keypair, domain)
 
     query = "SELECT id FROM coordinate_frame WHERE name = %s"
 
     logging.info('Tunneling to DB (slow) . . .')
-    with call.tunnel(mysql_params.host, mysql_params.port, 'rds') as local_port:
+    with boss_rds.connect_rds(session, domain) as sql:
         try:
-            sql = connector.connect(
-                user=mysql_params.user, password=mysql_params.password, 
-                port=local_port, database=mysql_params.db
-            )
-            try:
-                cursor = sql.cursor()
-                cursor.execute(query, (coordinate_frame,))
-                coordinate_set = cursor.fetchall()
-                if len(coordinate_set) != 1:
-                    raise ResourceNotFoundException(
-                        "Can't find coordinate frame: {}".format(coordinate_frame))
-                else:
-                    logging.info("{} coordinate frame id: {}".format(coordinate_frame, coordinate_set[0][0]))
+            cursor = sql.cursor()
+            cursor.execute(query, (coordinate_frame,))
+            coordinate_set = cursor.fetchall()
+            if len(coordinate_set) != 1:
+                raise ResourceNotFoundException(
+                    "Can't find coordinate frame: {}".format(coordinate_frame))
+            else:
+                logging.info("{} coordinate frame id: {}".format(coordinate_frame, coordinate_set[0][0]))
 
-            finally:
-                cursor.close()
         finally:
-            sql.close()
+            cursor.close()
     
     return coordinate_set[0][0]
 
