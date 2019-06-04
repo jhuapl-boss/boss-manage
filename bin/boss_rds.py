@@ -29,6 +29,7 @@ from lib import aws
 from lib import boss_rds
 
 COMMANDS = {
+    "sql-tables":boss_rds.sql_tables,
     "sql-list": boss_rds.sql_list,
     "sql-resource-lookup": boss_rds.sql_resource_lookup_key,
     "sql-coord-frame-lookup": boss_rds.sql_coordinate_frame_lookup_key,
