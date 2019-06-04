@@ -188,7 +188,8 @@ def sql_channel_job_ids(session, domain, resource):
             raise Exception(
                 "Can't find resource name: {}/{}/{}".format(coll,exp,chan))
         else:
-            logging.info("Job-Ids corresponding to {}/{}/{} \n".format(coll,exp,chan))
+            logging.info("\n Job-Ids corresponding to {}/{}/{}".format(coll,exp,chan))
+            logging.info("< id,                      start_date,                     x_start,y_start,z_start,x_stop, y_stop, z_stop>")
             for i in job_ids:
                 logging.info(i)
         return job_ids
