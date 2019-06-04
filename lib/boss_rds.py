@@ -182,7 +182,7 @@ def sql_channel_job_ids(session, domain, channel):
             raise Exception(
                 "Can't find channel name: {}".format(channel))
         else:
+            logging.info("Job-Ids corresponding to {} \n".format(channel))
             for i in job_ids:
-                logging.info("Job-Ids corresponding to {} \n".format(channel))
                 logging.info(i)
         return job_ids
