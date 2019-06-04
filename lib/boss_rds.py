@@ -171,23 +171,22 @@ def sql_channel_job_ids(session, domain, resource):
     Returns:
         job_ids(list): job_ids and start dates associated with channel
     """
-
-    query = "SELECT id,start_date FROM ingest_job WHERE collection = %s & experiment = %s & channel = %s"
-    keypair = aws.keypair_lookup(session)
-    call = ExternalCalls(session, keypair, domain)
-
     coll = resource.split("/")[0]
     exp = resource.split("/")[1]
     chan = resource.split("/")[2]
 
+    query = "SELECT id,start_date FROM ingest_job WHERE collection = '{}' & experiment = '{}' & channel = '{}'".format(coll,exp,chan)
+    keypair = aws.keypair_lookup(session)
+    call = ExternalCalls(session, keypair, domain)
+
     with call.connect_rds() as cursor:
-        cursor.execute(query, (coll,), (exp,), (chan,))
+        cursor.execute(query)
         job_ids = cursor.fetchall()
         if len(job_ids) == 0:
             raise Exception(
                 "Can't find resource name: {}/{}/{}".format(coll,exp,chan))
         else:
-            logging.info("Job-Ids corresponding to {} \n".format(channel))
+            logging.info("Job-Ids corresponding to {}/{}/{} \n".format(coll,exp,chan))
             for i in job_ids:
                 logging.info(i)
         return job_ids
