@@ -175,7 +175,7 @@ def sql_channel_job_ids(session, domain, resource):
     exp = resource.split("/")[1]
     chan = resource.split("/")[2]
 
-    query = "SELECT id,start_date FROM ingest_job WHERE collection = '{}' & experiment = '{}' & channel = '{}'".format(coll,exp,chan)
+    query = "SELECT id,start_date FROM ingest_job WHERE collection = '{}' AND experiment = '{}' AND channel = '{}'".format(coll,exp,chan)
     keypair = aws.keypair_lookup(session)
     call = ExternalCalls(session, keypair, domain)
 
