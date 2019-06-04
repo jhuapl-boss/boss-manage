@@ -33,6 +33,14 @@ COMMANDS = {
     "sql-list": boss_rds.sql_list,
     "sql-resource-lookup": boss_rds.sql_resource_lookup_key,
     "sql-coord-frame-lookup": boss_rds.sql_coordinate_frame_lookup_key,
+    "sql-job-ids-lookup": boss_rds.sql_channel_job_ids,
+}
+HELP = {
+    "sql-tables",
+    "sql-list",
+    "sql-resource-lookup <coll/exp/chan> | <coll/exp> | <coll>",
+    "sql-coord-frame-lookup <coordinate_frame>",
+    "sql-job-ids-lookup <channel>",
 }
 
 if __name__ == '__main__':
@@ -44,8 +52,9 @@ if __name__ == '__main__':
                "\n".join(map(lambda x: "  " + x, options)) + "\n"
 
     commands = list(COMMANDS.keys())
-    commands_help = create_help("command supports the following:", commands)
-
+    instructions = list(HELP)
+    commands_help = create_help("command supports the following:", instructions)
+    
     parser = argparse.ArgumentParser(description = "Script for manipulating endpoint instances",
                                      formatter_class=argparse.RawDescriptionHelpFormatter,
                                      epilog=commands_help)

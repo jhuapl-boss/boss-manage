@@ -17,6 +17,27 @@ import logging
 from lib.external import ExternalCalls
 from lib import aws
 
+def sql_tables(session, domain):
+    """
+    List all tables in sql.
+
+    Args:
+        session (Session): Open boto3 session.
+        domain (str): VPC such as integration.boss.
+
+    Returns:
+        tables(list): Lookup key.
+    """
+    query = "show tables"
+    keypair = aws.keypair_lookup(session)
+    call = ExternalCalls(session, keypair, domain)
+    with call.connect_rds() as cursor:
+        cursor.execute(query)
+        tables = cursor.fetchall()
+        for i in tables:
+            logging.info(tables)
+        return tables
+
 def sql_list(session, domain, db_table):
     """
     List all the available members of a given sql table.
@@ -27,7 +48,7 @@ def sql_list(session, domain, db_table):
         db_table: Identifies which table members to list.
 
     Returns:
-        (str): Lookup key.
+        ans(list): list of all members of sql table.
     """
     query = "SELECT * FROM {}".format(db_table)
     keypair = aws.keypair_lookup(session)
@@ -36,8 +57,13 @@ def sql_list(session, domain, db_table):
     with call.connect_rds() as cursor:
         cursor.execute(query)
         ans = cursor.fetchall()
-        for i in ans:
-            logging.info(i)
+        if len(ans) == 0:
+            raise Exception(
+                "Can't find table name: {}".format(db_table))
+        else:
+            for i in ans:
+                logging.info(i)
+        return ans
 
 def sql_resource_lookup_key(session, domain, resource_params):
     """
@@ -49,7 +75,7 @@ def sql_resource_lookup_key(session, domain, resource_params):
         resource_params (str): Identifies collection, experiment or channel.
 
     Returns:
-        (str): Lookup key.
+        cuboid_str(str): Cuboid lookup key.
     """
     collection, experiment, channel = None, None, None
     resource = resource_params.split("/")
@@ -78,7 +104,7 @@ def sql_resource_lookup_key(session, domain, resource_params):
             cursor.execute(coll_query, (collection,))
             coll_set = cursor.fetchall()
             if len(coll_set) != 1:
-                raise ResourceNotFoundException(
+                raise Exception(
                     "Can't find collection: {}".format(collection))
             else:
                 cuboid_str = "{}&".format(coll_set[0][0])
@@ -87,7 +113,7 @@ def sql_resource_lookup_key(session, domain, resource_params):
             cursor.execute(exp_query, (experiment,))
             exp_set = cursor.fetchall()
             if len(exp_set) != 1:
-                raise ResourceNotFoundException(
+                raise Exception(
                     "Can't find experiment: {}".format(experiment))
             else:
                 cuboid_str = cuboid_str + "{}&".format(exp_set[0][0])
@@ -96,7 +122,7 @@ def sql_resource_lookup_key(session, domain, resource_params):
             cursor.execute(chan_query, (channel,))
             chan_set = cursor.fetchall()
             if len(chan_set) != 1:
-                raise ResourceNotFoundException(
+                raise Exception(
                     "Can't find channel: {}".format(channel))
             else:
                 cuboid_str = cuboid_str + "{}&".format(chan_set[0][0])
@@ -115,7 +141,7 @@ def sql_coordinate_frame_lookup_key(session, domain, coordinate_frame):
         coordinate_frame: Identifies coordinate frame.
 
     Returns:
-        (str): Lookup key.
+        coordinate_set(str): Coordinate Frame lookup key.
     """
 
     query = "SELECT id FROM coordinate_frame WHERE name = %s"
@@ -126,9 +152,37 @@ def sql_coordinate_frame_lookup_key(session, domain, coordinate_frame):
         cursor.execute(query, (coordinate_frame,))
         coordinate_set = cursor.fetchall()
         if len(coordinate_set) != 1:
-            raise ResourceNotFoundException(
+            raise Exception(
                 "Can't find coordinate frame: {}".format(coordinate_frame))
         else:
             logging.info("{} coordinate frame id: {}".format(coordinate_frame, coordinate_set[0][0]))
     
     return coordinate_set[0][0]
+
+def sql_channel_job_ids(session, domain, channel):
+    """
+    Get a list of channel job ids related to a given channel
+
+    Args:
+        session (Session): Open boto3 session.
+        domain (str): VPC such as integration.boss.
+        channel(str): channel for which job-ids will be queried
+    
+    Returns:
+        job_ids(list): job_ids and start dates associated with channel
+    """
+    query = "SELECT id,start_date FROM ingest_job WHERE channel = %s"
+    keypair = aws.keypair_lookup(session)
+    call = ExternalCalls(session, keypair, domain)
+
+    with call.connect_rds() as cursor:
+        cursor.execute(query, (channel,))
+        job_ids = cursor.fetchall()
+        if len(job_ids) == 0:
+            raise Exception(
+                "Can't find channel name: {}".format(channel))
+        else:
+            for i in job_ids:
+                logging.info("Job-Ids corresponding to {} \n".format(channel))
+                logging.info(i)
+        return job_ids
