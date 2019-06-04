@@ -40,7 +40,7 @@ HELP = {
     "sql-list",
     "sql-resource-lookup <coll/exp/chan> | <coll/exp> | <coll>",
     "sql-coord-frame-lookup <coordinate_frame>",
-    "sql-job-ids-lookup <channel>",
+    "sql-job-ids-lookup <coll/exp/channel>",
 }
 
 if __name__ == '__main__':

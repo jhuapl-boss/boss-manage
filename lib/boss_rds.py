@@ -159,28 +159,33 @@ def sql_coordinate_frame_lookup_key(session, domain, coordinate_frame):
     
     return coordinate_set[0][0]
 
-def sql_channel_job_ids(session, domain, channel):
+def sql_channel_job_ids(session, domain, resource):
     """
     Get a list of channel job ids related to a given channel
 
     Args:
         session (Session): Open boto3 session.
         domain (str): VPC such as integration.boss.
-        channel(str): channel for which job-ids will be queried
+        resource(str): resource
     
     Returns:
         job_ids(list): job_ids and start dates associated with channel
     """
-    query = "SELECT id,start_date FROM ingest_job WHERE channel = %s"
+
+    query = "SELECT id,start_date FROM ingest_job WHERE collection = %s & experiment = %s & channel = %s"
     keypair = aws.keypair_lookup(session)
     call = ExternalCalls(session, keypair, domain)
 
+    coll = resource.split("/")[0]
+    exp = resource.split("/")[1]
+    chan = resource.split("/")[2]
+
     with call.connect_rds() as cursor:
-        cursor.execute(query, (channel,))
+        cursor.execute(query, (coll,), (exp,), (chan,))
         job_ids = cursor.fetchall()
         if len(job_ids) == 0:
             raise Exception(
-                "Can't find channel name: {}".format(channel))
+                "Can't find resource name: {}/{}/{}".format(coll,exp,chan))
         else:
             logging.info("Job-Ids corresponding to {} \n".format(channel))
             for i in job_ids:
