@@ -230,5 +230,6 @@ def delete_sfns(session, domain):
     sfn.delete(session, names.query_deletes)
     sfn.delete(session, names.ingest_queue_populate)
     sfn.delete(session, names.ingest_queue_upload)
+    sfn.delete(session, names.volumetric_ingest_queue_upload)
     sfn.delete(session, names.resolution_hierarchy)
     #sfn.delete(session, names.downsample_volume)

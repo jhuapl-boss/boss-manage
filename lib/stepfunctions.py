@@ -21,25 +21,21 @@ from .constants import repo_path
 sys.path.append(repo_path('lib', 'heaviside.git'))
 import heaviside
 
+class BossVisitor(heaviside.ast.StateVisitor):
+    def __init__(self, domain):
+        self.domain = domain.replace('.', '-')
 
-class BossStateMachine(heaviside.StateMachine):
-
-    def __init__(self, name, domain, session):
-        super().__init__(name, session=session)
-
-        if domain:
-            self.domain = domain.replace('.', '-')
-        self.__translate = self._translate
-
-        def _translate(type_, function):
-            return self.__translate(type_, "{}-{}".format(function, self.domain))
-        self._translate = _translate
+    def handle_task(self, task):
+        service = task.service.value.lower()
+        if service in ('lambda', 'activity'):
+            task.arn = task.arn + '-' + self.domain
 
 def create(session, name, domain, sfn_file, role):
     filepath = repo_path('cloud_formation', 'stepfunctions', sfn_file)
     filepath = Path(filepath)
 
-    machine = BossStateMachine(name, domain, session)
+    machine = heaviside.StateMachine(name, session = session)
+    machine.add_visitor(BossVisitor(domain))
 
     if machine.arn is not None:
         print("StepFunction '{}' already exists, not creating".format(name))
@@ -47,7 +43,7 @@ def create(session, name, domain, sfn_file, role):
         machine.create(filepath, role)
 
 def delete(session, name):
-    machine = BossStateMachine(name, None, session)
+    machine = heaviside.StateMachine(name, session = session)
     machine.delete()
     # DP ???: remove activity ARNs when deleting the step function or when removing the activity code
 
