@@ -169,13 +169,15 @@ def sql_channel_job_ids(session, domain, resource):
         resource(str): resource
     
     Returns:
-        job_ids(list): job_ids and start dates associated with channel
+        job_ids(list): job_ids and start dates and x,y and z range associated with channel
+            format: (id,                      start_date,                     x_start,y_start,z_start,x_stop, y_stop, z_stop)
+            ex:     (2933, datetime.datetime(2019, 3, 16, 21, 33, 37, 831357), 32000,  45824,  14880, 213760, 169728, 14912)
     """
     coll = resource.split("/")[0]
     exp = resource.split("/")[1]
     chan = resource.split("/")[2]
 
-    query = "SELECT id,start_date FROM ingest_job WHERE collection = '{}' AND experiment = '{}' AND channel = '{}'".format(coll,exp,chan)
+    query = "SELECT id,start_date,x_start,y_start,z_start,x_stop,y_stop,z_stop FROM ingest_job WHERE collection = '{}' AND experiment = '{}' AND channel = '{}'".format(coll,exp,chan)
     keypair = aws.keypair_lookup(session)
     call = ExternalCalls(session, keypair, domain)
 
