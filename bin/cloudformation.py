@@ -269,6 +269,13 @@ if __name__ == '__main__':
         print("Then run the following command:")
         print("\t" + utils.get_command("post-init"))
         sys.exit(2)
+    except exceptions.VaultError as ex:
+        print()
+        print(ex)
+        print("Check Vault")
+        print("Then run the following command:")
+        print("\t" + utils.get_command("post-init"))
+        sys.exit(2)
     except heaviside.exceptions.CompileError as ex:
         print()
         print(ex)
