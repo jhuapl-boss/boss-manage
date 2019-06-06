@@ -368,7 +368,7 @@ class BossParser(ArgumentParser):
                 if idx is not None:
                     hostname = str(idx) + "." + hostname
 
-                a.bosslet = bosslet_name
+                a.bosslet_name = bosslet_name
                 a.bosslet_config = bosslet_config
                 a.hostname = hostname
 

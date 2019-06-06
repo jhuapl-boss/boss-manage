@@ -158,8 +158,10 @@ class AWSNames(object):
         'core': {'type': 'stack'},
         'cuboid_bucket': {'name': 'cuboids',
                           'type': 's3'},
-        "cuboid_ids_bucket": {'name': "cuboid-ids",
-                              'type': 's3'},
+        'cuboid_import_dlq': {'name': 'cuboidImportDlq',
+                              'type': 'sqs'},
+        'cuboid_import_lambda': {'name': 'cuboidImportLambda',
+                                 'type': 'lambda_'},
         'deadletter': {'name': 'Deadletter',
                        'type': 'sqs'},
         'default': {'type': 'rt'},
@@ -249,7 +251,7 @@ class AWSNames(object):
                                'type': 'lambda_'},
         'index_write_id': {'name': 'indexWriteIdLambda',
                            'type': 'lambda_'},
-        'ingest_bucket': {'name': 'ingest',
+        'ingest_bucket': {'name': 'ingest', # Cuboid staging area for volumetric ingests
                           'type': 's3'},
         'ingest_cleanup_dlq': {'name': 'IngestCleanupDlq',
                                'type': 'sqs'},
@@ -293,6 +295,10 @@ class AWSNames(object):
         'vault_monitor': {'name': 'vaultMonitor',
                           'type': 'lambda_'},
         'vault': {'types': ['dns', 'ami']},
+        'volumetric_ingest_queue_upload': {'name': 'Ingest.Volumetric.Upload',
+                                           'type': 'sfn'},
+        'volumetric_ingest_queue_upload_lambda': {'name': 'VolumetricIngestUpload',
+                                                  'type': 'lambda_'},
     }
 
     def build(self, name, resource_type):

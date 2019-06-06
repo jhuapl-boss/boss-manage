@@ -33,7 +33,6 @@ import time
 import pickle
 
 import alter_path
-import vault as vaultB
 from lib import utils, constants, console
 from lib.configuration import BossParser
 
@@ -421,10 +420,6 @@ if __name__ == '__main__':
     parser.add_argument("--dry-run", "-n",
                         action = "store_true",
                         help = "If the actions should be dry runned")
-    parser.add_argument("--config",
-                        metavar = "<config>",
-                        default ="asg-cfg-dev",
-                        help = "Name of auto scale group configuration file located inside boss-manage/config folder")
     parser.add_argument("action",
                         choices = actions,
                         metavar = "action",

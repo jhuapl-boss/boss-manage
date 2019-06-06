@@ -425,7 +425,7 @@ def update(bosslet_config):
     user_data = build_user_data(bosslet_config)
 
     config = create_config(bosslet_config, user_data)
-    config.update(session)
+    config.update()
 
     if utils.get_user_confirm("Rebuild multilambda", default = True):
         pre_init(bosslet_config)

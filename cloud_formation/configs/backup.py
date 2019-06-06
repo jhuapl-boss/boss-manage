@@ -17,6 +17,8 @@ Create a data pipeline that will periodically backup all RDS tables
 and DynaamoDB tables to S3 (protected by SSE-S3 data at rest).
 """
 
+DEPENDENCIES = ['core', 'api']
+
 from lib.cloudformation import CloudFormationConfiguration
 from lib.datapipeline import DataPipeline, Ref
 

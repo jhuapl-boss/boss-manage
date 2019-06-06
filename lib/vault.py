@@ -73,13 +73,13 @@ class Vault(object):
         if read_token is not None:
             token_file = self.path(read_token)
             if not os.path.exists(token_file):
-                raise Exception("Token file '{}' doesn't exist".format(token_file))
+                raise VaultError("Token file '{}' doesn't exist".format(token_file))
 
             with open(token_file, "r") as fh:
                 client.token = fh.read()
                 try:
                     if not client.is_authenticated():
-                        raise Exception("Vault token is not valid, cannot communicate with the Vault")
+                        raise VaultError("Vault token is not valid, cannot communicate with the Vault")
                 except:
                     raise
         return client
@@ -263,7 +263,7 @@ class Vault(object):
                 keys.append(fh.read())
 
         if len(keys) == 0:
-            raise Exception("Could not locate any key files, not unsealing")
+            raise VaultError("Could not locate any key files, not unsealing")
 
         res = client.unseal_multi(keys)
         if res['sealed']:
