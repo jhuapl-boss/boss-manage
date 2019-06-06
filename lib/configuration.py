@@ -56,7 +56,7 @@ class BossConfiguration(object):
         'REGION',
         'AVAILABILITY_ZONE_USAGE',
         'ACCOUNT_ID',
-        'PROFILE',
+        'PROFILE', # Optional
         'OUTBOUND_BASTION',
         'OUTBOUND_IP', # Conditional
         'OUTBOUND_PORT', # Conditional
@@ -100,10 +100,10 @@ class BossConfiguration(object):
             raise exceptions.BossManageError("Bosslet config is not valid")
 
         # Create the session object
-        if self._config.PROFILE:
-            self.session = Session(profile_name = self._config.PROFILE,
-                                   region_name = self._config.REGION)
-        else:
+        self.session = Session(profile_name = self.get('PROFILE'),
+                               region_name = self._config.REGION)
+        if self.session.get_credentials() is None:
+            print("Warning: Could not located AWS credentials")
             self.session = None
 
         # Load outbound bastion information in one location
@@ -173,7 +173,7 @@ class BossConfiguration(object):
         for key in self.__EXPECTED_KEYS:
             if not hasattr(self._config, key):
                 if key not in self.__DEFAULTS:
-                    if key in ('SCENARIO', 'BILLING_THREASHOLDS'):
+                    if key in ('SCENARIO', 'BILLING_THREASHOLDS', 'PROFILE'):
                         pass
                     elif key in ('OUTBOUND_IP',
                                  'OUTBOUND_PORT',
@@ -198,7 +198,7 @@ class BossConfiguration(object):
                 val = pformat(self.__getattr__(key))
                 print("{} = {}".format(key, val), file=fh)
             except AttributeError:
-                if key in ('SCENARIO', 'BILLING_THREASHOLDS'):
+                if key in ('SCENARIO', 'BILLING_THREASHOLDS', 'PROFILE'):
                     pass
                 elif key in ('OUTBOUND_IP',
                              'OUTBOUND_PORT',

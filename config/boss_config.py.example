@@ -22,6 +22,7 @@ LABMDA_SERVER_KEY = None
 
 REGION = "us-east-1"
 AVAILABILITY_ZONE_USAGE = { # Used to limit subnet usage for specific resources where AWS has issues
+                            # See test/availability_zones/ scripts for testing an account for problem AZs
     'lambda': ['b', 'c', 'd', 'e', 'f'], # NOTE: AZ labels are not static across accounts in the same region
     'asg': ['b', 'c', 'd', 'e', 'f'], # Same as lambda
     # Dev dont' use 'a'
@@ -29,7 +30,8 @@ AVAILABILITY_ZONE_USAGE = { # Used to limit subnet usage for specific resources 
 }
 
 ACCOUNT_ID = 123456789
-PROFILE = None
+PROFILE = None # (Optional) Name of the Boto3 profile to use for AWS credentials
+               #            Set to None / don't provide to use the Boto3 defaults
 
 # (Optional) Define an output bastion machine authenticated via SSH private key
 OUTBOUND_BASTION = False
