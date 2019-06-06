@@ -365,6 +365,7 @@ class CloudFormationConfiguration:
         """
         self.resources = {}
         self.parameters = {}
+        self.capabilities = None
         self.arguments = []
         self.region = bosslet_config.REGION
         self.keypairs = {}
@@ -440,15 +441,20 @@ class CloudFormationConfiguration:
 
         client = self.session.client('cloudformation')
 
+        kwargs = {
+            "StackName": self.stack_name,
+            "TemplateBody": self._create_template(),
+            "Parameters": self.arguments,
+            "Tags": [
+                {"Key": "Commit", "Value": utils.get_commit()}
+            ]
+        }
+
+        if self.capabilities is not None:
+            kwargs['Capabilities'] = self.capabilities 
+
         try:
-            response = client.create_stack(
-                StackName = self.stack_name,
-                TemplateBody = self._create_template(),
-                Parameters = self.arguments,
-                Tags = [
-                    {"Key": "Commit", "Value": utils.get_commit()}
-                ]
-            )
+            response = client.create_stack(**kwargs)
         except client.exceptions.AlreadyExistsException:
             msg = "Stack '{}' already exists".format(self.stack_name)
             raise BossManageError(msg)
@@ -482,28 +488,26 @@ class CloudFormationConfiguration:
 
         client = self.session.client('cloudformation')
 
+        kwargs = {
+            "StackName": self.stack_name,
+            "TemplateBody": self._create_template(),
+            "Parameters": self.arguments,
+            "Tags": [
+                {"Key": "Commit", "Value": utils.get_commit()}
+            ]
+        }
+
+        if self.capabilities is not None:
+            kwargs['Capabilities'] = self.capabilities 
+
         disable_preview = str(self.bosslet_config.disable_preview)
         disable_preview = disable_preview.lower() in ('yes', 'true', 'y', 't')
         if disable_preview:
-            response = client.update_stack(
-                StackName = self.stack_name,
-                TemplateBody = self._create_template(),
-                Parameters = self.arguments,
-                Tags = [
-                    {"Key": "Commit", "Value": utils.get_commit()}
-                ]
-            )
+            response = client.update_stack(**kwargs)
         else:
             commit = utils.get_commit()
-            response = client.create_change_set(
-                ChangeSetName = 'h' + commit,
-                StackName = self.stack_name,
-                TemplateBody = self._create_template(),
-                Parameters = self.arguments,
-                Tags = [
-                    {"Key": "Commit", "Value": commit}
-                ]
-            )
+            kwargs['ChangeSetName'] = 'h' + commit
+            response = client.create_change_set(**kwargs)
 
             try:
                 response = {'Status': 'CREATE_PENDING'}
@@ -629,6 +633,16 @@ class CloudFormationConfiguration:
         if arg.key not in self.parameters:
             self.parameters[arg.key] = arg.parameter
             self.arguments.append(arg.argument)
+
+    def add_capabilities(self, caps):
+        """Add capabilities to the configuration.
+
+        Add this if a InsufficentCapabilitiesException is raised.
+
+        Args:
+            caps (list[str]): 'CAPABILITY_IAM | 'CAPABILITY_NAMED_IAM'
+        """
+        self.capabilities = caps
 
     def add_vpc(self, key="VPC"):
         """Add a VPC to the configuration.
@@ -1612,6 +1626,36 @@ class CloudFormationConfiguration:
         if tags is not None:
             self.resources[key]['Properties']['Tags'] = tags
 
+
+    def add_iam_policy_to_role(self, key, resource_arn, roles, actions):
+        """
+        Add an IAM policy to a role or multiple roles.
+
+        Args:
+                key (string): Unique name for the resource in the template.
+                resource_arn (str): Resource to grant role permissions to.
+                roles (list[str]): Roles to grant permissions to.
+                actions (list): List of strings for the types of actions to allow.
+        """
+        self.resources[key] = {
+           "Type": "AWS::IAM::Policy",
+           "Properties": {
+              "PolicyName": "S3TablePutItem",
+              "PolicyDocument": {
+                 "Version" : "2012-10-17",
+                 "Statement": [
+                    { 
+                        "Effect": "Allow",
+                        "Action": actions,
+                        "Resource": resource_arn
+                    }
+                 ]
+              },
+              "Roles": roles
+           }
+        }
+
+
     def add_s3_bucket_policy(self, key, bucket_name, action, principal):
         """Add permissions to an S3 bucket.
 
@@ -1639,6 +1683,33 @@ class CloudFormationConfiguration:
         }
 
 
+    def append_s3_bucket_policy(self, key, bucket_name, action, principal):
+        """Add an additional action-principal pair to a bucket.
+
+        Args:
+            key (string): Existing name for the resource in the template.
+            bucket_name (string|dict): Bucket name or CloudFormation instrinsic function to determine name (example: {"Ref": "mybucket"}).
+            action (list): List of strings for the types of actions to allow.
+            principal (dict): Dictionary identifying the entity given permission to the S3 bucket.
+        """
+        if key not in self.resources:
+            raise ValueError(key + " doesn't exist, cannot append to")
+
+        if self.resources[key]['Type'] != 'AWS::S3::BucketPolicy':
+            raise ValueError(key + " is not an S3 bucket policy")
+
+        if self.resources[key]['Properties']['Bucket'] != bucket_name:
+            raise ValueError(key + " is not an S3 bucket policy for bucket: " + bucket_name)
+
+        self.resources[key]['Properties']['PolicyDocument']['Statement'].append(
+            {
+                'Action': action,
+                'Effect': 'Allow',
+                'Resource': { 'Fn::Join': ['', ['arn:aws:s3:::', bucket_name, '/*']]},
+                'Principal': principal
+            })
+
+
     def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python2.7", reserved_executions=None, dlq=None):
         """Create a Python Lambda
 
@@ -1651,15 +1722,15 @@ class CloudFormationConfiguration:
             s3 (None|tuple) : Tuple (bucket, key, handler) for the S3 location containing lambda source code
                               handler is the Python function to execute
             description (str) : Lambda description
-            memory (string|int) : Amount of memory (MB) to execute the lambda with
+            memory (str|int) : Amount of memory (MB) to execute the lambda with
                                   Note, CPU is linked to the amount of memory allocated
-            timeout (string|int) : Execution timeout (Seconds)
+            timeout (str|int) : Execution timeout (Seconds)
             security_groups (None|list) : List of ids of security groups to grant the lambda access to
             subnets (None|list) : List of ids of subnets to grant the lambda access to
-            depends_on (None|string|list) : A unique name or list of unique names of resources within the
+            depends_on (None|str|list) : A unique name or list of unique names of resources within the
                                             configuration and is used to determine the launch order of resources
-            runtime (optional[string]) : Lambda runtime to use.  Defaults to "python2.7".
-            dlq (optional[string]): ARN of dead letter queue.  Defaults to None.
+            runtime (optional[str]) : Lambda runtime to use.  Defaults to "python2.7".
+            dlq (optional[str]): ARN of dead letter queue.  Defaults to None.
             reserved_executions (optional[int]): Number of reserved concurrent executions for the lambda.
         """
 
@@ -1730,7 +1801,7 @@ class CloudFormationConfiguration:
             self.resources[key]['Properties']['ReservedConcurrentExecutions'] = reserved_executions
 
     def add_lambda_permission(self, key, lambda_, action="lambda:invokeFunction", principal="sns.amazonaws.com", source=None, depends_on=None):
-        """Add permissions to a Lambda
+        """Add permissions to a Lambda (typically to allow another resource to invoke the lambda)
 
         Args:
             key (str) : Unique name for the resource in the template

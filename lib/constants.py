@@ -122,7 +122,10 @@ REDIS_CACHE_TYPE = "cache.t2.micro"
 REDIS_SESSION_TYPE = None
 REDIS_TYPE = "cache.t2.micro"
 CACHE_MANAGER_TYPE = "t2.micro"
+CONSUL_TYPE = "t2.micro"
+VAULT_TYPE = "t2.micro"
 ACTIVITIES_TYPE = "t2.micro"
+AUTH_TYPE = "t2.micro"
 
 
 ########################

@@ -35,8 +35,12 @@ if __name__ == '__main__':
                                       'To supply arguments from a file, provide the filename prepended with an `@`.',
                                       fromfile_prefix_chars = '@')
     parser.add_bosslet()
+    parser.add_argument('--refresh-only', '-r',
+                        action = 'store_true',
+                        help = 'Tell AWS to just reload the lambdas from S3')
 
     args = parser.parse_args()
 
-    load_lambdas_on_s3(args.bosslet_config)
+    if not args.refresh_only:
+        load_lambdas_on_s3(args.bosslet_config)
     update_lambda_code(args.bosslet_config)

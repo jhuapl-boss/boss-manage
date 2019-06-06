@@ -27,6 +27,7 @@ base:
         - git
         - ingest-client.ingest
         - chrony
+        - open-files.increase-open-files
 
     'lambda*':
         - lambda-dev

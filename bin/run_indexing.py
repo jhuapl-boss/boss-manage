@@ -168,35 +168,34 @@ def get_common_args(bosslet_config):
                                                   bosslet_config.ACCOUNT_ID)
     n = bosslet_config.names
     common_args = {
-        "id_supervisor_step_fcn": '{}{}'.format(sfn_arn_prefix, n.sfn.index_supervisor),
-        "id_cuboid_supervisor_step_fcn": '{}{}'.format(sfn_arn_prefix, n.sfn.index_cuboid_supervisor),
-        "index_dequeue_cuboids_step_fcn":'{}{}'.format(sfn_arn_prefix, n.sfn.index_dequeue_cuboids),
-        "id_index_step_fcn": '{}{}'.format(sfn_arn_prefix, n.sfn.index_id_writer),
-        "batch_enqueue_cuboids_step_fcn": '{}{}'.format(sfn_arn_prefix, n.sfn.index_enqueue_cuboids),
-        "fanout_enqueue_cuboids_step_fcn": '{}{}'.format(sfn_arn_prefix, n.sfn.index_fanout_enqueue_cuboids),
-        "fanout_id_writers_step_fcn": '{}{}'.format(sfn_arn_prefix, n.sfn.index_fanout_id_writers),
-        "cuboid_ids_bucket": n.s3.cuboid_ids_bucket,
+        "id_supervisor_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_supervisor.sfn),
+        "id_cuboid_supervisor_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_cuboid_supervisor.sfn),
+        "index_dequeue_cuboids_step_fcn":'{}{}'.format(sfn_arn_prefix, n.index_dequeue_cuboids.sfn),
+        "id_index_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_id_writer.sfn),
+        "batch_enqueue_cuboids_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_enqueue_cuboids.sfn),
+        "fanout_enqueue_cuboids_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_fanout_enqueue_cuboids.sfn),
+        "fanout_id_writers_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_fanout_id_writers.sfn),
         "config": {
           "object_store_config": {
-            "id_count_table": n.ddb.id_count_index,
-            "page_in_lambda_function": n.lambda_.multi_lambda,
-            "page_out_lambda_function": n.lambda_.multi_lambda,
-            "cuboid_bucket": n.s3.cuboid_bucket,
-            "s3_index_table": n.ddb.s3_index,
-            "id_index_table": n.ddb.id_index,
-            "s3_flush_queue": 'https://queue.amazonaws.com/{}/{}'.format(account, n.sqs.s3flush),
+            "id_count_table": n.id_count_index.ddb,
+            "page_in_lambda_function": n.multi_lambda.lambda_,
+            "page_out_lambda_function": n.multi_lambda.lambda_,
+            "cuboid_bucket": n.cuboid_bucket.s3,
+            "s3_index_table": n.s3_index.ddb,
+            "id_index_table": n.id_index.ddb,
+            "s3_flush_queue": 'https://queue.amazonaws.com/{}/{}'.format(account, n.s3flush.sqs),
             "id_index_new_chunk_threshold": NEW_CHUNK_THRESHOLD,
-            "index_deadletter_queue": 'https://queue.amazonaws.com/{}/{}'.format(account, n.sqs.index_deadletter),
-            "index_cuboids_keys_queue": 'https://queue.amazonaws.com/{}/{}'.format(account, n.sqs.index_cuboids_keys)
+            "index_deadletter_queue": 'https://queue.amazonaws.com/{}/{}'.format(account, n.index_deadletter.sqs),
+            "index_cuboids_keys_queue": 'https://queue.amazonaws.com/{}/{}'.format(account, n.index_cuboids_keys.sqs)
           },
           "kv_config": {
-            "cache_host": n.redis.cache,
+            "cache_host": n.cache.redis,
             "read_timeout": 86400,
             "cache_db": "0"
           },
           "state_config": {
             "cache_state_db": "0",
-            "cache_state_host": n.redis.cache_state
+            "cache_state_host": n.cache_state.redis,
           }
         },
         "max_write_id_index_lambdas": 599,

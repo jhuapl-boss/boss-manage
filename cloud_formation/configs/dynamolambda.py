@@ -85,7 +85,7 @@ def create_config(bosslet_config):
                           "index.handler"),
                       timeout=120,
                       memory=128,
-                      runtime="nodejs6.10",
+                      runtime="nodejs8.10",
                       reserved_executions=1)
 
     config.add_cloudwatch_rule(TRIGGER_KEY,

@@ -48,13 +48,14 @@ import json
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, public=True, depends_on=None):
+def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, type_="t2.micro", public=True, depends_on=None):
     security_groups = [Ref("InternalSecurityGroup")]
     config.add_autoscale_group(key,
                                hostname,
                                ami,
                                keypair,
                                subnets = isubnets,
+                               type_= type_,
                                security_groups = security_groups,
                                user_data = user_data,
                                min = size,
@@ -109,6 +110,7 @@ def create_config(bosslet_config):
                                aws.ami_lookup(bosslet_config, names.consul.ami),
                                keypair,
                                subnets = internal_subnets_asg,
+                               type_ = const.CONSUL_TYPE,
                                security_groups = [Ref("InternalSecurityGroup")],
                                user_data = str(user_data),
                                min = const.CONSUL_CLUSTER_SIZE,
@@ -126,6 +128,7 @@ def create_config(bosslet_config):
                                aws.ami_lookup(bosslet_config, names.vault.ami),
                                keypair,
                                subnets = internal_subnets_asg,
+                               type_ = const.VAULT_TYPE,
                                security_groups = [Ref("InternalSecurityGroup")],
                                user_data = str(user_data),
                                min = const.VAULT_CLUSTER_SIZE,
@@ -167,6 +170,7 @@ def create_config(bosslet_config):
                    [("443", "8080", "HTTPS", cert)],
                    "HTTP:8080/index.html",
                    sgs = [Ref("AuthSecurityGroup")],
+                   type_=const.AUTH_TYPE,
                    depends_on=deps)
     config.add_public_dns('AuthLoadBalancer', names.public_dns('auth'))
 
@@ -239,7 +243,8 @@ def create_config(bosslet_config):
                                  depends_on = "AttachInternetGateway")
 
     config.add_internet_gateway("InternetGateway", names.internet.gw)
-    config.add_endpoint("S3Endpoint", "s3", [Ref("InternalRouteTable")])
+    config.add_endpoint("S3Endpoint", "s3", [Ref("InternalRouteTable"), Ref('InternetRouteTable')])
+    config.add_endpoint("DynamoDBEndpoint", "dynamodb", [Ref("InternalRouteTable"), Ref('InternetRouteTable')])
     config.add_nat("NAT", Ref("ExternalSubnet"), depends_on="AttachInternetGateway")
 
     return config

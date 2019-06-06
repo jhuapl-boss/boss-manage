@@ -155,7 +155,6 @@ if __name__ == '__main__':
                         metavar = "<config>",
                         nargs = "+",
                         help="Packer variable to build a machine image for")
-
     args = parser.parse_args()
 
     if "all" in args.config:

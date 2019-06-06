@@ -1,11 +1,14 @@
 # Instance types
-ENDPOINT_TYPE: m4.2xlarge
+ENDPOINT_TYPE: m5.2xlarge
 RDS_TYPE: db.t2.medium
 REDIS_CACHE_TYPE: cache.m4.10xlarge
 REDIS_SESSION_TYPE: cache.t2.medium
-REDIS_TYPE: cache.m4.xlarge
+REDIS_TYPE: cache.m5.xlarge
 CACHE_MANAGER_TYPE: t2.medium
-ACTIVITIES_TYPE: m4.xlarge
+CONSUL_TYPE: t3.medium
+VAULT_TYPE: t3.medium
+ACTIVITIES_TYPE: m5.xlarge
+AUTH_TYPE: m5.xlarge
 
 # Cluster / ASG sizes
 AUTH_CLUSTER_SIZE: 1

@@ -97,8 +97,8 @@ if __name__ == '__main__':
         bossutils.configuration.download_and_save()
         #read_vault_token() # Not currently supported when generating access tokens
         set_hostname()
-    except:
-        log.exception("Problem during initial configuration")
+    except Exception as ex:
+        logging.exception('Problem during initial configuration: {}'.format(ex))
     finally:
         # Since the service is to be run once, disable it
         bossutils.utils.stop_firstboot()

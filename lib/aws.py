@@ -33,9 +33,10 @@ from .exceptions import BossManageError
 
 def get_all(to_wrap, key):
     """Utility helper method for requesting all results from AWS
+
     Usage:
         items = get_all(session.client('ec2').describe_instances, 'Reservations') \
-                       (Filters=[...])
+                (Filters=[...])
         items # => List of Reservations returned by describe_instances
 
     Args:
@@ -77,11 +78,11 @@ def machine_lookup_all(session, hostname, public_ip = True):
         (list) : List of IP addresses
     """
     client = session.client('ec2')
-    response = client.describe_instances(Filters=[{"Name":"tag:Name", "Values":[hostname]},
-                                                  {"Name":"instance-state-name", "Values":["running"]}])
+    items = get_all(client.describe_instances, 'Reservations') \
+                    (Filters=[{"Name":"tag:Name", "Values":[hostname]},
+                              {"Name":"instance-state-name", "Values":["running"]}])
 
     addresses = []
-    items = response['Reservations']
     if len(items) > 0:
         for i in items:
             item = i['Instances'][0]
@@ -119,10 +120,10 @@ def machine_lookup(session, hostname, public_ip = True):
         idx = 0
 
     client = session.client('ec2')
-    response = client.describe_instances(Filters=[{"Name":"tag:Name", "Values":[hostname]},
-                                                  {"Name":"instance-state-name", "Values":["running"]}])
+    item = get_all(client.describe_instances, 'Reservations') \
+                    (Filters=[{"Name":"tag:Name", "Values":[hostname]},
+                              {"Name":"instance-state-name", "Values":["running"]}])
 
-    item = response['Reservations']
     if len(item) == 0:
         print("Could not find IP address for '{}'".format(hostname))
         return None
@@ -1180,3 +1181,45 @@ def get_existing_stacks(bosslet_config):
         if stack['StackName'].endswith(suffix) and stack['StackStatus'] not in invalid
     }
     return existing
+
+def create_keypair(session, KeyName, DryRun=False):
+    """
+    Returns dict with SHA-1 digest of the DER encoded private key
+    An unencrypted PEM encoded RSA private key
+    and the name of the key pair. 
+    Args:
+        session(Session): boto3.session.Session object
+        KeyName (str): Desired name of the keypair
+    
+    Returns:
+        (dict):
+    """
+    if session is None:
+        return None
+    
+    client = session.client('ec2')
+    response = client.create_key_pair(
+        KeyName = KeyName,
+        DryRun = DryRun
+    )
+    return response
+
+def delete_keypair(session, KeyName, DryRun=False):
+    """
+    Returns none
+    Args:
+        session(Session): boto3.session.Session object
+        KeyName (str): Desired name of the keypair
+    
+    Returns:
+        none
+    """
+    if session is None:
+        return None
+    
+    client = session.client('ec2')
+    response = client.delete_key_pair(
+        KeyName = KeyName,
+        DryRun = DryRun
+    )
+    return response

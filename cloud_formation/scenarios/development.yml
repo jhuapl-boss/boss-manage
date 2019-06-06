@@ -5,7 +5,10 @@ REDIS_CACHE_TYPE: cache.t2.small
 REDIS_SESSION_TYPE: null # Not used for dev
 REDIS_TYPE: cache.t2.small
 CACHE_MANAGER_TYPE: t2.micro
-ACTIVITIES_TYPE: m4.large
+CONSUL_TYPE: t3.micro
+VAULT_TYPE: t3.micro
+ACTIVITIES_TYPE: m5.large
+AUTH_TYPE: t2.micro
 
 # Cluster / ASG sizes
 AUTH_CLUSTER_SIZE: 1

@@ -40,10 +40,9 @@ import botocore
 EXPIRE_IN_DAYS = 21
 
 # Number of days to wait before deleting an object marked for deletion.
-MARKED_FOR_DELETION_DAYS = 1
+MARKED_FOR_DELETION_DAYS = 3
 
 # Ids used for bucket lambda triggers.
-TILE_BUCKET_TRIGGER = 'tileBucketInvokeTileUploadedLambda'
 INGEST_BUCKET_TRIGGER = 'ingestBucketInvokeCuboidImportLambda'
 
 CUBOID_IMPORT_ROLE = 'CuboidImportLambdaRole'
@@ -68,17 +67,15 @@ def get_cf_bucket_life_cycle_rules():
             {
                 'ExpirationInDays': EXPIRE_IN_DAYS,
                 'Status': 'Enabled',
-                'Filter': {}
             },
             {
                 # Marked for deletion rule.
                 'ExpirationInDays': MARKED_FOR_DELETION_DAYS,
                 'Status': 'Enabled',
-                'Filter': {
-                    'Tag': {
-                        'Key': TAG_DELETE_KEY,
-                        'Value': TAG_DELETE_VALUE }
-                }
+                'TagFilters': [{
+                    'Key': TAG_DELETE_KEY,
+                    'Value': TAG_DELETE_VALUE
+                }]
             }
         ]
     }
@@ -118,7 +115,32 @@ def get_boto_bucket_life_cycle_rules():
         ]
     }
 
+def get_s3_index_arn(bosslet_config):
+    """
+    Get arn of the DynamoDB s3 index.
+
+    Args:
+        bosslet_config (BossConfiguration): target bosslet
+
+    Returns:
+        (str):
+    """
+    names = bosslet_config.names
+    dynamo = bosslet_config.session.client('dynamodb')
+    resp = dynamo.describe_table(TableName=names.s3_index)
+    return resp['Table']['TableArn']
+
 def create_config(bosslet_config, user_data=None):
+    """
+    Create the CloudFormationConfiguration object.
+    Args:
+        bosslet_config (BossConfiguration): target bosslet
+        user_data (UserData): information used by the endpoint instance and vault.  Data will be run through the CloudFormation Fn::Join template intrinsic function so other template intrinsic functions used in the user_data will be parsed and executed.
+
+    Returns: the config for the Cloud Formation stack
+
+    """
+
     # Prepare user data for parsing by CloudFormation.
     if user_data is not None:
         parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
@@ -164,13 +186,33 @@ def create_config(bosslet_config, user_data=None):
     config.add_arg(Arg.String("LambdaCacheExecutionRole", role,
                               "IAM role for " + names.multi_lambda.lambda_))
 
-    index_bucket_name = names.cuboid_bucket.s3
-    if not aws.s3_bucket_exists(session, index_bucket_name):
-        config.add_s3_bucket("cuboidBucket", index_bucket_name)
+    domain = bosslet_config.INTERNAL_DOMAIN # TODO: refactor out
+    cuboid_import_role = aws.role_arn_lookup(session, CUBOID_IMPORT_ROLE)
+    config.add_arg(Arg.String(CUBOID_IMPORT_ROLE, cuboid_import_role,
+                              "IAM role for cuboidImport." + domain))
+
+    config.add_capabilities(['CAPABILITY_IAM'])
+ 
+    # Allow updating S3 index table with cuboid's object key during
+    # volumetric ingest.
+    # Example of s3_index_arn form: arn:aws:dynamodb:us-east-1:12345678:table/s3index.*.boss
+    # TODO: either create the role in the config or move this into roles.json
+    config.add_iam_policy_to_role(
+        'S3IndexPutItem{}'.format(domain).replace('.', ''),
+        get_s3_index_arn(session, domain).replace(domain,'*.') + domain.split('.')[1],
+        [CUBOID_IMPORT_ROLE], ['dynamodb:PutItem'])
+
+    cuboid_bucket_name = names.cuboid_bucket.s3
+    if not aws.s3_bucket_exists(session, cuboid_bucket_name):
+        config.add_s3_bucket("cuboidBucket", cuboid_bucket_name)
+
     config.add_s3_bucket_policy(
-        "cuboidBucketPolicy", index_bucket_name,
+        "cuboidBucketPolicy", cuboid_bucket_name,
         ['s3:GetObject', 's3:PutObject'],
         { 'AWS': role})
+    config.append_s3_bucket_policy(
+        "cuboidBucketPolicy", cuboid_bucket_name,
+        ['s3:PutObject'], { 'AWS': cuboid_import_role})
 
     delete_bucket_name = names.delete_bucket.s3
     if not aws.s3_bucket_exists(session, delete_bucket_name):
@@ -180,10 +222,8 @@ def create_config(bosslet_config, user_data=None):
         ['s3:GetObject', 's3:PutObject'],
         { 'AWS': role})
 
-    creating_tile_bucket = False
     tile_bucket_name = names.tile_bucket.s3
     if not aws.s3_bucket_exists(session, tile_bucket_name):
-        creating_tile_bucket = True
         life_cycle_cfg = get_cf_bucket_life_cycle_rules()
         config.add_s3_bucket(
             "tileBucket", tile_bucket_name, life_cycle_config=life_cycle_cfg)
@@ -193,14 +233,19 @@ def create_config(bosslet_config, user_data=None):
         ['s3:GetObject', 's3:PutObject'],
         { 'AWS': role})
 
+    # The ingest bucket is a staging area for cuboids uploaded during volumetric ingest.
+    creating_ingest_bucket = False
     ingest_bucket_name = names.ingest_bucket.s3
     if not aws.s3_bucket_exists(session, ingest_bucket_name):
-        config.add_s3_bucket("ingestBucket", ingest_bucket_name)
-    # Uncomment when merging volumetric ingest back in.
-    #config.add_s3_bucket_policy(
-    #    "ingestBucketPolicy", ingest_bucket_name,
-    #    ['s3:GetObject', 's3:PutObject', 's3:PutObjectTagging'],
-    #    { 'AWS': cuboid_import_role})
+        creating_ingest_bucket = True
+        ing_bucket_life_cycle_cfg = get_cf_bucket_life_cycle_rules()
+        config.add_s3_bucket("ingestBucket", ingest_bucket_name,
+            life_cycle_config=ing_bucket_life_cycle_cfg)
+
+    config.add_s3_bucket_policy(
+        "ingestBucketPolicy", ingest_bucket_name,
+        ['s3:GetObject', 's3:PutObject', 's3:PutObjectTagging'],
+        { 'AWS': cuboid_import_role})
 
     config.add_ec2_instance("CacheManager",
                             names.cache_manager.dns,
@@ -215,6 +260,11 @@ def create_config(bosslet_config, user_data=None):
 
     config.add_sqs_queue(
         names.ingest_cleanup_dlq.sqs, names.ingest_cleanup_dlq.sqs, 30, 20160)
+    config.add_sqs_queue(
+        names.cuboid_import_dlq.sqs, names.cuboid_import_dlq.sqs, 30, 20160)
+
+    config.add_sqs_policy('cuboidImportDlqPolicy', 'cuboidImportDlqPolicy',
+        [Ref(names.cuboid_import_dlq.sqs)], cuboid_import_role)
 
     config.add_lambda("MultiLambda",
                       names.multi_lambda.lambda_,
@@ -233,8 +283,8 @@ def create_config(bosslet_config, user_data=None):
                       s3=(bosslet_config.LAMBDA_BUCKET,
                           names.multi_lambda.zip,
                           "tile_uploaded_lambda.handler"),
-                      timeout=30,
-                      memory=256,
+                      timeout=5,
+                      memory=1024,
                       runtime='python3.6')
     config.add_lambda("TileIngestLambda",
                       names.tile_ingest.lambda_,
@@ -242,8 +292,8 @@ def create_config(bosslet_config, user_data=None):
                       s3=(bosslet_config.LAMBDA_BUCKET,
                           names.multi_lambda.zip,
                           "tile_ingest_lambda.handler"),
-                      timeout=120,
-                      memory=1024,
+                      timeout=30,
+                      memory=1536,
                       runtime='python3.6')
     config.add_lambda("DeleteTileObjsLambda",
                       names.delete_tile_objs.lambda_,
@@ -265,19 +315,45 @@ def create_config(bosslet_config, user_data=None):
                       memory=128,
                       runtime='python3.6',
                       dlq=Arn(names.ingest_cleanup_dlq.sqs))
+    config.add_lambda("CuboidImportLambda",
+                      names.cuboid_import_lambda.lambda_,
+                      Ref(CUBOID_IMPORT_ROLE),
+                      s3=(bosslet_config.LAMBDA_BUCKET,
+                          names.multi_lambda.zip,
+                          "cuboid_import_lambda.handler"),
+                      timeout=90,
+                      memory=128,
+                      runtime='python3.6',
+                      dlq=Arn(names.cuboid_import_dlq))
+    config.add_lambda("VolumetricIngestLambda",
+                      names.volumetric_ingest_queue_upload_lambda.lambda_,
+                      Ref("LambdaCacheExecutionRole"),
+                      s3=(bosslet_config.LAMBDA_BUCKET,
+                          names.multi_lambda.zip,
+                          "ingest_queue_upload_volumetric_lambda.handler"),
+                      timeout=120,
+                      memory=1024,
+                      runtime='python3.6')
 
-    if creating_tile_bucket:
-        config.add_lambda_permission('tileBucketInvokeTileUploadLambda',
-                                     names.tile_uploaded.lambda_,
-                                     principal='s3.amazonaws.com',
-                                     source={ 'Fn::Join': [':', ['arn', 'aws', 's3', '', '', tile_bucket_name]]},
-                                     depends_on=['tileBucket', 'TileUploadedLambda'])
+    if creating_ingest_bucket:
+        config.add_lambda_permission(
+            'ingestBucketInvokeCuboidImportLambda', names.cuboid_import_lambda.lambda_,
+            principal='s3.amazonaws.com', source={
+                'Fn::Join': [':', ['arn', 'aws', 's3', '', '', ingest_bucket_name]]}, #DP TODO: move into constants
+            depends_on=['ingestBucket', 'CuboidImportLambda']
+        )
     else:
-        config.add_lambda_permission('tileBucketInvokeMultiLambda',
-                                     names.tile_uploaded.lambda_,
-                                     principal='s3.amazonaws.com',
-                                     source={ 'Fn::Join': [':', ['arn', 'aws', 's3', '', '', tile_bucket_name]]},
-                                     depends_on='TileUploadedLambda')
+        # NOTE: this permission doesn't seem to apply properly when doing a
+        # CloudFormation update.  During testing, I had to manually apply this
+        # permission before the bucket trigger could be applied in post_init().
+        # Doing a CloudFormation delete followed by a create did not have a
+        # problem.
+        config.add_lambda_permission(
+            'ingestBucketInvokeCuboidImportLambda', names.cuboid_import_lambda.lambda_,
+            principal='s3.amazonaws.com', source={
+                'Fn::Join': [':', ['arn', 'aws', 's3', '', '', ingest_bucket_name]]},
+            depends_on='CuboidImportLambda'
+        )
 
     # Add topic to indicating that the object store has been write locked.
     # Now using "production mailing list" instead of separate write lock topic.
@@ -294,8 +370,7 @@ def generate(bosslet_config):
     config = create_config(bosslet_config)
     config.generate()
 
-def create(bosslet_config):
-    """Create the configuration, and launch it"""
+def build_user_data(bosslet_config):
     names = bosslet_config.names
     session = bosslet_config.session
 
@@ -327,7 +402,13 @@ def create(bosslet_config):
     user_data["lambda"]["flush_function"] = names.multi_lambda.lambda_
     user_data["lambda"]["page_in_function"] = names.multi_lambda.lambda_
 
-    pre_init(bosslet_config)
+    return user_data
+
+
+def create(bosslet_config):
+    """Create the configuration, and launch it"""
+
+    user_data = build_user_data(bosslet_config)
 
     config = create_config(bosslet_config, user_data)
     config.create()
@@ -341,50 +422,68 @@ def pre_init(bosslet_config):
     load_lambdas_on_s3(bosslet_config)
 
 def update(bosslet_config):
-    user_data = None
-    raise Exception("user_data not defined, update disabled")
+    user_data = build_user_data(bosslet_config)
 
     config = create_config(bosslet_config, user_data)
-    success = config.update()
+    config.update(session)
 
     if utils.get_user_confirm("Rebuild multilambda", default = True):
         pre_init(bosslet_config)
         update_lambda_code(bosslet_config)
 
-    post_init()
+    post_init(bosslet_config)
 
 def post_init(bosslet_config):
     print("post_init")
 
-    print('adding tile bucket trigger of tile_uploaded_lambda')
+    print('adding ingest bucket trigger of import-cuboid lambda')
     add_bucket_trigger(bosslet_config.session,
-                       bosslet_config.names.tile_uploaded.lambda_,
-                       bosslet_config.names.tile_bucket.s3,
-                       TILE_BUCKET_TRIGGER)
+                       bosslet_config.names.cuboid_import_lambda.lambda_,
+                       bosslet_config.names.ingest_bucket.s3,
+                       INGEST_BUCKET_TRIGGER)
 
     print('setting tile bucket expiration policy')
-    set_bucket_life_cycle_policy(bosslet_config.session,
-                                 bosslet_config.names.tile_bucket.s3)
+    check_bucket_life_cycle_policy(bosslet_config.session,
+                                   bosslet_config.names.tile_bucket.s3)
 
     print('setting ingest bucket expiration policy')
-    set_bucket_life_cycle_policy(bosslet_config.session,
-                                 bosslet_config.names.ingest_bucket.s3)
+    check_bucket_life_cycle_policy(bosslet_config.session,
+                                   bosslet_config.names.ingest_bucket.s3)
 
-def set_bucket_life_cycle_policy(session, bucket_name):
+def check_bucket_life_cycle_policy(session, bucket_name):
     """
-    Set the expiration policy for the given bucket.
+    Ensure the expiration policy is attached to the given bucket.
 
     Args:
         bucket_name (str): Name of S3 bucket.
     """
     s3 = session.client('s3')
+
+    try:
+        resp = s3.get_bucket_lifecycle_configuration(Bucket=bucket_name)
+
+        policy_in_place = False
+        if 'Rules' in resp:
+            for rule in resp['Rules']:
+                if 'Expiration' in rule and 'Days' in rule['Expiration']:
+                    if (rule['Expiration']['Days'] == EXPIRE_IN_DAYS and 
+                            rule['Status'] == 'Enabled'):
+                        policy_in_place = True
+        if policy_in_place:
+            print('policy already set')
+            return
+    except botocore.exceptions.ClientError as ex:
+        if ex.response['Error']['Code'] != 'NoSuchLifecycleConfiguration':
+            raise
+
+    print('setting policy')
     s3.put_bucket_lifecycle_configuration(
         Bucket=bucket_name,
         LifecycleConfiguration=get_boto_bucket_life_cycle_rules())
 
 
 def add_bucket_trigger(session, lambda_name, bucket_name, trigger_id):
-    """Trigger MultiLambda when file uploaded to tile bucket.
+    """Trigger lambda when file uploaded to tile bucket.
 
     This is done in post-init() because the bucket isn't always
     created during CloudFormation (it may already exist).
@@ -396,7 +495,7 @@ def add_bucket_trigger(session, lambda_name, bucket_name, trigger_id):
         session (Boto3.Session)
         lambda_name (str): Name of lambda to trigger.
         bucket_name (str): Bucket that triggers lambda.
-        triger_id (str): Name to use for triger to preserve idempotentness.
+        trigger_id (str): Name to use for trigger to preserve idempotentness.
     """
     lam = session.client('lambda')
     resp = lam.get_function_configuration(FunctionName=lambda_name)

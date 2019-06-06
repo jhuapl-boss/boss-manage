@@ -107,6 +107,7 @@ def create_config(bosslet_config, lookup=True):
     user_data["aws"]["tile-index-table"] = names.tile_index.ddb
     user_data["aws"]["id-index-table"] = names.id_index.ddb
     user_data["aws"]["id-count-table"] = names.id_count_index.ddb
+    user_data["aws"]["max_task_id_suffix"] = str(const.MAX_TASK_ID_SUFFIX)
 
     config.add_autoscale_group("Activities",
                                names.activities.dns,
@@ -126,6 +127,7 @@ def create_config(bosslet_config, lookup=True):
                       const.INGEST_LAMBDA,
                       handler="index.handler",
                       timeout=60 * 5,
+                      runtime='python3.6',
                       memory=3008)
 
     config.add_lambda_permission("IngestLambdaExecute", Ref("IngestLambda"))
@@ -211,6 +213,7 @@ def post_init(bosslet_config):
     #sfn.create(bosslet_config, names.populate_upload_queue.sfn, 'populate_upload_queue.hsd', role)
     sfn.create(bosslet_config, names.ingest_queue_populate.sfn, 'ingest_queue_populate.hsd', role)
     sfn.create(bosslet_config, names.ingest_queue_upload.sfn, 'ingest_queue_upload.hsd', role)
+    sfn.create(bosslet_config, names.volumetric_ingest_queue_upload.sfn, 'volumetric_ingest_queue_upload.hsd', role)
     sfn.create(bosslet_config, names.resolution_hierarchy.sfn, 'resolution_hierarchy.hsd', role)
     #sfn.create(bosslet_config, names.downsample_volume.sfn, 'downsample_volume.hsd', role)
 
@@ -224,12 +227,13 @@ def delete_sfns(bosslet_config):
     names = bosslet_config.names
 
     # DP TODO: delete activities
+    sfn.delete(bosslet_config, names.query_deletes.sfn)
     sfn.delete(bosslet_config, names.delete_cuboid.sfn)
     sfn.delete(bosslet_config, names.delete_experiment.sfn)
     sfn.delete(bosslet_config, names.delete_coord_frame.sfn)
     sfn.delete(bosslet_config, names.delete_collection.sfn)
-    sfn.delete(bosslet_config, names.query_deletes.sfn)
     sfn.delete(bosslet_config, names.ingest_queue_populate.sfn)
     sfn.delete(bosslet_config, names.ingest_queue_upload.sfn)
+    sfn.delete(bosslet_config, names.volumetric_ingest_queue_upload.sfn)
     sfn.delete(bosslet_config, names.resolution_hierarchy.sfn)
     #sfn.delete(bosslet_config, names.downsample_volume.sfn)

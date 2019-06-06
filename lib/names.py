@@ -400,11 +400,10 @@ class AWSNames(object):
         "cuboid_bucket": "cuboids",
         "multi_lambda": "multiLambda",
         "s3_index": "s3index",
-        "ingest_bucket": "ingest",
+        "ingest_bucket": "ingest",          # Cuboid staging area For volumetric ingests.
         "tile_bucket": "tiles",
         "delete_tile_objs_lambda": 'deleteTileObjsLambda',
         "tile_index": "tileindex",
-        "cuboid_ids_bucket": "cuboid-ids",
         "delete_tile_index_entry_lambda": 'deleteTileEntryLambda',
         "ingest_cleanup_dlq": "IngestCleanupDlq",
         "id_index": "idIndex",
@@ -430,13 +429,17 @@ class AWSNames(object):
         'downsample_volume_lambda': 'downsampleVolumeLambda',
         'ingest_queue_populate': 'Ingest.Populate',
         'ingest_queue_upload': 'Ingest.Upload',
+        'volumetric_ingest_queue_upload': 'Ingest.Volumetric.Upload',
+        'volumetric_ingest_queue_upload_lambda': 'VolumetricIngestUpload',
         'ingest_lambda': 'IngestUpload',
         'dynamo_lambda': 'dynamoLambda',
         'trigger_dynamo_autoscale': 'triggerDynamoAutoscale',
         'start_sfn_lambda': 'startSfnLambda',
-        'index_id_writer_sfn': 'Index.IdWriter',
         'downsample_status': 'downsample-status',
         'downsample_dlq': 'downsample-dlq',
+        'cuboid_import_lambda': 'cuboidImportLambda',
+        'cuboid_import_dlq': 'cuboidImportDlq',
+        'index_id_writer_sfn': 'Index.IdWriter',
         'index_cuboid_supervisor_sfn': 'Index.CuboidSupervisor',
         'index_find_cuboids_sfn': 'Index.FindCuboids',
         'index_supervisor_sfn': 'Index.Supervisor',
@@ -477,7 +480,6 @@ class AWSNames(object):
 
         fq_hostname = hostname + self.base_dot
 
-        # Lambda names cannot have periods, so we use dashes, instead.
         if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'consul_monitor', 'vault_consul_check',
                     'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 
                     'index_s3_writer_lambda', 'index_fanout_id_writer_lambda',
@@ -503,12 +505,11 @@ class AWSNames(object):
                     ]:
             fq_hostname = fq_hostname.replace('.','-')
 
-        # Queue names cannot have periods, so we capitalize each word, instead.
         if name in ['s3flush_queue', 'deadletter_queue', 'delete_cuboid', 'query_deletes',
                     'ingest_queue_populate', 'ingest_queue_upload', 'resolution_hierarchy',
                     'downsample_volume', 'delete_experiment', 'delete_collection', 'delete_coord_frame',
                     'index_deadletter_queue', 'index_cuboids_keys_queue',
-                    'ingest_cleanup_dlq', 'copy_cuboid_dlq']:
+                     'cuboid_import_dlq', 'ingest_cleanup_dlq', 'copy_cuboid_dlq', 'volumetric_ingest_queue_upload']:
             fq_hostname = "".join(map(lambda x: x.capitalize(), fq_hostname.split('.')))
 
         return fq_hostname

@@ -99,11 +99,12 @@ def create_config(bosslet_config, db_config={}):
     user_data["lambda"]["page_in_function"] = names.multi_lambda.lambda_
     user_data["lambda"]["ingest_function"] = names.tile_ingest.lambda_
     user_data["lambda"]["downsample_volume"] = names.downsample_volume.lambda_
+    user_data["lambda"]["tile_uploaded_function"] = names.tile_uploaded_lambda.lambda_
 
     user_data['sfn']['populate_upload_queue'] = names.ingest_queue_populate.sfn
     user_data['sfn']['upload_sfn'] = names.ingest_queue_upload.sfn
+    user_data['sfn']['volumetric_upload_sfn'] = names.volumetric_ingest_queue_upload.sfn
     user_data['sfn']['downsample_sfn'] = names.resolution_hierarchy.sfn
-    user_data['sfn']['index_id_writer_sfn'] = names.index_id_writer.sfn
     user_data['sfn']['index_cuboid_supervisor_sfn'] = names.index_cuboid_supervisor.sfn
 
     # Prepare user data for parsing by CloudFormation.

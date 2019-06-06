@@ -1,5 +1,105 @@
 [
   {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "iam:*LoginProfile",
+            "iam:*AccessKey*",
+            "iam:*SSHPublicKey*"
+          ],
+          "Effect": "Allow",
+          "Resource": "arn:aws:iam::451493790433:user/${aws:username}"
+        },
+        {
+          "Action": [
+            "iam:ListAccount*",
+            "iam:GetAccountSummary",
+            "iam:GetAccountPasswordPolicy",
+            "iam:ListUsers"
+          ],
+          "Effect": "Allow",
+          "Resource": "*"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "APLSelfAdminister"
+  },
+  {
+    "Path": "/service-role/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": "logs:CreateLogGroup",
+          "Effect": "Allow",
+          "Resource": "arn:aws:logs:us-east-1:451493790433:*"
+        },
+        {
+          "Action": [
+            "logs:CreateLogStream",
+            "logs:PutLogEvents"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "arn:aws:logs:us-east-1:451493790433:log-group:/aws/lambda/objectRecognitionHandler:*"
+          ]
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "AWSLambdaBasicExecutionRole-12d9102c-34c8-47da-9686-b9801b176487"
+  },
+  {
+    "Path": "/service-role/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": "logs:CreateLogGroup",
+          "Effect": "Allow",
+          "Resource": "arn:aws:logs:us-east-1:451493790433:*"
+        },
+        {
+          "Action": [
+            "logs:CreateLogStream",
+            "logs:PutLogEvents"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "arn:aws:logs:us-east-1:451493790433:log-group:/aws/lambda/check:*"
+          ]
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "AWSLambdaBasicExecutionRole-18e45b2f-a398-4109-8f35-b79c82f6749b"
+  },
+  {
+    "Path": "/service-role/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": "logs:CreateLogGroup",
+          "Effect": "Allow",
+          "Resource": "arn:aws:logs:us-east-1:451493790433:*"
+        },
+        {
+          "Action": [
+            "logs:CreateLogStream",
+            "logs:PutLogEvents"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "arn:aws:logs:us-east-1:451493790433:log-group:/aws/lambda/SnowballTest:*"
+          ]
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "AWSLambdaBasicExecutionRole-28085153-2e10-4740-8166-7090f779f1c7"
+  },
+  {
     "Path": "/service-role/",
     "PolicyDocument": {
       "Statement": [
@@ -34,6 +134,293 @@
       "Version": "2012-10-17"
     },
     "PolicyName": "AWSLambdaS3ExecutionRole-2a0110ca-6e60-4f94-8510-fdaf9ddfb583"
+  },
+  {
+    "Path": "/service-role/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "dynamodb:PutItem"
+          ],
+          "Effect": "Allow",
+          "Resource": "arn:aws:dynamodb:us-east-1:451493790433:table/*"
+        },
+        {
+          "Action": [
+            "lambda:InvokeFunction"
+          ],
+          "Effect": "Allow",
+          "Resource": "arn:aws:lambda:us-east-1:451493790433:function:*"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "AWSLambdaTestHarnessExecutionRole-03257ae2-b691-4ced-be24-8ddf2ef976a5"
+  },
+  {
+    "Path": "/service-role/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "ec2:CreateNetworkInterface"
+          ],
+          "Effect": "Allow",
+          "Resource": "*"
+        },
+        {
+          "Action": [
+            "ec2:DescribeNetworkInterfaces",
+            "ec2:DeleteNetworkInterface"
+          ],
+          "Effect": "Allow",
+          "Resource": "arn:aws:ec2:us-east-1:451493790433:network-interface/*"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "AWSLambdaVPCAccessExecutionRole-b2075bb1-0254-4f5f-abe6-c012abd2a001"
+  },
+  {
+    "Path": "/service-role/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "dynamodb:DescribeTable",
+            "dynamodb:UpdateTable",
+            "cloudwatch:PutMetricAlarm",
+            "cloudwatch:DescribeAlarms",
+            "cloudwatch:GetMetricStatistics",
+            "cloudwatch:SetAlarmState",
+            "cloudwatch:DeleteAlarms"
+          ],
+          "Effect": "Allow",
+          "Resource": "*"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "DynamoDBAutoscalePolicy"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "s3:GetBucketLocation",
+            "s3:ListAllMyBuckets"
+          ],
+          "Effect": "Allow",
+          "Resource": "arn:aws:s3:::*"
+        },
+        {
+          "Action": [
+            "s3:ListBucket"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "arn:aws:s3:::princeton-bucket-boss"
+          ]
+        },
+        {
+          "Action": [
+            "s3:PutObject",
+            "s3:GetObject",
+            "s3:DeleteObject"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "arn:aws:s3:::princeton-bucket-boss/*"
+          ]
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "Princeton-Upload-Bucket-Access"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "dynamodb:DeleteTable"
+          ],
+          "Effect": "Deny",
+          "Resource": [
+            "arn:aws:dynamodb:us-east-1:451493790433:table/s3index.production.boss"
+          ],
+          "Sid": "Stmt1491922753000"
+        },
+        {
+          "Action": [
+            "dynamodb:DeleteTable"
+          ],
+          "Effect": "Deny",
+          "Resource": [
+            "arn:aws:dynamodb:us-east-1:451493790433:table/idIndex.production.boss"
+          ],
+          "Sid": "Stmt1491922808000"
+        },
+        {
+          "Action": [
+            "dynamodb:DeleteTable"
+          ],
+          "Effect": "Deny",
+          "Resource": [
+            "arn:aws:dynamodb:us-east-1:451493790433:table/idCount.production.boss"
+          ],
+          "Sid": "Stmt1491922848000"
+        },
+        {
+          "Action": [
+            "dynamodb:DeleteTable"
+          ],
+          "Effect": "Deny",
+          "Resource": [
+            "arn:aws:dynamodb:us-east-1:451493790433:table/bossmeta.production.boss"
+          ],
+          "Sid": "Stmt1491922867000"
+        },
+        {
+          "Action": [
+            "dynamodb:DeleteTable"
+          ],
+          "Effect": "Deny",
+          "Resource": [
+            "arn:aws:dynamodb:us-east-1:451493790433:table/tileindex.production.boss"
+          ],
+          "Sid": "Stmt1491922897000"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "Prod-DynamoDB-DeleteTable-DENY"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "rds:DeleteDBCluster",
+            "rds:DeleteDBInstance"
+          ],
+          "Effect": "Deny",
+          "Resource": [
+            "arn:aws:rds:us-east-1:451493790433:db:endpoint-db-production-boss"
+          ],
+          "Sid": "Stmt1491923817000"
+        },
+        {
+          "Action": [
+            "rds:DeleteDBCluster",
+            "rds:DeleteDBInstance"
+          ],
+          "Effect": "Deny",
+          "Resource": [
+            "arn:aws:rds:us-east-1:451493790433:db:auth-db-production-boss"
+          ],
+          "Sid": "Stmt1491923864000"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "Prod-RDS-DENY-Delete-Instance"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "sns:*",
+            "iam:*",
+            "rds:*",
+            "s3:*",
+            "lambda:*",
+            "cloudformation:*",
+            "dynamodb:*",
+            "ec2:*",
+            "elasticloadbalancing:*"
+          ],
+          "Effect": "Allow",
+          "Resource": "*",
+          "Sid": "VisualEditor0"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "apl-auto-build"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "logs:CreateLogGroup",
+            "logs:CreateLogStream",
+            "logs:PutLogEvents",
+            "logs:DescribeLogStreams"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "arn:aws:logs:*:*:*"
+          ]
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "apl-cloudwatch-instance-logs"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "sns:*",
+            "ec2:*",
+            "cloudformation:*",
+            "sqs:*"
+          ],
+          "Effect": "Allow",
+          "Resource": "*",
+          "Sid": "VisualEditor0"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "apl-lambda-test-build"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "aws-portal:ModifyAccount",
+            "aws-portal:ModifyBilling",
+            "aws-portal:ModifyPaymentMethods",
+            "aws-portal:ViewAccount",
+            "aws-portal:ViewBilling",
+            "aws-portal:ViewPaymentMethods",
+            "aws-portal:ViewUsage"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "*"
+          ],
+          "Sid": "Stmt1446839853000"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "aplBillingGroupPolicy"
   },
   {
     "Path": "/",
@@ -333,48 +720,6 @@
     "PolicyName": "aplCloudFormationFullAccess"
   },
   {
-    "Path": "/service-role/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "dynamodb:PutItem"
-          ],
-          "Effect": "Allow",
-          "Resource": "arn:aws:dynamodb:us-east-1:451493790433:table/*"
-        },
-        {
-          "Action": [
-            "lambda:InvokeFunction"
-          ],
-          "Effect": "Allow",
-          "Resource": "arn:aws:lambda:us-east-1:451493790433:function:*"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "AWSLambdaTestHarnessExecutionRole-03257ae2-b691-4ced-be24-8ddf2ef976a5"
-  },
-  {
-    "Path": "/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "sqs:*"
-          ],
-          "Effect": "Allow",
-          "Resource": [
-            "*"
-          ],
-          "Sid": "Stmt1485812624000"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "aplPopulateUploadQueue"
-  },
-  {
     "Path": "/",
     "PolicyDocument": {
       "Statement": [
@@ -463,188 +808,6 @@
       "Statement": [
         {
           "Action": [
-            "iam:UpdateSSHPublicKey",
-            "iam:UpdateServerCertificate",
-            "iam:UpdateSigningCertificate",
-            "iam:UploadSSHPublicKey",
-            "iam:UploadServerCertificate",
-            "iam:UploadSigningCertificate"
-          ],
-          "Effect": "Allow",
-          "Resource": [
-            "*"
-          ],
-          "Sid": "Stmt1454613958000"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "aplUploadCertificatePolicy"
-  },
-  {
-    "Path": "/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "sns:*",
-            "iam:*",
-            "rds:*",
-            "s3:*",
-            "lambda:*",
-            "cloudformation:*",
-            "dynamodb:*",
-            "ec2:*",
-            "elasticloadbalancing:*"
-          ],
-          "Effect": "Allow",
-          "Resource": "*",
-          "Sid": "VisualEditor0"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "apl-auto-build"
-  },
-  {
-    "Path": "/service-role/",
-    "PolicyDocument": {
-      "Statement": {
-        "Action": [
-          "xray:PutTraceSegments",
-          "xray:PutTelemetryRecords"
-        ],
-        "Effect": "Allow",
-        "Resource": [
-          "*"
-        ]
-      },
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "AWSLambdaTracerAccessExecutionRole-683aea08-9fc8-4468-adfc-7d4af2c826bc"
-  },
-  {
-    "Path": "/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "iam:AttachUserPolicy",
-            "iam:DetachUserPolicy",
-            "iam:ListAttachedUserPolicies"
-          ],
-          "Effect": "Allow",
-          "Resource": [
-            "arn:aws:iam::*:user/vault-*"
-          ],
-          "Sid": "Stmt1473863272000"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "aplVaultAttachUserPolicy"
-  },
-  {
-    "Path": "/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "aws-portal:ModifyAccount",
-            "aws-portal:ModifyBilling",
-            "aws-portal:ModifyPaymentMethods",
-            "aws-portal:ViewAccount",
-            "aws-portal:ViewBilling",
-            "aws-portal:ViewPaymentMethods",
-            "aws-portal:ViewUsage"
-          ],
-          "Effect": "Allow",
-          "Resource": [
-            "*"
-          ],
-          "Sid": "Stmt1446839853000"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "aplBillingGroupPolicy"
-  },
-  {
-    "Path": "/service-role/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": "logs:CreateLogGroup",
-          "Effect": "Allow",
-          "Resource": "arn:aws:logs:us-east-1:451493790433:*"
-        },
-        {
-          "Action": [
-            "logs:CreateLogStream",
-            "logs:PutLogEvents"
-          ],
-          "Effect": "Allow",
-          "Resource": [
-            "arn:aws:logs:us-east-1:451493790433:log-group:/aws/lambda/check:*"
-          ]
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "AWSLambdaBasicExecutionRole-18e45b2f-a398-4109-8f35-b79c82f6749b"
-  },
-  {
-    "Path": "/service-role/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "ec2:CreateNetworkInterface"
-          ],
-          "Effect": "Allow",
-          "Resource": "*"
-        },
-        {
-          "Action": [
-            "ec2:DescribeNetworkInterfaces",
-            "ec2:DeleteNetworkInterface"
-          ],
-          "Effect": "Allow",
-          "Resource": "arn:aws:ec2:us-east-1:451493790433:network-interface/*"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "AWSLambdaVPCAccessExecutionRole-b2075bb1-0254-4f5f-abe6-c012abd2a001"
-  },
-  {
-    "Path": "/service-role/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "dynamodb:DescribeTable",
-            "dynamodb:UpdateTable",
-            "cloudwatch:PutMetricAlarm",
-            "cloudwatch:DescribeAlarms",
-            "cloudwatch:GetMetricStatistics",
-            "cloudwatch:SetAlarmState",
-            "cloudwatch:DeleteAlarms"
-          ],
-          "Effect": "Allow",
-          "Resource": "*"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "DynamoDBAutoscalePolicy"
-  },
-  {
-    "Path": "/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
             "iam:CreateUser",
             "iam:PutUserPolicy",
             "iam:CreateAccessKey"
@@ -656,69 +819,6 @@
       "Version": "2012-10-17"
     },
     "PolicyName": "aplDynamicVaultUserPolicy"
-  },
-  {
-    "Path": "/service-role/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": "logs:CreateLogGroup",
-          "Effect": "Allow",
-          "Resource": "arn:aws:logs:us-east-1:451493790433:*"
-        },
-        {
-          "Action": [
-            "logs:CreateLogStream",
-            "logs:PutLogEvents"
-          ],
-          "Effect": "Allow",
-          "Resource": [
-            "arn:aws:logs:us-east-1:451493790433:log-group:/aws/lambda/objectRecognitionHandler:*"
-          ]
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "AWSLambdaBasicExecutionRole-12d9102c-34c8-47da-9686-b9801b176487"
-  },
-  {
-    "Path": "/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "cloudformation:Describe*",
-            "cloudformation:List*",
-            "cloudformation:Get*"
-          ],
-          "Effect": "Allow",
-          "Resource": "*"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "aplTestCloudFormation"
-  },
-  {
-    "Path": "/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "iam:ListGroupsForUser",
-            "iam:ListUserPolicies",
-            "iam:ListAccessKeys",
-            "iam:DeleteAccessKey",
-            "iam:DeleteUserPolicy",
-            "iam:DeleteUser"
-          ],
-          "Effect": "Allow",
-          "Resource": "arn:aws:iam::*:user/vault*"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "aplRevokeVaultUserPolicy"
   },
   {
     "Path": "/",
@@ -744,65 +844,23 @@
     "PolicyName": "aplInstanceOwnerPolicy"
   },
   {
-    "Path": "/service-role/",
-    "PolicyDocument": {
-      "Statement": {
-        "Action": [
-          "xray:PutTraceSegments",
-          "xray:PutTelemetryRecords"
-        ],
-        "Effect": "Allow",
-        "Resource": [
-          "*"
-        ]
-      },
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "AWSLambdaTracerAccessExecutionRole-ff12834d-2eb4-44cb-9130-1ce3a86f1b76"
-  },
-  {
-    "Path": "/service-role/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": "logs:CreateLogGroup",
-          "Effect": "Allow",
-          "Resource": "arn:aws:logs:us-east-1:451493790433:*"
-        },
-        {
-          "Action": [
-            "logs:CreateLogStream",
-            "logs:PutLogEvents"
-          ],
-          "Effect": "Allow",
-          "Resource": [
-            "arn:aws:logs:us-east-1:451493790433:log-group:/aws/lambda/SnowballTest:*"
-          ]
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "AWSLambdaBasicExecutionRole-28085153-2e10-4740-8166-7090f779f1c7"
-  },
-  {
     "Path": "/",
     "PolicyDocument": {
       "Statement": [
         {
           "Action": [
-            "sns:*",
-            "ec2:*",
-            "cloudformation:*",
             "sqs:*"
           ],
           "Effect": "Allow",
-          "Resource": "*",
-          "Sid": "VisualEditor0"
+          "Resource": [
+            "*"
+          ],
+          "Sid": "Stmt1485812624000"
         }
       ],
       "Version": "2012-10-17"
     },
-    "PolicyName": "apl-lambda-test-build"
+    "PolicyName": "aplPopulateUploadQueue"
   },
   {
     "Path": "/",
@@ -847,6 +905,90 @@
       "Version": "2012-10-17"
     },
     "PolicyName": "aplResolutionHierarchy"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "iam:ListGroupsForUser",
+            "iam:ListUserPolicies",
+            "iam:ListAccessKeys",
+            "iam:DeleteAccessKey",
+            "iam:DeleteUserPolicy",
+            "iam:DeleteUser"
+          ],
+          "Effect": "Allow",
+          "Resource": "arn:aws:iam::*:user/vault*"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "aplRevokeVaultUserPolicy"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "cloudformation:Describe*",
+            "cloudformation:List*",
+            "cloudformation:Get*"
+          ],
+          "Effect": "Allow",
+          "Resource": "*"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "aplTestCloudFormation"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "iam:UpdateSSHPublicKey",
+            "iam:UpdateServerCertificate",
+            "iam:UpdateSigningCertificate",
+            "iam:UploadSSHPublicKey",
+            "iam:UploadServerCertificate",
+            "iam:UploadSigningCertificate"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "*"
+          ],
+          "Sid": "Stmt1454613958000"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "aplUploadCertificatePolicy"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": [
+            "iam:AttachUserPolicy",
+            "iam:DetachUserPolicy",
+            "iam:ListAttachedUserPolicies"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "arn:aws:iam::*:user/vault-*"
+          ],
+          "Sid": "Stmt1473863272000"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "aplVaultAttachUserPolicy"
   },
   {
     "Path": "/",
@@ -1072,132 +1214,5 @@
       "Version": "2012-10-17"
     },
     "PolicyName": "mesh-bucket-policy"
-  },
-  {
-    "Path": "/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "s3:GetBucketLocation",
-            "s3:ListAllMyBuckets"
-          ],
-          "Effect": "Allow",
-          "Resource": "arn:aws:s3:::*"
-        },
-        {
-          "Action": [
-            "s3:ListBucket"
-          ],
-          "Effect": "Allow",
-          "Resource": [
-            "arn:aws:s3:::princeton-bucket-boss"
-          ]
-        },
-        {
-          "Action": [
-            "s3:PutObject",
-            "s3:GetObject",
-            "s3:DeleteObject"
-          ],
-          "Effect": "Allow",
-          "Resource": [
-            "arn:aws:s3:::princeton-bucket-boss/*"
-          ]
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "Princeton-Upload-Bucket-Access"
-  },
-  {
-    "Path": "/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "dynamodb:DeleteTable"
-          ],
-          "Effect": "Deny",
-          "Resource": [
-            "arn:aws:dynamodb:us-east-1:451493790433:table/s3index.production.boss"
-          ],
-          "Sid": "Stmt1491922753000"
-        },
-        {
-          "Action": [
-            "dynamodb:DeleteTable"
-          ],
-          "Effect": "Deny",
-          "Resource": [
-            "arn:aws:dynamodb:us-east-1:451493790433:table/idIndex.production.boss"
-          ],
-          "Sid": "Stmt1491922808000"
-        },
-        {
-          "Action": [
-            "dynamodb:DeleteTable"
-          ],
-          "Effect": "Deny",
-          "Resource": [
-            "arn:aws:dynamodb:us-east-1:451493790433:table/idCount.production.boss"
-          ],
-          "Sid": "Stmt1491922848000"
-        },
-        {
-          "Action": [
-            "dynamodb:DeleteTable"
-          ],
-          "Effect": "Deny",
-          "Resource": [
-            "arn:aws:dynamodb:us-east-1:451493790433:table/bossmeta.production.boss"
-          ],
-          "Sid": "Stmt1491922867000"
-        },
-        {
-          "Action": [
-            "dynamodb:DeleteTable"
-          ],
-          "Effect": "Deny",
-          "Resource": [
-            "arn:aws:dynamodb:us-east-1:451493790433:table/tileindex.production.boss"
-          ],
-          "Sid": "Stmt1491922897000"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "Prod-DynamoDB-DeleteTable-DENY"
-  },
-  {
-    "Path": "/",
-    "PolicyDocument": {
-      "Statement": [
-        {
-          "Action": [
-            "rds:DeleteDBCluster",
-            "rds:DeleteDBInstance"
-          ],
-          "Effect": "Deny",
-          "Resource": [
-            "arn:aws:rds:us-east-1:451493790433:db:endpoint-db-production-boss"
-          ],
-          "Sid": "Stmt1491923817000"
-        },
-        {
-          "Action": [
-            "rds:DeleteDBCluster",
-            "rds:DeleteDBInstance"
-          ],
-          "Effect": "Deny",
-          "Resource": [
-            "arn:aws:rds:us-east-1:451493790433:db:auth-db-production-boss"
-          ],
-          "Sid": "Stmt1491923864000"
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "PolicyName": "Prod-RDS-DENY-Delete-Instance"
   }
 ]

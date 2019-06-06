@@ -233,7 +233,6 @@ if __name__ == '__main__':
                         metavar = "config_name",
                         nargs = "+",
                         help="Configuration to act upon (imported from configs/)")
-
     args = parser.parse_args()
 
     try:
