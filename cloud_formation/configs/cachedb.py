@@ -32,6 +32,7 @@ from lib.userdata import UserData
 from lib import aws
 from lib import constants as const
 from lib import utils
+from lib import console
 from lib.lambdas import load_lambdas_on_s3, update_lambda_code
 
 import botocore
@@ -427,7 +428,7 @@ def update(bosslet_config):
     config = create_config(bosslet_config, user_data)
     config.update()
 
-    if utils.get_user_confirm("Rebuild multilambda", default = True):
+    if console.confirm("Rebuild multilambda", default = True):
         pre_init(bosslet_config)
         update_lambda_code(bosslet_config)
 

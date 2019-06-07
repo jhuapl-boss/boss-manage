@@ -38,6 +38,7 @@ from lib.keycloak import KeyCloakClient
 from lib.exceptions import BossManageError, BossManageCanceled
 from lib import aws
 from lib import utils
+from lib import console
 from lib import scalyr
 from lib import constants as const
 from lib import console
@@ -411,7 +412,7 @@ def update(bosslet_config):
 
     print("Update command will take {} - {} minutes to finish".format(min_time, max_time))
     print("Stack will be available during that time")
-    if not utils.get_user_confirm("Update?", default = False):
+    if not console.confirm("Update?", default = False):
         raise BossManageCanceled()
 
     config = create_config(bosslet_config)
@@ -451,7 +452,7 @@ def update(bosslet_config):
 
 def delete(bosslet_config):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
-    if not utils.get_user_confirm("All data will be lost. Are you sure you want to proceed?"):
+    if not console.confirm("All data will be lost. Are you sure you want to proceed?"):
         raise BossManageCanceled()
 
     session = bosslet_config.session

@@ -168,26 +168,6 @@ def find_dict_with(list_of_dicts, key, value):
 def deprecated(msg = "The called function is now deprecated"):
     warnings.warn(msg, DeprecationWarning, stacklevel=2)
 
-def get_user_confirm(message, default = False):
-    """
-    General method to warn the user to read the message before proceeding
-    and prompt a yes or no answer.
-    
-    Args:
-        message (str): The message which will be showed to the user.
-        default (bool): Denoting if yes or no should be the default response
-    
-    Returns:
-        returns True if user confirms with yes
-    """
-    suffix = " [{}/{}]: ".format("Y" if default else "y",
-                                "n" if default else "N")
-    resp = input(message + suffix)
-    if len(resp) == 0:
-        return default
-    else:
-        return resp[0] in ('y', 'Y')
-
 def parse_hostname(hostname):
     # handle one of the following
     # - index.machine_name.bosslet_name

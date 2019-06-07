@@ -17,6 +17,7 @@ from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, Arg
 from lib.userdata import UserData
 from lib import aws
 from lib import utils
+from lib import console
 from lib import constants as const
 from lib import stepfunctions as sfn
 from lib.lambdas import load_lambdas_on_s3, update_lambda_code
@@ -137,7 +138,7 @@ def generate(bosslet_config):
 
 def create(bosslet_config):
     """Create the configuration and launch."""
-    if utils.get_user_confirm("Rebuild multilambda", default = True):
+    if console.confirm("Rebuild multilambda", default = True):
         pre_init(bosslet_config)
 
     config = create_config(bosslet_config)
@@ -181,14 +182,14 @@ def post_init(bosslet_config):
 
 
 def update(bosslet_config):
-    if utils.get_user_confirm("Rebuild multilambda", default = True):
+    if console.confirm("Rebuild multilambda", default = True):
         pre_init(bosslet_config)
         update_lambda_code(bosslet_config)
 
     config = create_config(bosslet_config)
     config.update()
 
-    if utils.get_user_confirm("Replace step functions", default = True):
+    if console.confirm("Replace step functions", default = True):
         delete_sfns(bosslet_config)
 
         # Need to delay so AWS actually removes the step functions before trying to create them

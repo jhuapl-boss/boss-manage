@@ -30,6 +30,7 @@ from lib.userdata import UserData
 from lib.keycloak import KeyCloakClient
 from lib.exceptions import BossManageCanceled
 from lib import aws
+from lib import console
 from lib import utils
 from lib import scalyr
 from lib import constants as const
@@ -365,7 +366,7 @@ def delete(bosslet_config):
     domain = bosslet_config.INTERNAL_DOMAIN
     names = bosslet_config.names
 
-    if not utils.get_user_confirm("All data will be lost. Are you sure you want to proceed?"):
+    if not console.confirm("All data will be lost. Are you sure you want to proceed?"):
         raise BossManageCanceled()
 
     aws.route53_delete_records(session, domain, names.endpoint.dns)

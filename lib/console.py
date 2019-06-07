@@ -66,8 +66,13 @@ def confirm(message, default = False, timeout = None):
     General method to warn the user to read the message before proceeding
     and prompt a yes or no answer.
 
-    If stdout is piped or redirected then the default is automatically returned
-    without displaying the prompt
+    If stdout is piped a timeout will be set (if not provided) so that the
+    script doesn't hang waiting for input. A timeout is used so that a user
+    can use `python3 script.py > script.log` and have the script take the
+    default action for all prompts.
+
+    If the user wants to answer `yes` to all of the prompts they can use
+    `yes | python3 script.py` to automatically answer the prompts.
     
     Args:
         message (str): The message which will be showed to the user.
@@ -79,7 +84,12 @@ def confirm(message, default = False, timeout = None):
         returns True if user confirms with yes
     """
     if not sys.stdout.isatty():
-        return default
+        # If stdout is piped (often meaning that no user is available for a
+        # response) then set a short timeout. The timeout allows (instead of
+        # just returning the default value) so that this function works correctly
+        # when running under `yes | python3 script.py > script.log`
+        if timeout is None:
+            timeout = 3
 
     if timeout is not None:
         signal.signal(signal.SIGALRM, _raise_timeout)
@@ -89,12 +99,17 @@ def confirm(message, default = False, timeout = None):
         suffix = " [{}/{}]: ".format("Y" if default else "y",
                                     "n" if default else "N")
         resp = input(message + suffix)
+        if not sys.stdin.isatty():
+            # If stdin is piped (often from `yes`) then print the response so
+            # that is shows up in the logs (as it was not typed in the screen)
+            print(resp)
+
         if len(resp) == 0:
             return default
         else:
             return resp[0] in ('y', 'Y')
     except TimeoutError:
-        print() # since user didn't hit <enter>
+        print(" (timeout)") # since user didn't hit <enter>
         return default
     finally:
         if timeout is not None:
@@ -332,7 +347,7 @@ if __name__ == '__main__':
         yellow("one fish") ; time.sleep(1)
         green("two fish") ; time.sleep(1)
 
-        r = confirm('Are you sure?', timeout=3)
+        r = confirm('Are you sure?', timeout=None)
         print('Are you sure? {}'.format(r))
 
     print()
