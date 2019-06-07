@@ -200,23 +200,3 @@ def parse_hostname(hostname):
 
     return (idx, machine, bosslet_name)
 
-class console:
-    """
-        Used to add coloring to terminal print statements
-    """
-
-    @staticmethod
-    def warning(message):
-        print('\033[93m' + message +'\033[0m')
-
-    @staticmethod
-    def okgreen(message):
-        print('\033[92m' + message +'\033[0m')
-
-    @staticmethod
-    def okblue(message):
-        print('\033[94m' + message +'\033[0m')
-
-    @staticmethod
-    def fail(message):
-        print('\033[91m' + message +'\033[0m')
