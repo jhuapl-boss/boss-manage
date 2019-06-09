@@ -128,7 +128,7 @@ def get_s3_index_arn(bosslet_config):
     """
     names = bosslet_config.names
     dynamo = bosslet_config.session.client('dynamodb')
-    resp = dynamo.describe_table(TableName=names.s3_index)
+    resp = dynamo.describe_table(TableName=names.s3_index.ddb)
     return resp['Table']['TableArn']
 
 def create_config(bosslet_config, user_data=None):
@@ -200,7 +200,7 @@ def create_config(bosslet_config, user_data=None):
     # TODO: either create the role in the config or move this into roles.json
     config.add_iam_policy_to_role(
         'S3IndexPutItem{}'.format(domain).replace('.', ''),
-        get_s3_index_arn(session, domain).replace(domain,'*.') + domain.split('.')[1],
+        get_s3_index_arn(bosslet_config).replace(domain,'*.') + domain.split('.')[1],
         [CUBOID_IMPORT_ROLE], ['dynamodb:PutItem'])
 
     cuboid_bucket_name = names.cuboid_bucket.s3
@@ -325,7 +325,7 @@ def create_config(bosslet_config, user_data=None):
                       timeout=90,
                       memory=128,
                       runtime='python3.6',
-                      dlq=Arn(names.cuboid_import_dlq))
+                      dlq=Arn(names.cuboid_import_dlq.sqs))
     config.add_lambda("VolumetricIngestLambda",
                       names.volumetric_ingest_queue_upload_lambda.lambda_,
                       Ref("LambdaCacheExecutionRole"),

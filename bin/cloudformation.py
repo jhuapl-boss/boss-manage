@@ -236,11 +236,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     try:
-        constants.load_scenario(args.scenario)
-
         bosslet_config = configuration.BossConfiguration(args.bosslet_name,
+                                                         disable_preview = args.disable_preview,
                                                          ami_version = args.ami_version,
-                                                         disable_preview = args.disable_preview)
+                                                         scenario = args.scenario)
+
+        constants.load_scenario(bosslet_config.scenario)
 
         if args.config_name == ['all']:
             configs = config_names

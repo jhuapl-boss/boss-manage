@@ -64,7 +64,7 @@ def create_config(bosslet_config):
     #          as the Cloud Formation delete doesn't delete the bucket,
     #          making this a conditional add
     BUCKET_DEPENDENCY = None # Needed as the pipelines try to execute when launched
-    if not aws.s3_bucket_exists(session, names.backup.s3):
+    if not aws.s3_bucket_exists(bosslet_config.session, names.backup.s3):
         life_cycle = {
             'Rules': [{
                 'Id': 'Delete Data',

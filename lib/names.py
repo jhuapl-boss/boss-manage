@@ -23,6 +23,11 @@ class AWSNameAccumulator(object):
         self.acc = [initial_value]
         self.cb = callback
 
+    def __repr__(self):
+        """Display the partial AWSName so that it is easier to track
+        down problems with json.dump"""
+        return "<AWSNames().{}>".format('.'.join(self.acc))
+
     def __getattr__(self, key):
         self.acc.append(key)
 

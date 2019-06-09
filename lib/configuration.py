@@ -47,7 +47,8 @@ class BossConfiguration(object):
         'NETWORK', # Optional
         'SUBNET_CIDR', # Optional
         'AMI_SUFFIX',
-        'SCENARIO', # Optional, no default ??? <<<<<<<
+        'AMI_VERSION', # Optional
+        'SCENARIO', # Optional, no default
         'VERIFY_SSL', # Optional
         'AUTH_RDS',
         'LAMBDA_BUCKET',
@@ -75,6 +76,7 @@ class BossConfiguration(object):
         "EXTERNAL_FORMAT": "{machine}",
         "NETWORK": "10.0.0.0/16",
         "SUBNET_CIDR": 24,
+        "AMI_VERSION": "latest",
         "VERIFY_SSL": True,
         "OUTBOUND_BASTION": False,
         "HTTPS_INBOUND": "0.0.0.0/0",
@@ -86,9 +88,6 @@ class BossConfiguration(object):
     def __init__(self, bosslet, **kwargs):
         self.bosslet = bosslet
 
-        self.ami_version = kwargs.get('ami_version', 'latest')
-        self.disable_preview = kwargs.get('disable_preview')
-
         # Import the bosslet configuration file
         try:
             bosslet = bosslet.replace('.','_')
@@ -98,6 +97,18 @@ class BossConfiguration(object):
 
         if not self.verify():
             raise exceptions.BossManageError("Bosslet config is not valid")
+
+        # Handle keyword arguments
+        self.disable_preview = kwargs.get('disable_preview')
+
+        self.ami_version = self.get('AMI_VERSION')
+        if kwargs.get('ami_version') is not None:
+            self.ami_version = kwargs['ami_version']
+
+        self.scenario = self.get('SCENARIO')
+        if kwargs.get('scenario') is not None:
+            self.scenario = kwargs['scenario']
+
 
         # Create the session object
         self.session = Session(profile_name = self.get('PROFILE'),

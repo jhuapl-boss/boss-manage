@@ -10,7 +10,8 @@ NETWORK = "10.0.0.0/16" # (Optional) Network allocation for VPC
 SUBNET_CIDR = 24 # (Optional) CIDR for each subnet in VPC
 
 AMI_SUFFIX = ".tld"
-SCENARIO = "" # (Optional) Uses internal defaults if not --scenario provided
+AMI_VERSION = "latest" # (Optional) The default AMI version to use if --ami-version is not used with cloudformation.py
+SCENARIO = "" # (Optional) The default scenario to use if --scenario is not used with cloudformation.py
 
 VERIFY_SSL = True # (Optional) False if using a self-signed cert
 AUTH_RDS = False # If Keycloak will use an external database. Cannot update unless True
