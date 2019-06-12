@@ -19,6 +19,11 @@ class BossManageCanceled(BossManageError):
     def __init__(self):
         super().__init__("Action Canceled")
 
+class MissingResourceError(BossManageError):
+    def __init__(self, resource_type, resource_name):
+        msg = "{} {} resource does not exist yet".format(resource)
+        super().__init__(msg)
+
 class DependencyError(BossManageError):
     pass
 

@@ -23,6 +23,7 @@ DEPENDENCIES = ['core', 'api']
 from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, Arn
 from lib.userdata import UserData
 from lib.keycloak import KeyCloakClient
+from lib.exceptions import MissingResourceError
 from lib import aws
 from lib import utils
 from lib import scalyr
@@ -47,15 +48,13 @@ def create_config(bosslet_config):
 
     loadbalancer_name = names.endpoint_elb.dns
     if not aws.lb_lookup(session, loadbalancer_name):
-        raise Exception("Invalid load balancer name: " + loadbalancer_name)
+        raise MissingResourceError('ELB', loadbalancer_name)
 
     # TODO Test that MailingListTopic is working.
     production_mailing_list = bosslet_config.ALERT_TOPIC
     mailing_list_arn = aws.sns_topic_lookup(session, production_mailing_list)
     if mailing_list_arn is None:
-        #config.add_sns_topic("topicList", production_mailing_list)
-        msg = "MailingList {} needs to be created before running config"
-        raise Exception(msg.format(bosslet_config.ALERT_TOPIC))
+        raise MissingResourceError('SNS topic', bosslet_config.ALERT_TOPIC)
 
     config.add_cloudwatch(loadbalancer_name, [mailing_list_arn])
 

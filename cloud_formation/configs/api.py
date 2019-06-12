@@ -28,7 +28,7 @@ DEPENDENCIES = ['core', 'redis'] # also depends on activities for step functions
 from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, Arn
 from lib.userdata import UserData
 from lib.keycloak import KeyCloakClient
-from lib.exceptions import BossManageCanceled
+from lib.exceptions import BossManageCanceled, MissingResourceError
 from lib import aws
 from lib import console
 from lib import utils
@@ -51,12 +51,11 @@ def create_config(bosslet_config, db_config={}):
     cachemanager_role_arn = aws.role_arn_lookup(session, 'cachemanager')
     dns_arn = aws.sns_topic_lookup(session, names.dns.sns)
     if dns_arn is None:
-        raise Exception("SNS topic named " + names.dns.sns + " does not exist.")
+        raise MissingResourceError('SNS topic', names.dns.sns)
 
     mailing_list_arn = aws.sns_topic_lookup(session, bosslet_config.ALERT_TOPIC)
     if mailing_list_arn is None:
-        msg = "MailingList {} needs to be created before running config".format(bosslet_config.ALERT_TOPIC)
-        raise Exception(msg)
+        raise MissingResourceError('SNS topic', bosslet_config.ALERT_TOPIC)
 
     # Configure Vault and create the user data config that the endpoint will
     # use for connecting to Vault and the DB instance

@@ -29,6 +29,7 @@ DEPENDENCIES = ['core', 'redis', 'api']
 from lib.bucket_object_tags import TAG_DELETE_KEY, TAG_DELETE_VALUE
 from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, Arn
 from lib.userdata import UserData
+from lib.exceptions import MissingResourceError
 from lib import aws
 from lib import constants as const
 from lib import utils
@@ -396,8 +397,7 @@ def build_user_data(bosslet_config):
 
     mailing_list_arn = aws.sns_topic_lookup(session, bosslet_config.ALERT_TOPIC)
     if mailing_list_arn is None:
-        msg = "MailingList {} needs to be created before running config".format(bosslet_config.ALERT_TOPIC)
-        raise Exception(msg)
+        raise MissingResourceError('SNS topic', bosslet_config.ALERT_TOPIC)
     user_data["aws"]["sns-write-locked"] = mailing_list_arn
 
     user_data["lambda"]["flush_function"] = names.multi_lambda.lambda_
