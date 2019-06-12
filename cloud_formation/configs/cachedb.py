@@ -188,22 +188,12 @@ def create_config(bosslet_config, user_data=None):
     config.add_arg(Arg.String("LambdaCacheExecutionRole", role,
                               "IAM role for " + names.multi_lambda.lambda_))
 
-    domain = bosslet_config.INTERNAL_DOMAIN # TODO: refactor out
     cuboid_import_role = aws.role_arn_lookup(session, CUBOID_IMPORT_ROLE)
     config.add_arg(Arg.String(CUBOID_IMPORT_ROLE, cuboid_import_role,
-                              "IAM role for cuboidImport." + domain))
+                              "IAM role for cuboidImport"))
 
     config.add_capabilities(['CAPABILITY_IAM'])
  
-    # Allow updating S3 index table with cuboid's object key during
-    # volumetric ingest.
-    # Example of s3_index_arn form: arn:aws:dynamodb:us-east-1:12345678:table/s3index.*.boss
-    # TODO: either create the role in the config or move this into roles.json
-    config.add_iam_policy_to_role(
-        'S3IndexPutItem{}'.format(domain).replace('.', ''),
-        get_s3_index_arn(bosslet_config).replace(domain,'*.') + domain.split('.')[1],
-        [CUBOID_IMPORT_ROLE], ['dynamodb:PutItem'])
-
     cuboid_bucket_name = names.cuboid_bucket.s3
     if not aws.s3_bucket_exists(session, cuboid_bucket_name):
         config.add_s3_bucket("cuboidBucket", cuboid_bucket_name)

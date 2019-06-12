@@ -1627,35 +1627,6 @@ class CloudFormationConfiguration:
             self.resources[key]['Properties']['Tags'] = tags
 
 
-    def add_iam_policy_to_role(self, key, resource_arn, roles, actions):
-        """
-        Add an IAM policy to a role or multiple roles.
-
-        Args:
-                key (string): Unique name for the resource in the template.
-                resource_arn (str): Resource to grant role permissions to.
-                roles (list[str]): Roles to grant permissions to.
-                actions (list): List of strings for the types of actions to allow.
-        """
-        self.resources[key] = {
-           "Type": "AWS::IAM::Policy",
-           "Properties": {
-              "PolicyName": "S3TablePutItem",
-              "PolicyDocument": {
-                 "Version" : "2012-10-17",
-                 "Statement": [
-                    { 
-                        "Effect": "Allow",
-                        "Action": actions,
-                        "Resource": resource_arn
-                    }
-                 ]
-              },
-              "Roles": roles
-           }
-        }
-
-
     def add_s3_bucket_policy(self, key, bucket_name, action, principal):
         """Add permissions to an S3 bucket.
 
