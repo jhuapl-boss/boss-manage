@@ -42,6 +42,18 @@ def create(session, name, domain, sfn_file, role):
     else:
         machine.create(filepath, role)
 
+def update(session, name, domain, sfn_file):
+    filepath = repo_path('cloud_formation', 'stepfunctions', sfn_file)
+    filepath = Path(filepath)
+
+    machine = heaviside.StateMachine(name, session = session)
+    machine.add_visitor(BossVisitor(domain))
+
+    if machine.arn is None:
+        raise Exception("Step Function '{}' doesn't exist...".format(name))
+    else:
+        machine.update(filepath)
+
 def delete(session, name):
     machine = heaviside.StateMachine(name, session = session)
     machine.delete()

@@ -263,6 +263,36 @@ def post_init(session, domain):
         'index_fanout_id_writers.hsd', 'StatesExecutionRole-us-east-1 ')
 
 
+def post_update(session, domain):
+    """Create step functions."""
+    names = AWSNames(domain)
+
+    sfn.update(
+        session, names.index_supervisor_sfn, domain, 
+        'index_supervisor.hsd')
+    sfn.update(
+        session, names.index_cuboid_supervisor_sfn, domain, 
+        'index_cuboid_supervisor.hsd')
+    sfn.update(
+        session, names.index_id_writer_sfn, domain, 
+        'index_id_writer.hsd')
+    sfn.update(
+        session, names.index_find_cuboids_sfn, domain, 
+        'index_find_cuboids.hsd')
+    sfn.update(
+        session, names.index_enqueue_cuboids_sfn, domain, 
+        'index_enqueue_cuboids.hsd')
+    sfn.update(
+        session, names.index_fanout_enqueue_cuboids_sfn, domain, 
+        'index_fanout_enqueue_cuboids.hsd')
+    sfn.update(
+        session, names.index_dequeue_cuboids_sfn, domain, 
+        'index_dequeue_cuboids.hsd')
+    sfn.update(
+        session, names.index_fanout_id_writers_sfn, domain, 
+        'index_fanout_id_writers.hsd')
+
+
 def update(session, domain):
     resp = input('Rebuild multilambda: [Y/n]:')
     if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
@@ -276,10 +306,7 @@ def update(session, domain):
     if not success:
         return False
 
-    resp = input('Replace step functions: [Y/n]:')
-    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
-        delete_sfns(session, domain)
-        post_init(session, domain)
+    post_update(session, domain)
 
     return True
 

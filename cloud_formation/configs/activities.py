@@ -183,16 +183,7 @@ def update(session, domain):
     if not success:
         return False
 
-    resp = input('Replace step functions: [Y/n]:')
-    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
-        delete_sfns(session, domain)
-
-        # Need to delay so AWS actually removes the step functions before trying to create them
-        delay = 30
-        print("Step Functions deleted, waiting for {} seconds".format(delay))
-        time.sleep(delay)
-
-        post_init(session, domain)
+    post_update(session, domain)
 
     return True
 
@@ -212,6 +203,22 @@ def post_init(session, domain):
     sfn.create(session, names.volumetric_ingest_queue_upload, domain, 'volumetric_ingest_queue_upload.hsd', 'StatesExecutionRole-us-east-1')
     sfn.create(session, names.resolution_hierarchy, domain, 'resolution_hierarchy.hsd', 'StatesExecutionRole-us-east-1')
     #sfn.create(session, names.downsample_volume, domain, 'downsample_volume.hsd', 'StatesExecutionRole-us-east-1')
+
+
+def post_update(session, domain):
+    names = AWSNames(domain)
+
+    sfn.update(session, names.query_deletes, domain, 'query_for_deletes.hsd')
+    sfn.update(session, names.delete_cuboid, domain, 'delete_cuboid.hsd')
+    sfn.update(session, names.delete_experiment, domain, 'delete_experiment.hsd')
+    sfn.update(session, names.delete_coord_frame, domain, 'delete_coordinate_frame.hsd')
+    sfn.update(session, names.delete_collection, domain, 'delete_collection.hsd')
+    #sfn.update(session, names.populate_upload_queue, domain, 'populate_upload_queue.hsd')
+    sfn.update(session, names.ingest_queue_populate, domain, 'ingest_queue_populate.hsd')
+    sfn.update(session, names.ingest_queue_upload, domain, 'ingest_queue_upload.hsd')
+    sfn.update(session, names.volumetric_ingest_queue_upload, domain, 'volumetric_ingest_queue_upload.hsd')
+    sfn.update(session, names.resolution_hierarchy, domain, 'resolution_hierarchy.hsd')
+    #sfn.update(session, names.downsample_volume, domain, 'downsample_volume.hsd')
 
 
 def delete(session, domain):
