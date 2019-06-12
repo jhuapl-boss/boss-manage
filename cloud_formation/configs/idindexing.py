@@ -28,6 +28,19 @@ for annotation (object) id indexing.  When building from scratch, it should
 be run after the CloudFormation cachedb config.
 """
 
+def STEP_FUNCTIONS(bosslet_config):
+    names = bosslet_config.names
+    return [
+        (names.index_supervisor.sfn, 'index_supervisor.hsd'),
+        (names.index_cuboid_supervisor.sfn, 'index_cuboid_supervisor.hsd'),
+        (names.index_id_writer.sfn, 'index_id_writer.hsd'),
+        (names.index_find_cuboids.sfn, 'index_find_cuboids.hsd'),
+        (names.index_enqueue_cuboids.sfn, 'index_enqueue_cuboids.hsd'),
+        (names.index_fanout_enqueue_cuboids.sfn, 'index_fanout_enqueue_cuboids.hsd'),
+        (names.index_dequeue_cuboids.sfn, 'index_dequeue_cuboids.hsd'),
+        (names.index_fanout_id_writers.sfn, 'index_fanout_id_writers.hsd'),
+    ]
+
 def create_config(bosslet_config):
     """Create the CloudFormationConfiguration object."""
     config = CloudFormationConfiguration('idindexing', bosslet_config)
@@ -153,62 +166,17 @@ def pre_init(bosslet_config):
 
 def post_init(bosslet_config):
     """Create step functions."""
-    names = bosslet_config.names
+    role = 'StatesExecutionRole-us-east-1 '
 
-    sfn.create(
-        bosslet_config, names.index_supervisor.sfn,
-        'index_supervisor.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(
-        bosslet_config, names.index_cuboid_supervisor.sfn,
-        'index_cuboid_supervisor.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(
-        bosslet_config, names.index_id_writer.sfn,
-        'index_id_writer.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(
-        bosslet_config, names.index_find_cuboids.sfn,
-        'index_find_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(
-        bosslet_config, names.index_enqueue_cuboids.sfn,
-        'index_enqueue_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(
-        bosslet_config, names.index_fanout_enqueue_cuboids.sfn,
-        'index_fanout_enqueue_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(
-        bosslet_config, names.index_dequeue_cuboids.sfn,
-        'index_dequeue_cuboids.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(
-        bosslet_config, names.index_fanout_id_writers.sfn,
-        'index_fanout_id_writers.hsd', 'StatesExecutionRole-us-east-1 ')
+    for name, path in STEP_FUNCTIONS(bosslet_config):
+        sfn.create(bosslet_config, name, path, role)
 
 
 def post_update(bosslet_config):
     """Create step functions."""
-    names = bosslet_config.names
 
-    sfn.update(
-        bosslet_config, names.index_supervisor.sfn,
-        'index_supervisor.hsd')
-    sfn.update(
-        bosslet_config, names.index_cuboid_supervisor.sfn,
-        'index_cuboid_supervisor.hsd')
-    sfn.update(
-        bosslet_config, names.index_id_writer.sfn,
-        'index_id_writer.hsd')
-    sfn.update(
-        bosslet_config, names.index_find_cuboids.sfn,
-        'index_find_cuboids.hsd')
-    sfn.update(
-        bosslet_config, names.index_enqueue_cuboids.sfn,
-        'index_enqueue_cuboids.hsd')
-    sfn.update(
-        bosslet_config, names.index_fanout_enqueue_cuboids.sfn,
-        'index_fanout_enqueue_cuboids.hsd')
-    sfn.update(
-        bosslet_config, names.index_dequeue_cuboids.sfn,
-        'index_dequeue_cuboids.hsd')
-    sfn.update(
-        bosslet_config, names.index_fanout_id_writers.sfn,
-        'index_fanout_id_writers.hsd')
+    for name, path in STEP_FUNCTIONS(bosslet_config):
+        sfn.update(bosslet_config, name, path)
 
 
 def update(bosslet_config):
@@ -228,13 +196,6 @@ def delete(bosslet_config):
 
 
 def delete_sfns(bosslet_config):
-    names = bosslet_config.names
-    sfn.delete(bosslet_config, names.index_fanout_id_writers.sfn)
-    sfn.delete(bosslet_config, names.index_dequeue_cuboids.sfn)
-    sfn.delete(bosslet_config, names.index_fanout_enqueue_cuboids.sfn)
-    sfn.delete(bosslet_config, names.index_enqueue_cuboids.sfn)
-    sfn.delete(bosslet_config, names.index_find_cuboids.sfn)
-    sfn.delete(bosslet_config, names.index_id_writer.sfn)
-    sfn.delete(bosslet_config, names.index_cuboid_supervisor.sfn)
-    sfn.delete(bosslet_config, names.index_supervisor.sfn)
+    for name, _ in STEP_FUNCTIONS(bosslet_config):
+        sfn.delete(bosslet_config, name)
 
