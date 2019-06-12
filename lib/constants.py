@@ -1,4 +1,4 @@
-# Copyright 2016 The Johns Hopkins University Applied Physics Laboratory
+# Copyright 2018 The Johns Hopkins University Applied Physics Laboratory
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,23 +13,33 @@
 # limitations under the License.
 
 import os
+import sys
+import yaml
 
-from .cloudformation import get_scenario
+##################
+# Scenario Support
+def load_scenario(scenario):
+    # Locate the imported module so code can reference global
+    # variables without using the 'global' keyword
+    d = sys.modules['lib.constants'].__dict__
 
-# Region api is created in.  Later versions of boto3 should allow us to
-# extract this from the session variable.  Hard coding for now.
-REGION = 'us-east-1'
-INCOMING_SUBNET = os.environ.get('_BASTION_ALLOW_IP', '52.3.13.189') + '/32'  # microns-bastion elastic IP
+    if scenario is not None:
+        file = "{}.yml".format(scenario)
+        path = repo_path("cloud_formation", "scenarios", file)
 
-PRODUCTION_MAILING_LIST = "ProductionMicronsMailingList"
-PRODUCTION_BILLING_TOPIC = "ProductionBillingList"
-MAX_ALARM_DOLLAR = 200  # Maximum size of alarms in $1,000s
+        if not os.path.exists(path):
+            print("Scenario file '{}' doesn't exist".format(path))
+            return
 
+        try:
+            with open(path, 'r') as fh:
+                config = yaml.load(fh.read())
+        except Exception as ex:
+            print("Problem loading scenario file")
+            print(ex)
 
-########################
-# Lambda Build Server
-PROD_LAMBDA_KEY = 'microns-bastion20151117'
-DEV_LAMBDA_KEY = 'microns-bastion20151117'
+        for key in config:
+            d[key] = config[key]
 
 
 ########################
@@ -48,6 +58,7 @@ def repo_path(*args):
 
 
 LAMBDA_SUBNETS = 16
+
 ########################
 # Lambda Files
 LAMBDA_DIR = repo_path('cloud_formation', 'lambda')
@@ -105,104 +116,31 @@ TIMEOUT_KEYCLOAK = 150
 
 ########################
 # Machine Instance Types
-ENDPOINT_TYPE = {
-    "development": "t2.medium",
-    "production": "m5.2xlarge",
-    "ha-development": "t2.medium",
-}
+ENDPOINT_TYPE = "t2.micro"
+RDS_TYPE = "db.t2.micro"
+REDIS_CACHE_TYPE = "cache.t2.micro"
+REDIS_SESSION_TYPE = None
+REDIS_TYPE = "cache.t2.micro"
+CACHE_MANAGER_TYPE = "t2.micro"
+CONSUL_TYPE = "t2.micro"
+VAULT_TYPE = "t2.micro"
+ACTIVITIES_TYPE = "t2.micro"
+AUTH_TYPE = "t2.micro"
 
-RDS_TYPE = {
-    "development": "db.t2.micro",
-    "production": "db.t2.medium",
-    "ha-development": "db.t2.micro",
-}
-
-REDIS_CACHE_TYPE = {
-    "development": "cache.t2.small",
-    "production": "cache.m4.10xlarge",
-    "ha-development": "cache.t2.small",
-}
-
-# Django session cache using Redis.
-REDIS_SESSION_TYPE = {
-    "development": None,            # Don't use Redis for dev stack sessions.
-    "production": "cache.t2.medium",
-    "ha-development": "cache.t2.small",
-}
-
-REDIS_TYPE = {
-    "development": "cache.t2.small",
-    "production": "cache.m5.xlarge",
-    "ha-development": "cache.t2.small",
-}
-
-CACHE_MANAGER_TYPE = {
-    "development": "t2.micro",
-    "production": "t2.medium",
-    "ha-development": "t2.micro",
-}
-
-CONSUL_TYPE = {
-    "development": "t3.micro",
-    "production": "t3.medium",
-    "ha-development": "t3.large",
-}
-
-VAULT_TYPE = {
-    "development": "t3.micro",
-    "production": "t3.medium",
-    "ha-development": "t3.large",
-}
-
-ACTIVITIES_TYPE = {
-    "development": "m5.large",
-    "production": "m5.xlarge",
-    "ha-development": "m5.large",
-}
-
-AUTH_TYPE = {
-    "development": "t2.micro",
-    "production": "m5.xlarge",
-    "ha-development": "t2.micro",
-}
 
 ########################
 # Machine Cluster Sizes
-AUTH_CLUSTER_SIZE = { # Auth Server Cluster is a fixed size
-    "development" : 1,
-    "production": 1, # should be an odd number
-    "ha-development": 1,  # should be an odd number
-}
+AUTH_CLUSTER_SIZE = 1
+CONSUL_CLUSTER_SIZE = 1
+VAULT_CLUSTER_SIZE = 1
+ENDPOINT_CLUSTER_MIN = 1
+ENDPOINT_CLUSTER_MAX = 1
+REDIS_CLUSTER_SIZE = 1
 
-CONSUL_CLUSTER_SIZE = { # Consul Cluster is a fixed size
-    "development" : 1,
-    "production": 5, # can tolerate 2 failures
-    "ha-development": 3,  # can tolerate 1 failures
-}
 
-VAULT_CLUSTER_SIZE = { # Vault Cluster is a fixed size
-    "development" : 1,
-    "production": 3, # should be an odd number
-    "ha-development": 1,  # should be an odd number
-}
-
-ENDPOINT_CLUSTER_MIN = { # Minimum and Default size of the ASG
-    "development": 1,
-    "production": 1,
-    "ha-development": 1,
-}
-
-ENDPOINT_CLUSTER_MAX = { # Maximum number of instances in the ASG
-    "development": 1,
-    "production": 60,
-    "ha-development": 3,
-}
-
-REDIS_CLUSTER_SIZE = {
-    "development": 1,
-    "production": 2,
-    "ha-development": 1,
-}
+#################
+# Resource Memory
+REDIS_RESERVED_MEMORY = 0
 
 
 ########################
@@ -212,13 +150,6 @@ ENDPOINT_DB_CONFIG = {
     "user":"testuser", # DP ???: Why is the name testuser? should we generate the username too?
     "password": "",
     "port": "3306"
-}
-
-REDIS_RESERVED_MEMORY = {
-    # Size in MB, should be 75% of total.
-    "development": 387,
-    "production": 38500,
-    "ha-development": 387,
 }
 
 BASTION_AMI = "amzn-ami-vpc-nat-hvm-2015.03.0.x86_64-ebs"
@@ -231,7 +162,7 @@ write_files:
     - content: |
             acl localhost src 127.0.0.1/32 ::1
             acl to_localhost dst 127.0.0.0/8 0.0.0.0/32 ::1
-            acl localnet dst 10.0.0.0/8
+            acl localnet dst {}
             acl Safe_ports port 8200
 
             http_access deny !Safe_ports

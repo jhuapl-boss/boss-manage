@@ -22,40 +22,40 @@ sys.path.append(repo_path('lib', 'heaviside.git'))
 import heaviside
 
 class BossVisitor(heaviside.ast.StateVisitor):
-    def __init__(self, domain):
-        self.domain = domain.replace('.', '-')
+    def __init__(self, bosslet_config):
+        self.domain = bosslet_config.INTERNAL_DOMAIN.replace('.', '-')
 
     def handle_task(self, task):
         service = task.service.value.lower()
         if service in ('lambda', 'activity'):
             task.arn = task.arn + '-' + self.domain
 
-def create(session, name, domain, sfn_file, role):
+def create(bosslet_config, name, sfn_file, role):
     filepath = repo_path('cloud_formation', 'stepfunctions', sfn_file)
     filepath = Path(filepath)
 
-    machine = heaviside.StateMachine(name, session = session)
-    machine.add_visitor(BossVisitor(domain))
+    machine = heaviside.StateMachine(name, session = bosslet_config.session)
+    machine.add_visitor(BossVisitor(bosslet_config))
 
     if machine.arn is not None:
         print("StepFunction '{}' already exists, not creating".format(name))
     else:
         machine.create(filepath, role)
 
-def update(session, name, domain, sfn_file):
+def update(bosslet_config, name, sfn_file):
     filepath = repo_path('cloud_formation', 'stepfunctions', sfn_file)
     filepath = Path(filepath)
 
-    machine = heaviside.StateMachine(name, session = session)
-    machine.add_visitor(BossVisitor(domain))
+    machine = heaviside.StateMachine(name, session = bosslet_config.session)
+    machine.add_visitor(BossVisitor(bosslet_config))
 
     if machine.arn is None:
         raise Exception("Step Function '{}' doesn't exist...".format(name))
     else:
         machine.update(filepath)
 
-def delete(session, name):
-    machine = heaviside.StateMachine(name, session = session)
+def delete(bosslet_config, name):
+    machine = heaviside.StateMachine(name, session = bosslet_config.session)
     machine.delete()
     # DP ???: remove activity ARNs when deleting the step function or when removing the activity code
 

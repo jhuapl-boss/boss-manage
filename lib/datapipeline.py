@@ -19,8 +19,6 @@ Author:
     Derek Pryor <Derek.Pryor@jhuapl.edu>
 """
 
-from . import constants as const
-
 class Ref(object):
     """Reference internal to the Data Pipeline"""
     def __init__(self, ref):
@@ -143,7 +141,7 @@ class DataPipeline(object):
                        imageId = image,
                        terminateAfter = duration)
 
-    def add_emr_cluster(self, name, type="m3.xlarge", count="1", version="3.9.0", region=None, duration="2 Hours"):
+    def add_emr_cluster(self, name, type="m3.xlarge", count="1", version="3.9.0", region='us-east-1', duration="2 Hours"):
         """Add an Elastic Map Reduce cluster to the pipeline
         (Used for DynamoDB operations)
 
@@ -156,8 +154,6 @@ class DataPipeline(object):
             duration (str): A time string (ex '2 Hours') after which the instance
                             will be terminated (if it hasn't finished)
         """
-        if region is None:
-            region = const.REGION
 
         bootstrapArgs = """
 s3://{}.elasticmapreduce/bootstrap-actions/configure-hadoop,
@@ -260,7 +256,7 @@ s3://{}.elasticmapreduce/bootstrap-actions/configure-hadoop,
                        output = destination,
                        runsOn = runs_on)
 
-    def add_emr_copy(self, name, source, destination, runs_on=None, region=None, export=True):
+    def add_emr_copy(self, name, source, destination, runs_on=None, region='us-east-1', export=True):
         """Add a EMR / DynamoDB Copy Activity
 
         Args:
@@ -271,11 +267,6 @@ s3://{}.elasticmapreduce/bootstrap-actions/configure-hadoop,
             region (str): The AWS region
             export (bool): If the copy is an export or import
         """
-
-        if region is None:
-            region = const.REGION
-
-        
 
         step = "s3://dynamodb-emr-{region}/emr-ddb-storage-handler/2.1.0/emr-ddb-2.1.0.jar,org.apache.hadoop.dynamodb.tools.DynamoDb{port},#{{{dir_type}.directoryPath}},#{{{tbl_type}.tableName}},#{{{rate}ThroughputPercent}}".format(
             region = region,

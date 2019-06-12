@@ -88,4 +88,4 @@ base:
         - unzip
         - users.ec2-user
         - backup
-
+        - chrony

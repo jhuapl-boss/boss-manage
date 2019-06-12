@@ -14,9 +14,6 @@
 
 """Library for common methods that are used by the different configs scripts.
 
-Library currently appends the boss-manage.git/vault/ directory to the system path
-so that it can import vault/bastion.py and vault/vault.py.
-
 Library contains a set of AWS lookup methods for locating AWS data and other related
 helper functions and classes.
 
@@ -29,33 +26,10 @@ import time
 import json
 import re
 import sys
-from boto3.session import Session
 
-from . import constants as const
 from . import hosts
-
-def create_session(credentials):
-    """Read the AWS from the credentials dictionary and then create a boto3
-    connection to AWS with those credentials.
-    """
-    if type(credentials) == dict:
-        pass
-    elif type(credentials) == str:
-        credentials = json.loads(credentials)
-    else:
-        credentials = json.load(credentials)
-
-    session = Session(aws_access_key_id = credentials["aws_access_key"],
-                      aws_secret_access_key = credentials["aws_secret_key"],
-                      region_name = credentials.get('aws_region', const.REGION))
-    return session
-
-def use_iam_role():
-    """Create a session with no credentials, meant to be used by internal instance
-    with assumed iam role.
-    """
-    session = Session(region_name='us-east-1')
-    return session 
+from .utils import deprecated
+from .exceptions import BossManageError
 
 def get_all(to_wrap, key):
     """Utility helper method for requesting all results from AWS
@@ -282,6 +256,7 @@ def subnet_id_lookup(session, subnet_domain):
 
     Args:
         session (Session|None) : Boto3 session used to lookup information in AWS
+
                                  If session is None no lookup is performed
         subnet_domain (string) : Name of Subnet to lookup
 
@@ -298,36 +273,33 @@ def subnet_id_lookup(session, subnet_domain):
     else:
         return response['Subnets'][0]['SubnetId']
 
-def azs_lookup(session, lambda_compatible_only=False):
+def azs_lookup(bosslet_config, compatibility=None):
     """Lookup all of the Availablity Zones for the connected region.
 
     Args:
-        session (Session|None) : Boto3 session used to lookup information in AWS
-                                 If session is None no lookup is performed
-        lambda_compatible_only(bool): only return AZs that work with Lambda.
+        bosslet_config (BossConfiguration) : Bosslet configuration
+        compatiblity (str|None) : AVAILABILITY_ZONE_USAGE key to apply
     Returns:
         (list) : List of tuples (availability zone, zone letter)
     """
-    if session is None:
-        return []
-
-    client = session.client('ec2')
+    client = bosslet_config.session.client('ec2')
     response = client.describe_availability_zones()
-    # SH Removing Hack as subnet A is already in Production and causes issues trying to delete
-    #    We will strip out subnets A and C when creating the lambdas.
-    #rtn = [(z["ZoneName"], z["ZoneName"][-1]) for z in response["AvailabilityZones"] if z['ZoneName'] != 'us-east-1a']
+
     rtn = [(z["ZoneName"], z["ZoneName"][-1]) for z in response["AvailabilityZones"]]
 
-    if lambda_compatible_only:
-        current_account = get_account_id_from_session(session)
-        for az in rtn.copy():
-            if az[1] == 'c' and current_account == hosts.PROD_ACCOUNT:
-                rtn.remove(az)
-            if az[1] == 'a' and current_account == hosts.DEV_ACCOUNT:
-                rtn.remove(az)
+    if compatibility:
+        try:
+            limits = bosslet_config.AVAILABILITY_ZONE_USAGE[compatibility]
+        except:
+            pass # Don't do anything
+        else:
+            for az in rtn.copy():
+                if az[1] not in limits:
+                    rtn.remove(az)
+
     return rtn
 
-def ami_lookup(session, ami_name, version = None):
+def ami_lookup(bosslet_config, ami_name, version = None):
     """Lookup the Id for the AMI with the given name.
 
     If ami_name ends with '.boss', the AMI_VERSION environmental variable is used
@@ -335,7 +307,7 @@ def ami_lookup(session, ami_name, version = None):
     for the AMI with the specific tag ('.boss-<AMI_VERSION>').
 
     Args:
-        session (Session|None) : Boto3 session used to lookup information in AWS
+        bosslet_config (BossConfiguration) : Boto3 session used to lookup information in AWS
                                  If session is None no lookup is performed
         ami_name (string) : Name of AMI to lookup
         version (string|None) : Overrides the AMI_VERSION environment variable
@@ -345,12 +317,9 @@ def ami_lookup(session, ami_name, version = None):
         (tuple|None) : Tuple of strings (AMI ID, Commit hash of AMI build) or None
                        if AMI could not be located
     """
-    if session is None:
-        return None
-
     specific = False
-    if ami_name.endswith(".boss"):
-        ami_version = os.environ.get("AMI_VERSION", 'latest') if version is None else version
+    if ami_name.endswith(bosslet_config.AMI_SUFFIX):
+        ami_version = bosslet_config.ami_version if version is None else version
         if ami_version == "latest":
             # limit latest searching to only versions tagged with hash information
             ami_search = ami_name + "-h*"
@@ -360,14 +329,14 @@ def ami_lookup(session, ami_name, version = None):
     else:
         ami_search = ami_name
 
-    client = session.client('ec2')
+    client = bosslet_config.session.client('ec2')
     response = client.describe_images(Filters=[{"Name": "name", "Values": [ami_search]}])
     if len(response['Images']) == 0:
         if specific:
             print("Could not locate AMI '{}', trying to find the latest '{}' AMI".format(ami_search, ami_name))
-            return ami_lookup(session, ami_name, version = "latest")
+            return ami_lookup(bosslet_config, ami_name, version = "latest")
         else:
-            return None
+            raise BossManageError("Could not locate AMI '{}'".format(ami_name))
     else:
         response['Images'].sort(key=lambda x: x["CreationDate"], reverse=True)
         image = response['Images'][0]
@@ -544,52 +513,6 @@ def peering_lookup(session, from_id, to_id, owner_id=None):
         return None
     else:
         return response['VpcPeeringConnections'][0]['VpcPeeringConnectionId']
-
-
-def keypair_lookup(session):
-    """Lookup the names of valid Key Pair.
-
-    If the SSH_KEY enviro variable is defined and points to a valid keypair, that
-    keypair name is returned. Else all of the keypairs are printed to stdout and
-    the user is prompted to select which keypair to use.
-
-    Args:
-        session (Session|None) : Boto3 session used to lookup information in AWS
-                                 If session is None no lookup is performed
-
-    Returns:
-        (string|None) : Key Pair Name or None if the session is None
-    """
-    if session is None:
-        return None
-
-    client = session.client('ec2')
-    response = client.describe_key_pairs()
-    
-    # If SSH_KEY exists and points to a valid Key Pair, use it
-    key = os.environ.get("SSH_KEY", None)  # reuse bastion.py env vars
-    if key is not None:
-        kp_name = os.path.basename(key)
-        if kp_name.endswith(".pem"):
-            kp_name = kp_name[:-4]
-        for kp in response['KeyPairs']:
-            if kp["KeyName"] == kp_name:
-                return kp_name
-
-    print("Key Pairs")
-    for i in range(len(response['KeyPairs'])):
-        print("{}:  {}".format(i, response['KeyPairs'][i]['KeyName']))
-    if len(response['KeyPairs']) == 0:
-        return None
-    while True:
-        try:
-            idx = input("[0]: ")
-            idx = int(idx if len(idx) > 0 else "0")
-            return response['KeyPairs'][idx]['KeyName']
-        except KeyboardInterrupt:
-            sys.exit(1)
-        except:
-            print("Invalid Key Pair number, try again")
 
 
 def instanceid_lookup(session, hostname):
@@ -849,24 +772,6 @@ def request_cert(session, domain_name, validation_domain):
                                           DomainValidationOptions=validation_options)
     return response
 
-def get_hosted_zone(session):
-    """
-    Get hosted zone by looking up account name and using that to tell which
-     zone to return.
-    Args:
-        session: Boto3 Session
-
-    Returns:
-        Hosted zone name.
-    """
-    account = get_account_id_from_session(session)
-    if account == hosts.PROD_ACCOUNT:
-        return hosts.PROD_DOMAIN
-    elif account == hosts.DEV_ACCOUNT:
-        return hosts.DEV_DOMAIN
-    else:
-        return None
-
 def get_hosted_zone_id(session, hosted_zone):
     """Look up Hosted Zone ID by DNS Name
 
@@ -1035,7 +940,7 @@ def route53_delete_records(session, hosted_zone, cname):
     )
     return response
 
-def sns_unsubscribe_all(session, topic, region="us-east-1", account=None):
+def sns_unsubscribe_all(bosslet_config, topic):
     """Unsubscribe all subscriptions for the given SNS topic
 
     Args:
@@ -1046,12 +951,9 @@ def sns_unsubscribe_all(session, topic, region="us-east-1", account=None):
         account (string) : AWS account ID.  If None is provided the account ID
                            will be looked up from the session object using iam
     """
-    if session is None:
-        return None
-
-    if account is None:
-        account = get_account_id_from_session(session)
-
+    session = bosslet_config.session
+    region = bosslet_config.REGION
+    account = bosslet_config.ACCOUNT_ID
     topic = "arn:aws:sns:{}:{}:{}".format(region, account, topic.replace(".", "-"))
 
     client = session.client('sns')
@@ -1196,74 +1098,6 @@ def s3_bucket_delete(session, name, empty=False):
 
     bucket.delete()
 
-def get_account_id_from_session(session):
-    """
-    gets the account id from the session using the iam client.  This method will work even
-    if you have assumed a role in another account.
-    Args:
-        session (Session): Boto3 session used to lookup information in AWS.
-    Returns:
-        (str) AWS account id
-    """
-
-    if session is None:
-        return None
-
-    return session.client('iam').list_users(MaxItems=1)["Users"][0]["Arn"].split(':')[4]
-
-# DP TODO: refactor all lambda server functions into some common entity so it is easy to handle multiple accounts
-def get_lambda_s3_bucket(session):
-    '''
-    returns the lambda bucket based on the session
-    Args:
-        session:
-
-    Returns:
-        (str) bucket name to store lambdas
-    '''
-    account = get_account_id_from_session(session)
-    if account == hosts.PROD_ACCOUNT:
-        return hosts.PROD_LAMBDA_BUCKET
-    elif account == hosts.DEV_ACCOUNT:
-        return hosts.DEV_LAMBDA_BUCKET
-    else:
-        raise NameError("Unknown session account used, {}, S3_BUCKET for Lambda unknown.".format(account))
-
-def get_lambda_server(session):
-    '''
-    returns the lambda server based on the session
-    Args:
-        session:
-
-    Returns:
-        (str) build server for lambdas
-    '''
-    account = get_account_id_from_session(session)
-    if account == hosts.PROD_ACCOUNT:
-        return hosts.PROD_LAMBDA_SERVER
-    elif account == hosts.DEV_ACCOUNT:
-        return hosts.DEV_LAMBDA_SERVER
-    else:
-        raise NameError("Unknown session account used, {}, lambda_build_server for this session is unknown.".format(account))
-
-def get_lambda_server_key(session):
-    '''
-    returns the lambda server based on the session
-    Args:
-        session:
-
-    Returns:
-        (str) build server for lambdas
-    '''
-    account = get_account_id_from_session(session)
-    if account == hosts.PROD_ACCOUNT:
-        return const.PROD_LAMBDA_KEY
-    elif account == hosts.DEV_ACCOUNT:
-        return const.DEV_LAMBDA_KEY
-    else:
-        raise NameError("Unknown session account used, {}, lambda_build_server for this session is unknown.".format(account))
-
-
 def lambda_arn_lookup(session, lambda_name):
     """
     Returns the arn for a lambda given a lambda function name.
@@ -1336,6 +1170,17 @@ def activate_data_pipeline(session, id):
     from datetime import datetime
     client.activate_pipeline(pipelineId = id,
                              startTimestamp = datetime.utcnow())
+
+def get_existing_stacks(bosslet_config):
+    client = bosslet_config.session.client('cloudformation')
+    suffix = "".join([x.capitalize() for x in bosslet_config.INTERNAL_DOMAIN.split('.')])
+    invalid = ("DELETE_COMPLETE", )
+    existing = {
+        stack['StackName'][:-len(suffix)].lower(): stack
+        for stack in get_all(client.list_stacks, 'StackSummaries')()
+        if stack['StackName'].endswith(suffix) and stack['StackStatus'] not in invalid
+    }
+    return existing
 
 def create_keypair(session, KeyName, DryRun=False):
     """

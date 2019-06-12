@@ -25,14 +25,11 @@ from lib import aws
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
+    # DP NOTE: This should possibly be in user-scratch as it is specific to our deployment
+    # DP ???: Still used?
     parser = argparse.ArgumentParser(description="Request SSL domain certificates for theboss.io subdomains",
                                      formatter_class=argparse.RawDescriptionHelpFormatter,
                                      epilog='create domain cert')
-    parser.add_argument("--aws-credentials", "-a",
-                        metavar="<file>",
-                        default=os.environ.get("AWS_CREDENTIALS"),
-                        type=argparse.FileType('r'),
-                        help="File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
     parser.add_argument("domain_name", help="Domain to create the SSL certificate for (Ex: api.integration.theboss.io)")
 
     args = parser.parse_args()

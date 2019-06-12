@@ -27,13 +27,19 @@ import traceback
 
 import alter_path
 from lib import aws
-from lib import hosts
-from lib.names import AWSNames
+from lib import configuration
 
-AMIS = ["endpoint.boss", "cachemanager.boss", "proofreader-web.boss", "auth.boss", "vault.boss", "consul.boss", "activities.boss"]
+# TODO: Just read the packer config variables files
+AMIS = ["endpoint",
+        "cachemanager",
+        "proofreader-web",
+        "auth",
+        "vault",
+        "consul",
+        "activities"]
 
 
-def copy_amis(session, ami_ending, new_ami_ending):
+def copy_amis(bosslet_config, ami_ending, new_ami_ending):
     """
     changes Route53 entry for the api in domain to use cloudfront for the s3 maintenance bucket.
     Args:
@@ -44,12 +50,13 @@ def copy_amis(session, ami_ending, new_ami_ending):
     Returns:
         Nothing
     """
-    client = session.client("ec2")
+    client = bosslet_config.session.client("ec2")
     for prefix in AMIS:
+        prefix += bosslet_config.AMI_SUFFIX
         (ami_id, hash) = aws.ami_lookup(session, prefix, version=ami_ending)
         print(str(ami_id))
         try:
-            response = client.copy_image(SourceRegion=session.region_name,
+            response = client.copy_image(SourceRegion=bosslet_config.REGION,
                                          SourceImageId=ami_id,
                                          Name=prefix + "-" + new_ami_ending,
                                          Description="Copied from ami id {}".format(ami_id))
@@ -59,25 +66,14 @@ def copy_amis(session, ami_ending, new_ami_ending):
 
 
 
-cmd_help = "this will copy all AMIs given a specific version or name to a new AMI name, like sprint01."
-
-
-
 def create_parser():
     """
     Creates the argumentPaser
     Returns:
         (ArgumentParser) not yet parsed.
     """
-    parser = argparse.ArgumentParser(
-        description="",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=cmd_help)
-    parser.add_argument("--aws-credentials", "-a",
-                        metavar="<file>",
-                        default=os.environ.get("AWS_CREDENTIALS"),
-                        type=argparse.FileType('r'),
-                        help="File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
+    parser = configuration.BossParser(description = "Duplicate AMIs with a given ending to another ending, like latest to sprintXX")
+    parser.add_bosslet()
     parser.add_argument("ami_ending",
                         help="ami_ending ex: hc1ea3281 or latest")
     parser.add_argument("new_ami_ending",
@@ -92,11 +88,5 @@ if __name__ == '__main__':
     parser = create_parser()
     args = parser.parse_args()
 
-    if args.aws_credentials is None:
-        parser.print_usage()
-        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
-        sys.exit(1)
-
-    session = aws.create_session(args.aws_credentials)
-    copy_amis(session, args.ami_ending, args.new_ami_ending)
+    copy_amis(args.bosslet_config, args.ami_ending, args.new_ami_ending)
 

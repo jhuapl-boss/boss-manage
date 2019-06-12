@@ -71,17 +71,13 @@ wait
 
 #Checkout the right branch
 cd boss-manage/
-git checkout auto-build-test
-# git checkout 8a55840
+#git checkout integration
+git checkout refactor
 
 #Install all requirements
 git submodule init
 git submodule update
 python3.5 -m pip install -r requirements.txt
-
-cd salt_stack/salt/boss-tools/files/boss-tools.git
-git checkout vault_update
-cd ../../../../../
 
 # # Set-up log records on Cloudwatch:
 # export EC2_REGION=`curl --silent http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region`
@@ -110,18 +106,15 @@ source set_vars-auto_build_test.sh
 cd ../bin/
 
 #Create  keypair to attach to ec2 instances made by cloudformation.
-python3.5 ./manage_keypair.py delete auto-build-keypair
-python3.5 ./manage_keypair.py create auto-build-keypair
-export SSH_KEY="~/.ssh/auto-build-keypair.pem"
-chmod 400 ~/.ssh/auto-build-keypair.pem
-# ssh-add ~/.ssh/auto-build-keypair.pem
+python3.5 ./manage_keypair.py auto-build-test.boss delete auto-build-keypair
+python3.5 ./manage_keypair.py auto-build-test.boss create auto-build-keypair
 wait
 
 #Build AMIs
 echo " "
 echo "----------------------Building AMIs----------------------"
 echo " " 
-python3.5 ./packer.py auth vault consul endpoint cachemanager activities --name autotest --no-bastion
+python3.5 ./packer.py auto-build-test.boss all --ami-version autotest
 wait
 
 echo " "
@@ -132,21 +125,8 @@ echo "Env:"
 env
 
 #Run building cloudformation
-yes | python3.5 ./cloudformation.py create test.boss core --ami-version autotest
-wait 
-sleep 60
-yes | python3.5 ./cloudformation.py post-init test.boss core --ami-version autotest
+yes | python3.5 ./cloudformation.py create auto-build-test.boss all --ami-version autotest
 wait
-sleep 30
-yes | python3.5 ./cloudformation.py create test.boss redis --ami-version autotest
-wait
-yes | python3.5 ./cloudformation.py create test.boss api --ami-version autotest
-wait
-yes | python3.5 ./cloudformation.py create test.boss activities --ami-version autotest
-wait
-yes | python3.5 ./cloudformation.py create test.boss cloudwatch --ami-version autotest
-wait
-# yes  | python3.5 ./cloudformation.py create test.boss dynamolambda --ami-version autotest
 
 echo " "
 echo "----------------------Performing Tests----------------------"
@@ -156,30 +136,20 @@ echo " "
 
 #Endpoint tests:
 echo 'Performing tests...'
-python3.5 ./bastion.py --ssh-key ~/.ssh/auto-build-keypair.pem endpoint.test.boss ssh-cmd "cd /srv/www/django && python3 manage.py test"# python3 manage.py test -- -c inttest.cfg
+python3.5 ./bastion.py endpoint.auto-build-test.boss ssh-cmd "cd /srv/www/django && python3 manage.py test"# python3 manage.py test -- -c inttest.cfg
 
 #ndingest library
-python3.5 ./bastion.py --ssh-key ~/.ssh/auto-build-keypair.pem endpoint.test.boss ssh-cmd "python3 -m pip install pytest"
-python3.5 ./bastion.py --ssh-key ~/.ssh/auto-build-keypair.pem endpoint.test.boss ssh-cmd "cd /usr/local/lib/python3/site-packages/ndingest && export NDINGEST_TEST=1 && pytest -c test_apl.cfg"
+python3.5 ./bastion.py endpoint.auto-build-test.boss ssh-cmd "python3 -m pip install pytest"
+python3.5 ./bastion.py endpoint.auto-build-test.boss ssh-cmd "cd /usr/local/lib/python3/site-packages/ndingest && export NDINGEST_TEST=1 && pytest -c test_apl.cfg"
 
 #cachemanage VM
-python3.5 ./bastion.py --ssh-key ~/.ssh/auto-build-keypair.pem cachemanager.test.boss ssh-cmd "cd /srv/salt/boss-tools/files/boss-tools.git/cachemgr && sudo nose2 && sudo nose2 -c inttest.cfg"
+python3.5 ./bastion.py cachemanager.auto-build-test.boss ssh-cmd "cd /srv/salt/boss-tools/files/boss-tools.git/cachemgr && sudo nose2 && sudo nose2 -c inttest.cfg"
 
 echo " "
 echo "----------------------Delete Stacks----------------------"
 echo " " 
 
-# yes | python3.5 ./cloudformation.py delete test.boss dynamolambda
-# wait
-yes | python3.5 ./cloudformation.py delete test.boss cloudwatch
-wait
-yes | python3.5 ./cloudformation.py delete test.boss activities
-wait
-yes | python3.5 ./cloudformation.py delete test.boss api
-wait
-yes | python3.5 ./cloudformation.py delete test.boss redis
-wait
-yes | python3.5 ./cloudformation.py delete test.boss core
+yes | python3.5 ./cloudformation.py delete auto-build-test.boss all
 wait
 
 # echo " "
@@ -187,7 +157,7 @@ wait
 # echo " " 
 
 Delete keypairs from aws
-python3.5 ./manage_keypair.py delete auto-build-keypair
+python3.5 ./manage_keypair.py auto-build-test.boss delete auto-build-keypair
 Shutdown the instance an hour after script executes.
 shutdown -h +3600"""
 

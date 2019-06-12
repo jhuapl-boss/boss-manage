@@ -1,0 +1,92 @@
+#
+# Example Cloud Formation configuration file
+#
+# A configuration file is used to build a Cloud Formation template
+# using the cloudformation library. Once the template is built it can
+# be created, updated, and deleted.
+#
+
+# A list of other configuration files that this file depends upon
+# either because this file uses AWS resources created in it as a
+# dependency or because there are runtime dependencies between components
+DEPENDENCIES = []
+
+# Libraries that are often used. They all contain PyDocs that describe
+# how should they work
+from lib.cloudformation import CloudFormationConfiguration
+from lib import constants as const
+from lib import aws
+from lib import scalyr
+from lib.exceptions import BossManageError, BossManageCanceled
+
+# The create, update, delete, pre-init, post-init, generate methods
+# should raise a BossManageError if there is a problem. If the user
+# selected to not proceed with an action a BossManageCanceled should
+# be raised.
+
+def create_config(bosslet_config):
+    """A Common method for generating the configuration object
+    Used by multiple entry points for the file
+    """
+    # AWSNames is used to provide the correct reference to different AWS resource
+    session = bosslet_config.session
+    names = bosslet_config.names
+
+    # const.* are constants, including the scenario overlay (if selected at runtime)
+
+    config = CloudFormationConfiguration('<name of config file>', bosslet_config)
+
+    # create Cloud Formation template by calling `config.add_*` methods
+
+    return config
+
+def generate(bosslet_config):
+    """Generate the Cloud Formation template as a file on disk, so the developer can
+    inspect the results
+    """
+
+    config = create_config(bosslet_config)
+    config.generate()
+
+def create(bosslet_config):
+    """Build and Create the Cloud Formation template in AWS"""
+
+    config = create_config(bosslet_config)
+    config.create()
+
+    post_init(bosslet_config)
+
+def post_init(bosslet_config):
+    """Post-create configuration actions
+    Either called by create or manually if there was an error in post-init
+    when it was first run. This means that this function should be able to
+    be called multiple times without problems (if defined)
+    """
+
+    # post-init actions
+    pass
+
+def update(bosslet_config):
+    """Build a new Cloud Formation template and update the existing stack
+    in AWS
+    """
+
+    config = create_config(bosslet_config)
+    config.update()
+
+    # post update actions
+    pass
+
+def delete(bosslet_config):
+    """Delete an existing Cloud Formation  stack
+    If this method is not defined the below line is used by `bin/cloudformation.py`
+    to delete the stack
+    """
+    
+    # Pre-delete actions
+
+    config = CloudFormationConfiguration('<name of config file>', bosslet_config)
+    config.delete()
+
+    # Post-delete actions
+    pass

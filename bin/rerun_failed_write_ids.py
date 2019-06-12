@@ -21,17 +21,17 @@ For Index.IdWriters that successfully start, the corresponding message is
 deleted from the queue.
 """
 
-import alter_path
 import argparse
 import botocore
 import boto3
-from hashlib import md5
 import json
-from lib import aws
-from lib.hosts import PROD_ACCOUNT, DEV_ACCOUNT
-from lib.names import AWSNames
 import os
 import time
+from hashlib import md5
+
+import alter_path
+from lib import aws
+from lib import configuration
 
 MAX_SQS_RECEIVE = 10
 
@@ -67,23 +67,7 @@ def check_response(msg):
         raise CorruptSqsResponseError('Message corrupt - MD5 mismatch')
 
 
-def get_account(domain):
-    """
-    Return the AWS account number based on the domain.  The account number is
-    used to assemble the step function arns.
-
-    Args:
-        domain (str): VPC such as integration.boss.
-
-    Returns:
-        (str): AWS account number.
-    """
-    if domain == 'production.boss' or domain == 'integration.boss':
-        return PROD_ACCOUNT
-    return DEV_ACCOUNT
-
-
-def start(session, domain, region, account, spacing):
+def start(bosslet_config, spacing):
     """
     Main entry point of script.  Step functions are started as fast as
     possible but the first state is a delay.  The spacing argument is added to
@@ -91,22 +75,19 @@ def start(session, domain, region, account, spacing):
     The nth's step function's delay is (n-1) * spacing.
 
     Args:
-        session (boto3.session.Session): Open boto3 Session.
-        domain (str): Domain that identifies VPC used such as integration.boss.
-        region (str): AWS region.
-        account (str): AWS account number.
+        bosslet_config (BossConfiguration): Configuration for the target Bosslet
         spacing (int): Space start of step function's lambda task by this many seconds.
     """
-    names = AWSNames(domain)
-    sfn_arn_prefix = 'arn:aws:states:{}:{}:stateMachine:'.format(region, account)
-    arn = '{}{}'.format(sfn_arn_prefix, names.index_id_writer_sfn)
-    queue_name = names.index_deadletter_queue
+    sfn_arn_prefix = 'arn:aws:states:{}:{}:stateMachine:'.format(bosslet_config.REGION,
+                                                                 bosslet_config.ACCOUNT_ID)
+    arn = '{}{}'.format(sfn_arn_prefix, bosslet_config.names.index_id_writer.sfn)
+    queue_name = names.index_deadletter.sqs
 
-    sqs = session.client('sqs')
+    sqs = bosslet_config.session.client('sqs')
     resp = sqs.get_queue_url(QueueName=queue_name)
     queue_url = resp['QueueUrl']
 
-    sfn = session.client('stepfunctions')
+    sfn = bosslet_config.session.client('stepfunctions')
 
     wait_secs = 0
 
@@ -162,39 +143,18 @@ def start(session, domain, region, account, spacing):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description='Script for retrying Index.IdWriters that failed' + 
-        'To supply arguments from a file, provide the filename prepended with an `@`.',
-        fromfile_prefix_chars = '@')
-    parser.add_argument(
-        '--aws-credentials', '-a',
-        metavar='<file>',
-        default=os.environ.get('AWS_CREDENTIALS'),
-        type=argparse.FileType('r'),
-        help='File with credentials for connecting to AWS (default: AWS_CREDENTIALS)')
-    parser.add_argument(
-        '--region', '-r',
-        default='us-east-1',
-        help='AWS region (default: us-east-1)')
-    parser.add_argument(
-        'domain',
-        help='Domain that lambda functions live in, such as integration.boss.')
-    parser.add_argument(
-        'wait_secs',
-        nargs='?',
-        type=int,
-        default=10,
-        help='# seconds to space starting of step functions (default: 10)')
+    parser = configuration.BossParser(description='Script for retrying Index.IdWriters that failed' + 
+                                      'To supply arguments from a file, provide the filename prepended with an `@`.',
+                                      fromfile_prefix_chars = '@')
+    parser.add_bosslet()
+    parser.add_argument('wait_secs',
+                        nargs='?',
+                        type=int,
+                        default=10,
+                        help='# seconds to space starting of step functions (default: 10)')
 
     args = parser.parse_args()
 
-    if args.aws_credentials is None:
-        parser.print_usage()
-        parser.exit(1, 'Error: AWS credentials not provided and AWS_CREDENTIALS is not defined')
-
-    session = aws.create_session(args.aws_credentials)
-
-    account = get_account(args.domain)
-    start(session, args.domain, args.region, account, args.wait_secs)
+    start(args.bosslet_config, args.wait_secs)
     print('Done.')
 

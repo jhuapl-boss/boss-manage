@@ -21,5 +21,9 @@
 # is maintained.  These lambdas are triggered by uploads to the S3 buckets
 # which are in turn triggered by SQS messages.  When an SQS message is
 # delivered multiple times, problems occured when deleting immediately.
+
+# DP NOTE: Not included in constants.py because this file is added to bossnames
+#          as part of the lambda build process and constants.py has too many
+#          dependencies for that.
 TAG_DELETE_KEY = "delete"
 TAG_DELETE_VALUE = "true"

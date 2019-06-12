@@ -15,6 +15,34 @@
 class BossManageError(Exception):
     pass
 
+class BossManageCanceled(BossManageError):
+    def __init__(self):
+        super().__init__("Action Canceled")
+
+class DependencyError(BossManageError):
+    pass
+
+class CircularDependencyError(DependencyError):
+    def __init__(self, a=None, b=None):
+        msg = "Circular dependency"
+        if a and b:
+            msg += " '{}' <--> '{}'".format(a, b)
+        else:
+            msg += " in configurations"
+        super(CircularDependencyError, self).__init__(msg)
+
+class MissingDependencyError(DependencyError):
+    def __init__(self, config, dependency):
+        msg = "Dependency '{}' for config '{}' is not being launched and doesn't exist"
+        msg = msg.format(dependency, config)
+        super(MissingDependencyError, self).__init__(msg)
+
+class DependencyInProgressError(DependencyError):
+    def __init__(self, config):
+        msg = "Dependency '{}' is in progress"
+        msg = msg.format(config)
+        super(DependencyInProgressError, self).__init__(msg)
+
 class SSHError(BossManageError):
     pass
 
@@ -68,3 +96,6 @@ class KeyCloakLoginError(KeyCloakError):
     def __init__(self, target, username):
         message = "Could not login to Keycloak at {} with username {}".format(target, username)
         super(KeyCloakLoginError, self).__init__(None, message)
+
+class VaultError(Exception):
+    pass
