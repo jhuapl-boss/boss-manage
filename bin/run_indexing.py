@@ -27,11 +27,8 @@ import boto3
 import os
 import json
 from collections import namedtuple
-from mysql import connector
 
 import alter_path
-from lib import aws
-from lib.external import ExternalCalls
 from lib import configuration
 
 # When this number of number of write units is consumed updating an entry in
@@ -56,18 +53,6 @@ class ResourceNotFoundException(Exception):
     """
 
 """
-Container for MySQL connection parameters.
-
-Fields:
-    host (str): DB host name or ip address.
-    port (str|int): Port to connect to.
-    db (str): Name of DB.
-    user (str): DB user name.
-    password (str): User password.
-"""
-DbParams = namedtuple('DbParams', ['host', 'port', 'db', 'user', 'password'])
-
-"""
 Container that identifies Boss channel.
 
 Fields:
@@ -79,35 +64,12 @@ ChannelParams = namedtuple(
     'ChannelParams', ['collection', 'experiment', 'channel'])
 
 
-def get_mysql_params(bosslet_config):
-    """
-    Get MySQL connection info from Vault.
-
-    Args:
-        session (Session): Open boto3 session.
-        domain (str): VPC such as integration.boss.
-
-    Returns:
-        (DbParams): Connection info from Vault.
-    """
-    print('Getting MySQL parameters from Vault (slow) . . .')
-    with bosslet_config.call.vault() as vault:
-        params = vault.read('secret/endpoint/django/db')
-
-    return DbParams(bosslet_config.names.endpoint_db.rds,
-                    params['port'],
-                    params['name'],
-                    params['user'],
-                    params['password'])
-
-def get_lookup_key_from_db(bosslet_config, db_params, channel_params):
+def get_lookup_key_from_db(bosslet_config, channel_params):
     """
     Get the lookup key that identifies the annotation channel from the database.
 
     Args:
-        session (Session): Open boto3 session.
-        domain (str): VPC such as integration.boss.
-        db_params (DbParams): DB connection info.
+        bosslet_config (BossConfiguration): Bosslet configuration object
         channel_params (ChannelParams): Identifies channel.
 
     Returns:
@@ -117,36 +79,24 @@ def get_lookup_key_from_db(bosslet_config, db_params, channel_params):
     exp_query = "SELECT id FROM experiment WHERE name = %s"
     chan_query = "SELECT id FROM channel WHERE name = %s"
 
-    print('Tunneling to DB (slow) . . .')
-    with bosslet_config.call.tunnel(db_params.host, db_params.port, 'rds') as local_port:
-        try:
-            sql = connector.connect(
-                user=db_params.user, password=db_params.password, 
-                port=local_port, database=db_params.db
-            )
-            try:
-                cursor = sql.cursor()
-                cursor.execute(coll_query, (channel_params.collection,))
-                coll_set = cursor.fetchall()
-                if len(coll_set) != 1:
-                    raise ResourceNotFoundException(
-                        "Can't find collection: {}".format(channel_params.collection))
+    with bosslet_config.call.connect_rds() as cursor:
+        cursor.execute(coll_query, (channel_params.collection,))
+        coll_set = cursor.fetchall()
+        if len(coll_set) != 1:
+            raise ResourceNotFoundException(
+                "Can't find collection: {}".format(channel_params.collection))
 
-                cursor.execute(exp_query, (channel_params.experiment,))
-                exp_set = cursor.fetchall()
-                if len(exp_set) != 1:
-                    raise ResourceNotFoundException(
-                        "Can't find experiment: {}".format(channel_params.experiment))
+        cursor.execute(exp_query, (channel_params.experiment,))
+        exp_set = cursor.fetchall()
+        if len(exp_set) != 1:
+            raise ResourceNotFoundException(
+                "Can't find experiment: {}".format(channel_params.experiment))
 
-                cursor.execute(chan_query, (channel_params.channel,))
-                chan_set = cursor.fetchall()
-                if len(chan_set) != 1:
-                    raise ResourceNotFoundException(
-                        "Can't find channel: {}".format(channel_params.experiment))
-            finally:
-                cursor.close()
-        finally:
-            sql.close()
+        cursor.execute(chan_query, (channel_params.channel,))
+        chan_set = cursor.fetchall()
+        if len(chan_set) != 1:
+            raise ResourceNotFoundException(
+                "Can't find channel: {}".format(channel_params.experiment))
 
     return '{}&{}&{}&{}'.format(
         coll_set[0][0], exp_set[0][0], chan_set[0][0], RESOLUTION)
@@ -157,13 +107,12 @@ def get_common_args(bosslet_config):
     Get common arguments for starting step functions related to indexing.
 
     Args:
-        domain (str): VPC such as integration.boss.
-        account (str): AWS account number.
-        region (str): AWS region.
+        bosslet_config (BossConfiguration): Bosslet configuration object
 
     Returns:
         (dict): Arguments.
     """
+    account = bosslet_config.ACCOUNT_ID
     sfn_arn_prefix = SFN_ARN_PREFIX_FORMAT.format(bosslet_config.REGION,
                                                   bosslet_config.ACCOUNT_ID)
     n = bosslet_config.names
@@ -211,9 +160,7 @@ def get_find_cuboid_args(bosslet_config, lookup_key):
     Get all arguments needed to start Index.FindCuboids.
 
     Args:
-        domain (str): VPC such as integration.boss.
-        account (str): AWS account number.
-        region (str): AWS region.
+        bosslet_config (BossConfiguration): Bosslet configuration object
 
     Returns:
         (str, str): [0] is the ARN of Index.FindCuboids; [1] are the step function arguments as a JSON string.
@@ -233,6 +180,7 @@ def get_running_step_fcns(bosslet_config, arn):
     Retrive execution arns of running step functions.
 
     Args:
+        bosslet_config (BossConfiguration): Bosslet configuration object
         arn (str): Specifies step function of interest.
 
     Yields:
@@ -260,9 +208,8 @@ def run_find_cuboids(bosslet_config, args):
     process from the beginning.
 
     Args:
-        session (Session): An open boto3 Session.
+        bosslet_config (BossConfiguration): Bosslet configuration object
         args (Namespace): Parsed command line arguments.
-        account (str): AWS account id.
     """
     channel_params = ChannelParams(
         args.collection, args.experiment, args.channel)
@@ -270,13 +217,7 @@ def run_find_cuboids(bosslet_config, args):
     if args.lookup_key is not None:
         lookup_key = args.lookup_key 
     else:
-        # Get DB params from Vault and tunnel to the DB and get lookup_key.
-        # Slow!
-        mysql_params = get_mysql_params(bosslet_config)
-        #print(mysql_params)
-
         lookup_key = get_lookup_key_from_db(bosslet_config,
-                                            mysql_params,
                                             channel_params) 
         print('lookup_key is: {}'.format(lookup_key))
 
@@ -299,10 +240,7 @@ def resume_indexing(bosslet_config):
     empty, indexing will resume on those cuboids identified in that queue.
 
     Args:
-        session (Session): An open boto3 Session.
-        region (str): AWS region such as us-east-1.
-        account (str): AWS account id.
-        domain (str): VPC domain such as production.boss.
+        bosslet_config (BossConfiguration): Bosslet configuration object
     """
     resume_args = get_common_args(bosslet_config):
     resume_args['queue_empty'] = False
@@ -325,10 +263,7 @@ def stop_indexing(bosslet_config):
     functions will be halted.  This allows the indexing process to be resumed.
 
     Args:
-        session (Session): An open boto3 Session.
-        region (str): AWS region such as us-east-1.
-        account (str): AWS account id.
-        domain (str): VPC domain such as production.boss.
+        bosslet_config (BossConfiguration): Bosslet configuration object
     """
     stop_args = get_common_args(bosslet_config)
 
