@@ -19,6 +19,8 @@ import json
 from pprint import pprint
 import traceback
 
+from .exceptions import VaultError
+
 VAULT_TOKEN = "vault_token"
 VAULT_KEY = "vault_key."
 
@@ -71,13 +73,13 @@ class Vault(object):
         if read_token is not None:
             token_file = self.path(read_token)
             if not os.path.exists(token_file):
-                raise Exception("Token file '{}' doesn't exist".format(token_file))
+                raise VaultError("Token file '{}' doesn't exist".format(token_file))
 
             with open(token_file, "r") as fh:
                 client.token = fh.read()
                 try:
                     if not client.is_authenticated():
-                        raise Exception("Vault token is not valid, cannot communicate with the Vault")
+                        raise VaultError("Vault token is not valid, cannot communicate with the Vault")
                 except:
                     raise
         return client
@@ -102,7 +104,7 @@ class Vault(object):
         client = self.connect(VAULT_TOKEN)
         code.interact(local=locals())
 
-    def initialize(self, secrets = 5, threashold = 3):
+    def initialize(self, account_id, secrets = 5, threashold = 3):
         """Initialize a Vault. Connect using get_client() and if the Vault is not
         initialized then initialize it with 5 secrets and a threashold of 3. The
         keys are stored as VAULT_KEY and root token is stored as VAULT_TOKEN.
@@ -110,6 +112,7 @@ class Vault(object):
         After initializing the Vault it is unsealed for use and vault-configure is called.
 
         Args:
+            account_id (str) : AWS Account ID that Vault is running under, passed to configure()
             secrets (int) : Total number of secrets to split the master key into
             threashold (int) : The number of secrets required to reconstruct the master key
         """
@@ -144,9 +147,9 @@ class Vault(object):
             print("Unsealing Vault")
             client.unseal_multi(result["keys"])
 
-        self.configure()
+        self.configure(account_id)
 
-    def configure(self):
+    def configure(self, account_id):
         """A companion function that will configure a newly initialized Vault
         as needed for BOSS. This includes:
             * Configuring the Audit Backend
@@ -156,11 +159,10 @@ class Vault(object):
                   for any policy
             * Configure the AWS backend (if there are AWS credentials to use)
             * Configure AWS backend roles from policies/*.iam
-            * Configure the PKI backend (if there is a certificate to use)
-            * Configure PKI backend roles from policies/*.pki
 
         Args:
-            machine (None|string) : hostname of the machine, used for reading/saving unique data
+            account_id (str) : AWS Account ID that Vault is running under, used when binding
+                               AWS roles to Vault policies in the AWS authentication backend
         """
         print("Configuring Vault")
         client = self.connect(VAULT_TOKEN)
@@ -191,16 +193,19 @@ class Vault(object):
             try:
                 client.enable_auth_backend('aws')
             except Exception as e:
-                raise Exception("Error while enabling auth back end. {}".format(e))
+                raise VaultError("Error while enabling auth back end. {}".format(e))
         else:
             print("aws auth backend already created.")
+
         #Define policies and arn                                     
         policies = [p for p in provisioner_policies if p not in ('provisioner',)]
-        arn = 'arn:aws:iam::{}:instance-profile/'.format(os.environ['AWS_ACCOUNT'])
-        #TODO: Find a temporary way of storing the aws account number
+        arn = 'arn:aws:iam::{}:instance-profile/'.format(account_id)
         #For each policy configure the policies on a role of the same name
         for policy in policies:
-            client.write('/auth/aws/role/' + policy, auth_type='ec2', bound_iam_instance_profile_arn= arn + policy, policies=policy)
+            client.write('/auth/aws/role/' + policy,
+                         auth_type='ec2',
+                         bound_iam_instance_profile_arn= arn + policy,
+                         policies=policy)
             print('Successful write to aws/role/' + policy)
         
         # AWS Secret Backend
@@ -208,7 +213,7 @@ class Vault(object):
             try:
                 client.enable_secret_backend('aws')
             except Exception as e:
-                raise Exception('Error while enabling secret back end. {}'.format(e))
+                raise VaultError('Error while enabling secret back end. {}'.format(e))
         else:
             print("aws secret backend already created.")
 
@@ -218,28 +223,6 @@ class Vault(object):
             with open(iam, 'r') as fh:
                 # if we json parse the file first we can use the duplicate key trick for comments
                 client.write("aws/roles/" + name, policy = fh.read())
-
-        # PKI Backend
-        """
-        if True: # Disabled until we either have a CA cert or can generate a CA
-            print("Vault PKI cert file does not exist, skipping configuration of PKI secret backend")
-        else:
-            client.enable_secret_backend('pki')
-            # Generate a self signed certificate for CA
-            print("Generating self signed CA")
-            response = client.write("pki/root/generate/internal", common_name=aws_creds["domain"])
-            with open(get_path(machine, "ca.pem"), 'w') as fh:
-                fh.write(response["data"]["certificate"])
-
-            # Should we configure CRL?
-
-            path = os.path.join(_CURRENT_DIR, "policies", "*.pki")
-            for pki in glob.glob(path):
-                name = os.path.basename(pki).split('.')[0]
-                with open(pki, 'r') as fh:
-                    keys = json.load(fh)
-                    client.write("aws/roles/" + name, **keys)
-        """
 
     def set_policy(self, name, policy):
         """Create or Update a policy
@@ -280,7 +263,7 @@ class Vault(object):
                 keys.append(fh.read())
 
         if len(keys) == 0:
-            raise Exception("Could not locate any key files, not unsealing")
+            raise VaultError("Could not locate any key files, not unsealing")
 
         res = client.unseal_multi(keys)
         if res['sealed']:

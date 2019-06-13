@@ -24,6 +24,7 @@ import os
 
 import alter_path
 from lib import aws
+from lib import configuration
 from pathlib import Path
 
 if __name__ == '__main__':
@@ -36,14 +37,10 @@ if __name__ == '__main__':
     actions = ["create", "delete"]
     actions_help = create_help("action supports the following:", actions)
 
-    parser = argparse.ArgumentParser(description = "Script the creation and deletion of keypairs.",
-                                     formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     epilog=actions_help)
-    parser.add_argument("--aws-credentials", "-a",
-                        metavar = "<file>",
-                        default = os.environ.get("AWS_CREDENTIALS"),
-                        type = argparse.FileType('r'),
-                        help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
+    parser = configuration.BossParser(description = "Script the creation and deletion of keypairs.",
+                                      formatter_class=argparse.RawDescriptionHelpFormatter,
+                                      epilog=actions_help)
+    parser.add_bosslet()
     parser.add_argument("action",
                         choices = actions,
                         metavar = "action",
@@ -53,17 +50,7 @@ if __name__ == '__main__':
                         help = "Name of keypair to manage")
     args = parser.parse_args()
 
-    if args.aws_credentials is None:
-        try:
-            print("AWS credentials not provided and AWS_CREDENTIALS is not defined, assuming IAM role")
-            session = aws.use_iam_role()
-        except Exception as e:
-            parser.print_usage()
-            print('Error: Could not assume IAM role')
-    else:
-        session = aws.create_session(args.aws_credentials)
-
-    client = session.client('ec2')
+    client = args.bosslet_config.session.client('ec2')
 
     #Define key pair path
     key_file_path = Path.home() / '.ssh' / (args.keypairName + '.pem')
@@ -81,7 +68,7 @@ if __name__ == '__main__':
                 key_file_path.touch()
                 with key_file_path.open('w') as fh:
                     fh.write(response['KeyMaterial'])
-                key_file_path.chmod(0o444)
+                key_file_path.chmod(0o400)
                 print('KeyPair saved in ~/.ssh/')
             except FileExistsError:
                 print('Directory {} already existed'.format(key_dir))

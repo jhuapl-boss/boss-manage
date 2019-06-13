@@ -18,11 +18,12 @@ Create the cloudwatch alarms for the load balancer on top of a loadbalancer stac
 
 """
 
+DEPENDENCIES = ['core', 'api']
+
 from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, Arn
 from lib.userdata import UserData
-from lib.names import AWSNames
 from lib.keycloak import KeyCloakClient
-from lib.external import ExternalCalls
+from lib.exceptions import MissingResourceError
 from lib import aws
 from lib import utils
 from lib import scalyr
@@ -30,40 +31,40 @@ from lib import constants as const
 
 import json
 
-def create_config(session, domain):
+def create_config(bosslet_config):
     """Create the CloudFormationConfiguration object.
     :arg session used to perform lookups
     :arg domain DNS name of vpc
     """
-    config = CloudFormationConfiguration('cloudwatch', domain)
-    names = AWSNames(domain)
+    config = CloudFormationConfiguration('cloudwatch', bosslet_config)
+    names = bosslet_config.names
+    session = bosslet_config.session
+    domain = bosslet_config.INTERNAL_DOMAIN
 
-    vpc_id = config.find_vpc(session)
-    lambda_subnets, _ = config.find_all_availability_zones(session, lambda_compatible_only=True)
+    vpc_id = config.find_vpc()
+    lambda_subnets, _ = config.find_all_subnets(compatibility = 'lambda')
 
-    internal_sg = aws.sg_lookup(session, vpc_id, names.internal)
+    internal_sg = aws.sg_lookup(session, vpc_id, names.internal.sg)
 
-    loadbalancer_name = names.endpoint_elb
+    loadbalancer_name = names.endpoint_elb.dns
     if not aws.lb_lookup(session, loadbalancer_name):
-        raise Exception("Invalid load balancer name: " + loadbalancer_name)
+        raise MissingResourceError('ELB', loadbalancer_name)
 
     # TODO Test that MailingListTopic is working.
-    production_mailing_list = const.PRODUCTION_MAILING_LIST
+    production_mailing_list = bosslet_config.ALERT_TOPIC
     mailing_list_arn = aws.sns_topic_lookup(session, production_mailing_list)
     if mailing_list_arn is None:
-        #config.add_sns_topic("topicList", production_mailing_list)
-        msg = "MailingList {} needs to be created before running config"
-        raise Exception(msg.format(const.PRODUCTION_MAILING_LIST))
+        raise MissingResourceError('SNS topic', bosslet_config.ALERT_TOPIC)
 
     config.add_cloudwatch(loadbalancer_name, [mailing_list_arn])
 
     lambda_role = aws.role_arn_lookup(session, 'VaultConsulHealthChecker')
     config.add_arg(Arg.String(
         'VaultConsulHealthChecker', lambda_role,
-        'IAM role for vault/consul health check.' + domain))
+        'IAM role for vault/consul health check'))
 
     config.add_lambda('VaultLambda',
-                      names.vault_monitor,
+                      names.vault_monitor.lambda_,
                       description='Check health of vault instances.',
                       timeout=30,
                       role=Ref('VaultConsulHealthChecker'),
@@ -73,7 +74,7 @@ def create_config(session, domain):
                       file=const.VAULT_LAMBDA)
 
     config.add_lambda('ConsulLambda',
-                      names.consul_monitor,
+                      names.consul_monitor.lambda_,
                       description='Check health of vault instances.',
                       timeout=30,
                       role=Ref('VaultConsulHealthChecker'),
@@ -90,17 +91,17 @@ def create_config(session, domain):
     })
 
     config.add_cloudwatch_rule('VaultConsulCheck',
-                               name=names.vault_consul_check,
+                               name=names.vault_consul_check.cw,
                                description='Check health of vault and consul instances.',
                                targets=[
                                    {
                                        'Arn': Arn('VaultLambda'),
-                                       'Id': names.vault_monitor,
+                                       'Id': names.vault_monitor.lambda_,
                                        'Input': json_str
                                    },
                                    {
                                        'Arn': Arn('ConsulLambda'),
-                                       'Id': names.consul_monitor,
+                                       'Id': names.consul_monitor.lambda_,
                                        'Input': json_str
                                    },
                                ],
@@ -108,41 +109,28 @@ def create_config(session, domain):
                                depends_on=['VaultLambda', 'ConsulLambda'])
 
     config.add_lambda_permission('VaultPerms',
-                                 names.vault_monitor,
+                                 names.vault_monitor.lambda_,
                                  principal='events.amazonaws.com',
                                  source=Arn('VaultConsulCheck'))
 
     config.add_lambda_permission('ConsulPerms',
-                                 names.consul_monitor,
+                                 names.consul_monitor.lambda_,
                                  principal='events.amazonaws.com',
                                  source=Arn('VaultConsulCheck'))
 
     return config
 
 
-def generate(session, domain):
-    """Create the configuration and save it to disk
-    :arg folder location to generate the cloudformation template stack
-    :arg domain internal DNS name"""
-    config = create_config(session, domain)
+def generate(bosslet_config):
+    """Create the configuration and save it to disk"""
+    config = create_config(bosslet_config)
     config.generate()
 
+def create(bosslet_config):
+    config = create_config(bosslet_config)
 
-def create(session, domain):
-    """Create the configuration, launch it, and initialize Vault
-    :arg session information for performing lookups
-    :arg domain internal DNS name """
-    config = create_config(session, domain)
-
-    success = config.create(session)
-
-    if success:
-        print('success')
-    else:
-        print('failed')
-
+    config.create()
 
 def update(session, domain):
-    config = create_config(session, domain)
-    success = config.update(session)
-    return success
+    config = create_config(bosslet_config)
+    config.update()

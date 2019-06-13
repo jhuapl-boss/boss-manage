@@ -12,52 +12,66 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Create the activites configuration that consists of
+  * Ingest Lambda
+  * Step Function Activities server ASG
+
+The activities configuration creates all of the Step Function related resources.
+The Activities server run Step Function Activites using the Heaviside library.
+
+As a post-init action the config manually creates the Step Functions by
+compiling the Heaviside files.
+"""
+
+DEPENDENCIES = ['core', 'api', 'redis', 'cachedb']
+
 import time
 import json
-from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, get_scenario, Arg
+from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, Arg
 from lib.userdata import UserData
-from lib.names import AWSNames
+from lib import console
+from lib import utils
 from lib import aws
 from lib import constants as const
 from lib import stepfunctions as sfn
-from update_lambda_fcn import load_lambdas_on_s3, update_lambda_code
+from lib.lambdas import load_lambdas_on_s3, update_lambda_code
 
-keypair = None
-
-
-def create_config(session, domain):
+def create_config(bosslet_config, lookup=True):
     """Create the CloudFormationConfiguration object."""
-    config = CloudFormationConfiguration('activities', domain, const.REGION)
-    names = AWSNames(domain)
+    config = CloudFormationConfiguration('activities', bosslet_config)
+    names = bosslet_config.names
+    keypair = bosslet_config.SSH_KEY
+    session = bosslet_config.session
 
-    global keypair
-    keypair = aws.keypair_lookup(session)
-
-    vpc_id = config.find_vpc(session)
+    vpc_id = config.find_vpc()
     sgs = aws.sg_lookup_all(session, vpc_id)
-    internal_subnets, _ = config.find_all_availability_zones(session)
-    internal_subnets_lambda, _ = config.find_all_availability_zones(session, lambda_compatible_only=True)
+    internal_subnets, _ = config.find_all_subnets()
+    internal_subnets_asg, _ = config.find_all_subnets(compatibility='asg')
     topic_arn = aws.sns_topic_lookup(session, "ProductionMicronsMailingList")
     event_data = {
         "lambda-name": "delete_lambda",
-        "db": names.endpoint_db,
-        "meta-db": names.meta,
-        "s3-index-table": names.s3_index,
-        "id-index-table": names.id_index,
-        "id-count-table": names.id_count_index,
-        "cuboid_bucket": names.cuboid_bucket,
-        "delete_bucket": names.delete_bucket,
+        "db": names.endpoint_db.rds,
+        "meta-db": names.meta.ddb,
+        "s3-index-table": names.s3_index.ddb,
+        "id-index-table": names.id_index.ddb,
+        "id-count-table": names.id_count_index.ddb,
+        "cuboid_bucket": names.cuboid_bucket.s3,
+        "delete_bucket": names.delete_bucket.s3,
         "topic-arn": topic_arn,
-        "query-deletes-sfn-name": names.query_deletes,
-        "delete-sfn-name": names.delete_cuboid,
-        "delete-exp-sfn-name": names.delete_experiment,
-        "delete-coord-frame-sfn-name": names.delete_coord_frame,
-        "delete-coll-sfn-name": names.delete_collection
+        "query-deletes-sfn-name": names.query_deletes.sfn,
+        "delete-sfn-name": names.delete_cuboid.sfn,
+        "delete-exp-sfn-name": names.delete_experiment.sfn,
+        "delete-coord-frame-sfn-name": names.delete_coord_frame.sfn,
+        "delete-coll-sfn-name": names.delete_collection.sfn,
     }
 
     role_arn = aws.role_arn_lookup(session, "events_for_delete_lambda")
-    multi_lambda = names.multi_lambda
-    lambda_arn = aws.lambda_arn_lookup(session, multi_lambda)
+    multi_lambda = names.multi_lambda.lambda_
+    if lookup:
+        lambda_arn = aws.lambda_arn_lookup(session, multi_lambda)
+    else:
+        lambda_arn = None
     target_list = [{
         "Arn": lambda_arn,
         "Id": multi_lambda,
@@ -66,43 +80,50 @@ def create_config(session, domain):
     schedule_expression = "cron(1 6-11/1 ? * TUE-FRI *)"
     #schedule_expression = "cron(0/2 * * * ? *)"  # testing fire every two minutes
 
-    config.add_event_rule("DeleteEventRule", names.delete_event_rule, role_arn=role_arn,
-                          schedule_expression=schedule_expression, target_list=target_list, description=None)
+    config.add_event_rule("DeleteEventRule",
+                          # XXX What type for event rules?
+                          names.delete_event_rule.dns,
+                          role_arn=role_arn,
+                          schedule_expression=schedule_expression,
+                          target_list=target_list)
+
     # Events have to be given permission to run lambda.
-    config.add_lambda_permission('DeleteRulePerm', multi_lambda, principal='events.amazonaws.com',
+    config.add_lambda_permission('DeleteRulePerm',
+                                 multi_lambda,
+                                 principal='events.amazonaws.com',
                                  source=Arn('DeleteEventRule'))
     user_data = UserData()
-    user_data["system"]["fqdn"] = names.activities
+    user_data["system"]["fqdn"] = names.activities.dns
     user_data["system"]["type"] = "activities"
-    user_data["aws"]["db"] = names.endpoint_db
-    user_data["aws"]["cache"] = names.cache
-    user_data["aws"]["cache-state"] = names.cache_state
+    user_data["aws"]["db"] = names.endpoint_db.rds
+    user_data["aws"]["cache"] = names.cache.redis
+    user_data["aws"]["cache-state"] = names.cache_state.redis
     user_data["aws"]["cache-db"] = "0"
     user_data["aws"]["cache-state-db"] = "0"
-    user_data["aws"]["meta-db"] = names.meta
-    user_data["aws"]["cuboid_bucket"] = names.cuboid_bucket
-    user_data["aws"]["tile_bucket"] = names.tile_bucket
-    user_data["aws"]["ingest_bucket"] = names.ingest_bucket
-    user_data["aws"]["s3-index-table"] = names.s3_index
-    user_data["aws"]["tile-index-table"] = names.tile_index
-    user_data["aws"]["id-index-table"] = names.id_index
-    user_data["aws"]["id-count-table"] = names.id_count_index
+    user_data["aws"]["meta-db"] = names.meta.ddb
+    user_data["aws"]["cuboid_bucket"] = names.cuboid_bucket.s3
+    user_data["aws"]["tile_bucket"] = names.tile_bucket.s3
+    user_data["aws"]["ingest_bucket"] = names.ingest_bucket.s3
+    user_data["aws"]["s3-index-table"] = names.s3_index.ddb
+    user_data["aws"]["tile-index-table"] = names.tile_index.ddb
+    user_data["aws"]["id-index-table"] = names.id_index.ddb
+    user_data["aws"]["id-count-table"] = names.id_count_index.ddb
     user_data["aws"]["max_task_id_suffix"] = str(const.MAX_TASK_ID_SUFFIX)
 
     config.add_autoscale_group("Activities",
-                               names.activities,
-                               aws.ami_lookup(session, 'activities.boss'),
+                               names.activities.dns,
+                               aws.ami_lookup(bosslet_config, names.activities.ami),
                                keypair,
-                               subnets=internal_subnets_lambda,
+                               subnets=internal_subnets_asg,
                                type_=const.ACTIVITIES_TYPE,
-                               security_groups=[sgs[names.internal]],
+                               security_groups=[sgs[names.internal.sg]],
                                user_data=str(user_data),
                                role=aws.instance_profile_arn_lookup(session, "activities"),
                                min=1,
                                max=1)
 
     config.add_lambda("IngestLambda",
-                      names.ingest_lambda,
+                      names.ingest_lambda.lambda_,
                       aws.role_arn_lookup(session, 'IngestQueueUpload'),
                       const.INGEST_LAMBDA,
                       handler="index.handler",
@@ -117,10 +138,10 @@ def create_config(session, domain):
     lambda_role = aws.role_arn_lookup(session, "lambda_resolution_hierarchy")
 
     config.add_lambda("DownsampleVolumeLambda",
-                      names.downsample_volume_lambda,
+                      names.downsample_volume.lambda_,
                       lambda_role,
-                      s3=(aws.get_lambda_s3_bucket(session),
-                          "multilambda.{}.zip".format(domain),
+                      s3=(bosslet_config.LAMBDA_BUCKET,
+                          names.multi_lambda.zip,
                           "downsample_volume.handler"),
                       timeout=120,
                       memory=1024,
@@ -128,12 +149,12 @@ def create_config(session, domain):
                       dlq = Ref('DownsampleDLQ'))
 
     config.add_sns_topic("DownsampleDLQ",
-                         names.downsample_dlq,
-                         names.downsample_dlq,
+                         names.downsample_dlq.sqs,
+                         names.downsample_dlq.sqs,
                          [('lambda', Arn('DownsampleDLQLambda'))])
 
     config.add_lambda('DownsampleDLQLambda',
-                      names.downsample_dlq,
+                      names.downsample_dlq.sqs,
                       lambda_role,
                       const.DOWNSAMPLE_DLQ_LAMBDA,
                       handler='index.handler',
@@ -145,90 +166,75 @@ def create_config(session, domain):
     return config
 
 
-def generate(session, domain):
+def generate(bosslet_config):
     """Create the configuration and save it to disk"""
-    config = create_config(session, domain)
+    config = create_config(bosslet_config, lookup=False)
     config.generate()
 
+def create(bosslet_config):
+    if console.confirm('Build multilambda', default = True):
+        pre_init(bosslet_config)
 
-def create(session, domain):
-    """Create the configuration, launch it, and initialize Vault"""
-    resp = input('Rebuild multilambda: [Y/n]:')
-    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
-        pre_init(session, domain)
+    config = create_config(bosslet_config)
+    config.create()
 
-    config = create_config(session, domain)
+    post_init(bosslet_config)
 
-    success = config.create(session)
-    if success:
-        post_init(session, domain)
-
-
-def pre_init(session, domain):
+def pre_init(bosslet_config):
     """Build multilambda zip file and put in S3."""
-    bucket = aws.get_lambda_s3_bucket(session)
-    load_lambdas_on_s3(session, domain, bucket)
+    load_lambdas_on_s3(bosslet_config)
 
+def update(bosslet_config):
+    if console.confirm('Build multilambda', default = True):
+        pre_init(bosslet_config)
+        update_lambda_code(bosslet_config)
 
-def update(session, domain):
-    resp = input('Rebuild multilambda: [Y/n]:')
-    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
-        pre_init(session, domain)
-        bucket = aws.get_lambda_s3_bucket(session)
-        update_lambda_code(session, domain, bucket)
+    config = create_config(bosslet_config)
+    config.update()
 
-    config = create_config(session, domain)
-    success = config.update(session)
-
-    if not success:
-        return False
-
-    resp = input('Replace step functions: [Y/n]:')
-    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
-        delete_sfns(session, domain)
+    if console.confirm('Replace step functions', default = True):
+        delete_sfns(bosslet_config)
 
         # Need to delay so AWS actually removes the step functions before trying to create them
-        delay = 30
+        delay = 60
         print("Step Functions deleted, waiting for {} seconds".format(delay))
         time.sleep(delay)
 
-        post_init(session, domain)
+        post_init(bosslet_config)
 
-    return True
+def post_init(bosslet_config):
+    names = bosslet_config.names
+    role = 'StatesExecutionRole-us-east-1 '
 
+    sfn.create(bosslet_config, names.query_deletes.sfn, 'query_for_deletes.hsd', role)
+    sfn.create(bosslet_config, names.delete_cuboid.sfn, 'delete_cuboid.hsd', role)
+    sfn.create(bosslet_config, names.delete_experiment.sfn, 'delete_experiment.hsd', role)
+    sfn.create(bosslet_config, names.delete_coord_frame.sfn, 'delete_coordinate_frame.hsd', role)
+    sfn.create(bosslet_config, names.delete_collection.sfn, 'delete_collection.hsd', role)
+    #sfn.create(bosslet_config, names.populate_upload_queue.sfn, 'populate_upload_queue.hsd', role)
+    sfn.create(bosslet_config, names.ingest_queue_populate.sfn, 'ingest_queue_populate.hsd', role)
+    sfn.create(bosslet_config, names.ingest_queue_upload.sfn, 'ingest_queue_upload.hsd', role)
+    sfn.create(bosslet_config, names.volumetric_ingest_queue_upload.sfn, 'volumetric_ingest_queue_upload.hsd', role)
+    sfn.create(bosslet_config, names.resolution_hierarchy.sfn, 'resolution_hierarchy.hsd', role)
+    #sfn.create(bosslet_config, names.downsample_volume.sfn, 'downsample_volume.hsd', role)
 
-def post_init(session, domain):
-    names = AWSNames(domain)
+def delete(bosslet_config):
+    CloudFormationConfiguration('activities', bosslet_config).delete()
 
-    sfn.create(session, names.query_deletes, domain, 'query_for_deletes.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(session, names.delete_cuboid, domain, 'delete_cuboid.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(session, names.delete_experiment, domain, 'delete_experiment.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(session, names.delete_coord_frame, domain, 'delete_coordinate_frame.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(session, names.delete_collection, domain, 'delete_collection.hsd', 'StatesExecutionRole-us-east-1 ')
-    #sfn.create(session, names.populate_upload_queue, domain, 'populate_upload_queue.hsd',
-    #           'StatesExecutionRole-us-east-1 ')
-    sfn.create(session, names.ingest_queue_populate, domain, 'ingest_queue_populate.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(session, names.ingest_queue_upload, domain, 'ingest_queue_upload.hsd', 'StatesExecutionRole-us-east-1 ')
-    sfn.create(session, names.volumetric_ingest_queue_upload, domain, 'volumetric_ingest_queue_upload.hsd', 'StatesExecutionRole-us-east-1')
-    sfn.create(session, names.resolution_hierarchy, domain, 'resolution_hierarchy.hsd', 'StatesExecutionRole-us-east-1')
-    #sfn.create(session, names.downsample_volume, domain, 'downsample_volume.hsd', 'StatesExecutionRole-us-east-1')
+    delete_sfns(bosslet_config)
 
-
-def delete(session, domain):
-    # DP TODO: delete activities
-    CloudFormationConfiguration('activities', domain).delete(session)
-    delete_sfns(session, domain)
-
-
-def delete_sfns(session, domain):
+def delete_sfns(bosslet_config):
     """Delete step functions."""
-    names = AWSNames(domain)
-    sfn.delete(session, names.delete_cuboid)
-    sfn.delete(session, names.delete_experiment)
-    sfn.delete(session, names.delete_coord_frame)
-    sfn.delete(session, names.delete_collection)
-    sfn.delete(session, names.query_deletes)
-    sfn.delete(session, names.ingest_queue_populate)
-    sfn.delete(session, names.ingest_queue_upload)
-    sfn.delete(session, names.resolution_hierarchy)
-    #sfn.delete(session, names.downsample_volume)
+    names = bosslet_config.names
+
+    # DP TODO: delete activities
+    sfn.delete(bosslet_config, names.query_deletes.sfn)
+    sfn.delete(bosslet_config, names.delete_cuboid.sfn)
+    sfn.delete(bosslet_config, names.delete_experiment.sfn)
+    sfn.delete(bosslet_config, names.delete_coord_frame.sfn)
+    sfn.delete(bosslet_config, names.delete_collection.sfn)
+    sfn.delete(bosslet_config, names.ingest_queue_populate.sfn)
+    sfn.delete(bosslet_config, names.ingest_queue_upload.sfn)
+    sfn.delete(bosslet_config, names.volumetric_ingest_queue_upload.sfn)
+    sfn.delete(bosslet_config, names.resolution_hierarchy.sfn)
+    #sfn.delete(bosslet_config, names.downsample_volume.sfn)

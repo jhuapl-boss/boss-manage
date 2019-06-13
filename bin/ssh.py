@@ -37,58 +37,33 @@ import os
 import sys
 
 import alter_path
+from lib import utils
 from lib import aws
-from lib.ssh import SSHConnection
+from lib import configuration
+from lib.ssh import SSHConnection, SSHTarget
+from lib.names import AWSNames
+from lib.utils import keypair_to_file
 
 if __name__ == "__main__":
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
-    parser = argparse.ArgumentParser(description = "Script to lookup AWS instance names and start an SSH session",
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--aws-credentials", "-a",
-                        metavar = "<file>",
-                        default = os.environ.get("AWS_CREDENTIALS"),
-                        type = argparse.FileType('r'),
-                        help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
-    parser.add_argument("--ssh-key", "-s",
-                        metavar = "<file>",
-                        default = os.environ.get("SSH_KEY"),
-                        help = "SSH private key to use when connecting to AWS instances (default: SSH_KEY)")
+    parser = configuration.BossParser(description = "Script to lookup AWS instance names and start an SSH session",
+                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--cmd", "-c",
                         default=None,
                         help="command to run in ssh, if you want to run a command.")
     parser.add_argument("--scp",
                         default=None,
                         help="Copy file. (Format: 'remote:path local:path' or 'local:path remote:path')")
-    parser.add_argument("hostname", help="Hostname of the EC2 instance to create SSH Tunnels on")
     parser.add_argument("--user", "-u",
                         default=None,
                         help="username on remote host.")
-    parser.add_argument("--private-ip", "-p",
-                        action='store_true',
-                        default=False,
-                        help="add this flag to type in a private IP address in internal command instead of a DNS name which is looked up")
+    parser.add_argument("--key", "-k",
+                        default=None,
+                        help="SSH keypair name for the instance (Default: bosslet.SSH_KEY)")
+    parser.add_hostname(private_ip = True)
 
     args = parser.parse_args()
-
-    if args.aws_credentials is None:
-        parser.print_usage()
-        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
-        sys.exit(1)
-    if args.ssh_key is None:
-        parser.print_usage()
-        print("Error: SSH key not provided and SSH_KEY is not defined")
-        sys.exit(1)
-    if not os.path.exists(args.ssh_key):
-        parser.print_usage()
-        print("Error: SSH key '{}' does not exist".format(args.ssh_key))
-        sys.exit(1)
-
-    session = aws.create_session(args.aws_credentials)
-    if args.private_ip:
-        ip = args.hostname
-    else:
-        ip = aws.machine_lookup(session, args.hostname)
 
     # the bastion server (being an AWS AMI) has a differnt username
     if args.user is None:
@@ -96,7 +71,14 @@ if __name__ == "__main__":
     else:
         user = args.user
 
-    ssh = SSHConnection(args.ssh_key, (ip, 22, user))
+    if args.bosslet_config.outbound_bastion:
+        bastions = [args.bosslet_config.outbound_bastion]
+    else:
+        bastions = []
+
+    ssh_key = keypair_to_file(args.key) if args.key else args.bosslet_config.ssh_key
+    ssh_target = SSHTarget(ssh_key, args.ip, 22, user)
+    ssh = SSHConnection(ssh_target, bastions)
     if args.cmd:
         ret = ssh.cmd(args.cmd)
     if args.scp:

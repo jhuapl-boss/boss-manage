@@ -43,15 +43,17 @@ Author:
     Derek Pryor <Derek.Pryor@jhuapl.edu>
 """
 
-import argparse
 import os
 import sys
+import argparse
 
 import vault
 
 import alter_path
 from lib import aws
-from lib.ssh import SSHConnection, vault_tunnel
+from lib import utils
+from lib import configuration
+from lib.ssh import SSHConnection, SSHTarget, vault_tunnel
 from lib.vault import Vault
 
 if __name__ == "__main__":
@@ -64,20 +66,11 @@ if __name__ == "__main__":
     commands.extend(vault.COMMANDS.keys())
     commands_help = create_help("command supports the following:", commands)
 
-    parser = argparse.ArgumentParser(description = "Script creating SSH Tunnels and connecting to internal VMs",
-                                     formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     epilog=commands_help)
+    parser = configuration.BossParser(description = "Script creating SSH Tunnels and connecting to internal VMs",
+                                      formatter_class=argparse.RawDescriptionHelpFormatter,
+                                      epilog=commands_help)
 
-
-    parser.add_argument("--aws-credentials", "-a",
-                        metavar = "<file>",
-                        default = os.environ.get("AWS_CREDENTIALS"),
-                        type = argparse.FileType('r'),
-                        help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
-    parser.add_argument("--private-ip", "-p",
-                        action='store_true',
-                        default=False,
-                        help = "add this flag to type in a private IP address in internal command instead of a DNS name which is looked up")
+    parser.add_hostname(private_ip = True)
     parser.add_argument("--user", "-u",
                         default='ubuntu',
                         help = "Username of the internal machine")
@@ -85,12 +78,10 @@ if __name__ == "__main__":
                         default=22,
                         type=int,
                         help = "Port to connect to on the internal machine")
-    parser.add_argument("--ssh-key", "-s",
-                        metavar = "<file>",
-                        default = os.environ.get("SSH_KEY"),
-                        help = "SSH private key to use when connecting to AWS instances (default: SSH_KEY)")
-    parser.add_argument("--bastion","-b",  help="Hostname of the EC2 bastion server to create SSH Tunnels on")
-    parser.add_argument("internal", help="Hostname of the EC2 internal server to create the SSH Tunnels to")
+    parser.add_argument("--local-port",
+                        default = None,
+                        type = int,
+                        help = "Local port to use when tunneling")
     parser.add_argument("command",
                         choices = commands,
                         metavar = "command",
@@ -100,42 +91,16 @@ if __name__ == "__main__":
                         help = "Arguments to pass to the command")
 
     args = parser.parse_args()
+    bosslet_config = args.bosslet_config
 
-    if args.aws_credentials is None:
-        try:
-            print("AWS credentials not provided and AWS_CREDENTIALS is not defined, assuming IAM role")
-            session = aws.use_iam_role()
-        except Exception as e:
-            parser.print_usage()
-            print('Error: Could not assume IAM role due to:{}'.format(e))
-    elif args.aws_credentials is not None:
-        session = aws.create_session(args.aws_credentials)
+    bastion = aws.machine_lookup(bosslet_config.session,
+                                 bosslet_config.names.bastion.dns) 
 
-    if args.ssh_key is None:
-        parser.print_usage()
-        print("Error: SSH key not provided and SSH_KEY is not defined")
-        sys.exit(1)
-    if not os.path.exists(args.ssh_key):
-        parser.print_usage()
-        print("Error: SSH key '{}' does not exist".format(args.ssh_key))
-        sys.exit(1)
-
-    # This next step will make bastion work with 1.consul or 1.vault internal names.
-    boss_position = 1
-    try:
-        int(args.internal.split(".", 1)[0])
-        boss_position = 2
-    except ValueError:
-        pass
-
-    bastion_host = args.bastion if args.bastion else "bastion." + args.internal.split(".", boss_position)[boss_position]
-    bastion = aws.machine_lookup(session, bastion_host)
-    if args.private_ip:
-        private = args.internal
-    else:
-        private = aws.machine_lookup(session, args.internal, public_ip=False)
-
-    ssh = SSHConnection(args.ssh_key, (private, args.port, args.user), bastion)
+    ssh_target = SSHTarget(bosslet_config.ssh_key, args.ip, args.port, args.user)
+    bastions = [SSHTarget(bosslet_config.ssh_key, bastion, 22, 'ec2-user')]
+    if bosslet_config.outbound_bastion:
+        bastions.insert(0, bosslet_config.outbound_bastion)
+    ssh = SSHConnection(ssh_target, bastions, args.local_port)
 
     if args.command in ("ssh",):
         ssh.shell()
@@ -146,17 +111,20 @@ if __name__ == "__main__":
         ret = ssh.cmd(*args.arguments)
         sys.exit(ret)
     elif args.command in ("ssh-tunnel",):
-        ssh.external_tunnel(*args.arguments)
+        with ssh.tunnel() as local_port:
+            print("Connect to localhost:{} to be forwarded to {}:{}".format(local_port, args.ip, args.port))
+            input("Waiting to close tunnel...")
     elif args.command in ("ssh-all",):
-        addrs = aws.machine_lookup_all(session, args.internal, public_ip=False)
+        addrs = aws.machine_lookup_all(bosslet_config.session, args.hostname, public_ip=False)
         for addr in addrs:
-            print("{} at {}".format(args.internal, addr))
-            ssh = SSHConnection(args.ssh_key, addr, bastion)
+            print("{} at {}".format(args.hostname, addr))
+            ssh_target = SSHTarget(bosslet_config.ssh_key, addr, args.port, args.user)
+            ssh = SSHConnection(ssh_target, bastions)
             ssh.cmd(*args.arguments)
             print()
     elif args.command in vault.COMMANDS:
-        with vault_tunnel(args.ssh_key, bastion):
-            vault.COMMANDS[args.command](Vault(args.internal, private), *args.arguments)
+        with vault_tunnel(bosslet_config.ssh_key, bastions):
+            vault.COMMANDS[args.command](Vault(args.hostname, args.ip), *args.arguments)
     else:
         parser.print_usage()
         sys.exit(1)
