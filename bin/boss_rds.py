@@ -19,13 +19,10 @@
 COMMANDS : A dictionary of available commands and the functions to call
 """
 
-import argparse
 import sys, os
-import boto3
 import logging
 import alter_path
 
-from lib import aws
 from lib import boss_rds
 from lib import configuration
 

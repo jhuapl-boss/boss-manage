@@ -14,9 +14,6 @@
 
 import logging
 
-from lib.external import ExternalCalls
-from lib import aws
-
 def sql_tables(bosslet_config):
     """
     List all tables in sql.
@@ -162,9 +159,6 @@ def sql_channel_job_ids(bosslet_config, resource):
     chan = resource.split("/")[2]
 
     query = "SELECT id,start_date,x_start,y_start,z_start,x_stop,y_stop,z_stop FROM ingest_job WHERE collection = '{}' AND experiment = '{}' AND channel = '{}'".format(coll,exp,chan)
-    keypair = aws.keypair_lookup(session)
-    call = ExternalCalls(session, keypair, domain)
-
     with bosslet_config.call.connect_rds() as cursor:
         cursor.execute(query)
         job_ids = cursor.fetchall()
