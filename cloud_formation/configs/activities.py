@@ -37,6 +37,22 @@ from lib import constants as const
 from lib import stepfunctions as sfn
 from lib.lambdas import load_lambdas_on_s3, update_lambda_code
 
+def STEP_FUNCTIONS(bosslet_config):
+    names = bosslet_config.names
+    return [
+        (names.query_deletes.sfn, 'query_for_deletes.hsd'),
+        (names.delete_cuboid.sfn, 'delete_cuboid.hsd'),
+        (names.delete_experiment.sfn, 'delete_experiment.hsd'),
+        (names.delete_coord_frame.sfn, 'delete_coordinate_frame.hsd'),
+        (names.delete_collection.sfn, 'delete_collection.hsd'),
+        #(names.populate_upload_queue.sfn, 'populate_upload_queue.hsd'),
+        (names.ingest_queue_populate.sfn, 'ingest_queue_populate.hsd'),
+        (names.ingest_queue_upload.sfn, 'ingest_queue_upload.hsd'),
+        (names.volumetric_ingest_queue_upload.sfn, 'volumetric_ingest_queue_upload.hsd'),
+        (names.resolution_hierarchy.sfn, 'resolution_hierarchy.hsd'),
+        #(names.downsample_volume.sfn, 'downsample_volume.hsd'),
+    ]
+
 def create_config(bosslet_config, lookup=True):
     """Create the CloudFormationConfiguration object."""
     config = CloudFormationConfiguration('activities', bosslet_config)
@@ -192,31 +208,17 @@ def update(bosslet_config):
     config = create_config(bosslet_config)
     config.update()
 
-    if console.confirm('Replace step functions', default = True):
-        delete_sfns(bosslet_config)
-
-        # Need to delay so AWS actually removes the step functions before trying to create them
-        delay = 60
-        print("Step Functions deleted, waiting for {} seconds".format(delay))
-        time.sleep(delay)
-
-        post_init(bosslet_config)
+    post_update(session, domain)
 
 def post_init(bosslet_config):
-    names = bosslet_config.names
     role = 'StatesExecutionRole-us-east-1 '
 
-    sfn.create(bosslet_config, names.query_deletes.sfn, 'query_for_deletes.hsd', role)
-    sfn.create(bosslet_config, names.delete_cuboid.sfn, 'delete_cuboid.hsd', role)
-    sfn.create(bosslet_config, names.delete_experiment.sfn, 'delete_experiment.hsd', role)
-    sfn.create(bosslet_config, names.delete_coord_frame.sfn, 'delete_coordinate_frame.hsd', role)
-    sfn.create(bosslet_config, names.delete_collection.sfn, 'delete_collection.hsd', role)
-    #sfn.create(bosslet_config, names.populate_upload_queue.sfn, 'populate_upload_queue.hsd', role)
-    sfn.create(bosslet_config, names.ingest_queue_populate.sfn, 'ingest_queue_populate.hsd', role)
-    sfn.create(bosslet_config, names.ingest_queue_upload.sfn, 'ingest_queue_upload.hsd', role)
-    sfn.create(bosslet_config, names.volumetric_ingest_queue_upload.sfn, 'volumetric_ingest_queue_upload.hsd', role)
-    sfn.create(bosslet_config, names.resolution_hierarchy.sfn, 'resolution_hierarchy.hsd', role)
-    #sfn.create(bosslet_config, names.downsample_volume.sfn, 'downsample_volume.hsd', role)
+    for name, path in STEP_FUNCTIONS(bosslet_config):
+        sfn.create(bosslet_config, name, path, role)
+
+def post_update(bosslet_config):
+    for name, path in STEP_FUNCTIONS(bosslet_config):
+        sfn.update(bosslet_config, name, path)
 
 def delete(bosslet_config):
     CloudFormationConfiguration('activities', bosslet_config).delete()
@@ -225,16 +227,8 @@ def delete(bosslet_config):
 
 def delete_sfns(bosslet_config):
     """Delete step functions."""
-    names = bosslet_config.names
 
     # DP TODO: delete activities
-    sfn.delete(bosslet_config, names.query_deletes.sfn)
-    sfn.delete(bosslet_config, names.delete_cuboid.sfn)
-    sfn.delete(bosslet_config, names.delete_experiment.sfn)
-    sfn.delete(bosslet_config, names.delete_coord_frame.sfn)
-    sfn.delete(bosslet_config, names.delete_collection.sfn)
-    sfn.delete(bosslet_config, names.ingest_queue_populate.sfn)
-    sfn.delete(bosslet_config, names.ingest_queue_upload.sfn)
-    sfn.delete(bosslet_config, names.volumetric_ingest_queue_upload.sfn)
-    sfn.delete(bosslet_config, names.resolution_hierarchy.sfn)
-    #sfn.delete(bosslet_config, names.downsample_volume.sfn)
+    for name, _ in STEP_FUNCTIONS(bosslet_config):
+        sfn.delete(bosslet_config, name)
+
