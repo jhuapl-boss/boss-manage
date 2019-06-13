@@ -27,6 +27,7 @@ import alter_path
 
 from lib import aws
 from lib import boss_rds
+from lib import configuration
 
 COMMANDS = {
     "sql-tables":boss_rds.sql_tables,
@@ -55,20 +56,14 @@ if __name__ == '__main__':
     instructions = list(HELP)
     commands_help = create_help("command supports the following:", instructions)
     
-    parser = argparse.ArgumentParser(description = "Script for manipulating endpoint instances",
-                                     formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     epilog=commands_help)
-    parser.add_argument("--aws-credentials", "-a",
-                        metavar = "<file>",
-                        default = os.environ.get("AWS_CREDENTIALS"),
-                        type = argparse.FileType('r'),
-                        help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
+    parser = configuration.BossParser(description = "Script for manipulating endpoint instances",
+                                      formatter_class=argparse.RawDescriptionHelpFormatter,
+                                      epilog=commands_help)
     parser.add_argument("--quiet", "-q",
                         action='store_true',
                         default=False,
                         help='Run the script quietly, no print statements will be displayed.')
-    parser.add_argument("domain",
-                    help="Domain in which to execute the configuration (example: subnet.vpc.boss)")
+    parser.add_bosslet()
     parser.add_argument("command",
                         choices = commands,
                         metavar = "command",
@@ -79,21 +74,12 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    #Check AWS configurations
-    if args.aws_credentials is None:
-        parser.print_usage()
-        logging.error("AWS credentials not provided and AWS_CREDENTIALS is not defined")
-        sys.exit(1)
-
-    # specify AWS keys, sets up connection to the client.
-    session = aws.create_session(args.aws_credentials)
-
-    # COnfigure logging if verbose
+    # Configure logging if verbose
     if not args.quiet:
         logging.basicConfig(level=logging.INFO)
         
     if args.command in COMMANDS:
-        COMMANDS[args.command](session, args.domain, *args.arguments)
+        COMMANDS[args.command](args.bosslet_config, *args.arguments)
     else:
         parser.print_usage()
         sys.exit(1)

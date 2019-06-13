@@ -17,44 +17,37 @@ import logging
 from lib.external import ExternalCalls
 from lib import aws
 
-def sql_tables(session, domain):
+def sql_tables(bosslet_config):
     """
     List all tables in sql.
 
     Args:
-        session (Session): Open boto3 session.
-        domain (str): VPC such as integration.boss.
+        bosslet_config (BossConfiguration): Bosslet configuration object
 
     Returns:
         tables(list): Lookup key.
     """
     query = "show tables"
-    keypair = aws.keypair_lookup(session)
-    call = ExternalCalls(session, keypair, domain)
-    with call.connect_rds() as cursor:
+    with bosslet_config.call.connect_rds() as cursor:
         cursor.execute(query)
         tables = cursor.fetchall()
         for i in tables:
             logging.info(tables)
         return tables
 
-def sql_list(session, domain, db_table):
+def sql_list(bosslet_config, db_table):
     """
     List all the available members of a given sql table.
 
     Args:
-        session (Session): Open boto3 session.
-        domain (str): VPC such as integration.boss.
+        bosslet_config (BossConfiguration): Bosslet configuration object
         db_table: Identifies which table members to list.
 
     Returns:
         ans(list): list of all members of sql table.
     """
     query = "SELECT * FROM {}".format(db_table)
-    keypair = aws.keypair_lookup(session)
-    call = ExternalCalls(session, keypair, domain)
-
-    with call.connect_rds() as cursor:
+    with bosslet_config.call.connect_rds() as cursor:
         cursor.execute(query)
         ans = cursor.fetchall()
         if len(ans) == 0:
@@ -65,13 +58,12 @@ def sql_list(session, domain, db_table):
                 logging.info(i)
         return ans
 
-def sql_resource_lookup_key(session, domain, resource_params):
+def sql_resource_lookup_key(bosslet_config, resource_params):
     """
     Get the lookup key that identifies the resource from the database.
 
     Args:
-        session (Session): Open boto3 session.
-        domain (str): VPC such as integration.boss.
+        bosslet_config (BossConfiguration): Bosslet configuration object
         resource_params (str): Identifies collection, experiment or channel.
 
     Returns:
@@ -79,9 +71,6 @@ def sql_resource_lookup_key(session, domain, resource_params):
     """
     collection, experiment, channel = None, None, None
     resource = resource_params.split("/")
-
-    keypair = aws.keypair_lookup(session)
-    call = ExternalCalls(session, keypair, domain)
 
     if len(resource) == 0:
         raise Exception("Incorrect number of arguments(Make sure the resource provided has at least a collection to lookup)")
@@ -99,7 +88,7 @@ def sql_resource_lookup_key(session, domain, resource_params):
     exp_query = "SELECT id FROM experiment WHERE name = %s"
     chan_query = "SELECT id FROM channel WHERE name = %s"
 
-    with call.connect_rds() as cursor:
+    with bosslet_config.call.connect_rds() as cursor:
         if collection is not None:
             cursor.execute(coll_query, (collection,))
             coll_set = cursor.fetchall()
@@ -131,13 +120,12 @@ def sql_resource_lookup_key(session, domain, resource_params):
     logging.info("Cuboid key: {} \n".format(cuboid_str))
     return cuboid_str
 
-def sql_coordinate_frame_lookup_key(session, domain, coordinate_frame):
+def sql_coordinate_frame_lookup_key(bosslet_config, coordinate_frame):
     """
     Get the lookup key that identifies the coordinate fram specified.
 
     Args:
-        session (Session): Open boto3 session.
-        domain (str): VPC such as integration.boss.
+        bosslet_config (BossConfiguration): Bosslet configuration object
         coordinate_frame: Identifies coordinate frame.
 
     Returns:
@@ -145,10 +133,7 @@ def sql_coordinate_frame_lookup_key(session, domain, coordinate_frame):
     """
 
     query = "SELECT id FROM coordinate_frame WHERE name = %s"
-    keypair = aws.keypair_lookup(session)
-    call = ExternalCalls(session, keypair, domain)
-
-    with call.connect_rds() as cursor:
+    with bosslet_config.call.connect_rds() as cursor:
         cursor.execute(query, (coordinate_frame,))
         coordinate_set = cursor.fetchall()
         if len(coordinate_set) != 1:
@@ -159,13 +144,12 @@ def sql_coordinate_frame_lookup_key(session, domain, coordinate_frame):
     
     return coordinate_set[0][0]
 
-def sql_channel_job_ids(session, domain, resource):
+def sql_channel_job_ids(bosslet_config, resource):
     """
     Get a list of channel job ids related to a given channel
 
     Args:
-        session (Session): Open boto3 session.
-        domain (str): VPC such as integration.boss.
+        bosslet_config (BossConfiguration): Bosslet configuration object
         resource(str): resource
     
     Returns:
@@ -181,7 +165,7 @@ def sql_channel_job_ids(session, domain, resource):
     keypair = aws.keypair_lookup(session)
     call = ExternalCalls(session, keypair, domain)
 
-    with call.connect_rds() as cursor:
+    with bosslet_config.call.connect_rds() as cursor:
         cursor.execute(query)
         job_ids = cursor.fetchall()
         if len(job_ids) == 0:
