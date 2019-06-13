@@ -18,6 +18,7 @@ import json
 import importlib
 import warnings
 import glob
+import itertools
 from argparse import ArgumentParser
 from pprint import pformat
 
@@ -31,13 +32,17 @@ from .aws import machine_lookup
 from .utils import keypair_to_file, parse_hostname
 from .names import AWSNames
 
-CONFIGS_GLOB = const.repo_path('config', '*.py')
+CONFIGS_GLOBS = [const.repo_path('config', '*.py'),
+                 const.repo_path('config', 'custom', '*.py')]
+CONFIGS_FMTS = [const.repo_path('config', '{}.py'),
+                const.repo_path('config', 'custom', '{}.py')]
 
 def valid_bosslet(bosslet_name):
     return bosslet_name in list_bosslets()
 
 def list_bosslets():
-    return [os.path.basename(f)[:-3].replace('_','.') for f in glob.glob(CONFIGS_GLOB)]
+    return [os.path.basename(f)[:-3].replace('_','.')
+            for f in itertools.chain(*[glob.glob(g) for g in CONFIGS_GLOBS])]
 
 class BossConfiguration(object):
     __EXPECTED_KEYS = [
@@ -91,9 +96,19 @@ class BossConfiguration(object):
         # Import the bosslet configuration file
         try:
             bosslet = bosslet.replace('.','_')
-            self._config = importlib.import_module('config.' + bosslet)
+            prefix = const.repo_path()
+
+            for fmt in CONFIGS_FMTS:
+                path = fmt.format(bosslet)
+                if os.path.exists(path):
+                    # Translate the file path into a module import reference
+                    mod = path.replace(prefix, '').replace('/', '.')[1:-3]
+                    self._config = importlib.import_module(mod)
+                    break
+            else:
+                raise ValueError("Cannot located Bosslet '{}'".format(self.bosslet))
         except ImportError:
-            raise exceptions.BossManageError("Problem importing 'config/{}.py'".format(bosslet))
+            raise exceptions.BossManageError("Problem importing '{}'".format(mod))
 
         if not self.verify():
             raise exceptions.BossManageError("Bosslet config is not valid")
@@ -190,7 +205,7 @@ class BossConfiguration(object):
                                  'OUTBOUND_PORT',
                                  'OUTBOUND_USER',
                                  'OUTBOUND_KEY') and \
-                         self._config.OUTBOUND_BASTION == False:
+                         self.get('OUTBOUND_BASTION') == False:
                         pass
                     else:
                         print("Error: Variable '{}' not defined".format(key), file=fh)
