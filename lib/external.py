@@ -13,9 +13,11 @@
 # limitations under the License.
 
 import time
+import logging
+
 from urllib.request import urlopen, HTTPError
 from contextlib import contextmanager
-
+from mysql import connector
 from . import exceptions
 from . import aws
 from .utils import keypair_to_file
@@ -23,7 +25,6 @@ from .ssh import SSHConnection, SSHTarget, vault_tunnel
 from .vault import Vault
 from .exceptions import SSHError
 from .names import AWSNames
-
 
 def gen_timeout(total, step):
     """Break the total timeout value into steps
@@ -153,6 +154,34 @@ class ExternalCalls:
 
         return self.connections[key].tunnel()
 
+    @contextmanager
+    def connect_rds(self):
+        """
+        Context manager with established connection to endpoint boss rds
+        Prompts vault to grab credentials
+
+        Returns:
+            cursor object context
+        """
+        DB_HOST_NAME = self.names.endpoint_db.rds
+        logging.debug("DB Hostname is: {}".format(DB_HOST_NAME))
+
+        logging.info('Getting MySQL parameters from Vault (slow) . . .')
+        with self.vault() as vault:
+            mysql_params = vault.read('secret/endpoint/django/db')
+
+        logging.info('Tunneling to DB (slow) . . .')
+        with self.tunnel(DB_HOST_NAME, mysql_params['port'], 'rds') as local_port:
+            try:
+                sql = connector.connect(
+                    user=mysql_params['user'], password=mysql_params['password'], 
+                    port=local_port, database=mysql_params['name']
+                )
+                cursor = sql.cursor()
+                yield cursor
+            finally:
+                cursor.close()
+                sql.close()
 
     def check_vault(self, timeout, exception=True):
         """Vault status check to see if Vault is accessible
@@ -237,4 +266,3 @@ class ExternalCalls:
                 raise exceptions.StatusCheckError(msg, machine + "." + self.domain)
 
             return ret == 0 # 0 - no issues, 1 - problems
-
