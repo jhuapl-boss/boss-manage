@@ -19,6 +19,7 @@
 COMMANDS : A dictionary of available commands and the functions to call
 """
 
+import argparse
 import sys, os
 import logging
 import alter_path
