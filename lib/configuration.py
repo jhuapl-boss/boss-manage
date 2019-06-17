@@ -359,53 +359,56 @@ class BossParser(ArgumentParser):
         # Note: Using `self.print_usage()` will not necessarly print the correct
         #       usage if the problem is with arguments from a subparser
 
-        if 'bosslet_name' in a:
-            a.bosslet_config = BossConfiguration(a.bosslet_name)
+        try:
+            if 'bosslet_name' in a:
+                a.bosslet_config = BossConfiguration(a.bosslet_name)
 
-        elif  'hostname' in a:
-            finished = False
-            if 'private_ip' in a:
-                if a.private_ip:
-                    if not a.bosslet:
-                        self.print_usage()
-                        print("Error: --bosslet required if --private-ip is used")
-                        sys.exit(1)
-                    else:
-                        a.bosslet_config = BossConfiguration(a.bosslet)
-                        a.ip = a.hostname
-                        finished = True
+            elif  'hostname' in a:
+                finished = False
+                if 'private_ip' in a:
+                    if a.private_ip:
+                        if not a.bosslet:
+                            msg = "--bosslet required if --private-ip is used"
+                            self.error(msg)
+                        else:
+                            a.bosslet_config = BossConfiguration(a.bosslet)
+                            a.ip = a.hostname
+                            finished = True
 
-            if not finished:
-                idx, machine, bosslet_name = parse_hostname(a.hostname)
+                if not finished:
+                    idx, machine, bosslet_name = parse_hostname(a.hostname)
 
-                if not bosslet_name and not a.bosslet:
-                    self.print_usage()
-                    print("Error: could not parse out bosslet name, include --bosslet")
-                    sys.exit(1)
-                elif bosslet_name and a.bosslet:
-                    if bosslet_name != a.bosslet:
-                        print("Error: two different bosslet names were specified, remove one")
-                        sys.exit(1)
-                elif a.bosslet:
-                    bosslet_name = a.bosslet
+                    if not bosslet_name and not a.bosslet:
+                        msg = "Could not parse out bosslet name, include --bosslet"
+                        self.error(msg)
+                    elif bosslet_name and a.bosslet:
+                        if bosslet_name != a.bosslet:
+                            msg = "Two different bosslet names were specified, remove one"
+                            self.error(msg)
+                    elif a.bosslet:
+                        bosslet_name = a.bosslet
 
-                bosslet_config = BossConfiguration(bosslet_name)
-                hostname = bosslet_config.names[machine].dns
-                if idx is not None:
-                    hostname = str(idx) + "." + hostname
+                    bosslet_config = BossConfiguration(bosslet_name)
+                    hostname = bosslet_config.names[machine].dns
+                    if idx is not None:
+                        hostname = str(idx) + "." + hostname
 
-                a.bosslet_name = bosslet_name
-                a.bosslet_config = bosslet_config
-                a.hostname = hostname
+                    a.bosslet_name = bosslet_name
+                    a.bosslet_config = bosslet_config
+                    a.hostname = hostname
 
-                if self._private_ip: # only lookup IP if we allow specifying a private ip
-                    ip = machine_lookup(bosslet_config.session, hostname, public_ip=False)
-                    if not ip:
-                        sys.exit(1) # machine_lookup() already printed an error message
+                    if self._private_ip: # only lookup IP if we allow specifying a private ip
+                        ip = machine_lookup(bosslet_config.session, hostname, public_ip=False)
+                        if not ip:
+                            sys.exit(1) # machine_lookup() already printed an error message
 
-                    a.ip = ip
+                        a.ip = ip
 
-        return a
+            return a
+        except exceptions.BossManageError as ex: # BossConfig import or verification error
+            self.error(ex)
+        except ValueError as ex: # Invalid Bosslet name
+            self.error(ex)
 
 class BossCLI(object):
     """Interface for defining a CLI application / script"""
