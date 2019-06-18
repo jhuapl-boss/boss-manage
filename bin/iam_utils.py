@@ -464,7 +464,7 @@ class IamUtils(object):
     #########
     # Roles
 
-    def role_create(self):
+    def role_create(self, resource):
         """Create a new IAM Role
 
         Args:
