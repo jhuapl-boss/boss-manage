@@ -35,7 +35,7 @@ OUTBOUND_BASTION = False
 # interact with the stack it is standing up, but no one else can
 import urllib.request
 META_URL = "http://169.254.169.254/latest/meta-data/public-ipv4"
-LOCAL_IP = urllib.request.urlopen(url).read().decode("utf-8")
+LOCAL_IP = urllib.request.urlopen(META_URL).read().decode("utf-8")
 
 HTTPS_INBOUND = LOCAL_IP + "/32"
 SSH_INBOUND = LOCAL_IP + "/32"
