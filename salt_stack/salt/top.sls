@@ -31,7 +31,7 @@ base:
 
     'lambda*':
         - lambda-dev
-        - chrony
+        #- chrony got an error added chrony, it conflicted with already installed ntp
 
     'ep-jenkins*':
         - jenkins-microns.endpoint
