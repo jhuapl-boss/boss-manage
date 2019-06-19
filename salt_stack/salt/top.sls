@@ -31,7 +31,6 @@ base:
 
     'lambda*':
         - lambda-dev
-        - chrony
 
     'ep-jenkins*':
         - jenkins-microns.endpoint
