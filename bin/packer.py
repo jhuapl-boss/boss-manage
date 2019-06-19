@@ -51,6 +51,11 @@ CONFIGS = [
 
 os.environ["PATH"] += ":" + repo_path("bin") # allow executing Packer from the bin/ directory
 
+def lambda_ami():
+    # Amazon Linux AMI 2017.09.0 (HVM), SSD Volume Type
+    # Should match runtime used by AWS Lambda
+    return "ami-8c1be5f6"
+
 def get_commit():
     """Figure out the commit hash of the current git revision.
         Note: Only works if the CWD is a git repository
@@ -125,7 +130,8 @@ if __name__ == '__main__':
 
     config_help_names = list(CONFIGS)
     config_help_names.append("all")
-    config_help = create_help("config is on of the following:", config_help_names)
+    config_help_names.append("lambda")
+    config_help = create_help("config is on of the following: ('all' will build all except 'lambda')", config_help_names)
 
     parser = configuration.BossParser(description = "Script the building of machines images using Packer and SaltStack",
                                       formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -134,10 +140,6 @@ if __name__ == '__main__':
                         action = "store_true",
                         default = False,
                         help = "Only build one config at a time. (default: Build all configs at the same time)")
-    parser.add_argument("--only",
-                        metavar = "<packer-builder>",
-                        default = "amazon-ebs",
-                        help = "Which Packer building to use. (default: amazon-ebs)")
     parser.add_argument("--force", "-f",
                         action = "store_true",
                         default = False,
@@ -192,18 +194,19 @@ if __name__ == '__main__':
              -var 'name={machine}' -var 'ami_version={ami_version}'
              -var 'ami_suffix={ami_suffix}' -var 'aws_region={region}'
              -var 'commit={commit}' -var 'force_deregister={deregister}'
-             -var 'aws_source_ami={ami}' -only={only} {packer_file}"""
+             -var 'aws_source_ami={ami}' -var 'aws_source_user={user}'
+             {packer_file}"""
     cmd_args = {
         "packer" : "packer",
         "bastion" : bastion_config,
         "credentials" : credentials_config,
-        "only" : args.only,
         "packer_file" : packer_file,
         "region": args.bosslet_config.REGION,
         "ami_suffix": args.bosslet_config.AMI_SUFFIX,
-        "ami_version" : "-" + args.ami_version,
+        "ami_version" : ("-" + args.ami_version) if len(args.ami_version) > 0 else "",
         "commit" : git_hash,
         "ami" : ami,
+        "user": "ubuntu",
         "deregister" : "true" if args.force else "false",
         "machine" : "" # replace for each call
     }
@@ -213,6 +216,9 @@ if __name__ == '__main__':
         print("Launching {} configuration".format(config))
         log_file = os.path.join(packer_logs, config + ".log")
         cmd_args["machine"] = config
+        cmd_args['ami'] = lambda_ami() if config == 'lambda' else ami
+        cmd_args['user'] = 'ec2-user' if config == 'lambda' else 'ubuntu'
+
         proc = execute(cmd.format(**cmd_args), log_file)
 
         if args.single_thread:

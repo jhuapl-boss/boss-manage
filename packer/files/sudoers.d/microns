@@ -1,2 +1,0 @@
-# Passwordless sudo for microns user
-microns ALL=(ALL) NOPASSWD: ALL
