@@ -28,15 +28,15 @@ production, develop and testing stacks.
 ### Create a new key pair for the first bosslet
 * In the AWS Console under EC2 - Key Pairs: "Create Key Pair" for the <your_bosslet_name>
 
-Move both key pairs to the ~/.aws directory. Change the name to end in .pem instead of .pem.txt if that is what it currently is.  
+Move both key pairs to the ~/.ssh directory. Change the name to end in .pem instead of .pem.txt if that is what it currently is.  
 Change the properties of both pem files to 400
 ```sh
 chmod 400 <name>.pem
 ``` 
 
 ### Create new instance for Bastion
-To create a bastion server create a new t3.micro with thest latest release of ubuntu 14.04, 
-set it up in the default VPC or create a new one just for the bastion server.  The server will need a Public IP Address.  Use the new key pair when prompted.
+To create a bastion server, create a new t2.micro or t3.micro (t3.micro is latest generation, however t2.micro is consider free tier) with the Linux flavor of your choice, 
+set it up in the default VPC or create a new VPC just for the bastion server.  The server will need a Public IP Address.  Use the new key pair when prompted.
 
 ### Give the bastion server an elastic IP
 In the AWS Console under EC2 - Elastic IP: "Allocate new address".  Assign the new address to your bastion server.  You
@@ -81,21 +81,9 @@ Create a virtual environment for working with bossdb and pip install the require
 $ pip install -r boss-manage.git/requirements.txt
 ```
 
-### Create a boss-manage/config/lambda-build.json file with the following information filled out.
-```json
-
-    "aws_access_key": "xxxxxxxxxxxxxxxxxxxxx",
-    "aws_secret_key": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    "aws_account": "123456789012",
-    "aws_bastion_ip": "xxx.xxx.xxx.xxx",
-    "aws_bastion_user": "ubuntu",
-    "aws_bastion_priv_key_file": "./bastion-key.pem"
-}
-```
-
 ### build Lambda Build Server AMI using Packer
 ```sh
-$ packer build -var-file=../config/lambda-build.json -var-file=variables/lambda  -var 'force_deregister=true' lambda.packer
+$ bin/packer.py <bosslet_config> lambda --ami-version "" -f
 ```
 
 ### Create security group
