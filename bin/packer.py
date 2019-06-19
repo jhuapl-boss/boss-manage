@@ -203,7 +203,7 @@ if __name__ == '__main__':
         "packer_file" : packer_file,
         "region": args.bosslet_config.REGION,
         "ami_suffix": args.bosslet_config.AMI_SUFFIX,
-        "ami_version" : "-" + args.ami_version,
+        "ami_version" : ("-" + args.ami_version) if len(args.ami_version) > 0 else "",
         "commit" : git_hash,
         "ami" : ami,
         "user": "ubuntu",
@@ -218,7 +218,7 @@ if __name__ == '__main__':
         cmd_args["machine"] = config
         cmd_args['ami'] = lambda_ami() if config == 'lambda' else ami
         cmd_args['user'] = 'ec2-user' if config == 'lambda' else 'ubuntu'
-        # TODO if single_thread then display stdout
+
         proc = execute(cmd.format(**cmd_args), log_file)
 
         if args.single_thread:
