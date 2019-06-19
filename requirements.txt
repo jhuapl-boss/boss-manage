@@ -7,4 +7,3 @@ pyminifier
 funcparserlib
 iso8601
 colorama
-jsonschema
