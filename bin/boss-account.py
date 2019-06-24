@@ -34,6 +34,7 @@ class SubscriptionList(object):
     def __init__(self, bosslet_config, topic):
         self.bosslet_config = bosslet_config
         self.client = bosslet_config.session.client('sns')
+        self.client_cw = bosslet_config.session.client('cloudwatch')
         self.topic = topic
         self.arn = self.to_arn(topic)
 
@@ -90,10 +91,10 @@ class BillingList(SubscriptionList):
             return False
 
         try:
-            thresholds = eval(self.bosslet_config.BILLING_THREASHOLDS)
+            thresholds = eval(self.bosslet_config.BILLING_THRESHOLDS)
             console.info("Creating {} billing alarms".format(len(thresholds)))
-        except AttributeError: # Assume BILLING_THREASHOLDS is not provided
-            console.error("Bosslet value 'BILLING_THREASHOLDS' needs to be defined before creating alarms")
+        except AttributeError: # Assume BILLING_THRESHOLDS is not provided
+            console.error("Bosslet value 'BILLING_THRESHOLDS' needs to be defined before creating alarms")
             return False
 
         currency = self.bosslet_config.BILLING_CURRENCY
@@ -108,18 +109,18 @@ class BillingList(SubscriptionList):
             'Namespace': 'AWS/Billing',
             'Statistic': 'Maximum',
             'Dimensions': [{'Name': 'Currency', 'Value': currency}],
-            'Period': 10,
+            'Period': 21600,
             'EvaluationPeriods': 1,
             'Threshold': None,
             'ComparisonOperator': 'GreaterThanOrEqualToThreshold'
         }
 
-        for threashold in threasholds:
+        for threashold in thresholds:
             console.debug("\tAlert level: {:,}".format(threashold))
             alarm_parms['AlarmName'] = "Billing_{}".format(str(threashold))
             alarm_parms['AlarmDescription'] = "Alarm when spending reaches {:,}".format(threashold)
             alarm_parms['Threshold'] = float(threashold)
-            response = self.client.put_metric_alarm(**alarm_parms)
+            response = self.client_cw.put_metric_alarm(**alarm_parms)
 
 class AlertList(SubscriptionList):
     def __init__(self, bosslet_config):
@@ -158,6 +159,9 @@ if __name__ == '__main__':
         list = AlertList(args.bosslet_config)
 
     if args.create:
+        if list.create() is False:
+            sys.exit(1)
+
         if list.exists():
             console.warning("List already exists, not creating")
         else:
