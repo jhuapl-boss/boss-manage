@@ -107,7 +107,7 @@ Attach the elastic IP address: lambda_build_server_ip
 
 ## Billing Alerts
 * Run `bin/boss-account.py <bosslet.name> billing --create --add <email.address@company.tld> --ls` to create billing alarms
-  - This requires the optional `BILLING_THREASHOLDS` Bosslet configuration value to be defined
+  - This requires the optional `BILLING_THRESHOLDS` Bosslet configuration value to be defined
   - This is optional and only needed if you want to receive notification once the AWS monthly bill exceeds the given threashold(s)
 
 ## Error Alerts
