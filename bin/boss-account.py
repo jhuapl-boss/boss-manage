@@ -34,7 +34,6 @@ class SubscriptionList(object):
     def __init__(self, bosslet_config, topic):
         self.bosslet_config = bosslet_config
         self.client = bosslet_config.session.client('sns')
-        self.client_cw = bosslet_config.session.client('cloudwatch')
         self.topic = topic
         self.arn = self.to_arn(topic)
 
@@ -85,6 +84,8 @@ class SubscriptionList(object):
 class BillingList(SubscriptionList):
     def __init__(self, bosslet_config):
         super().__init__(bosslet_config, bosslet_config.BILLING_TOPIC)
+        self.client_cw = bosslet_config.session.client('cloudwatch')
+
 
     def create(self):
         if super().create() is False:
@@ -159,9 +160,6 @@ if __name__ == '__main__':
         list = AlertList(args.bosslet_config)
 
     if args.create:
-        if list.create() is False:
-            sys.exit(1)
-
         if list.exists():
             console.warning("List already exists, not creating")
         else:
