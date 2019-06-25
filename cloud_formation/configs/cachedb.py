@@ -49,6 +49,7 @@ INGEST_BUCKET_TRIGGER = 'ingestBucketInvokeCuboidImportLambda'
 
 CUBOID_IMPORT_ROLE = 'CuboidImportLambdaRole'
 
+
 def get_cf_bucket_life_cycle_rules():
     """
     Generate the CloudFormation expiration policy for the tile bucket.  This is
@@ -117,6 +118,7 @@ def get_boto_bucket_life_cycle_rules():
         ]
     }
 
+
 def get_s3_index_arn(bosslet_config):
     """
     Get arn of the DynamoDB s3 index.
@@ -131,6 +133,7 @@ def get_s3_index_arn(bosslet_config):
     dynamo = bosslet_config.session.client('dynamodb')
     resp = dynamo.describe_table(TableName=names.s3_index.ddb)
     return resp['Table']['TableArn']
+
 
 def create_config(bosslet_config, user_data=None):
     """
@@ -362,6 +365,7 @@ def generate(bosslet_config):
     config = create_config(bosslet_config)
     config.generate()
 
+
 def build_user_data(bosslet_config):
     names = bosslet_config.names
     session = bosslet_config.session
@@ -401,16 +405,20 @@ def create(bosslet_config):
 
     user_data = build_user_data(bosslet_config)
 
+    pre_init(bosslet_config)
+
     config = create_config(bosslet_config, user_data)
     config.create()
 
     post_init(bosslet_config)
+
 
 def pre_init(bosslet_config):
     """Send spdb, bossutils, lambda, and lambda_utils to the lambda build
     server, build the lambda environment, and upload to S3.
     """
     load_lambdas_on_s3(bosslet_config)
+
 
 def update(bosslet_config):
     user_data = build_user_data(bosslet_config)
@@ -423,6 +431,7 @@ def update(bosslet_config):
         update_lambda_code(bosslet_config)
 
     post_init(bosslet_config)
+
 
 def post_init(bosslet_config):
     print("post_init")
@@ -440,6 +449,7 @@ def post_init(bosslet_config):
     print('setting ingest bucket expiration policy')
     check_bucket_life_cycle_policy(bosslet_config.session,
                                    bosslet_config.names.ingest_bucket.s3)
+
 
 def check_bucket_life_cycle_policy(session, bucket_name):
     """
