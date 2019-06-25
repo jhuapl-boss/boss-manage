@@ -110,7 +110,7 @@ class BillingList(SubscriptionList):
             'Namespace': 'AWS/Billing',
             'Statistic': 'Maximum',
             'Dimensions': [{'Name': 'Currency', 'Value': currency}],
-            'Period': 21600,
+            'Period': 21600,  # This should be at least 21600 (6 hrs) or all alarms will reset and fire every 6 hrs.
             'EvaluationPeriods': 1,
             'Threshold': None,
             'ComparisonOperator': 'GreaterThanOrEqualToThreshold'
