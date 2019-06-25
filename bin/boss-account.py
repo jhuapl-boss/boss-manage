@@ -84,16 +84,18 @@ class SubscriptionList(object):
 class BillingList(SubscriptionList):
     def __init__(self, bosslet_config):
         super().__init__(bosslet_config, bosslet_config.BILLING_TOPIC)
+        self.client_cw = bosslet_config.session.client('cloudwatch')
+
 
     def create(self):
         if super().create() is False:
             return False
 
         try:
-            thresholds = eval(self.bosslet_config.BILLING_THREASHOLDS)
+            thresholds = eval(self.bosslet_config.BILLING_THRESHOLDS)
             console.info("Creating {} billing alarms".format(len(thresholds)))
-        except AttributeError: # Assume BILLING_THREASHOLDS is not provided
-            console.error("Bosslet value 'BILLING_THREASHOLDS' needs to be defined before creating alarms")
+        except AttributeError: # Assume BILLING_THRESHOLDS is not provided
+            console.error("Bosslet value 'BILLING_THRESHOLDS' needs to be defined before creating alarms")
             return False
 
         currency = self.bosslet_config.BILLING_CURRENCY
@@ -108,18 +110,18 @@ class BillingList(SubscriptionList):
             'Namespace': 'AWS/Billing',
             'Statistic': 'Maximum',
             'Dimensions': [{'Name': 'Currency', 'Value': currency}],
-            'Period': 10,
+            'Period': 21600,  # This should be at least 21600 (6 hrs) or all alarms will reset and fire every 6 hrs.
             'EvaluationPeriods': 1,
             'Threshold': None,
             'ComparisonOperator': 'GreaterThanOrEqualToThreshold'
         }
 
-        for threashold in threasholds:
+        for threashold in thresholds:
             console.debug("\tAlert level: {:,}".format(threashold))
             alarm_parms['AlarmName'] = "Billing_{}".format(str(threashold))
             alarm_parms['AlarmDescription'] = "Alarm when spending reaches {:,}".format(threashold)
             alarm_parms['Threshold'] = float(threashold)
-            response = self.client.put_metric_alarm(**alarm_parms)
+            response = self.client_cw.put_metric_alarm(**alarm_parms)
 
 class AlertList(SubscriptionList):
     def __init__(self, bosslet_config):
