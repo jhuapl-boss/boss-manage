@@ -177,7 +177,7 @@ def create_config(bosslet_config):
 
     if USE_DB:
         config.add_rds_db("AuthDB",
-                          names.auth_db.dns,
+                          names.auth_db.rds,
                           "3306",
                           "keycloak",
                           "keycloak",
