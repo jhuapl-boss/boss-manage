@@ -59,13 +59,14 @@ SLACK_WEBHOOK_PATH_DEV = 'SLACK_WEBHOOK_PATH_DEV'
 # Domain name will be included in messages to Slack and also determines
 # whether SLACK_WEBHOOK_PATH_DEV's or SLACK_WEBHOOK_PATH_PRODUCTION's value is 
 # written to SLACK_WEBHOOK_PATH.
-VPC_DOMAIN =  'VPC_DOMAIN'
+VPC_DOMAIN = 'VPC_DOMAIN'
 
 # Used to override normal autoscale rules when creating a developer's stack.
 # All tables will use the autoscale rules defined by the "default" config to
 # avoid spending too much.  The production autoscale rules have minimums that
 # are way too high for DynamoDB tables for developers.
 DEV_STACK = 'DEV_STACK'
+
 
 def create_config(bosslet_config):
     session = bosslet_config.session
@@ -76,7 +77,7 @@ def create_config(bosslet_config):
     config.add_arg(Arg.String("LambdaCacheExecutionRole", role,
                               "IAM role for " + names.multi_lambda.lambda_))
 
-    lambda_key = generate_lambda_key(bosslet_config)
+    lambda_key = bosslet_config.names.dynamodb_autoscale.zip
     config.add_lambda(DYNAMO_LAMBDA_KEY,
                       names.dynamo_lambda.lambda_,
                       Ref("LambdaCacheExecutionRole"),
@@ -113,12 +114,14 @@ def generate(bosslet_config):
     config = create_config(bosslet_config)
     config.generate()
 
+
 def create(bosslet_config):
     """Create the configuration, and launch it"""
     pre_init(bosslet_config)
 
     config = create_config(bosslet_config)
     config.create()
+
 
 def pre_init(bosslet_config):
     """
@@ -148,12 +151,14 @@ def update_config_file(config_str, bosslet_config):
     parser.read_string(config_str)
     parser.set('default', VPC_DOMAIN, bosslet_config.INTERNAL_DOMAIN)
 
-    raise Exception("Need to remove logic for dev vs production setup")
+    #raise Exception("Need to remove logic for dev vs production setup")
     # TODO: remove logic for dev vs production setup
     # TODO: figure out how to handle SLACK integration, as not everyone will use it
     slack_host = parser.get('default', SLACK_WEBHOOK_HOST)
     slack_path_prod = parser.get('default', SLACK_WEBHOOK_PATH_PRODUCTION)
     slack_path_dev = parser.get('default', SLACK_WEBHOOK_PATH_DEV)
+    session = bosslet_config.session
+    domain = bosslet_config.INTERNAL_DOMAIN
     if domain == 'production.boss':
         parser.set('default', SLACK_WEBHOOK_PATH, slack_path_prod)
     else:
@@ -187,12 +192,14 @@ def update_config_file(config_str, bosslet_config):
 
     with open(CONFIG_OUTPUT_PATH, 'w') as out:
         out.write(headerless_config)
-    #print(headerless_config)
+    # print(headerless_config)
+
 
 def build_lambda():
     """Package lambda in preparation to upload to S3."""
     install_node_deps()
     build_node()
+
 
 def install_node_deps():
     """npm install NodeJS dependencies."""
@@ -205,6 +212,7 @@ def install_node_deps():
         print(str(output))
         raise RuntimeError('Failed to install dependencies.')
 
+
 def build_node():
     """Build and package in dist.zip."""
     print('Packaging NodeJS app.')
@@ -216,30 +224,26 @@ def build_node():
         print(str(output))
         raise RuntimeError('Failed to build Node application.')
 
+
 def upload_to_s3(bosslet_config, zip_file):
-    """Upload the zip file to the given S3 bucket.
+    """Upload the zip file to the correct S3 bucket.
 
     Args:
-        session (Session): Boto3 Session.
-        domain (str): domain of the stack being created
+        bosslet_config (BossConfiguration): Bosslet configuration class which contains everything specific to a boss:
+                                            session, bucket, names
         zip_file (str): Name of zip file.
-        bucket (str): Name of bucket to use.
+
     """
     print('Uploading to S3.')
     bucket = bosslet_config.LAMBDA_BUCKET
-    key = generate_lambda_key(domain)
+    session = bosslet_config.session
+    key = bosslet_config.names.dynamodb_autoscale.zip
     s3 = session.client('s3')
-    s3.create_bucket(Bucket=bucket)
+
+    try:
+        s3.create_bucket(Bucket=bucket)
+    except s3.exceptions.BucketAlreadyOwnedByYou:
+        pass # Only us-east-1 will not throw an exception if the bucket already exists
+
     s3.put_object(Bucket=bucket, Key=key, Body=open(zip_file, 'rb'))
-
-def generate_lambda_key(bosslet_config):
-    """Generate the S3 key name for the lambda's zip file.
-
-    Args:
-        domain (str): Use the domain as part of the key.
-
-    Returns:
-        (str)
-    """
-    return bosslet_config.names.dynamodb_autoscale.zip
 
