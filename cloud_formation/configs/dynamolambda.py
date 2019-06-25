@@ -237,20 +237,13 @@ def upload_to_s3(bosslet_config, zip_file):
     print('Uploading to S3.')
     bucket = bosslet_config.LAMBDA_BUCKET
     session = bosslet_config.session
-    key = generate_lambda_key(bosslet_config)
+    key = bosslet_config.names.dynamodb_autoscale.zip
     s3 = session.client('s3')
-    s3.create_bucket(Bucket=bucket)
+
+    try:
+        s3.create_bucket(Bucket=bucket)
+    except s3.exceptions.BucketAlreadyOwnedByYou:
+        pass # Only us-east-1 will not throw an exception if the bucket already exists
+
     s3.put_object(Bucket=bucket, Key=key, Body=open(zip_file, 'rb'))
-
-
-def generate_lambda_key(bosslet_config):
-    """Generate the S3 key name for the lambda's zip file.
-
-    Args:
-        bosslet_config (BossConfiguration): Bosslet configuration class which contains everything specific to a boss
-
-    Returns:
-        (str)
-    """
-    return bosslet_config.names.dynamodb_autoscale.zip
 
