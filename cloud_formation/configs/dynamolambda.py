@@ -77,7 +77,7 @@ def create_config(bosslet_config):
     config.add_arg(Arg.String("LambdaCacheExecutionRole", role,
                               "IAM role for " + names.multi_lambda.lambda_))
 
-    lambda_key = generate_lambda_key(bosslet_config)
+    lambda_key = bosslet_config.names.dynamodb_autoscale.zip
     config.add_lambda(DYNAMO_LAMBDA_KEY,
                       names.dynamo_lambda.lambda_,
                       Ref("LambdaCacheExecutionRole"),
