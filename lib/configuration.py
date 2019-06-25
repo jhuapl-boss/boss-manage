@@ -72,7 +72,7 @@ class BossConfiguration(object):
         'SSH_INBOUND',
         'SSH_KEY',
         'BILLING_TOPIC', # Optional
-        'BILLING_THREASHOLDS', # Conditional, required if setting up account
+        'BILLING_THRESHOLDS', # Conditional, required if setting up account
         'BILLING_CURRENCY', # Optional
         'ALERT_TOPIC', # Optional
     ]
@@ -199,7 +199,7 @@ class BossConfiguration(object):
         for key in self.__EXPECTED_KEYS:
             if not hasattr(self._config, key):
                 if key not in self.__DEFAULTS:
-                    if key in ('SCENARIO', 'BILLING_THREASHOLDS', 'PROFILE'):
+                    if key in ('SCENARIO', 'BILLING_THRESHOLDS', 'PROFILE'):
                         pass
                     elif key in ('OUTBOUND_IP',
                                  'OUTBOUND_PORT',
@@ -224,7 +224,7 @@ class BossConfiguration(object):
                 val = pformat(self.__getattr__(key))
                 print("{} = {}".format(key, val), file=fh)
             except AttributeError:
-                if key in ('SCENARIO', 'BILLING_THREASHOLDS', 'PROFILE'):
+                if key in ('SCENARIO', 'BILLING_THRESHOLDS', 'PROFILE'):
                     pass
                 elif key in ('OUTBOUND_IP',
                              'OUTBOUND_PORT',
