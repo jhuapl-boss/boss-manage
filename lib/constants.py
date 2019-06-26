@@ -140,7 +140,7 @@ REDIS_CLUSTER_SIZE = 1
 
 #################
 # Resource Memory
-REDIS_RESERVED_MEMORY = 0
+REDIS_RESERVED_MEMORY_PERCENT = 25
 
 
 ########################
