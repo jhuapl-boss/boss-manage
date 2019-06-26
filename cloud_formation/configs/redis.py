@@ -35,7 +35,7 @@ def create_config(bosslet_config):
     config = CloudFormationConfiguration('redis', bosslet_config)
 
     vpc_id = config.find_vpc()
-    internal_subnets, external_subnets = config.find_all_subnets(session)
+    internal_subnets, external_subnets = config.find_all_subnets()
     sgs = aws.sg_lookup_all(session, vpc_id)
 
     # Create the Cache and CacheState Redis Clusters

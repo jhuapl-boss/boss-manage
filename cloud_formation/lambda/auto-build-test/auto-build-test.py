@@ -114,7 +114,7 @@ wait
 echo " "
 echo "----------------------Building AMIs----------------------"
 echo " " 
-python3.5 ./packer.py auto-build-test.boss all --ami-version autotest
+python3.5 ./packer.py auto-build-test.boss all --ami-version autotest --force
 wait
 
 echo " "

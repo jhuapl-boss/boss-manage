@@ -64,7 +64,11 @@ def create_config(bosslet_config, lookup=True):
     sgs = aws.sg_lookup_all(session, vpc_id)
     internal_subnets, _ = config.find_all_subnets()
     internal_subnets_asg, _ = config.find_all_subnets(compatibility='asg')
-    topic_arn = aws.sns_topic_lookup(session, "ProductionMicronsMailingList")
+
+    topic_arn = aws.sns_topic_lookup(session, bosslet_config.ALERT_TOPIC)
+    if topic_arn is None:
+        raise MissingResourceError('SNS topic', bosslet_config.ALERT_TOPIC)
+
     event_data = {
         "lambda-name": "delete_lambda",
         "db": names.endpoint_db.rds,
@@ -170,7 +174,7 @@ def create_config(bosslet_config, lookup=True):
                          [('lambda', Arn('DownsampleDLQLambda'))])
 
     config.add_lambda('DownsampleDLQLambda',
-                      names.downsample_dlq.sqs,
+                      names.downsample_dlq.lambda_,
                       lambda_role,
                       const.DOWNSAMPLE_DLQ_LAMBDA,
                       handler='index.handler',

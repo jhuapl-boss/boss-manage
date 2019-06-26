@@ -39,6 +39,8 @@ def load_scenario(scenario):
             print(ex)
 
         for key in config:
+            if key not in d:
+                print("Warning: Scenario variable {} is new".format(key))
             d[key] = config[key]
 
 

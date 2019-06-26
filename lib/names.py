@@ -188,7 +188,7 @@ class AWSNames(object):
                              'type': 'lambda_'},
         'dns': {'types': ['sns', 'lambda_']},
         'downsample_dlq': {'name': 'downsample-dlq',
-                           'type': 'sqs'},
+                           'types': ['sqs', 'lambda_']},
         'downsample_volume': {'name': 'downsample.volume',
                               'type': 'lambda_'},
         'dynamodb_autoscale': {'name': 'dynamodb_autoscale',
