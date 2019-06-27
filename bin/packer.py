@@ -44,7 +44,6 @@ CONFIGS = [
     "auth",
     "backup",
     "cachemanager",
-    "consul",
     "endpoint",
     "vault",
 ]

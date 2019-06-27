@@ -6,18 +6,16 @@
 ENDPOINT_TYPE:      # EC2 Instance Type
 RDS_TYPE:           # RDS Instance Type
 REDIS_CACHE_TYPE:   # ElastiCache Instance Type
+REDIS_SESSION_TYPE: # ElastiCache Instance Type
 REDIS_TYPE:         # ElastiCache Instance Type
 CACHE_MANAGER_TYPE: # EC2 Instance Type
 ACTIVITIES_TYPE:    # EC2 Instance Type
+VAULT_TYPE:         # EC2 Instance Type
+AUTH_TYPE:          # EC2 Instance Type
+
 
 # Cluster / ASG sizes
 AUTH_CLUSTER_SIZE:    # Fixed Size Auto Scale Group (ASG)
-CONSUL_CLUSTER_SIZE:  # Fixed Size ASG
-                      # You want an odd number of cluster instances as they
-                      # form a quorum and if it is lost then the cluster fails
-                      # Size 1 - cannot lose any instances
-                      # Size 3 - can lose one instance
-                      # Size 5 - can lose two instances
 VAULT_CLUSTER_SIZE:   # Fized Size ASG
 ENDPOINT_CLUSTER_MIN: # Minimum Size of ASG
 ENDPOINT_CLUSTER_MAX: # Maximum Size of ASG

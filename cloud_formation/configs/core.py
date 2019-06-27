@@ -17,7 +17,8 @@ Create the core configuration which consists of
   * A new VPC with an internal DNS Hosted Zone
   * Internal and External subnets for every availability zone
   * A Bastion server that allows SSH access to internal machines
-  * A Consul and Vault ASG clusters for secret storage
+  * A Vault ASG clusters for secret storage
+  * A Vault DynamoDB table for Vault storage of data
   * A Keycloak Authentication server ASG, ELB,  and (optional) RDS instance
   * A lambda to handle DNS updates for ASG instance changes
   * An Internet Gateway allowing network connections to the internet

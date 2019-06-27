@@ -153,7 +153,6 @@ class AWSNames(object):
         'cache_state': {'name': 'cache-state',
                         'type': 'redis'},
         'cloudwatch': {'type': 'stack'},
-        'consul': {'types': ['dns', 'ami']},
         'consul_monitor': {'name': 'consulMonitor',
                            'types': 'lambda_'},
         'copycuboid': {'type': 'stack'},

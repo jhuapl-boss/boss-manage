@@ -43,7 +43,6 @@
         "aws-elasticbeanstalk-service-role",
         "backup",
         "cachemanager",
-        "consul",
         "endpoint",
         "events_for_delete_lambda",
         "goad-lambda-role",
