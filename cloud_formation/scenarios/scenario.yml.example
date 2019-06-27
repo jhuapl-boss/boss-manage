@@ -24,4 +24,4 @@ ENDPOINT_CLUSTER_MAX: # Maximum Size of ASG
 REDIS_CLUSTER_SIZE:   # ElastiCache Redis Replicas
 
 # Memory Size
-REDIS_RESERVED_MEM: 387 # ElastiCache Redis Reserved Memory
+REDIS_RESERVED_MEMORY_PERCENT: 25 # ElastiCache Redis Percentage of Memory that is Reserved Memory (recommended to be 25%)

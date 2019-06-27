@@ -18,6 +18,7 @@ DEPENDENCIES = ['core']
 Create the redis configuration which consists of
   * redis cluster for cache
   * redis cluster for cache-state
+  * redis for session key 
 
 The redis configuration creates cache and cache-state redis clusters for the
 BOSS system. redis configuration is in a separate file to improve the update process
@@ -41,7 +42,7 @@ def create_config(bosslet_config):
     # Create the Cache and CacheState Redis Clusters
     REDIS_PARAMETERS = {
         "maxmemory-policy": "volatile-lru",
-        "reserved-memory": str(const.REDIS_RESERVED_MEMORY * 1000000),
+        "reserved-memory-percent": str(const.REDIS_RESERVED_MEMORY_PERCENT),
         "maxmemory-samples": "5", # ~ 5 - 10
     }
 
