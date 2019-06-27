@@ -366,9 +366,11 @@ the endpoint initialization and unit test step).
 
 Click on `Boss roles`.
 
-Click on `ADD BOSS ROLE`.
+Click on `MANAGE ROLES`.
 
-Find the user you created and add the `ADMIN` role to that user and save.
+Find the user you created and add the `user-manager` and `resource-manager` roles to that user and save.
+
+Next login as that user so the new roles are properly synced.
 
 
 ##### Run Intern Integration Tests
@@ -395,5 +397,3 @@ To be filled out
 ### Manual Checks
 * https://api.theboss.io/ping/
 * https://api.theboss.io/latest/collection/
-* Login into Scalyr and verify that the new instances appear on the overview page.
-* Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint.

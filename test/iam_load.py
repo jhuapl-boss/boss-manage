@@ -5,57 +5,32 @@ import os
 import sys
 import json
 import time
+from boto3.session import Session
 
 
 import alter_path
-from lib import aws
-from lib.vault import Vault
-from lib.ssh import vault_tunnel
+from lib.configuration import BossParser
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description = "Script to load test create a large number of IAM credentials using Vault")
+    parser = BossParser(description = "Script to load test create a large number of IAM credentials using Vault")
 
-    parser.add_argument("--aws-credentials", "-a",
-                        metavar = "<file>",
-                        default = os.environ.get("AWS_CREDENTIALS"),
-                        type = argparse.FileType('r'),
-                        help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
-    parser.add_argument("--ssh-key", "-s",
-                        metavar = "<file>",
-                        default = os.environ.get("SSH_KEY"),
-                        help = "SSH private key to use when connecting to AWS instances (default: SSH_KEY)")
     parser.add_argument("--load", "-l",
                         metavar = "<load>",
                         default = 50,
+                        type = int,
                         help = "How many credentials to request from Vault")
-    parser.add_argument("domain",
-                        metavar = "domain",
-                        help = "Domain to target")
+    parser.add_bosslet()
 
     args = parser.parse_args()
+    bosslet_config = args.bosslet_config
 
-    if args.aws_credentials is None:
-        parser.print_usage()
-        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
-        sys.exit(1)
-
-    if args.ssh_key is None:
-        parser.print_usage()
-        print("Error: SSH key not provided and SSH_KEY is not defined")
-        sys.exit(1)
-
-    session = aws.create_session(args.aws_credentials)
-    bastion = aws.machine_lookup(session, 'bastion.' + args.domain)
-    iam = session.resource('iam')
-    client = session.client('iam')
-
-    domain = args.domain.replace('.', '-')
+    iam = bosslet_config.session.resource('iam')
+    client = bosslet_config.session.client('iam')
+    domain = bosslet_config.INTERNAL_DOMAIN.replace('.', '-')
 
     print("Opening ssh tunnel")
-    with vault_tunnel(args.ssh_key, bastion):
+    with bosslet_config.call.vault() as v:
         print("\tcomplete")
-
-        v = Vault('vault.' + args.domain)
 
         #while True:
         #    try:
@@ -96,8 +71,8 @@ if __name__ == '__main__':
             try:
                 print("Starting test")
                 creds = []
-                for i in range(int(args.load)):
-                    cred = v.read('aws/creds/ingest-loadtest')['data']
+                for i in range(args.load):
+                    cred = v.read('aws/creds/ingest-loadtest')
                     print(cred)
                     creds.append(cred)
 
@@ -105,8 +80,9 @@ if __name__ == '__main__':
 
                 for cred in creds:
                     try:
-                        c = aws.create_session({'aws_access_key': cred['access_key'],
-                                                'aws_secret_key': cred['secret_key']}).client('iam')
+                        s = Session(aws_access_key_id = cred['access_key'],
+                                    aws_secret_access_key = cred['secret_key'])
+                        c = s.client('iam')
                         c.list_users()
                     except Exception as ex:
                         print(ex)

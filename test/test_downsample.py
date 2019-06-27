@@ -14,23 +14,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import alter_path
 import argparse
 import blosc
-from bossutils.multidimensional import XYZ, Buffer
-from bossutils.multidimensional import range as xyz_range
 import boto3
 from boto3.dynamodb.conditions import Attr
 import json
+from multiprocessing.pool import Pool
+import os
+from sys import stdout
+
+import alter_path
 from lib import aws
 from lib.hosts import PROD_ACCOUNT, DEV_ACCOUNT
 from lib.names import AWSNames
-from multiprocessing.pool import Pool
-import os
+from lib.configuration import BossParser
+
+from bossutils.multidimensional import XYZ, Buffer
+from bossutils.multidimensional import range as xyz_range
 from spdb.c_lib.ndtype import CUBOIDSIZE
 from spdb.spatialdb import AWSObjectStore, Cube
 from spdb.project.basicresource import BossResourceBasic
-from sys import stdout
 
 """
 Script for running the downsample process against test data.
@@ -110,16 +113,15 @@ class S3Bucket(object):
 
 class TestDownsample(object):
 
-    def __init__(self, domain, chan_id, frame):
+    def __init__(self, bosslet_config, chan_id, frame):
         """
         Args:
-            domain (str): VPC domain such as production.boss.
+            bosslet_config (BossConfiguration): Boss Configuration of the stack when downsample should be executed
             chan_id (str): Id of channel.  Use letters to avoid collisions with real data.
             frame (list[int]): Coordinate frame x/y/z stops.
         """
-        self.domain = domain
+        self.bosslet_config = bosslet_config
         self.chan_id = chan_id
-        self.account = self.get_account(domain)
         self.frame = frame
 
     def get_image_dict(self):
@@ -178,39 +180,24 @@ class TestDownsample(object):
 
         return data
 
-    def get_account(self, domain):
-        """
-        Return the AWS account number based on the domain.  The account number is
-        used to assemble the step function arns.
-
-        Args:
-            domain (str): VPC such as integration.boss.
-
-        Returns:
-            (str): AWS account number.
-        """
-        if domain == 'production.boss' or domain == 'integration.boss':
-            return PROD_ACCOUNT
-        return DEV_ACCOUNT
-
-    def get_downsample_args(self, region):
+    def get_downsample_args(self):
         """
         Get arguments for starting the downsample.
-
-        Args:
-            region (str): AWS region.
 
         Returns:
             (dict): Arguments.
         """
-        names = AWSNames(self.domain)
-        sfn_arn_prefix = SFN_ARN_PREFIX_FORMAT.format(region, self.account)
+        names = self.bosslet_config.names
+        sfn_arn_prefix = SFN_ARN_PREFIX_FORMAT.format(self.bosslet_config.REGION,
+                                                      self.bosslet_config.ACCOUNT_ID)
         start_args = {
             # resolution_hierarchy_sfn is used by the test script, but not by the
             # actual resolution hiearchy step function that the script invokes.
-            'resolution_hierarchy_sfn': '{}{}'.format(sfn_arn_prefix, names.resolution_hierarchy),
+            'resolution_hierarchy_sfn': '{}{}'.format(sfn_arn_prefix, names.sfn.resolution_hierarchy),
 
-            'downsample_volume_lambda': LAMBDA_ARN_FORMAT.format(region, self.account, names.downsample_volume_lambda),
+            'downsample_volume_lambda': LAMBDA_ARN_FORMAT.format(self.bosslet_config.REGION,
+                                                                 self.bosslet_config.ACCOUNT_ID,
+                                                                 names.lambda_.downsample_volume)
 
             'test': True,
 
@@ -220,8 +207,8 @@ class TestDownsample(object):
             'annotation_channel': False,
             'data_type': 'uint8',
 
-            's3_index': names.s3_index,
-            's3_bucket': names.cuboid_bucket,
+            's3_index': names.s3.s3_index,
+            's3_bucket': names.s3.cuboid_bucket,
 
             'x_start': 0,
             'y_start': 0,
@@ -238,12 +225,12 @@ class TestDownsample(object):
             'type': 'anisotropic',
             'iso_resolution': 3,
 
-            'aws_region': region,
+            'aws_region': self.bosslet_config.REGION,
         }
 
         return start_args
 
-    def upload_data(self, session, args):
+    def upload_data(self, args):
         """
         Fill the coord frame with random data.
 
@@ -265,7 +252,7 @@ class TestDownsample(object):
         #          just upload the first volume worth of cubes.
         #          The downsample volume lambda will only read these cubes when
         #          passed the 'test' argument.
-        bucket = S3Bucket(session, args['s3_bucket'])
+        bucket = S3Bucket(self.bosslet_config.session, args['s3_bucket'])
         print('Uploading test data', end='', flush=True)
         for cube in xyz_range(XYZ(0,0,0), XYZ(2,2,2)):
             key = AWSObjectStore.generate_object_key(resource, resolution, ts, cube.morton)
@@ -280,10 +267,10 @@ class TestDownsample(object):
             print('.', end='', flush=True)
         print(' Done uploading.')
 
-    def delete_data(self, session, args):
+    def delete_data(self, args):
         lookup_prefix = '&'.join([args['collection_id'], args['experiment_id'], args['channel_id']])
 
-        client = session.client('s3')
+        client = self.bosslet_config.session.client('s3')
         args_ = { 'Bucket': args['s3_bucket'] }
         resp = { 'KeyCount': 1 }
         count = 0
@@ -305,8 +292,8 @@ class TestDownsample(object):
         print("Deleted {} cubes".format(count))
 
 
-    def delete_index_keys(self, session, args):
-        table = session.resource('dynamodb').Table(args['s3_index'])
+    def delete_index_keys(self, args):
+        table = self.bosslet_config.session.resource('dynamodb').Table(args['s3_index'])
         lookup_prefix = '&'.join([args['collection_id'], args['experiment_id'], args['channel_id']])
 
         resp = {'Count': 1}
@@ -327,18 +314,10 @@ def parse_args():
     Returns:
         (Namespace): Parsed arguments.
     """
-    parser = argparse.ArgumentParser(
+    parser = BossParser(
         description='Script for testing downsample process. ' + 
         'To supply arguments from a file, provide the filename prepended with an `@`.',
         fromfile_prefix_chars = '@')
-    parser.add_argument('--aws-credentials', '-a',
-                        metavar='<file>',
-                        default=os.environ.get('AWS_CREDENTIALS'),
-                        type=argparse.FileType('r'),
-                        help='File with credentials for connecting to AWS (default: AWS_CREDENTIALS)')
-    parser.add_argument('--region', '-r',
-                        default='us-east-1',
-                        help='AWS region (default: us-east-1)')
     parser.add_argument('--frame', '-f',
                         nargs=3,
                         type=int,
@@ -356,19 +335,12 @@ def parse_args():
                         action = 'store_true',
                         default = False,
                         help = 'Remove S3 cubes and S3 index table keys related to testing')
-    parser.add_argument(
-        'domain',
-        help='Domain that lambda functions live in, such as integration.boss')
+    parser.add_bosslet()
     parser.add_argument(
         'channel_id',
         help='Id of channel that will hold test data')
 
     args = parser.parse_args()
-
-    if args.aws_credentials is None:
-        parser.print_usage()
-        parser.exit(
-            1, 'Error: AWS credentials not provided and AWS_CREDENTIALS is not defined')
 
     return args
 
@@ -376,10 +348,8 @@ def parse_args():
 
 if __name__ == '__main__':
     args = parse_args()
-    ds_test = TestDownsample(args.domain, args.channel_id, args.frame)
-    start_args = ds_test.get_downsample_args(args.region)
-
-    session = aws.create_session(args.aws_credentials)
+    ds_test = TestDownsample(args.bosslet_config, args.channel_id, args.frame)
+    start_args = ds_test.get_downsample_args()
 
     if args.cleanup:
         ds_test.delete_index_keys(session, start_args)
@@ -390,9 +360,9 @@ if __name__ == '__main__':
         ds_test.delete_index_keys(session, start_args)
 
     if not args.noupload:
-        ds_test.upload_data(session, start_args)
+        ds_test.upload_data(start_args)
 
-    sfn = session.client('stepfunctions')
+    sfn = args.bosslet_config.session.client('stepfunctions')
     resp = sfn.start_execution(
         stateMachineArn=start_args['resolution_hierarchy_sfn'],
         input=json.dumps(start_args)

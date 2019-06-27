@@ -27,16 +27,34 @@ import sys
 import os
 import glob
 import json
+import yaml
 import shlex
 import subprocess
+import configparser
 from distutils.spawn import find_executable
 from boto3.session import Session
 
 import alter_path
 from lib.constants import repo_path
-from lib import aws
+from lib import configuration
+from lib import utils
+
+CONFIGS = [
+    "activities",
+    "auth",
+    "backup",
+    "cachemanager",
+    "consul",
+    "endpoint",
+    "vault",
+]
 
 os.environ["PATH"] += ":" + repo_path("bin") # allow executing Packer from the bin/ directory
+
+def lambda_ami():
+    # Amazon Linux AMI 2017.09.0 (HVM), SSD Volume Type
+    # Should match runtime used by AWS Lambda
+    return "ami-8c1be5f6"
 
 def get_commit():
     """Figure out the commit hash of the current git revision.
@@ -58,23 +76,12 @@ def execute(cmd, output_file):
     """
     return subprocess.Popen(shlex.split(cmd), stderr=subprocess.STDOUT, stdout=open(output_file, "w"))
 
-def locate_ami(aws_config):
+def locate_ami(session):
     def contains(x, ys):
         for y in ys:
             if y not in x:
                 return False
         return True
-
-    try: 
-        with open(aws_config) as fh:
-            cred = json.load(fh)
-            session = Session(aws_access_key_id = cred["aws_access_key"],
-                            aws_secret_access_key = cred["aws_secret_key"],
-                            region_name = 'us-east-1')
-    except Exception as e:
-        print(e)
-        print("Session could not be established with credentials file, attempting to use iam role")
-        session = aws.use_iam_role()
 
     client = session.client('ec2')
     response = client.describe_images(Filters=[
@@ -85,7 +92,7 @@ def locate_ami(aws_config):
                     #{"Name": "platform", "Values": ["Ubuntu"]},
                     #{"Name": "name", "Values": ["hvm-ssd"]},
                     #{"Name": "name", "Values": ["14.04"]},
-                ])
+               ])
 
     images = response['Images']
     images = [i for i in images if contains(i['Name'], ('hvm-ssd', '14.04', 'server'))]
@@ -113,35 +120,38 @@ if __name__ == '__main__':
         return "\n" + header + "\n" + \
                "\n".join(map(lambda x: "  " + x, options)) + "\n"
 
-    config_glob = repo_path("packer", "variables", "*")
-    config_names = [x.split(os.path.sep)[-1] for x in glob.glob(config_glob)]
-    config_help_names = list(config_names)
-    config_help_names.append("all")
-    config_help = create_help("config is on of the following:", config_help_names)
+    # Use a seperate top level key in top.sls for AMIs?
+    # Use a seperate top level key to say which AMIs to not build using packer.py
+    #config_file = repo_path("salt_stack", "salt", "top.sls")
+    #with open(config_file, 'r') as fh:
+    #    top = yaml.load(fh.read())
+    #    configs = [k for k in top['base']]
+    #    print(configs)
 
-    parser = argparse.ArgumentParser(description = "Script the building of machines images using Packer and SaltStack",
-                                     formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     epilog=config_help)
+    config_help_names = list(CONFIGS)
+    config_help_names.append("all")
+    config_help_names.append("lambda")
+    config_help = create_help("config is on of the following: ('all' will build all except 'lambda')", config_help_names)
+
+    parser = configuration.BossParser(description = "Script the building of machines images using Packer and SaltStack",
+                                      formatter_class=argparse.RawDescriptionHelpFormatter,
+                                      epilog=config_help)
     parser.add_argument("--single-thread",
                         action = "store_true",
                         default = False,
                         help = "Only build one config at a time. (default: Build all configs at the same time)")
-    parser.add_argument("--only",
-                        metavar = "<packer-builder>",
-                        default = "amazon-ebs",
-                        help = "Which Packer building to use. (default: amazon-ebs)")
-    parser.add_argument("--name",
-                        metavar = "<build name>",
+    parser.add_argument("--force", "-f",
+                        action = "store_true",
+                        default = False,
+                        help = "Override any existing AMI with the same name")
+    parser.add_argument("--ami-version",
+                        metavar = "<ami-version>",
                         default = 'h' + git_hash[:8],
-                        help = "The build name for the machine image(s). (default: First 8 characters of the git SHA1 hash)")
-    parser.add_argument("--no-bastion",
-                        action = "store_false",
-                        default = True,
-                        dest="bastion",
-                        help = "Don't use the aws-bastion file when building. (default: Use the bastion)")
+                        help = "The AMI version for the machine image(s). (default: First 8 characters of the git SHA1 hash)")
     parser.add_argument("--base-ami",
                         metavar = "<base-ami>",
                         help = "Base AMI to build the new Image from")
+    parser.add_bosslet()
     parser.add_argument("config",
                         choices = config_help_names,
                         metavar = "<config>",
@@ -150,15 +160,25 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if "all" in args.config:
-        args.config = config_names
+        args.config = CONFIGS
 
-    bastion_config = "-var-file=" + repo_path("config", "aws-bastion")
-    credentials_config = repo_path("config", "aws-credentials")
+    if args.bosslet_config.OUTBOUND_BASTION:
+        bastion_config = """-var 'aws_bastion_ip={}'
+                            -var 'aws_bastion_user={}'
+                            -var 'aws_bastion_priv_key_file={}'
+                         """.format(args.bosslet_config.OUTBOUND_IP,
+                                    args.bosslet_config.OUTBOUND_USER,
+                                    utils.keypair_to_file(args.bosslet_config.OUTBOUND_KEY))
+    else:
+        bastion_config = ""
+
+    aws_creds = args.bosslet_config.session.get_credentials()
+    credentials_config = """-var 'aws_access_key={}'
+                            -var 'aws_secret_key={}'
+                         """.format(aws_creds.access_key,
+                                    aws_creds.secret_key)
+
     packer_file = repo_path("packer", "vm.packer")
-
-    if not os.path.exists(credentials_config):
-        print("Could not locate AWS credentials file at '{}', required...".format(credentials_config))
-        sys.exit(1)
 
     packer_logs = repo_path("packer", "logs")
     if not os.path.isdir(packer_logs):
@@ -167,23 +187,27 @@ if __name__ == '__main__':
     if args.base_ami:
         ami = args.base_ami
     else:
-        ami = locate_ami(credentials_config)
+        ami = locate_ami(args.bosslet_config.session)
 
     cmd = """{packer} build
-            {bastion} {credentials}
-            -var-file={machine} -var 'name_suffix={name}'
-            -var 'commit={commit}' -var 'force_deregister={deregister}'
-            -var 'aws_source_ami={ami}' -only={only} {packer_file}"""
+             {bastion} {credentials}
+             -var 'name={machine}' -var 'ami_version={ami_version}'
+             -var 'ami_suffix={ami_suffix}' -var 'aws_region={region}'
+             -var 'commit={commit}' -var 'force_deregister={deregister}'
+             -var 'aws_source_ami={ami}' -var 'aws_source_user={user}'
+             {packer_file}"""
     cmd_args = {
         "packer" : "packer",
-        "bastion" : bastion_config if args.bastion else "",
-        "credentials" : "-var-file=" + credentials_config if args.bastion else "",
-        "only" : args.only,
+        "bastion" : bastion_config,
+        "credentials" : credentials_config,
         "packer_file" : packer_file,
-        "name" : "-" + args.name,
+        "region": args.bosslet_config.REGION,
+        "ami_suffix": args.bosslet_config.AMI_SUFFIX,
+        "ami_version" : ("-" + args.ami_version) if len(args.ami_version) > 0 else "",
         "commit" : git_hash,
         "ami" : ami,
-        "deregister" : "true" if args.name in ["test", "sandy", "dean", "prodtest"] else "false",
+        "user": "ubuntu",
+        "deregister" : "true" if args.force else "false",
         "machine" : "" # replace for each call
     }
 
@@ -191,7 +215,10 @@ if __name__ == '__main__':
     for config in args.config:
         print("Launching {} configuration".format(config))
         log_file = os.path.join(packer_logs, config + ".log")
-        cmd_args["machine"] = repo_path("packer", "variables", config)
+        cmd_args["machine"] = config
+        cmd_args['ami'] = lambda_ami() if config == 'lambda' else ami
+        cmd_args['user'] = 'ec2-user' if config == 'lambda' else 'ubuntu'
+
         proc = execute(cmd.format(**cmd_args), log_file)
 
         if args.single_thread:

@@ -175,8 +175,7 @@ saving time overall.
 #### Running Lambda packer
 From the packer 
 ```shell
-$ cd boss-manage.git/packer
-$ packer build -var-file=../config/aws-credentials -var-file=variables/lambda -var-file=../config/aws-bastion -var 'force_deregister=true' lambda.packer
+$ boss-manage.git/bin/packer.py <bosslet.config> lambda --ami-version "" -f
 ```
 
 Manually create security group for the lambda_build_server

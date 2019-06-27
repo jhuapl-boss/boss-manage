@@ -26,7 +26,6 @@ base:
 
     'lambda*':
         - lambda-dev
-        - chrony
 
     'ep-jenkins*':
         - jenkins-microns.endpoint
@@ -83,3 +82,4 @@ base:
         - unzip
         - users.ec2-user
         - backup
+        - chrony

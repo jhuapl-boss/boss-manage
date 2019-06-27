@@ -20,6 +20,8 @@ import time
 from pprint import pprint
 import traceback
 
+from .exceptions import VaultError
+
 VAULT_TOKEN = "vault_token"
 VAULT_KEY = "vault_key."
 
@@ -72,13 +74,13 @@ class Vault(object):
         if read_token is not None:
             token_file = self.path(read_token)
             if not os.path.exists(token_file):
-                raise Exception("Token file '{}' doesn't exist".format(token_file))
+                raise VaultError("Token file '{}' doesn't exist".format(token_file))
 
             with open(token_file, "r") as fh:
                 client.token = fh.read()
                 try:
                     if not client.is_authenticated():
-                        raise Exception("Vault token is not valid, cannot communicate with the Vault")
+                        raise VaultError("Vault token is not valid, cannot communicate with the Vault")
                 except:
                     raise
         return client
@@ -103,7 +105,7 @@ class Vault(object):
         client = self.connect(VAULT_TOKEN)
         code.interact(local=locals())
 
-    def initialize(self, secrets = 1, threashold = 1):
+    def initialize(self, account_id, secrets = 1, threashold = 1):
         """Initialize a Vault. Connect using get_client() and if the Vault is not
         initialized then initialize it with 1 recovery key (and only requiring the
         1 key when used). The recovery key is stored as VAULT_KEY and root token
@@ -116,6 +118,7 @@ class Vault(object):
               not initialization will fail.
 
         Args:
+            account_id (str) : AWS Account ID that Vault is running under, passed to configure()
             secrets (int) : Total number of secrets to split the master key into
             threashold (int) : The number of secrets required to reconstruct the master key
         """
@@ -182,9 +185,9 @@ class Vault(object):
             raise Exception("Vault not finished initializing")
         print(" done")
 
-        self.configure()
+        self.configure(account_id)
 
-    def configure(self):
+    def configure(self, account_id):
         """A companion function that will configure a newly initialized Vault
         as needed for BOSS. This includes:
             * Configuring the Audit Backend
@@ -194,11 +197,10 @@ class Vault(object):
                   for any policy
             * Configure the AWS backend (if there are AWS credentials to use)
             * Configure AWS backend roles from policies/*.iam
-            * Configure the PKI backend (if there is a certificate to use)
-            * Configure PKI backend roles from policies/*.pki
 
         Args:
-            machine (None|string) : hostname of the machine, used for reading/saving unique data
+            account_id (str) : AWS Account ID that Vault is running under, used when binding
+                               AWS roles to Vault policies in the AWS authentication backend
         """
         print("Configuring Vault")
         client = self.connect(VAULT_TOKEN)
@@ -229,14 +231,13 @@ class Vault(object):
             try:
                 client.sys.enable_auth_method('aws')
             except Exception as e:
-                raise Exception("Error while enabling auth back end. {}".format(e))
+                raise VaultError("Error while enabling auth back end. {}".format(e))
         else:
             print("aws auth backend already created.")
 
         #Define policies and arn                                     
         policies = [p for p in provisioner_policies if p not in ('provisioner',)]
-        arn = 'arn:aws:iam::{}:instance-profile/'.format(os.environ['AWS_ACCOUNT'])
-        #TODO: Find a temporary way of storing the aws account number
+        arn = 'arn:aws:iam::{}:instance-profile/'.format(account_id)
         #For each policy configure the policies on a role of the same name
         for policy in policies:
             client.create_ec2_role(policy,
@@ -250,7 +251,7 @@ class Vault(object):
             try:
                 client.sys.enable_secrets_engine('aws')
             except Exception as e:
-                raise Exception('Error while enabling secret back end. {}'.format(e))
+                raise VaultError('Error while enabling secret back end. {}'.format(e))
         else:
             print("aws secret backend already created.")
 
@@ -260,28 +261,6 @@ class Vault(object):
             with open(iam, 'r') as fh:
                 # if we json parse the file first we can use the duplicate key trick for comments
                 client.secrets.aws.create_or_update_role(name, 'iam_user', policy_document = fh.read())
-
-        # PKI Backend
-        """
-        if True: # Disabled until we either have a CA cert or can generate a CA
-            print("Vault PKI cert file does not exist, skipping configuration of PKI secret backend")
-        else:
-            client.enable_secret_backend('pki')
-            # Generate a self signed certificate for CA
-            print("Generating self signed CA")
-            response = client.write("pki/root/generate/internal", common_name=aws_creds["domain"])
-            with open(get_path(machine, "ca.pem"), 'w') as fh:
-                fh.write(response["data"]["certificate"])
-
-            # Should we configure CRL?
-
-            path = os.path.join(_CURRENT_DIR, "policies", "*.pki")
-            for pki in glob.glob(path):
-                name = os.path.basename(pki).split('.')[0]
-                with open(pki, 'r') as fh:
-                    keys = json.load(fh)
-                    client.write("aws/roles/" + name, **keys)
-        """
 
     def set_policy(self, name, policy):
         """Create or Update a policy
@@ -322,7 +301,7 @@ class Vault(object):
                 keys.append(fh.read())
 
         if len(keys) == 0:
-            raise Exception("Could not locate any key files, not unsealing")
+            raise VaultError("Could not locate any key files, not unsealing")
 
         res = client.sys.submit_unseal_keys(keys)
         if res['sealed']:

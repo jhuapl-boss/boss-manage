@@ -99,3 +99,6 @@ cloud_formation/configs/dynamo_config.template
 
 /config/aws-credentials-prod
 /config/aws-credentials-dev
+
+# Ignore bosslet configuration files
+/config/*.py
