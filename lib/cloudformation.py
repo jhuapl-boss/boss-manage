@@ -2182,8 +2182,7 @@ class CloudFormationConfiguration:
             user_actions (list[str]): List of KMS actions that the given user(s) are allows
                                       to perform with the key
         """
-        # DP HACK: replace with reference to bosslet_config when refactored
-        account_id = os.environ['AWS_ACCOUNT']
+        account_id = self.bosslet_config.ACCOUNT_ID
 
         self.resources[key] = {
             "Type": "AWS::KMS::Key",
