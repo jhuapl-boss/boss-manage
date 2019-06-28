@@ -12,3 +12,35 @@
   - If you requested the certificate externally you need to import the certificate and private key into ACM so that AWS resources can use the SSL certificate
 
 Any Bosslet using the domain can now lookup the certificate(s) needed and attach them to the load balancers to provide HTTPS traffic
+
+## Scalyr
+Decide if you plan to use Scalyr for capture and view logs.  You can register for a free 30 day trail on their www.scalyr.com
+
+### Using Scalyr
+To setup scalyr with a new account
+Create a new Trial Account at www.scalyr.com
+After verifying your account's email address
+Select the drop-down menu under your accounts name in the top right corner -> choose "API Keys"
+You'll want the Log Access Key for Writes
+
+in boss-manage/salt_stack/pillar 
+create a new file scalyr.sls
+```
+# Scalyr values common to all VM images.
+scalyr:
+    log_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+Then paste in the Log Access Key for Writes into your account.
+You'll need to do this before building AMIs with packer 
+
+### Not Using Scalyr
+If you do not want to use Scaylr do the following
+Zero out the contents of the files but leave the files there.
+
+boss-manage/salt_stack/salt/scalyr/init.sls
+boss-manage/salt_stack/salt/scalyr/map.jinja
+boss-manage/salt_stack/salt/scalyr/update_host.sls
+
+Currently, errors will occur if the files are not there.
+
