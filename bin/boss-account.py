@@ -86,16 +86,44 @@ class BillingList(SubscriptionList):
         super().__init__(bosslet_config, bosslet_config.BILLING_TOPIC)
         self.client_cw = bosslet_config.session.client('cloudwatch')
 
-
-    def create(self):
-        if super().create() is False:
-            return False
-
+    def get_thresholds(self):
         try:
             thresholds = eval(self.bosslet_config.BILLING_THRESHOLDS)
             console.info("Creating {} billing alarms".format(len(thresholds)))
         except AttributeError: # Assume BILLING_THRESHOLDS is not provided
             console.error("Bosslet value 'BILLING_THRESHOLDS' needs to be defined before creating alarms")
+            thresholds = None
+
+        return thresholds
+
+    def exists(self):
+        if super().exists() is False:
+            return False
+
+        thresholds = self.get_thresholds()
+        if thresholds is None:
+            return False
+
+        threshold_names = ['Billing_{}'.format(str(t)) for t in thresholds]
+
+        resp = self.client_cw.describe_alarms(AlarmNamePrefix = 'Billing_')
+        alarm_names = [a['AlarmName'] for a in resp['MetricAlarms']]
+
+        missing_alarms = 0
+        for threshold in thresholds:
+            if threshold not in alarm_names:
+                missing_alarms += 1
+
+        console.error("Missing {} alarms".format(missing_alarms))
+
+        return missing_alarms == 0
+
+    def create(self):
+        if super().create() is False:
+            return False
+
+        thresholds = self.get_thresholds()
+        if thresholds is None:
             return False
 
         currency = self.bosslet_config.BILLING_CURRENCY
@@ -116,11 +144,11 @@ class BillingList(SubscriptionList):
             'ComparisonOperator': 'GreaterThanOrEqualToThreshold'
         }
 
-        for threashold in thresholds:
-            console.debug("\tAlert level: {:,}".format(threashold))
-            alarm_parms['AlarmName'] = "Billing_{}".format(str(threashold))
-            alarm_parms['AlarmDescription'] = "Alarm when spending reaches {:,}".format(threashold)
-            alarm_parms['Threshold'] = float(threashold)
+        for threshold in thresholds:
+            console.debug("\tAlert level: {:,}".format(threshold))
+            alarm_parms['AlarmName'] = "Billing_{}".format(str(threshold))
+            alarm_parms['AlarmDescription'] = "Alarm when spending reaches {:,}".format(threshold)
+            alarm_parms['Threshold'] = float(threshold)
             response = self.client_cw.put_metric_alarm(**alarm_parms)
 
 class AlertList(SubscriptionList):
