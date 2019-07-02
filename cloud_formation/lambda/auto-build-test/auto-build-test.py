@@ -17,10 +17,20 @@ import boto3
 import os
 
 REGION = os.environ['AWS_REGION'] # region to launch instance leveraging lambda env var.
-AMI = 'ami-456b493a' # Ubuntu 16.04 AWS provided base image.
 INSTANCE_TYPE = 't2.micro' # instance type to launch.
 
 EC2 = boto3.client('ec2', region_name=REGION)
+
+def lookup_ami(client):
+    ami_names = ['lambda.boss', 'lambda.boss-h*']
+    response = client.describe_images(Filters=[{"Name": "name", "Values": ami_names}])
+    if len(response['Images']) == 0:
+        raise Exception("Could not locate lambda.boss AMI")
+    else:
+        response['Images'].sort(key = lambda x: x['CreationDate'], reverse = True)
+        ami = response['Images'][0]['ImageId']
+        return ami
+
 
 def lambda_to_ec2(event, context):
     """ Lambda handler taking [message] and creating a httpd instance with an echo. """
@@ -99,13 +109,8 @@ rm -r salt_stack/salt/scalyr
 mkdir salt_stack/salt/scalyr
 touch salt_stack/salt/scalyr/init.sls && touch salt_stack/salt/scalyr/map.jinja && touch salt_stack/salt/scalyr/update_host.sls
 
-#Make empty aws-creds file so that cloudformation script works properly.
-cd config/
-touch aws-credentials
-source set_vars-auto_build_test.sh
-cd ../bin/
-
 #Create  keypair to attach to ec2 instances made by cloudformation.
+touch ~/.ssh/auto-build-keypair.pem # so the bosslet config is considered valid
 python3.5 ./manage_keypair.py auto-build-test.boss delete auto-build-keypair
 python3.5 ./manage_keypair.py auto-build-test.boss create auto-build-keypair
 wait
@@ -163,7 +168,7 @@ shutdown -h +3600"""
 
     print('Running script...')
     instance = EC2.run_instances(
-        ImageId=AMI,
+        ImageId=lookup_ami(EC2),
         KeyName='microns-bastion20151117',
         SecurityGroupIds=[
             "sg-00d308289c6e2baac"
