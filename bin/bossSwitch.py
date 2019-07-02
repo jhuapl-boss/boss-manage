@@ -435,8 +435,6 @@ if __name__ == '__main__':
     if not choice:
         sys.exit(0)
 
-    console.init()
-
     print("Turning the {} bosslet {}...".format(args.bosslet_name,
                                                 args.action))
 
