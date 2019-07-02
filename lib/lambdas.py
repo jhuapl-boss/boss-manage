@@ -141,8 +141,9 @@ def load_lambdas_on_s3(bosslet_config):
         try:
             print("calling makedomainenv on localhost")
 
-            output = subprocess.check_output(shlex.split(build_cmd),
+            output = subprocess.check_output(build_cmd,
                                              shell=True,
+                                             executable='/bin/bash',
                                              stderr=subprocess.STDOUT)
             print(output.decode('utf-8'))
         except subprocess.CalledProcessError as ex:

@@ -24,7 +24,7 @@ AUTH_RDS = False
 
 LAMBDA_BUCKET = "boss-lambda-env"
 LAMBDA_SERVER = None # Build lambdas locally
-LABMDA_SERVER_KEY = None
+LAMBDA_SERVER_KEY = None
 
 ACCOUNT_ID = 256215146792
 PROFILE = None # Use EC2 credentials
