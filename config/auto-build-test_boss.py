@@ -23,8 +23,8 @@ AVAILABILITY_ZONE_USAGE = {
 AUTH_RDS = False
 
 LAMBDA_BUCKET = "boss-lambda-env"
-LAMBDA_SERVER = "52.23.27.39"
-LABMDA_SERVER_KEY = 'microns-bastion20151117'
+LAMBDA_SERVER = None # Build lambdas locally
+LABMDA_SERVER_KEY = None
 
 ACCOUNT_ID = 256215146792
 PROFILE = None # Use EC2 credentials
