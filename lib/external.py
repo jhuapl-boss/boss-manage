@@ -146,7 +146,7 @@ class ExternalCalls:
             if type_ == 'ec2':
                 target_ip = aws.machine_lookup(self.session, target, public_ip=False)
             elif type_ == 'rds':
-                target_ip = aws.rds_lookup(self.session, target)
+                target_ip = aws.rds_lookup(self.session, target.replace('.', '-'))
             else:
                 raise Exception("Unsupported: tunnelling to machine type {}".format(type_))
             ssh_target = SSHTarget(self.keypair_file, target_ip, port, 'ubuntu')
