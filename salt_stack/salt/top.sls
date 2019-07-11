@@ -1,5 +1,8 @@
-{% set use_scalyr = salt['pillar.get']('scalyr:log_key', False) != False %}
-        
+#
+# Note Scalyr formulas are only applied if 'scalyr:log_key' set in
+# pillars.
+
+
 base:
     'consul*':
         - consul
@@ -9,10 +12,8 @@ base:
     'vault*':
         - vault.server
         - boss-tools.bossutils
-        {% if use_scalyr %}
         - scalyr
         - scalyr.update_host
-        {% endif %}
         - chrony
 
     'auth*':
@@ -26,10 +27,8 @@ base:
         - django.rest-framework # install first and patch
         - boss.django
         - django.login # patch, expects django to already be installed
-        {% if use_scalyr %}
         - scalyr
         - scalyr.update_host
-        {% endif %}
         - git
         - ingest-client.ingest
         - chrony
@@ -52,10 +51,8 @@ base:
         - django.rest-framework # install first and patch
         - proofreader-web
         - django.login # patch, expects django to already be installed
-        {% if use_scalyr %}
         - scalyr
         - scalyr.update_host
-        {% endif %}
 
     'workstation*':
         - python.python35
@@ -67,18 +64,14 @@ base:
     'cachemanager*':
         - boss-tools.bossutils
         - boss-tools.cachemanager
-        {% if use_scalyr %}
         - scalyr
         - scalyr.update_host
-        {% endif %}
         - git
         - chrony
 
     'activities*':
-        {% if use_scalyr %}
         - scalyr
         - scalyr.update_host
-        {% endif %}
         - open-files.increase-open-files
         - boss-tools.activities
 
