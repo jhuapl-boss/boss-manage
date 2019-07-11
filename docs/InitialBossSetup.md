@@ -35,12 +35,4 @@ Then paste in the Log Access Key for Writes into your account.
 You'll need to do this before building AMIs with packer 
 
 ### Not Using Scalyr
-If you do not want to use Scaylr do the following
-Zero out the contents of the files but leave the files there.
-
-boss-manage/salt_stack/salt/scalyr/init.sls
-boss-manage/salt_stack/salt/scalyr/map.jinja
-boss-manage/salt_stack/salt/scalyr/update_host.sls
-
-Currently, errors will occur if the files are not there.
-
+If you do not want to use Scaylr, there is nothing you need to do.
