@@ -987,7 +987,9 @@ class CloudFormationConfiguration:
                 "DBName" : db_name,
                 "Port" : port,
                 "StorageEncrypted" : "false"
-            }
+            },
+
+            "DeletionPolicy": "Delete" # By default CF creates a snapshot
         }
 
         self.resources[key + "SubnetGroup"] = {
