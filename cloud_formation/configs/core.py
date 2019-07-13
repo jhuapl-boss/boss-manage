@@ -30,12 +30,15 @@ Create the core configuration which consists of
 The core configuration create all of the infrastructure that is required for
 the other production resources to function.
 
-CHANGELOG:
+MIGRATION CHANGELOG:
     Version 1: Initial version of core config
     Version 2: Vault updates
                * Replaced Consul storage backend with DynamoDB storage backend
                * Updated Vault configuration to use AWS KMS for key storage
                * Code for migrating Vault data from Consul to DynamoDB
+               Public DNS updates
+               * Replaced manually created public Route53 DNS records with
+                 CloudFormation maintained records
 """
 
 DEPENDENCIES = None
@@ -124,7 +127,7 @@ def create_config(bosslet_config):
     user_data["system"]["fqdn"] = names.vault.dns
     user_data["system"]["type"] = "vault"
     user_data["vault"]["kms_key"] = str(Ref("VaultKey"))
-    user_data["vault"]["ddb_table"] = names.vault
+    user_data["vault"]["ddb_table"] = names.vault.ddb
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
     config.add_autoscale_group("Vault",
                                names.vault.dns,
@@ -258,15 +261,18 @@ def generate(bosslet_config):
     config.generate()
 
 def pre_init(bosslet_config):
-    # DP NOTE: DEPRECATED, used for transitioning public DNS records from
-    #          being manually created in post-init into records that are
-    #          created / managed by CloudFormation
+    # NOTE: In version 2 the public DNS records are managed by CloudFormation
+    #       If the DNS record currently exists in Route53 the creation of the
+    #       CloudFormation template will fail, so check to see if it exists
+    #       due to previous launches of a Boss stack
     session = bosslet_config.session
     ext_domain = bosslet_config.EXTERNAL_DOMAIN
-    names = bosslet_config.names
+    ext_cname = bosslet_config.names.public_dns('auth')
 
-    console.warning("Removing existing Auth public DNS entry, so CloudFormation can manage the DNS record")
-    aws.route53_delete_records(session, ext_domain, names.public_dns('auth'))
+    target = aws.get_dns_resource_for_domain_name(session, ext_cname, ext_domain)
+    if target is not None:
+        console.warning("Removing existing Auth public DNS entry, so CloudFormation can manage the DNS record")
+        aws.route53_delete_records(session, ext_domain, ext_cname)
 
 def create(bosslet_config):
     """Create the configuration, launch it, and initialize Vault"""
@@ -395,6 +401,7 @@ def post_init(bosslet_config):
     instances = [ names.vault.dns ]
     scalyr.add_instances_to_scalyr(session, bosslet_config.REGION, instances)
 
+
 def update(bosslet_config):
     # Checks to make sure they update can happen and the user wants to wait the required time
     if not bosslet_config.AUTH_RDS:
@@ -402,51 +409,15 @@ def update(bosslet_config):
         print("Updating the Auth server would loose all Keycloak information")
         raise BossManageError("Configuration doesn't support 'update'")
 
-    call = bosslet_config.call
-
     config = create_config(bosslet_config)
-    transition_vault = (1,2) == (config.existing_version(), config.version())
-
-    if transition_vault:
-        if not console.confirm("This updated will recreate the Vault cluster, proceed?", default = False):
-            raise BossManageCanceled()
-
-        export_path = const.repo_path('vault', 'private', names.vault, 'export.json')
-        with call.vault() as vault:
-            vault_data = vault.export("secret/")
-            with open(export_path, 'w') as outfile:
-                json.dump(vault_data, outfile, indent=3, sort_keys=True)
-                print("Vault data exported to {}".format(export_path))
-
-    config.update(session)
+    migrations = config.update()
 
     print("Waiting for Vault...")
-    if not call.check_vault(90, exception=False):
+    if not bosslet_config.call.check_vault(90, exception=False):
         print("Could not contact Vault, check networking and run the following command")
-        if transition_vault:
-            print("python3 bastion.py vault.bosslet vault-init")
-            print("python3 bastion.py vault.bosslet vault-import {}".format(export_path))
-        else:
-            print("python3 bastion.py vault.bosslet vault-status")
+        print("\tpython3 bastion.py vault.bosslet vault-status")
         print("To verify that Vault is working correctly")
         raise BossManageError("Could not contact Vault")
-
-    if transition_vault:
-        aws.route53_delete_records(session, domain, 'consul.' + bosslet_config.INTERNAL_DOMAIN)
-
-        with call.vault() as vault:
-            is_init = False
-            try:
-                vault.initialize()
-                is_init = True
-                vault.import_(vault_data)
-            except Exception as ex:
-                print("Problem updating Vault configuration")
-                print("Run the following commands to finalize the configuration")
-                if not is_init:
-                    print("python3 bastion.py vault.bosslet vault-init")
-                print("python3 bastion.py vault.bosslet vault-import {}".format(export_path))
-                raise
 
     print("Stack should be ready for use")
 

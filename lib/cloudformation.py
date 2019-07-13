@@ -27,6 +27,9 @@ from botocore.exceptions import ClientError
 from . import hosts
 from . import aws
 from . import utils
+from . import console
+from . import constants as const
+from .migrations import MigrationManager
 from .exceptions import BossManageError, BossManageCanceled
 
 def bool_str(val):
@@ -372,6 +375,7 @@ class CloudFormationConfiguration:
         self.region = bosslet_config.REGION
         self.keypairs = {}
 
+        self.config = config
         self.stack_name = bosslet_config.names[config].stack
         self.stack_version = version
 
@@ -505,6 +509,9 @@ class CloudFormationConfiguration:
             wait (bool) : If True, wait for the stack to be updated, printing
                           status information
 
+        Returns:
+            bool: If there were migrations applied
+
         Raises:
             BossManageCanceled: If the update was canceled
             BossManageError: If there was a problem updating the stack
@@ -516,6 +523,19 @@ class CloudFormationConfiguration:
                 raise BossManageError(msg)
 
         client = self.session.client('cloudformation')
+        migrations = MigrationManager(self.config, self.existing_version(), self.version())
+
+        # Save the migration progress in case there is an exception in one
+        # The "update-migration" command will allow the user to continue executing
+        # migrations from where they failed
+        migration_progress = const.repo_path('cloud_formation', 'configs', 'migrations', self.config, 'progress')
+        with open(migration_progress, 'w') as fh:
+            fh.write(str(migrations.cur_ver))
+
+        def update_stack_version(self, migration_file):
+            with open(migration_progress, 'w') as fh:
+                fh.write(str(migration_file.stop))
+        migrations.add_callback(post = update_stack_version)
 
         kwargs = {
             "StackName": self.stack_name,
@@ -533,6 +553,7 @@ class CloudFormationConfiguration:
         disable_preview = str(self.bosslet_config.disable_preview)
         disable_preview = disable_preview.lower() in ('yes', 'true', 'y', 't')
         if disable_preview:
+            migrations.pre_update(self.bosslet_config)
             response = client.update_stack(**kwargs)
         else:
             commit = utils.get_commit()
@@ -550,8 +571,7 @@ class CloudFormationConfiguration:
 
                 if response['Status'] != 'CREATE_COMPLETE':
                     print("ChangeSet status is {}".format(response['Status']))
-                    print("Reason: {}".format(response['StatusReason']))
-                    raise Exception()
+                    raise BossManageError(response['StatusReason'])
 
                 fmt = "{:<10}{:<30}{:<50}{:<45}{:<14}{}"
                 print(fmt.format(
@@ -575,21 +595,20 @@ class CloudFormationConfiguration:
                             ", ".join(change['Scope'])
                         ))
 
-                resp = input("Apply Update? [N/y] ")
-                if len(resp) == 0 or resp[0] not in ('y', 'Y'):
-                    raise Exception()
+                if not console.confirm('Apply Update?', default = False):
+                    raise BossManageCanceled()
                 else:
+                    migrations.pre_update(self.bosslet_config)
                     response = client.execute_change_set(
                         ChangeSetName = 'h' + commit,
                         StackName = self.stack_name
                     )
             except:
-                print("Canceled")
                 client.delete_change_set(
                     ChangeSetName = 'h' + commit,
                     StackName = self.stack_name
                 )
-                raise BossManageCanceled()
+                raise
 
         if wait:
             status = self._poll(client, self.stack_name, 'update', 'UPDATE_IN_PROGRESS')
@@ -602,6 +621,12 @@ class CloudFormationConfiguration:
             else:
                 msg = "Status of stack '{}' is '{}'".format(self.stack_name, status)
                 raise BossManageError(msg)
+
+        migrations.post_update(self.bosslet_config)
+
+        os.remove(migration_progress)
+
+        return migrations.has_migrations
 
     def delete(self, wait = True):
         """Deletes the given stack from CloudFormation.

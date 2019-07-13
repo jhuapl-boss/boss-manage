@@ -31,6 +31,7 @@ from lib import configuration
 from lib import constants
 from lib import console
 from lib.cloudformation import CloudFormationConfiguration
+from lib.migrations import MigrationManager
 from lib.stepfunctions import heaviside
 
 # Add a reference to boss-manage/lib/ so that we can import those files
@@ -189,6 +190,34 @@ def call_configs(bosslet_config, configs, func_name):
             else:
                 print("Configuration '{}' doesn't implement function '{}', skipping".format(config, func_name))
 
+def update_migrate(bosslet_config, config):
+    migration_progress = constants.repo_path("cloud_formation", "configs", "migrations", config, "progress")
+
+    if not os.path.exists(migration_progress):
+        console.info("No migrations to apply")
+        return
+
+    with open(migration_progress, "r") as fh:
+        cur_ver = int(fh.read())
+
+    new_ver = CloudFormationConfiguration(config, bosslet_config).existing_version()
+
+    migrations = MigrationManager(config, cur_ver, new_ver)
+    if not migrations.has_migrations:
+        console.info("No migrations to apply")
+        os.remove(migration_progress)
+        return
+
+    def callback(migration_file):
+        with open(migration_progress, 'w') as fh:
+            fh.write(str(migration_file.stop))
+
+    migrations.add_callback(post=callback)
+
+    migrations.post_update(bosslet_config)
+
+    os.remove(migration_progress)
+
 if __name__ == '__main__':
     os.chdir(os.path.join(cur_dir, "..", "cloud_formation"))
 
@@ -200,7 +229,7 @@ if __name__ == '__main__':
     config_names = [x.split('/')[1].split('.')[0] for x in glob.glob("configs/*.py") if "__init__" not in x]
     config_help = create_help("config_name supports the following:", config_names)
 
-    actions = ["create", "update", "delete", "post-init", "pre-init", "generate"]
+    actions = ["create", "update", "delete", "post-init", "pre-init", "update-migrate", "generate"]
     actions_help = create_help("action supports the following:", actions)
 
     scenarios = [x.split('/')[1].split('.')[0] for x in glob.glob("scenarios/*.yml")]
@@ -247,6 +276,12 @@ if __name__ == '__main__':
             configs = config_names
         else:
             configs = args.config_name
+
+        if args.action == "update-migrate":
+            if len(configs) > 1:
+                raise exceptions.BossManageError("Can only apply update migrations to a single config")
+            update_migrate(bosslet_config, configs[0])
+            sys.exit(0)
 
         func = args.action.replace('-','_')
         call_configs(bosslet_config, configs, func)
