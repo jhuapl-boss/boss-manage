@@ -133,7 +133,7 @@ def pre_init(bosslet_config):
         config_str = fh.read()
     update_config_file(config_str, bosslet_config)
     
-    build_lambda()
+    build_lambda(bosslet_config)
     zip_file = os.path.join(LAMBDA_ROOT_FOLDER, LAMBDA_ZIP_FILE)
     zips_s3_key = upload_to_s3(bosslet_config, zip_file)
 
@@ -195,10 +195,10 @@ def update_config_file(config_str, bosslet_config):
     # print(headerless_config)
 
 
-def build_lambda():
+def build_lambda(bosslet_config):
     """Package lambda in preparation to upload to S3."""
     install_node_deps()
-    build_node()
+    build_node(bosslet_config)
 
 
 def install_node_deps():
@@ -213,11 +213,21 @@ def install_node_deps():
         raise RuntimeError('Failed to install dependencies.')
 
 
-def build_node():
+def build_node(bosslet_config):
     """Build and package in dist.zip."""
     print('Packaging NodeJS app.')
+
+    # Inject the current region into the lambda code
+    region_json = const.repo_path('cloud_formation', 'lambda', 'dynamodb-lambda-autoscale', 'src', 'configuration', 'Region.json')
+    with open(region_json, 'w') as fh:
+        json.dump({'Region': bosslet_config.REGION}, fh)
+
     args = ('npm', 'run', 'build')
-    popen = subprocess.Popen(args, cwd=LAMBDA_ROOT_FOLDER, stdout=subprocess.PIPE)
+    # Use env vars to pass credentials / region instead of as arguments to build call
+    env = os.environ.copy()
+    env['AWS_PROFILE'] = bosslet_config.PROFILE
+    env['AWS_REGION'] = bosslet_config.REGION
+    popen = subprocess.Popen(args, cwd=LAMBDA_ROOT_FOLDER, env=env, stdout=subprocess.PIPE)
     exit_code = popen.wait()
     output = popen.stdout.read()
     if not exit_code == 0:

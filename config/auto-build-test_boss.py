@@ -13,6 +13,11 @@ NETWORK = "10.20.0.0/16"
 AMI_SUFFIX = ".boss"
 SCENARIO = "development"
 
+# NOTE: The region in which the lambda is running could be found
+# using the http://169.254.169.254/latest/dynamic/instance-identity/document
+# url, but then the AVAILABILITY_ZONE_USAGE would not be correct.
+# Also REGION is the region in which to launch the test stack, which
+# can be different from the lambda's region.
 REGION = "us-east-1"
 AVAILABILITY_ZONE_USAGE = {
     'lambda': ['b', 'c', 'd', 'e', 'f'],

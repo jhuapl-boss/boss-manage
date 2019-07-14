@@ -185,6 +185,7 @@ def create_ndingest_settings(bosslet_config, fp):
 
     parser['boss']['domain'] = bosslet_config.INTERNAL_DOMAIN
 
+    parser['aws']['region'] = bosslet_config.REGION
     parser['aws']['tile_bucket'] = names.tile_bucket.s3
     parser['aws']['cuboid_bucket'] = names.cuboid_bucket.s3
     parser['aws']['tile_index_table'] = names.tile_index.ddb
