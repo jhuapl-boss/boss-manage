@@ -1,3 +1,8 @@
+#
+# Note Scalyr formulas are only applied if 'scalyr:log_key' set in
+# pillars.
+
+
 base:
     'consul*':
         - consul
