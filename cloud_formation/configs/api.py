@@ -32,7 +32,6 @@ from lib.exceptions import BossManageCanceled, MissingResourceError
 from lib import aws
 from lib import console
 from lib import utils
-from lib import scalyr
 from lib import constants as const
 from lib import console
 
@@ -345,11 +344,6 @@ def post_init(bosslet_config):
     req = Request(api_uri, headers = headers)
     resp = json.loads(urlopen(req).read().decode('utf-8'))
     print("Collections: {}".format(resp))
-
-    # Tell Scalyr to get CloudWatch metrics for these instances.
-    instances = [names.endpoint.dns]
-    scalyr.add_instances_to_scalyr(
-        session, bosslet_config.REGION, instances)
 
 def update(bosslet_config):
     with bosslet_config.call.vault() as vault:
