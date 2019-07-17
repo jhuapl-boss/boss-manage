@@ -305,11 +305,7 @@ def post_init(bosslet_config):
         try:
             vault.initialize(bosslet_config.ACCOUNT_ID)
         except Exception as ex:
-            print(ex)
-            print("Could not initialize Vault")
-            print("Call: {}".format(utils.get_command("post-init")))
-            print("Before launching other stacks")
-            return False
+            raise BossManageError("Problem initializing Vault: {}".format(str(ex)))
 
         #Check and see if these secrets already exist before we overwrite them with new ones.
         # Write data into Vault
