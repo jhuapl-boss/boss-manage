@@ -60,7 +60,7 @@ class BossConfiguration(object):
         'LAMBDA_SERVER',
         'LAMBDA_SERVER_KEY',
         'REGION',
-        'AVAILABILITY_ZONE_USAGE',
+        'AVAILABILITY_ZONE_USAGE', # Optional
         'ACCOUNT_ID',
         'PROFILE', # Optional
         'OUTBOUND_BASTION',
@@ -83,6 +83,7 @@ class BossConfiguration(object):
         "SUBNET_CIDR": 24,
         "AMI_VERSION": "latest",
         "VERIFY_SSL": True,
+        "AVAILABILITY_ZONE_USAGE": {},
         "OUTBOUND_BASTION": False,
         "HTTPS_INBOUND": "0.0.0.0/0",
         "BILLING_TOPIC": "BossBillingList",

@@ -24,8 +24,7 @@ import shutil
 import colorama
 from colorama import Fore, Style
 
-def init():
-    colorama.init()
+colorama.init()
 
 def _colorize(*style_msg, **kwargs):
     print(*style_msg, sep='', **kwargs)
@@ -40,7 +39,7 @@ def green(msg, **kwargs):
     return _colorize(Fore.GREEN, msg, Style.RESET_ALL, **kwargs)
 
 def blue(msg, **kwargs):
-    return _colorize(Fore.BLUE, msg, Style.RESET_ALL, **kwargs)
+    return _colorize(Fore.BLUE, Style.BRIGHT, msg, Style.RESET_ALL, **kwargs)
 
 def fail(msg, **kwargs):
     return red(' FAIL: ' + msg, **kwargs)
@@ -338,7 +337,6 @@ class status_line(object):
 
 if __name__ == '__main__':
     # Test of the different functions
-    init()
 
     import time
     with status_line('status line', spin=True) as status:

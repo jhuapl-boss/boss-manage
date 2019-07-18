@@ -1042,7 +1042,9 @@ class CloudFormationConfiguration:
                 "DBName" : db_name,
                 "Port" : port,
                 "StorageEncrypted" : "false"
-            }
+            },
+
+            "DeletionPolicy": "Delete" # By default CF creates a snapshot
         }
 
         self.resources[key + "SubnetGroup"] = {
@@ -1792,7 +1794,7 @@ class CloudFormationConfiguration:
             "Properties" : {
                 "Code": code,
                 "Description": description,
-                "FunctionName": name.replace('.', '-'),
+                "FunctionName": name,
                 "Handler": handler,
                 "MemorySize": memory,
                 "Role": role,
@@ -2075,7 +2077,7 @@ class CloudFormationConfiguration:
             "Properties": {
                 "DisplayName": name,
                 "Subscription": [{"Endpoint": ep, "Protocol": pt} for pt, ep in subscriptions],
-                "TopicName": topic.replace('.', '-')
+                "TopicName": topic,
             }
         }
 

@@ -26,7 +26,6 @@ from lib.keycloak import KeyCloakClient
 from lib.exceptions import MissingResourceError
 from lib import aws
 from lib import utils
-from lib import scalyr
 from lib import constants as const
 
 import json

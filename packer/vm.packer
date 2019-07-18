@@ -16,6 +16,8 @@
 
         "aws_bastion_ip": "IP of the APL bastion server",
         "aws_bastion_ip": "",
+        "aws_bastion_port": "Port on the APL bastion server",
+        "aws_bastion_port": "",
         "aws_bastion_user": "User name to login to the bastion server",
         "aws_bastion_user": "",
         "aws_bastion_priv_key_file": "Path to the bastion's private key file",
@@ -53,6 +55,7 @@
         },
         "ssh_bastion_username": "{{user `aws_bastion_user`}}",
         "ssh_bastion_host": "{{user `aws_bastion_ip`}}",
+        "ssh_bastion_port": "{{user `aws_bastion_port`}}",
         "ssh_bastion_private_key_file": "{{user `aws_bastion_priv_key_file`}}",
         "force_deregister" : "{{user `force_deregister`}}"
     }],

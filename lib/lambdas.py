@@ -21,6 +21,9 @@ import botocore
 import configparser
 import os
 import tempfile
+import subprocess
+import shlex
+import shutil
 
 # Location of settings files for ndingest.
 NDINGEST_SETTINGS_FOLDER = const.repo_path('salt_stack', 'salt', 'ndingest', 'files', 'ndingest.git', 'settings')
@@ -121,27 +124,51 @@ def load_lambdas_on_s3(bosslet_config):
     zip.write_to_zip('__init__.py', zipname, arcname='bossnames/__init__.py')
     os.chdir(cwd)
 
-    print("Copying local modules to lambda-build-server")
 
-    #copy the zip file to lambda_build_server
+    #copy the zip file to lambda_build_server and run makedomainenv
     lambda_bucket = bosslet_config.LAMBDA_BUCKET
-    lambda_build_server = bosslet_config.LAMBDA_SERVER
-    lambda_build_server_key = bosslet_config.LAMBDA_SERVER_KEY
-    lambda_build_server_key = utils.keypair_to_file(lambda_build_server_key)
-    ssh_target = SSHTarget(lambda_build_server_key, lambda_build_server, 22, 'ec2-user')
-    bastions = [bosslet_config.outbound_bastion] if bosslet_config.outbound_bastion else []
-    ssh = SSHConnection(ssh_target, bastions)
+
+    build_cmd = 'source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {} {}'.format(domain, lambda_bucket)
     target_file = "sitezips/{}.zip".format(domain)
-    ret = ssh.scp(zipname, target_file, upload=True)
-    print("scp return code: " + str(ret))
 
-    os.remove(zipname)
+    lambda_build_server = bosslet_config.LAMBDA_SERVER
+    if lambda_build_server is None:
+        print("Copying local modules to localhost")
+        full_target_file = '/home/ec2-user/' + target_file
+        shutil.copy(zipname, full_target_file)
+        os.remove(zipname)
 
-    # This section will run makedomainenv on lambda-build-server
-    print("calling makedomainenv on lambda-build-server")
-    cmd = 'source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {} {}'.format(domain, lambda_bucket)
-    ret = ssh.cmd(cmd)
-    print("ssh return code: " + str(ret))
+        try:
+            print("calling makedomainenv on localhost")
+
+            output = subprocess.check_output(build_cmd,
+                                             shell=True,
+                                             executable='/bin/bash',
+                                             stderr=subprocess.STDOUT)
+            print(output.decode('utf-8'))
+        except subprocess.CalledProcessError as ex:
+            print("makedomainenv return code: {}".format(ex.returncode))
+            print(ex.output.decode('utf-8'))
+            # DP NOTE: currently eating the error, as there is no checking of error if there is a build server
+        finally:
+            os.remove(full_target_file)
+    else:
+        lambda_build_server_key = bosslet_config.LAMBDA_SERVER_KEY
+        lambda_build_server_key = utils.keypair_to_file(lambda_build_server_key)
+        ssh_target = SSHTarget(lambda_build_server_key, lambda_build_server, 22, 'ec2-user')
+        bastions = [bosslet_config.outbound_bastion] if bosslet_config.outbound_bastion else []
+        ssh = SSHConnection(ssh_target, bastions)
+
+        print("Copying local modules to lambda-build-server")
+        ret = ssh.scp(zipname, target_file, upload=True)
+        print("scp return code: " + str(ret))
+
+        os.remove(zipname)
+
+        # This section will run makedomainenv on lambda-build-server
+        print("calling makedomainenv on lambda-build-server")
+        ret = ssh.cmd(build_cmd)
+        print("ssh return code: " + str(ret))
 
 def create_ndingest_settings(bosslet_config, fp):
     """Create the settings.ini file for ndingest.
@@ -158,6 +185,7 @@ def create_ndingest_settings(bosslet_config, fp):
 
     parser['boss']['domain'] = bosslet_config.INTERNAL_DOMAIN
 
+    parser['aws']['region'] = bosslet_config.REGION
     parser['aws']['tile_bucket'] = names.tile_bucket.s3
     parser['aws']['cuboid_bucket'] = names.cuboid_bucket.s3
     parser['aws']['tile_index_table'] = names.tile_index.ddb

@@ -213,10 +213,13 @@ class ExternalCalls:
                         raise exceptions.StatusCheckError(msg, self.vault_hostname)
                     else:
                         return False
-            except SSHError:
+            except SSHError as ex:
                 ssh_errors -= 1
                 if ssh_errors == 0:
-                    raise
+                    if exception:
+                        raise exceptions.StatusCheckError(str(ex), self.vault_hostname)
+                    else:
+                        return False
                 else:
                     print("Error establishing SSH tunnel to Vault, waiting")
                     time.sleep(error_sleep)
@@ -228,29 +231,38 @@ class ExternalCalls:
         # DP ???: use the actual login url so the actual API is checked..
         #         (and parse response for 403 unauthorized vs any other error..)
 
-        # SH Manually waiting 30 secs before opening the ssh tunnel
-        #    Have seen tunnel timeout a few times now before the URL returns OK.
-        time.sleep(30)
+        ssh_errors = 8
+        error_sleep = 30 # seconds
+        while True:
+            try:
+                with self.tunnel(self.names.auth.dns, 8080) as port:
+                    # Could move to connecting through the ELB, but then KC will have to be healthy
+                    URL = "http://localhost:{}/auth/".format(port)
 
-        # TODO Handle if there is an error with establishing the tunnel
-        with self.tunnel(self.names.auth.dns, 8080) as port:
-            # Could move to connecting through the ELB, but then KC will have to be healthy
-            URL = "http://localhost:{}/auth/".format(port)
+                    for sleep in gen_timeout(timeout, 15): # 15 second sleep
+                        try:
+                            res = urlopen(URL)
+                            if res.getcode() == 200:
+                                return True
+                        except:# HTTPError: Also seeing RemoteDisconnected
+                            pass
+                        time.sleep(sleep)
 
-            for sleep in gen_timeout(timeout, 15): # 15 second sleep
-                try:
-                    res = urlopen(URL)
-                    if res.getcode() == 200:
-                        return True
-                except:# HTTPError: Also seeing RemoteDisconnected
-                    pass
-                time.sleep(sleep)
-
-            if exception:
-                msg = "Cannot connect to Keycloak after {} seconds".format(timeout)
-                raise exceptions.StatusCheckError(msg, "auth." + self.domain)
-            else:
-                return False
+                    if exception:
+                        msg = "Cannot connect to Keycloak after {} seconds".format(timeout)
+                        raise exceptions.StatusCheckError(msg, self.names.auth.dns)
+                    else:
+                        return False
+            except SSHError as ex:
+                ssh_errors -= 1
+                if ssh_errors == 0:
+                    if exception:
+                        raise exceptions.StatusCheckError(str(ex), self.names.auth.dns)
+                    else:
+                        return False
+                else:
+                    print("Error establishing SSH tunnel to Auth, waiting")
+                    time.sleep(error_sleep)
 
     def check_url(self, url, timeout, exception=True):
         for sleep in gen_timeout(timeout, 15): # 15 second sleep

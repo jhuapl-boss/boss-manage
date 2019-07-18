@@ -11,7 +11,6 @@ Table of Contents:
 * [vault.py](#vaultpy)
 * [cloudformation.py](#cloudformationpy)
 * [sfn-compile.py](#sfn-compile)
-* [Scalyr Enviroment Variables](#Scalyr-Enviroment-Variables)
 * [create_certificate.py](#create_certificatepy)
 * [iam_utils.py](#iam_utilspy)
 * [one_time_aws_account_setup.py](#one_time_aws_account_setuppy)
@@ -160,30 +159,6 @@ sfn-compile.py
 Compiles a heaviside step function DSL file into the AWS Step Function format.
 The result can be manually inspected or uploaded using one of the different
 AWS Step Function APIs or console.
-
-## Scalyr Enviroment Variables
-
-Update of the monitor config file on https://www.scalyr.com is one of the final steps of the CloudFormation script.  Scalyr retrieves the CloudWatch StatusCheckFailed metric from AWS.  These environment variables **must** be set for this to succeed:
-
-- scalyr_readconfig_token
-- scalyr_writeconfig_token
-
-These tokens can be retrieved (and deleted if necessary) from the Scalyr web site under Settings | API Keys.
-
-Here's a sample script for setting these values:
-
-```bash
-#!/bin/bash
-
-export scalyr_readconfig_token='some key string'
-export scalyr_writeconfig_token='another key string'
-```
-
-Run this script like so:
-
-```bash
-source scalyr_vars.sh
-```
 
 create_certificate.py
 ---------------------

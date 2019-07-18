@@ -24,7 +24,6 @@ from lib.datapipeline import DataPipeline, Ref
 
 from lib import aws
 from lib import utils
-from lib import scalyr
 from lib import constants as const
 from lib.vault import POLICY_DIR as VAULT_POLICY_DIR
 

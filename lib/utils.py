@@ -176,7 +176,7 @@ def parse_hostname(hostname):
     # - machine_name
     # where bosslet_name may contain a '.'
 
-    # TODO: Verify that the hostname is not an IP
+    # NOTE: Doesn't support passing an IP address
 
     # split out the index, machine name, and bosslet name
     try:
