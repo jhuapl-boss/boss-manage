@@ -383,33 +383,6 @@
           "Action": "sts:AssumeRole",
           "Effect": "Allow",
           "Principal": {
-            "Service": "ec2.amazonaws.com"
-          }
-        }
-      ],
-      "Version": "2012-10-17"
-    },
-    "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess",
-      "arn:aws:iam::aws:policy/AmazonRoute53ReadOnlyAccess"
-    ],
-    "InstanceProfileList": [
-      {
-        "InstanceProfileName": "consul",
-        "Path": "/"
-      }
-    ],
-    "Path": "/",
-    "RoleName": "consul",
-    "RolePolicyList": []
-  },
-  {
-    "AssumeRolePolicyDocument": {
-      "Statement": [
-        {
-          "Action": "sts:AssumeRole",
-          "Effect": "Allow",
-          "Principal": {
             "Service": "lambda.amazonaws.com"
           }
         }
@@ -474,8 +447,8 @@
           "Effect": "Allow",
           "Principal": {
             "Service": [
-              "datapipeline.amazonaws.com",
-              "elasticmapreduce.amazonaws.com"
+              "elasticmapreduce.amazonaws.com",
+              "datapipeline.amazonaws.com"
             ]
           }
         }

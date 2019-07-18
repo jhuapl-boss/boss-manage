@@ -16,6 +16,7 @@ import os
 import glob
 import hvac
 import json
+import time
 from pprint import pprint
 import traceback
 
@@ -90,7 +91,7 @@ class Vault(object):
         """
         try:
             client = self.connect()
-            client.is_initialized() # make an actual network connection
+            client.sys.is_initialized() # make an actual network connection
             return True
         except:
             return False
@@ -104,12 +105,17 @@ class Vault(object):
         client = self.connect(VAULT_TOKEN)
         code.interact(local=locals())
 
-    def initialize(self, account_id, secrets = 5, threashold = 3):
+    def initialize(self, account_id, secrets = 1, threashold = 1):
         """Initialize a Vault. Connect using get_client() and if the Vault is not
-        initialized then initialize it with 5 secrets and a threashold of 3. The
-        keys are stored as VAULT_KEY and root token is stored as VAULT_TOKEN.
+        initialized then initialize it with 1 recovery key (and only requiring the
+        1 key when used). The recovery key is stored as VAULT_KEY and root token
+        is stored as VAULT_TOKEN.
 
-        After initializing the Vault it is unsealed for use and vault-configure is called.
+        After initializing the Vault it is unsealed for use and vault-configure
+        is called.
+
+        Note: This expects Vault to be configured using a `seal` stanza. If it is
+              not initialization will fail.
 
         Args:
             account_id (str) : AWS Account ID that Vault is running under, passed to configure()
@@ -118,16 +124,20 @@ class Vault(object):
         """
 
         client = self.connect()
-        if client.is_initialized():
+        if client.sys.is_initialized():
             print("Vault is already initialized")
-            if client.is_sealed():
+            if client.sys.is_sealed():
                 print("Unsealing Vault")
                 self.unseal()
             else:
                 print("Vault already unsealed")
         else:
             print("Initializing with {} secrets and {} needed to unseal".format(secrets, threashold))
-            result = client.initialize(secrets, threashold)
+            result = client.sys.initialize(secret_shares=1,
+                                           secret_threshold=1,
+                                           stored_shares=1,
+                                           recovery_shares=secrets,
+                                           recovery_threshold=threashold)
 
             token_file = self.path(VAULT_TOKEN)
             key_file = self.path(VAULT_KEY)
@@ -135,17 +145,45 @@ class Vault(object):
                 fh.write(result["root_token"])
             for i in range(secrets):
                 with open(key_file + str(i+1), "w") as fh:
-                    fh.write(result["keys"][i])
+                    fh.write(result["recovery_keys"][i])
 
+            # DP TODO: refactor code so that the root token is revoked after configuration?
+            # DP ???: If no root token, how to auth for populating future values?
             print()
-            print("======== WARNING WARNING WARNING ========")
-            print("= Vault root token and unseal keys were =")
-            print("= written to disk. PROTECT these files. =")
-            print("======== WARNING WARNING WARNING ========")
+            print("========= WARNING WARNING WARNING =========")
+            print("= Vault root token and recovery keys were =")
+            print("= written to disk. PROTECT these files.   =")
+            print("========= WARNING WARNING WARNING =========")
+            print()
 
-            print()
-            print("Unsealing Vault")
-            client.unseal_multi(result["keys"])
+        # DP NOTE: When using the DynamoDB backend it is common for right after
+        #          initializing for requests to Vault to response with the error
+        #          > local node not active but active cluster node not found <
+        #          If given a little bit of time Vault will respond successfully
+        #          to requests
+
+        def poll():
+            """Check to see if Vault responds to a request without an error"""
+            try:
+                self.connect(VAULT_TOKEN).sys.list_enabled_audit_devices()
+                return True
+            except hvac.exceptions.InternalServerError as ex:
+                if str(ex) == 'local node not active but active cluster node not found':
+                    return False
+                raise
+
+        print("Waiting for Vault to finish initialization ", end='', flush=True)
+        step, remaining = 10, 60
+        while remaining >= 0:
+            if poll():
+                break
+
+            print(".", end='', flush=True)
+            remaining -= step
+            time.sleep(step)
+        if remaining < 0:
+            raise Exception("Vault not finished initializing")
+        print(" done")
 
         self.configure(account_id)
 
@@ -168,12 +206,12 @@ class Vault(object):
         client = self.connect(VAULT_TOKEN)
 
         # Audit Backend
-        audit_options = {
-            'low_raw': 'True',
-        }
-        try:
-            client.enable_audit_backend('syslog', options=audit_options)
-        except hvac.exceptions.InvalidRequest as ex:
+        if 'syslog/' not in client.sys.list_enabled_audit_devices():
+            audit_options = {
+                'log_raw': 'True',
+            }
+            client.sys.enable_audit_device('syslog', options=audit_options)
+        else:
             print("audit_backend already created.")
 
         # Policies
@@ -182,16 +220,16 @@ class Vault(object):
         for policy in glob.glob(path):
             name = os.path.basename(policy).split('.')[0]
             with open(policy, 'r') as fh:
-                client.set_policy(name, fh.read())
+                client.sys.create_or_update_policy(name, fh.read())
             # Add every policy to the provisioner, as it has to have the
             # superset of any policies that it will provision
             provisioner_policies.append(name)
 
         # AWS Authentication Backend
         # Enable AWS auth in Vault
-        if 'aws/' not in client.list_auth_backends():
+        if 'aws/' not in client.sys.list_auth_methods():
             try:
-                client.enable_auth_backend('aws')
+                client.sys.enable_auth_method('aws')
             except Exception as e:
                 raise VaultError("Error while enabling auth back end. {}".format(e))
         else:
@@ -202,16 +240,16 @@ class Vault(object):
         arn = 'arn:aws:iam::{}:instance-profile/'.format(account_id)
         #For each policy configure the policies on a role of the same name
         for policy in policies:
-            client.write('/auth/aws/role/' + policy,
-                         auth_type='ec2',
-                         bound_iam_instance_profile_arn= arn + policy,
-                         policies=policy)
+            client.create_ec2_role(policy,
+                                   bound_iam_instance_profile_arn = arn + policy,
+                                   policies = policy,
+                                   mount_point = 'aws')
             print('Successful write to aws/role/' + policy)
         
         # AWS Secret Backend
-        if 'aws/' not in client.list_secret_backends():
+        if 'aws/' not in client.sys.list_mounted_secrets_engines():
             try:
-                client.enable_secret_backend('aws')
+                client.sys.enable_secrets_engine('aws')
             except Exception as e:
                 raise VaultError('Error while enabling secret back end. {}'.format(e))
         else:
@@ -222,7 +260,7 @@ class Vault(object):
             name = os.path.basename(iam).split('.')[0]
             with open(iam, 'r') as fh:
                 # if we json parse the file first we can use the duplicate key trick for comments
-                client.write("aws/roles/" + name, policy = fh.read())
+                client.secrets.aws.create_or_update_role(name, 'iam_user', policy_document = fh.read())
 
     def set_policy(self, name, policy):
         """Create or Update a policy
@@ -252,7 +290,7 @@ class Vault(object):
         """
 
         client = self.connect()
-        if not client.is_sealed():
+        if not client.sys.is_sealed():
             print("Vault is already unsealed")
             return 0
 
@@ -265,7 +303,7 @@ class Vault(object):
         if len(keys) == 0:
             raise VaultError("Could not locate any key files, not unsealing")
 
-        res = client.unseal_multi(keys)
+        res = client.sys.submit_unseal_keys(keys)
         if res['sealed']:
             p = res['progress']
             t = res['t']
@@ -285,11 +323,11 @@ class Vault(object):
         """
 
         client = self.connect(VAULT_TOKEN)
-        if client.is_sealed():
+        if client.sys.is_sealed():
             print("Vault is already sealed")
             return
 
-        client.seal()
+        client.sys.seal()
         print("Vault is sealed")
 
     def status(self):
@@ -306,13 +344,13 @@ class Vault(object):
         """
 
         client = self.connect()
-        if not client.is_initialized():
+        if not client.sys.is_initialized():
             print("Vault is not initialized")
             return
         else:
             print("Vault is initialized")
 
-        if client.is_sealed():
+        if client.sys.is_sealed():
             print("Vault is sealed")
             print(client.seal_status)
             return
@@ -331,19 +369,19 @@ class Vault(object):
 
         print()
         print("Secret Backends")
-        print(json.dumps(client.list_secret_backends(), indent=True))
+        print(json.dumps(client.sys.list_mounted_secrets_engines(), indent=True))
 
         print()
         print("Policies")
-        print(json.dumps(client.list_policies()))
+        print(json.dumps(client.sys.list_policies()))
 
         print()
         print("Audit Backends")
-        print(json.dumps(client.list_audit_backends(), indent=True))
+        print(json.dumps(client.sys.list_enabled_audit_devices(), indent=True))
 
         print()
         print("Auth Backends")
-        print(json.dumps(client.list_auth_backends(), indent=True))
+        print(json.dumps(client.sys.list_auth_methods(), indent=True))
 
     def provision(self, policy):
         """Create a new Vault access token.
@@ -374,7 +412,7 @@ class Vault(object):
             lease_id (string) : String containing the Vault lease id to revoke
         """
         client = self.connect(VAULT_TOKEN)
-        client.revoke_secret(lease_id)
+        client.sys.revoke_secret(lease_id)
 
     def revoke_secret_prefix(self, prefix):
         """Revoke a Vault secret by prefix
@@ -383,7 +421,7 @@ class Vault(object):
             prefix (string) : String containing the Vault secret prefix to revoke
         """
         client = self.connect(VAULT_TOKEN)
-        client.revoke_secret_prefix(prefix)
+        client.sys.revoke_secret_prefix(prefix)
 
     def write(self, path, **kwargs):
         """A generic method for writing data into Vault.

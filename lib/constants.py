@@ -66,7 +66,6 @@ LAMBDA_SUBNETS = 16
 LAMBDA_DIR = repo_path('cloud_formation', 'lambda')
 DNS_LAMBDA = LAMBDA_DIR + '/updateRoute53/index.py'
 VAULT_LAMBDA = LAMBDA_DIR + '/monitors/chk_vault.py'
-CONSUL_LAMBDA = LAMBDA_DIR + '/monitors/chk_consul.py'
 INGEST_LAMBDA = LAMBDA_DIR + '/ingest_populate/ingest_queue_upload.py'
 DOWNSAMPLE_DLQ_LAMBDA = LAMBDA_DIR + '/downsample/dlq.py'
 
@@ -124,7 +123,6 @@ REDIS_CACHE_TYPE = "cache.t2.micro"
 REDIS_SESSION_TYPE = None
 REDIS_TYPE = "cache.t2.micro"
 CACHE_MANAGER_TYPE = "t2.micro"
-CONSUL_TYPE = "t2.micro"
 VAULT_TYPE = "t2.micro"
 ACTIVITIES_TYPE = "t2.micro"
 AUTH_TYPE = "t2.micro"
@@ -133,7 +131,6 @@ AUTH_TYPE = "t2.micro"
 ########################
 # Machine Cluster Sizes
 AUTH_CLUSTER_SIZE = 1
-CONSUL_CLUSTER_SIZE = 1
 VAULT_CLUSTER_SIZE = 1
 ENDPOINT_CLUSTER_MIN = 1
 ENDPOINT_CLUSTER_MAX = 1

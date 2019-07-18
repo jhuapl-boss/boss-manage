@@ -35,7 +35,6 @@ AMIS = ["endpoint",
         "proofreader-web",
         "auth",
         "vault",
-        "consul",
         "activities"]
 
 

@@ -48,39 +48,6 @@ def subnet_id_lookup(bosslet_config):
                                            az + bosslet_config.names.internal.subnet)
     return internal_subnet
 
-def consul_pipeline(bosslet_config, directory):
-    # DP NOTE: Currently having issues with Consul restore
-    #          For a restore certain kv paths shouldn't be restored
-    #          and all Vault instances must be shutdown, so they are not
-    #          interacting with Consul during the restore
-    #
-    # See
-    # https://groups.google.com/forum/#!msg/vault-tool/nTj0V9hC31E/0VT3Qq_CDQAJ
-    # https://groups.google.com/forum/#!msg/vault-tool/ISCbNmQVXms
-
-    internal_subnet = subnet_id_lookup(bosslet_config)
-
-    names = bosslet_config.names
-    s3_backup = "s3://" + names.backup.s3 + "/" + directory
-    s3_log = "s3://" + names.backup.s3 + "/restore-logs/"
-    cmd = "/usr/local/bin/consulate --api-host {} kv restore -b -f ${{INPUT1_STAGING_DIR}}/export.json".format(names.consul.dns)
-
-    _, data = list_s3_bucket(bosslet_config.session, names.backup.s3, directory + "/vault")
-    if len(data) == 0:
-        print("No consul data backed up on {}, skipping restore".format(directory))
-        return None
-
-    pipeline = DataPipeline(fmt="DP", log_uri = s3_log, resource_role="backup")
-    pipeline.add_shell_command("ConsulRestore",
-                               cmd,
-                               source = Ref("ConsulBucket"),
-                               runs_on = Ref("ConsulInstance"))
-    pipeline.add_ec2_instance("ConsulInstance",
-                              subnet = internal_subnet,
-                              image = aws.ami_lookup(bosslet_config, names.backup.ami)[0])
-    pipeline.add_s3_bucket("ConsulBucket", s3_backup + "/consul")
-    return pipeline
-
 def vault_pipeline(bosslet_config, directory):
     internal_subnet = subnet_id_lookup(bosslet_config)
 
@@ -138,6 +105,8 @@ def ddb_pipeline(bosslet_config, directory):
     tables, _ = list_s3_bucket(bosslet_config.session, names.backup.s3, directory + "/DDB")
     for table in tables:
         name = table.split('.', 1)[0]
+        if name == 'vault':
+            name = 'VaultData'
         pipeline.add_s3_bucket(name + "Bucket", s3_backup + "/DDB/" + table)
         pipeline.add_ddb_table(name, table)
         pipeline.add_emr_copy(name+"Copy",
@@ -149,7 +118,7 @@ def ddb_pipeline(bosslet_config, directory):
 
     for table in tables:
         name = table.split('.', 1)[0]
-        resp = input("Delete existing data in {}? [y/N] ".format(name))
+        resp = input("Delete existing data in {} table? [y/N] ".format(name))
         if resp and len(resp) > 0 and resp[0].lower() == 'y':
             ddb_delete_data(bosslet_config.session, table)
 
@@ -193,7 +162,7 @@ def auth_rds_pipeline(bosslet_config, directory):
                         bosslet_config.names.auth_db.rds)
 
 if __name__ == '__main__':
-    types = ['consul', 'vault', 'dynamo', 'endpoint', 'auth']
+    types = ['vault', 'dynamo', 'endpoint', 'auth']
     parser = BossParser(description = "Script the restoration of a backup")
     parser.add_argument("--ami-version",
                         metavar = "<ami-version>",
@@ -223,9 +192,6 @@ if __name__ == '__main__':
     pipeline_args = (bosslet_config, args.backup_date)
     print("Creating and activating restoration data pipelines")
     for name, build in [
-                        # Currently having issues with Consul restore
-                        #('consul', consul_pipeline),
-
                         # NOTE: in some scenarios vault data may need to be be
                         #       restored before the other restores are executed
                         ('vault', vault_pipeline),

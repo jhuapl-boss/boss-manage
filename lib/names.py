@@ -129,6 +129,7 @@ class AWSNames(object):
         's3': None, # S3 Bucket
         'sfn': format_capitalize, # StepFunction
         'cw': format_dash, # CloudWatch Rule
+        'key': None, # KMS Key
 
         'zip': lambda x: x.lower() + '.zip', # lambda code files
     }
@@ -152,7 +153,6 @@ class AWSNames(object):
         'cache_state': {'name': 'cache-state',
                         'type': 'redis'},
         'cloudwatch': {'type': 'stack'},
-        'consul': {'types': ['dns', 'ami']},
         'consul_monitor': {'name': 'consulMonitor',
                            'types': 'lambda_'},
         'copycuboid': {'type': 'stack'},
@@ -299,7 +299,7 @@ class AWSNames(object):
                                'type': 'cw'},
         'vault_monitor': {'name': 'vaultMonitor',
                           'type': 'lambda_'},
-        'vault': {'types': ['dns', 'ami']},
+        'vault': {'types': ['dns', 'ami', 'ddb', 'key']},
         'volumetric_ingest_queue_upload': {'name': 'Ingest.Volumetric.Upload',
                                            'type': 'sfn'},
         'volumetric_ingest_queue_upload_lambda': {'name': 'VolumetricIngestUpload',
@@ -389,7 +389,6 @@ class AWSNames(object):
         "auth": "auth", # ec2 instance, security group
         "auth_db": "auth-db",
         "vault": "vault",
-        "consul": "consul",
         "api": "api", # public name of endoint
         "endpoint": "endpoint",
         "endpoint_db": "endpoint-db",
@@ -424,7 +423,6 @@ class AWSNames(object):
         'write_lock_topic': 'WriteLockAlert',
         'write_lock': 'WriteLockAlert',
         'vault_monitor': 'vaultMonitor',
-        'consul_monitor': 'consulMonitor',
         'vault_consul_check': 'checkVaultConsul',
         'activities': 'activities',
         'delete_cuboid': 'Delete.Cuboid',
@@ -491,7 +489,7 @@ class AWSNames(object):
 
         fq_hostname = hostname + self.base_dot
 
-        if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'consul_monitor', 'vault_consul_check',
+        if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'vault_consul_check',
                     'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 
                     'index_s3_writer_lambda', 'index_fanout_id_writer_lambda',
                     'downsample_dlq', 'downsample_volume_lambda',

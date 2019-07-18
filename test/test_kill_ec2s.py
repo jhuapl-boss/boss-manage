@@ -33,9 +33,8 @@ import alter_path
 from lib.configuration import BossParser
 
 TARGET_MACHINES = [
-    "consul",
     "vault",
-    "auth"
+    "auth",
 ]
 
 
@@ -89,45 +88,12 @@ def kill_az(bosslet_config, dryrun):
     else:
         machine_terminate(bosslet_config.session, ids)
 
-ITERATIONS = 5 # DP TODO: make optional argument
-def test_consul(bosslet_config, dryrun):
-    global TARGET_MACHINES
-    TARGET_MACHINES = ['consul'] # Limit to only consul
-
-    azs = azs_lookup(session)
-    for i in range(ITERATIONS):
-        az = random.choice(azs)
-        print("Selecting Availability Zone ", az)
-
-        ids = machine_lookup(bosslet_config, az)
-        for id in ids:
-            print("Terminating instance ", id)
-        machine_terminate(session, ids)
-
-        print("Sleeping for 5 minutes")
-        time.sleep(5 * 60)
-
-        try:
-            with bosslet_config.call.vault() as vault:
-                result = vault.read("secret/auth/realm")
-                username = result['username']
-                print("Read username '{}' from Vault".format(username))
-        except Exception as e:
-            print("Problem connecting to Vault on iteration ", i)
-            print(e)
-            return 1
-
-        print()
-
-    print("Complete")
-    return 0
 
 if __name__ == "__main__":
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
     tests = {
         'kill-az': kill_az,
-        'test-consul': test_consul,
     }
 
     def create_help(header, options):

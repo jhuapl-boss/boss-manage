@@ -18,7 +18,7 @@
    The instances should first be stood up by building stacks through cloudformation.
    ASG are shut down. Only execute this code if you are certain the boss will not
    be running for another hour.
-   Currently not all of the ASGs are supported. The auth and consul ASGs could present problems
+   Currently not all of the ASGs are supported. The auth ASG could present problems
    if shut down, since all their data would be lost and would not be recovered upon turning the boss on. 
    Supporting Auth ASG could be done using the same check the core config uses to see ig an auth RDS should be create.
    If there is an auth db then you should be able to shut the ec2 instances down."""
@@ -36,10 +36,6 @@ import alter_path
 from lib import utils, constants, console
 from lib.configuration import BossParser
 
-# Cannot stop consul without losing data
-# Could do it if Vault was first re-initialized and configured
-# and then existing data imported
-
 """
 Error conditions and handling
 
@@ -48,7 +44,6 @@ and only work with the machines that didn't get turned on or off
 
 ex: On -> Vault failure, Manually fix Vault, On to finish all other instances
 
-Should prompt for turning Consul off?
 What about when no ASGs exist for the bosslet?
 
 Starting:
@@ -109,7 +104,6 @@ def load_sort(asgs, method):
         if obj:
             sorted.append(obj)
 
-    add('Consul')
     add('Vault')
     sorted.extend(unsorted)
 
@@ -248,7 +242,6 @@ def startInstances(bosslet_config):
             return
 
     asg_problem = False
-    consul_started = False
 
     asgs = load_aws(bosslet_config, 'on')
     with console.status_line(spin=True) as status:
@@ -284,17 +277,9 @@ def startInstances(bosslet_config):
             # Post-start actions or checks #
             ################################
 
-            if 'Consul' in asg.name:
-                consul_started = True
             if 'Vault' in asg.name:
                 if DRY_RUN:
                     print("Waiting for Vault to start")
-                    if not consul_started:
-                        print("Vault unseal")
-                    else:
-                        print("Vault initialize")
-                        print("Vault unseal")
-                        print("Vault configure")
                     print("Vault import {}".format(filename))
                     continue
 
@@ -304,21 +289,6 @@ def startInstances(bosslet_config):
                 bosslet_config.call.check_vault(constants.TIMEOUT_VAULT)
 
                 with bosslet_config.call.vault() as vault:
-                    if not consul_started:
-                        vault.unseal()
-                    else:
-                        print("Initializing Vault...")
-                        try:
-                            vault.initialize(bosslet_config.ACCOUNT_ID)
-                        except Exception as ex:
-                            filename = VAULT_FILE.format(bosslet_config.names.vault.dns)
-                            print(ex)
-                            print("Could not initialize Vault")
-                            print("Call the following commands before trying to turn the bosslet back on")
-                            print(" > bin/bastion.py vault.<bosslet> vault-initialize")
-                            print(" > bin/bastion.py vault.<bosslet> vault-import {}".format(filename))
-                            return
-
                     print("Importing previous Vault data")
                     try:
                         with open(filename) as fh:

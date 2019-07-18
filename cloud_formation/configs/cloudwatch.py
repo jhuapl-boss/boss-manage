@@ -72,50 +72,28 @@ def create_config(bosslet_config):
                       handler='index.lambda_handler',
                       file=const.VAULT_LAMBDA)
 
-    config.add_lambda('ConsulLambda',
-                      names.consul_monitor.lambda_,
-                      description='Check health of vault instances.',
-                      timeout=30,
-                      role=Ref('VaultConsulHealthChecker'),
-                      security_groups=[internal_sg],
-                      subnets=lambda_subnets,
-                      handler='index.lambda_handler',
-                      file=const.CONSUL_LAMBDA)
-
     # Lambda input data
     json_str = json.dumps({
-        'vpc_id': vpc_id,
-        'vpc_name': domain,
-        'topic_arn': mailing_list_arn,
+        'hostname': names.vault,
     })
 
-    config.add_cloudwatch_rule('VaultConsulCheck',
+    config.add_cloudwatch_rule('VaultCheck',
                                name=names.vault_consul_check.cw,
-                               description='Check health of vault and consul instances.',
+                               description='Check health of vault instances.',
                                targets=[
                                    {
                                        'Arn': Arn('VaultLambda'),
                                        'Id': names.vault_monitor.lambda_,
                                        'Input': json_str
                                    },
-                                   {
-                                       'Arn': Arn('ConsulLambda'),
-                                       'Id': names.consul_monitor.lambda_,
-                                       'Input': json_str
-                                   },
                                ],
-                               schedule='rate(1 minute)',
-                               depends_on=['VaultLambda', 'ConsulLambda'])
+                               schedule='rate(2 minutes)',
+                               depends_on=['VaultLambda'])
 
     config.add_lambda_permission('VaultPerms',
                                  names.vault_monitor.lambda_,
                                  principal='events.amazonaws.com',
-                                 source=Arn('VaultConsulCheck'))
-
-    config.add_lambda_permission('ConsulPerms',
-                                 names.consul_monitor.lambda_,
-                                 principal='events.amazonaws.com',
-                                 source=Arn('VaultConsulCheck'))
+                                 source=Arn('VaultCheck'))
 
     return config
 

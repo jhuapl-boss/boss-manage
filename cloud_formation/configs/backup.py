@@ -84,23 +84,6 @@ def create_config(bosslet_config):
                              encryption=encryption)
         BUCKET_DEPENDENCY = "BackupBucket"
 
-    # Consul Backup
-    # DP NOTE: Currently having issue with Consul restore, hence both Consul and Vault backups
-    cmd = "/usr/local/bin/consulate --api-host {} kv backup -b -f ${{OUTPUT1_STAGING_DIR}}/export.json".format(names.consul.dns)
-    pipeline = DataPipeline(log_uri = s3_logs, resource_role="backup")
-    pipeline.add_shell_command("ConsulBackup",
-                               cmd,
-                               destination = Ref("ConsulBucket"),
-                               runs_on = Ref("ConsulInstance"))
-    pipeline.add_s3_bucket("ConsulBucket", s3_backup + "/consul")
-    pipeline.add_ec2_instance("ConsulInstance",
-                              subnet=internal_subnet,
-                              image = backup_image)
-    config.add_data_pipeline("ConsulBackupPipeline",
-                             "consul-backup."+bosslet_config.INTERNAL_DOMAIN,
-                             pipeline.objects,
-                             depends_on = BUCKET_DEPENDENCY)
-
     # Vault Backup
     cmd = "/usr/local/bin/python3 ~/vault.py backup {}".format(bosslet_config.INTERNAL_DOMAIN)
     pipeline = DataPipeline(log_uri = s3_logs, resource_role="backup")
@@ -125,6 +108,7 @@ def create_config(bosslet_config):
         "TileIndex": names.tile_index.ddb,
         "IdIndex": names.id_index.ddb,
         "IdCountIndex": names.id_count_index.ddb,
+        "VaultData": names.vault.ddb,
     }
 
     pipeline = DataPipeline(log_uri = s3_logs)

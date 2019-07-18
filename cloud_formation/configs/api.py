@@ -19,6 +19,12 @@ Create the api configuration which consists of
 
 The api configuration creates most of the resources needed to run the
 BOSS system.
+
+MIGRATION CHANGELOG:
+    Version 1: Initial version of api config
+    Version 2: Public DNS updates
+               * Replaced manually created public Route53 DNS records with
+                 CloudFormation maintained records
 """
 
 # Redis dependency is because of Django session storage
@@ -109,7 +115,7 @@ def create_config(bosslet_config, db_config={}):
     # Prepare user data for parsing by CloudFormation.
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
 
-    config = CloudFormationConfiguration('api', bosslet_config)
+    config = CloudFormationConfiguration('api', bosslet_config, version="2")
     keypair = bosslet_config.SSH_KEY
 
     vpc_id = config.find_vpc()
@@ -245,15 +251,18 @@ def generate(bosslet_config):
     config.generate()
 
 def pre_init(bosslet_config):
-    # DP NOTE: DEPRECATED, used for transitioning public DNS records from
-    #          being manually created in post-init into records that are
-    #          created / managed by CloudFormation
+    # NOTE: In version 2 the public DNS records are managed by CloudFormation
+    #       If the DNS record currently exists in Route53 the creation of the
+    #       CloudFormation template will fail, so check to see if it exists
+    #       due to previous launches of a Boss stack
     session = bosslet_config.session
     ext_domain = bosslet_config.EXTERNAL_DOMAIN
-    names = bosslet_config.names
+    ext_cname = bosslet_config.names.public_dns('api')
 
-    console.warning("Removing existing API public DNS entry, so CloudFormation can manage the DNS record")
-    aws.route53_delete_records(session, ext_domain, names.public_dns('api'))
+    target = aws.get_dns_resource_for_domain_name(session, ext_cname, ext_domain)
+    if target is not None:
+        console.warning("Removing existing Api public DNS entry, so CloudFormation can manage the DNS record")
+        aws.route53_delete_records(session, ext_domain, ext_cname)
 
 def create(bosslet_config):
     """Configure Vault, create the configuration, and launch it"""
@@ -351,7 +360,6 @@ def update(bosslet_config):
 
     config = create_config(bosslet_config, db_config)
 
-    pre_init(bosslet_config)
     config.update()
 
 def delete(bosslet_config):

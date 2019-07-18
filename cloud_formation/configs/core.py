@@ -17,7 +17,8 @@ Create the core configuration which consists of
   * A new VPC with an internal DNS Hosted Zone
   * Internal and External subnets for every availability zone
   * A Bastion server that allows SSH access to internal machines
-  * A Consul and Vault ASG clusters for secret storage
+  * A Vault ASG clusters for secret storage
+  * A Vault DynamoDB table for Vault storage of data
   * A Keycloak Authentication server ASG, ELB,  and (optional) RDS instance
   * A lambda to handle DNS updates for ASG instance changes
   * An Internet Gateway allowing network connections to the internet
@@ -28,6 +29,16 @@ Create the core configuration which consists of
 
 The core configuration create all of the infrastructure that is required for
 the other production resources to function.
+
+MIGRATION CHANGELOG:
+    Version 1: Initial version of core config
+    Version 2: Vault updates
+               * Replaced Consul storage backend with DynamoDB storage backend
+               * Updated Vault configuration to use AWS KMS for key storage
+               * Code for migrating Vault data from Consul to DynamoDB
+               Public DNS updates
+               * Replaced manually created public Route53 DNS records with
+                 CloudFormation maintained records
 """
 
 DEPENDENCIES = None
@@ -46,7 +57,6 @@ import os
 import sys
 import json
 import time
-from concurrent.futures import ThreadPoolExecutor
 
 def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, type_="t2.micro", public=True, depends_on=None):
     security_groups = [Ref("InternalSecurityGroup")]
@@ -77,7 +87,7 @@ def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnet
 
 def create_config(bosslet_config):
     """Create the CloudFormationConfiguration object."""
-    config = CloudFormationConfiguration('core', bosslet_config)
+    config = CloudFormationConfiguration('core', bosslet_config, version="2")
     session = bosslet_config.session
     keypair = bosslet_config.SSH_KEY
     names = bosslet_config.names
@@ -101,28 +111,23 @@ def create_config(bosslet_config):
                             security_groups = [Ref("InternalSecurityGroup"), Ref("BastionSecurityGroup")],
                             depends_on = "AttachInternetGateway")
 
-    user_data = UserData()
-    user_data["system"]["fqdn"] = names.consul.dns
-    user_data["system"]["type"] = "consul"
-    user_data["consul"]["cluster"] = str(const.CONSUL_CLUSTER_SIZE)
-    config.add_autoscale_group("Consul",
-                               names.consul.dns,
-                               aws.ami_lookup(bosslet_config, names.consul.ami),
-                               keypair,
-                               subnets = internal_subnets_asg,
-                               type_ = const.CONSUL_TYPE,
-                               security_groups = [Ref("InternalSecurityGroup")],
-                               user_data = str(user_data),
-                               min = const.CONSUL_CLUSTER_SIZE,
-                               max = const.CONSUL_CLUSTER_SIZE,
-                               notifications = Ref("DNSSNS"),
-                               role = aws.instance_profile_arn_lookup(session, 'consul'),
-                               support_update = False, # Update will restart the instances manually
-                               depends_on = ["DNSLambda", "DNSSNS", "DNSLambdaExecute"])
+    vault_role = aws.role_arn_lookup(session, 'apl-vault')
+    vault_actions = ['kms:Encrypt', 'kms:Decrypt', 'kms:DescribeKey']
+    config.add_kms_key("VaultKey", names.vault.key, vault_role, vault_actions)
+
+    config.add_dynamo_table("VaultTable", names.vault.ddb,
+                            attributes = [('Path', 'S'),
+                                          ('Key', 'S')],
+                            key_schema = [('Path', 'HASH'),
+                                          ('Key', 'RANGE')],
+                            throughput = (5, 5))
 
     user_data = UserData()
     user_data["system"]["fqdn"] = names.vault.dns
     user_data["system"]["type"] = "vault"
+    user_data["vault"]["kms_key"] = str(Ref("VaultKey"))
+    user_data["vault"]["ddb_table"] = names.vault.ddb
+    parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
     config.add_autoscale_group("Vault",
                                names.vault.dns,
                                aws.ami_lookup(bosslet_config, names.vault.ami),
@@ -130,12 +135,12 @@ def create_config(bosslet_config):
                                subnets = internal_subnets_asg,
                                type_ = const.VAULT_TYPE,
                                security_groups = [Ref("InternalSecurityGroup")],
-                               user_data = str(user_data),
+                               user_data = parsed_user_data,
                                min = const.VAULT_CLUSTER_SIZE,
                                max = const.VAULT_CLUSTER_SIZE,
                                notifications = Ref("DNSSNS"),
                                role = aws.instance_profile_arn_lookup(session, 'apl-vault'),
-                               depends_on = ["Consul", "DNSLambda", "DNSSNS", "DNSLambdaExecute"])
+                               depends_on = ["VaultKey", "VaultTable", "DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
 
     user_data = UserData()
@@ -255,15 +260,18 @@ def generate(bosslet_config):
     config.generate()
 
 def pre_init(bosslet_config):
-    # DP NOTE: DEPRECATED, used for transitioning public DNS records from
-    #          being manually created in post-init into records that are
-    #          created / managed by CloudFormation
+    # NOTE: In version 2 the public DNS records are managed by CloudFormation
+    #       If the DNS record currently exists in Route53 the creation of the
+    #       CloudFormation template will fail, so check to see if it exists
+    #       due to previous launches of a Boss stack
     session = bosslet_config.session
     ext_domain = bosslet_config.EXTERNAL_DOMAIN
-    names = bosslet_config.names
+    ext_cname = bosslet_config.names.public_dns('auth')
 
-    console.warning("Removing existing Auth public DNS entry, so CloudFormation can manage the DNS record")
-    aws.route53_delete_records(session, ext_domain, names.public_dns('auth'))
+    target = aws.get_dns_resource_for_domain_name(session, ext_cname, ext_domain)
+    if target is not None:
+        console.warning("Removing existing Auth public DNS entry, so CloudFormation can manage the DNS record")
+        aws.route53_delete_records(session, ext_domain, ext_cname)
 
 def create(bosslet_config):
     """Create the configuration, launch it, and initialize Vault"""
@@ -297,7 +305,7 @@ def post_init(bosslet_config):
 
     # Initialize Vault
     print("Waiting for Vault...")
-    call.check_vault(const.TIMEOUT_VAULT)  # Expecting this to also check Consul
+    call.check_vault(const.TIMEOUT_VAULT)
 
     with call.vault() as vault:
         print("Initializing Vault...")
@@ -391,55 +399,18 @@ def update(bosslet_config):
         print("Updating the Auth server would loose all Keycloak information")
         raise BossManageError("Configuration doesn't support 'update'")
 
-    if int(const.CONSUL_CLUSTER_SIZE) < 3: # Only tested updating with minimum 3 instances
-        print("Cannot update Consul server as it is not running in a cluster configuration")
-        print("Updating the Consul server would loose all Vault data")
-        raise BossManageError("Configuration doesn't support 'update'")
-
-    consul_update_timeout = 5 # minutes
-    consul_size = int(const.CONSUL_CLUSTER_SIZE)
-    min_time = consul_update_timeout * consul_size
-    max_time = min_time + 5 # add some time to allow the CF update to happen
-
-    print("Update command will take {} - {} minutes to finish".format(min_time, max_time))
-    print("Stack will be available during that time")
-    if not console.confirm("Update?", default = False):
-        raise BossManageCanceled()
-
     config = create_config(bosslet_config)
+    migrations = config.update()
 
-    post_init(bosslet_config)
-    config.update()
-
-    session = bosslet_config.session
-    call = bosslet_config.call
-    names = bosslet_config.names
-
-    # Unseal Vault first, so the rest of the system can continue working
-    # TODO: Figure out what to do when the vault check fails, as consul
-    #       is not restarted
     print("Waiting for Vault...")
-    if not call.check_vault(90, exception=False):
+    if not bosslet_config.call.check_vault(90, exception=False):
         print("Could not contact Vault, check networking and run the following command")
-        print("bin/bastion.py vault.bosslet vault-unseal")
+        print("\tpython3 bastion.py vault.bosslet vault-status")
+        print("To verify that Vault is working correctly")
         raise BossManageError("Could not contact Vault")
 
-    with call.vault() as vault:
-        vault.unseal()
-
     print("Stack should be ready for use")
-    print("Starting to cycle consul cluster instances")
 
-    # DP NOTE: Cycling the instances is done manually (outside of CF)
-    #          so that Vault can be unsealed first, else the whole stacks
-    #          would not be usable until all consul instance were restarted
-    with ThreadPoolExecutor(max_workers=3) as tpe:
-        # Need time for the ASG to detect the terminated instance,
-        # launch the new instance, and have the instance cluster
-        tpe.submit(aws.asg_restart,
-                   session,
-                   names.consul.dns,
-                   consul_update_timeout * 60)
 
 def delete(bosslet_config):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
@@ -451,10 +422,12 @@ def delete(bosslet_config):
     names = bosslet_config.names
 
     aws.route53_delete_records(session, domain, names.auth.dns)
-    aws.route53_delete_records(session, domain, names.consul.dns)
     aws.route53_delete_records(session, domain, names.vault.dns)
 
     aws.sns_unsubscribe_all(bosslet_config, names.dns.sns)
 
     config = CloudFormationConfiguration('core', bosslet_config)
+    if config.existing_version() == 1: # Deleting a stack that has not been updated
+        aws.route53_delete_records(session, domain, 'consul.' + domain)
     config.delete()
+

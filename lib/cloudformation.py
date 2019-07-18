@@ -27,6 +27,9 @@ from botocore.exceptions import ClientError
 from . import hosts
 from . import aws
 from . import utils
+from . import console
+from . import constants as const
+from .migrations import MigrationManager
 from .exceptions import BossManageError, BossManageCanceled
 
 def bool_str(val):
@@ -351,7 +354,7 @@ class CloudFormationConfiguration:
     and launching them.
     """
 
-    def __init__(self, config, bosslet_config):
+    def __init__(self, config, bosslet_config, version="1"):
         """CloudFormationConfiguration constructor
 
         A domain name is in either <vpc>.<tld> or <subnet>.<vpc>.<tld> format and
@@ -360,8 +363,10 @@ class CloudFormationConfiguration:
         Note: region is used when creating the Hosted Zone for a new VPC.
 
         Args:
+            config (str) : Name of the configuration being constructed
             domain (str) : Domain that the CloudFormation template will work in.
-            region (str) : AWS region that the configuration will be created in.
+            region (optional[str]) : AWS region that the configuration will be created in.
+            version (optional[str]) : Version number for the configuration, used for update migration
         """
         self.resources = {}
         self.parameters = {}
@@ -370,7 +375,9 @@ class CloudFormationConfiguration:
         self.region = bosslet_config.REGION
         self.keypairs = {}
 
+        self.config = config
         self.stack_name = bosslet_config.names[config].stack
+        self.stack_version = version
 
         self.bosslet_config = bosslet_config
         self.session = bosslet_config.session
@@ -394,6 +401,31 @@ class CloudFormationConfiguration:
                            "Description" : description,
                            "Parameters": self.parameters,
                            "Resources": self.resources}, indent=indent)
+
+    def version(self):
+        """Get the version of this CloudFormationConfiguration object"""
+        return int(self.stack_version)
+
+    def existing_version(self):
+        """Get the version of this CloudFormationConfiguration stack running in AWS
+
+        Note: If the CloudFormation Stack was created before they were versioned the
+              default version (1) will be returned
+
+        Returns:
+            (int|None) : The version of the running stack or None if the stack is not running
+        """
+        client = self.session.client('cloudformation')
+
+        try:
+            response = client.describe_stacks(StackName = self.stack_name)
+            tags = response['Stacks'][0]['Tags']
+            for tag in tags:
+                if tag['Key'] == 'StackVersion':
+                    return int(tag['Value'])
+            return 1 # Default value for Stacks that are not already versioned
+        except ClientError:
+            return None # Stack doesn't exist
 
     def generate(self):
         """Generate the CloudFormation template and arguments files """
@@ -446,6 +478,7 @@ class CloudFormationConfiguration:
             "TemplateBody": self._create_template(),
             "Parameters": self.arguments,
             "Tags": [
+                {"Key": "StackVersion", "Value": self.stack_version},
                 {"Key": "Commit", "Value": utils.get_commit()}
             ]
         }
@@ -476,6 +509,9 @@ class CloudFormationConfiguration:
             wait (bool) : If True, wait for the stack to be updated, printing
                           status information
 
+        Returns:
+            bool: If there were migrations applied
+
         Raises:
             BossManageCanceled: If the update was canceled
             BossManageError: If there was a problem updating the stack
@@ -487,12 +523,26 @@ class CloudFormationConfiguration:
                 raise BossManageError(msg)
 
         client = self.session.client('cloudformation')
+        migrations = MigrationManager(self.config, self.existing_version(), self.version())
+
+        # Save the migration progress in case there is an exception in one
+        # The "update-migration" command will allow the user to continue executing
+        # migrations from where they failed
+        migration_progress = const.repo_path('cloud_formation', 'configs', 'migrations', self.config, 'progress')
+        with open(migration_progress, 'w') as fh:
+            fh.write(str(migrations.cur_ver))
+
+        def update_stack_version(self, migration_file):
+            with open(migration_progress, 'w') as fh:
+                fh.write(str(migration_file.stop))
+        migrations.add_callback(post = update_stack_version)
 
         kwargs = {
             "StackName": self.stack_name,
             "TemplateBody": self._create_template(),
             "Parameters": self.arguments,
             "Tags": [
+                {"Key": "StackVersion", "Value": self.stack_version},
                 {"Key": "Commit", "Value": utils.get_commit()}
             ]
         }
@@ -503,6 +553,7 @@ class CloudFormationConfiguration:
         disable_preview = str(self.bosslet_config.disable_preview)
         disable_preview = disable_preview.lower() in ('yes', 'true', 'y', 't')
         if disable_preview:
+            migrations.pre_update(self.bosslet_config)
             response = client.update_stack(**kwargs)
         else:
             commit = utils.get_commit()
@@ -520,8 +571,7 @@ class CloudFormationConfiguration:
 
                 if response['Status'] != 'CREATE_COMPLETE':
                     print("ChangeSet status is {}".format(response['Status']))
-                    print("Reason: {}".format(response['StatusReason']))
-                    raise Exception()
+                    raise BossManageError(response['StatusReason'])
 
                 fmt = "{:<10}{:<30}{:<50}{:<45}{:<14}{}"
                 print(fmt.format(
@@ -545,21 +595,20 @@ class CloudFormationConfiguration:
                             ", ".join(change['Scope'])
                         ))
 
-                resp = input("Apply Update? [N/y] ")
-                if len(resp) == 0 or resp[0] not in ('y', 'Y'):
-                    raise Exception()
+                if not console.confirm('Apply Update?', default = False):
+                    raise BossManageCanceled()
                 else:
+                    migrations.pre_update(self.bosslet_config)
                     response = client.execute_change_set(
                         ChangeSetName = 'h' + commit,
                         StackName = self.stack_name
                     )
             except:
-                print("Canceled")
                 client.delete_change_set(
                     ChangeSetName = 'h' + commit,
                     StackName = self.stack_name
                 )
-                raise BossManageCanceled()
+                raise
 
         if wait:
             status = self._poll(client, self.stack_name, 'update', 'UPDATE_IN_PROGRESS')
@@ -572,6 +621,12 @@ class CloudFormationConfiguration:
             else:
                 msg = "Status of stack '{}' is '{}'".format(self.stack_name, status)
                 raise BossManageError(msg)
+
+        migrations.post_update(self.bosslet_config)
+
+        os.remove(migration_progress)
+
+        return migrations.has_migrations
 
     def delete(self, wait = True):
         """Deletes the given stack from CloudFormation.
@@ -1052,8 +1107,8 @@ class CloudFormationConfiguration:
         Args:
             key (str) : Unique name (within the configuration) for this instance
             name (str) : DynamoDB Table name to create
-            attributes (dict) : Dictionary of {'AttributeName' : 'AttributeType', ...}
-            key_schema (dict) : Dictionary of {'AttributeName' : 'KeyType', ...}
+            attributes (list[tuple]) : List of tuples containing [('AttributeName', 'AttributeType'), ...]
+            key_schema (list[tuple]) : List of tuples containing [('AttributeName', 'KeyType'), ...]
             throughput (tuple) : Tuple of (ReadCapacity, WriteCapacity)
                                  ReadCapacity is the minimum number of consistent reads of items per second
                                               before Amazon DynamoDB balances the loads
@@ -1061,12 +1116,12 @@ class CloudFormationConfiguration:
                                                before Amazon DynamoDB balances the loads
         """
         attr_defs = []
-        for key_ in attributes:
-            attr_defs.append({"AttributeName": key_, "AttributeType": attributes[key_]})
+        for key_, attr in attributes:
+            attr_defs.append({"AttributeName": key_, "AttributeType": attr})
 
         key_schema_ = []
-        for key_ in key_schema:
-            key_schema_.append({"AttributeName": key_, "KeyType": key_schema[key_]})
+        for key_, schema in key_schema:
+            key_schema_.append({"AttributeName": key_, "KeyType": schema})
 
         self.resources[key] = {
             "Type" : "AWS::DynamoDB::Table",
@@ -2138,6 +2193,60 @@ class CloudFormationConfiguration:
             self.resources[key]["Properties"]["Targets"] = target_list
         if description is not None:
             self.resources[key]["Properties"]["Description"] = description
+
+    def add_kms_key(self, key, alias, key_users, user_actions):
+        """Add a KMS Key
+
+        Note: KMS Key permissions are a little different from the rest of AWS
+              resources. User's must be given permission to use a key and by
+              default they don't have permissions.
+
+        Args:
+            key (str): Unique name for the resource in the template
+            alias (str): Name of the key to be created
+            key_users (str|list[str]): ARN or list or ARNs of the users with permission
+                                       to use the key
+            user_actions (list[str]): List of KMS actions that the given user(s) are allows
+                                      to perform with the key
+        """
+        account_id = self.bosslet_config.ACCOUNT_ID
+
+        self.resources[key] = {
+            "Type": "AWS::KMS::Key",
+            "Properties": {
+                "Description": "KMS Key for {}".format(alias),
+                "KeyPolicy": {
+                    "Id": alias,
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "Enable IAM User Permissions",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": "arn:aws:iam::{}:root".format(account_id)
+                            },
+                            "Action": "kms:*",
+                            "Resource": "*"
+                        },
+                        {
+                            "Sid": "Allow use of the key",
+                            "Effect": "Allow",
+                            "Principal": { "AWS": key_users },
+                            "Action": user_actions,
+                            "Resource": "*"
+                        },
+                    ]
+                }
+            }
+        }
+
+        self.resources[key + "Alias"] = {
+            "Type": "AWS::KMS::Alias",
+            "Properties": {
+                "AliasName": "alias/" + alias.replace('.', '-'),
+                "TargetKeyId": Ref(key),
+            }
+        }
 
     def add_data_pipeline(self, key, name, objects, description="", depends_on=None):
         """Add a Data Pipeline definition

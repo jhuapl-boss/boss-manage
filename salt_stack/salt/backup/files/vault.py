@@ -142,7 +142,7 @@ token =
                 # B) They have been changed, and restoring them will
                 #    put incorrect data in Vault
                 # C) Passwords are restored if they don't exist currently
-                #    because Consul data may have been lost and the only
+                #    because Vault data may have been lost and the only
                 #    copy of the password is in the backup
                 new_data = v.client.read(path)
                 if new_data is not None and 'password' in new_data['data']:

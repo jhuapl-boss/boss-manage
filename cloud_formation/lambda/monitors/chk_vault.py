@@ -33,35 +33,39 @@ def lambda_handler(event, context):
         event (dict): Expected keys: vpc_id, vpc_name, topic_arn
         context (Context): Unused.
     """
-    vpc_id = event['vpc_id']
-    vpc_name = event['vpc_name']
-    topic_arn = event['topic_arn']
+    hostname = event['hostname']
+    domain = hostname.split('.', 1)[1]
 
+    route53_client = boto3.client('route53')
+    asg_client = boto3.client('autoscaling')
     ec2_client = boto3.client('ec2')
+
+    resp = route53_client.list_hosted_zones_by_name(DNSName=domain, MaxItems='1')
+    zone_id = resp['HostedZones'][0]['Id'].split('/')[-1]
+
     resp = ec2_client.describe_instances(Filters=[
             {
                 'Name': 'tag:Name',
-                'Values': ['vault*']
+                'Values': [hostname]
             },
             {
-                'Name': 'vpc-id',
-                'Values': [vpc_id]
-            }
+                'Name': 'instance-state-name',
+                'Values': ['running']
+            },
         ])
 
-    sns_client = boto3.client('sns')
-    route53_client = boto3.client('route53')
-
-    if len(resp['Reservations']) == 0:
-        print('No vault instances found!')
-        sns_publish_no_vaults(sns_client, topic_arn, vpc_name)
-
     for reserv in resp['Reservations']:
-
         for inst in reserv['Instances']:
-            ip = inst['PrivateIpAddress']
+            try:
+                ip = inst['PrivateIpAddress']
+            except KeyError:
+                print("Could not locate IP Address for {} ({})".format(hostname, inst['InstanceId']))
+                continue
+
             url = PROTOCOL + ip + PORT + ENDPOINT
             print('Checking vault server {} at {}...'.format(url, str(datetime.now())))
+
+            set_weight = lambda w: update_route53_weight(route53_client, zone_id, hostname, inst, w)
 
             try:
                 raw = urlopen(url, timeout=10).read()
@@ -69,13 +73,15 @@ def lambda_handler(event, context):
                 if err.getcode() == 500:
                     # Vault returns a status code of 500 if sealed or not
                     # initialized.
-                    raw = 'Vault sealed or uninitialized.'
+                    # Assume that Vault will be configured shortly
+                    print('Vault sealed or uninitialized.')
+                    set_weight(NORMAL_ROUTE53_WEIGHT)
+                    continue
                 elif err.getcode() == 429:
                     # Vault returns 429 if it's unsealed and in standby mode.
                     # This is not an error condition.
                     print('Unsealed and in standby mode.')
-                    update_route53_weight(
-                        route53_client, vpc_name, inst, NORMAL_ROUTE53_WEIGHT)
+                    set_weight(NORMAL_ROUTE53_WEIGHT)
                     continue
                 else:
                     raw = 'Status code: {}, reason: {}'.format(
@@ -85,20 +91,23 @@ def lambda_handler(event, context):
             else:
                 if validate(raw):
                     # Set weight in Route53 to default to ensure it receives
-                    # traffic, normally.
-                    update_route53_weight(
-                        route53_client, vpc_name, inst, NORMAL_ROUTE53_WEIGHT)
+                    # traffic, normally. Only happens if the check happened
+                    # during the HealthCheck grace period and the instance
+                    # was not terminated
+                    set_weight(NORMAL_ROUTE53_WEIGHT)
                     continue
 
             # Health check failed.
             print(raw)
 
-            # Publish failure to SNS topic.
-            sns_publish_sealed(sns_client, inst, raw, topic_arn, vpc_name)
+            # Set to unhealthy and the ASG will terminate and recreate
+            asg_client.set_instance_health(InstanceId = inst['InstanceId'],
+                                           HealthStatus = 'Unhealthy',
+                                           ShouldRespectGracePeriod = True)
 
-            # Set weight in Route53 to 0 so instance gets no traffic.
-            update_route53_weight(
-                route53_client, vpc_name, inst, SICK_ROUTE53_WEIGHT)
+            # Set weight in Route53 to 0 so instance gets no traffic, while
+            # waiting for the ASG to terminate and relaunch
+            set_weight(SICK_ROUTE53_WEIGHT)
 
 def validate(resp):
     """Check health status response from application.
@@ -125,102 +134,28 @@ def validate(resp):
 
     return True
 
-def where(xs, predicate):
-    """Filter list using given function.
-
-    Note, only the first element that passes the predicate is returned.
-
-    Args:
-        xs (list): List to filter.
-        predicate (function): Function to filter by.
-
-    Returns:
-        (string|None): Returns first element that passes predicate.
-    """
-    for x in xs:
-        if predicate(x):
-            return x
-    return None
-
-def find_name(xs):
-    """Search list of tags for the one with Name as its key.
-
-    Args:
-        xs (list): List of dicts as returned by Boto3's describe_instances().
-
-    Returns:
-        (string|None)
-    """
-    tag = where(xs, lambda x: x['Key'] == 'Name')
-    return None if tag is None else tag['Value']
-
-def sns_publish_no_vaults(sns_client, topic_arn, vpc_name):
-    """Send notification of NO existing vault instances.
-
-    Args:
-        sns_client (boto3.SNS.Client): Client for interacting with SNS.
-        topic_arn (string): ARN of SNS topic to publish to.
-        vpc_name (string): Name of VPC.
-    """
-    sns_client.publish(
-        TopicArn=topic_arn,
-        Subject='No vault instance in {}!'.format(vpc_name),
-        Message='No vault instances found in {}!'.format(vpc_name)
-    )
-
-def sns_publish_sealed(sns_client, inst_data, raw_err, topic_arn, domain_name):
-    """Send notification of failed instance to SNS topic.
-
-    Args:
-        sns_client (boto3.SNS.Client): Client for interacting with SNS.
-        inst_data (dict): Instance info as returned by describe_instances().
-        raw_err (string): Raw response from urlopen() or 'unreachable'.
-        topic_arn (string): ARN of SNS topic to publish to.
-        domain_name (string): Domain name of VPC.
-    """
-    ip = inst_data['PrivateIpAddress']
-    sns_client.publish(
-        TopicArn=topic_arn,
-        Subject='vault instance sealed in {}'.format(domain_name),
-        Message="""Vault instance with IP: {0} is uninitialized, sealed, or unreachable.\r\n
-Raw health check: {1}\r\n
-\r\n
-To unseal, from boss-manage.git/bin, run:\r\n
-./bastion.py #.vault.{2} vault-unseal\r\n
-where # is the number of the vault instance that is sealed.\r\n
-\r\n
-Find the number of the sealed vault instance using:\r\n
-./bastion.py #.vault.{2} vault-status\r\n
-""".format(ip, raw_err, domain_name)
-    )
-
-def update_route53_weight(route53_client, vpc_name, inst_data, weight):
+def update_route53_weight(route53_client, zone_id, hostname, inst, weight):
     """Change weight for given instance in Route53 (DNS).
 
     Args:
         route53_client (boto3.Route53.Client): Client for interacting with Route53.
-        vpc_name: Name of VPC instance runs in.
-        inst_data (dict): Instance info as returned by describe_instances().
+        zone_id (str): ID of the HostedZone containing the DNS Record to update
+        hostname (str): The hostname of the DNS Record to update
+        inst (dict): Instance info as returned by describe_instances().
         weight (int): New weight for instance.
     """
-    zones_resp = route53_client.list_hosted_zones_by_name(
-        DNSName=vpc_name, MaxItems='1')
-    zone_id = zones_resp['HostedZones'][0]['Id'].split('/')[-1]
-    inst_id = inst_data['InstanceId']
-    dns_name = find_name(inst_data['Tags'])
-    private_dns_name = inst_data['PrivateDnsName']
     route53_client.change_resource_record_sets(
         HostedZoneId=zone_id,
         ChangeBatch = {
             'Changes': [{
                 'Action': 'UPSERT',
                 'ResourceRecordSet': {
-                    'Name': dns_name,
+                    'Name': hostname,
                     'Type': 'CNAME',
-                    'ResourceRecords': [{'Value': private_dns_name}],
+                    'ResourceRecords': [{'Value': inst['PrivateDnsName']}],
                     'TTL': 300,
-                    'SetIdentifier': inst_id,
-                    'Weight': weight
+                    'SetIdentifier': inst['InstanceId'],
+                    'Weight': weight,
                 }
             }]
         }

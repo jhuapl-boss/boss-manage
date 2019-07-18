@@ -847,53 +847,41 @@ def set_domain_to_dns_name(session, domain_name, dns_resource, hosted_zone):
     return response
 
 
-def get_dns_resource_for_domain_name(session, domain_name, dns_resource, hosted_zone):
+def get_dns_resource_for_domain_name(session, domain_name, hosted_zone):
     """gets to resource name attached to a domain name
 
     Args:
         session (Session|None) : Boto3 session used to lookup information in AWS
                                  If session is None no lookup is performed
         domain_name (string) : FQDN of the public record to create / update
-        dns_resource (string) : Public FQDN of the AWS resource to map domain_name to
         hosted_zone (string) : DNS Name of the Hosted Zone that contains domain_name
 
     Returns:
-        (dict|None) : Dictionary with the "ChangeInfo" key containing a dict of
-                      information about the requested change or None if the session
-                      is None
+        str: Public FQDN of the AWS resource mapped to the domain name
     """
     if session is None:
         return None
 
     client = session.client('route53')
     hosted_zone_id = get_hosted_zone_id(session, hosted_zone)
+    domain_name += '.' # DNS record format
 
     if hosted_zone_id is None:
         print("Error: Unable to find Route 53 Hosted Zone, " + hosted_zone + ",  Cannot set resource record for: " +
               dns_resource)
         return None
 
-    response = client.change_resource_record_sets(
+    response = client.list_resource_record_sets(
         HostedZoneId=hosted_zone_id,
-        ChangeBatch={
-            'Changes': [
-                {
-                    'Action': 'UPSERT',
-                    'ResourceRecordSet': {
-                        'Name': domain_name,
-                        'Type': 'CNAME',
-                        'ResourceRecords': [
-                            {
-                                'Value': dns_resource
-                            },
-                        ],
-                        'TTL': 300,
-                    }
-                },
-            ]
-        }
+        StartRecordName=domain_name,
+        StartRecordType='CNAME'
     )
-    return response
+
+    for record in response['ResourceRecordSets']:
+        if record['Name'] == domain_name:
+            return record['ResourceRecords'][0]['Value']
+
+    return None
 
 
 def route53_delete_records(session, hosted_zone, cname):
@@ -1117,6 +1105,44 @@ def lambda_arn_lookup(session, lambda_name):
         return None
     else:
         return response['Configuration']['FunctionArn']
+
+def dynamo_scan(session, table_name):
+    if session is None:
+        return None
+    
+    client = session.client("dynamodb")
+    response = aws.scan(TableName=table_name)
+    if response is None:
+        return None
+    else:
+        return response
+
+def dynamodb_delete_table(session, table_name, wait=True):
+    """Deletes the given DynamoDB table, optionally waiting until it has been deleted
+
+    Args:
+        session (Session): boto3.session.Session object
+        table_name (str): name of the DynamoDB Table
+        wait (optional[bool]): If the function should poll AWS until the table is removed
+    """
+    client = session.client("dynamodb")
+
+    tables = client.list_tables()['TableNames']
+    if table_name not in tables:
+        return
+
+    client.delete_table(TableName = table_name)
+
+    if wait:
+        print("Deleting {} .".format(table_name), end='', flush=True)
+        while True:
+            print(".", end='', flush=True)
+            time.sleep(10)
+
+            tables = client.list_tables()['TableNames']
+            if table_name not in tables:
+                print(". done")
+                break
 
 def get_data_pipeline_id(session, name):
     client = session.client('datapipeline')
