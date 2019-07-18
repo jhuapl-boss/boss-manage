@@ -16,7 +16,6 @@ DEPENDENCIES = []
 from lib.cloudformation import CloudFormationConfiguration
 from lib import constants as const
 from lib import aws
-from lib import scalyr
 from lib.exceptions import BossManageError, BossManageCanceled
 
 # The create, update, delete, pre-init, post-init, generate methods

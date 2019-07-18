@@ -39,7 +39,6 @@ from lib.exceptions import BossManageError, BossManageCanceled
 from lib import aws
 from lib import utils
 from lib import console
-from lib import scalyr
 from lib import constants as const
 from lib import console
 
@@ -384,10 +383,6 @@ def post_init(bosslet_config):
 
             print("Uploading BOSS.realm configuration")
             kc.create_realm(realm)
-
-    # Tell Scalyr to get CloudWatch metrics for these instances.
-    instances = [ names.vault.dns ]
-    scalyr.add_instances_to_scalyr(session, bosslet_config.REGION, instances)
 
 def update(bosslet_config):
     # Checks to make sure they update can happen and the user wants to wait the required time
