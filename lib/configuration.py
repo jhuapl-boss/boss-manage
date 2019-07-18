@@ -69,7 +69,7 @@ class BossConfiguration(object):
         'OUTBOUND_PORT', # Conditional
         'OUTBOUND_USER', # Conditional
         'OUTBOUND_KEY', # Conditional
-        'HTTPS_INBOUND',
+        'HTTPS_INBOUND', # Optional
         'SSH_INBOUND',
         'SSH_KEY',
         'BILLING_TOPIC', # Optional
@@ -155,14 +155,6 @@ class BossConfiguration(object):
         else:
             self.ssh_key = None
 
-        # DP NOTE: Delayed loading of ExternalCalls because when intialized
-        #          it does DNS lookupss fo the bastion and vault instances
-        #          which will fail unless the core config has been launched
-        if self.session and self.ssh_key:
-            self._call = False
-        else:
-            self._call = None
-
         self.names = AWSNames.from_bosslet(self)
 
         # Use __getattr__ to get the __DEFAULT value if not specified
@@ -175,13 +167,20 @@ class BossConfiguration(object):
             return getattr(self._config, attr)
         elif attr in self.__DEFAULTS:
             return self.__DEFAULTS[attr]
-        elif attr == 'call' and self._call is not None:
+        elif attr == 'call':
+            # DP NOTE: Delayed loading of ExternalCalls because when intialized
+            #          it does DNS lookupss fo the bastion and vault instances
+            #          which will fail unless the core config has been launched
+            if self.session is None:
+                raise AttributeError("Require an AWS session to use ExternalCalls")
+            if self.ssh_key is None:
+                raise AttributeError("Require a SSH key to use ExternalCalls")
+
             # Using __getattr__ instead of an @property because if an
             # @property raises an AttributeError then __getattr__ gets
             # called.
-            if self._call is False:
-                self._call = ExternalCalls(self)
-            return self._call
+            self.call = ExternalCalls(self) # saving as self.call for future lookups
+            return self.call
         else:
             msg = "'{}' object has not attribute '{}'".format(self.__class__.__name__,
                                                               attr)
