@@ -26,6 +26,7 @@ from boto3.session import Session
 
 from . import exceptions
 from . import constants as const
+from . import console
 from .external import ExternalCalls
 from .ssh import SSHTarget
 from .aws import machine_lookup
@@ -130,7 +131,7 @@ class BossConfiguration(object):
         self.session = Session(profile_name = self.get('PROFILE'),
                                region_name = self._config.REGION)
         if self.session.get_credentials() is None:
-            print("Warning: Could not located AWS credentials")
+            console.warning("Could not located AWS credentials")
             self.session = None
 
         # Load outbound bastion information in one location
@@ -209,13 +210,13 @@ class BossConfiguration(object):
                          self.get('OUTBOUND_BASTION') == False:
                         pass
                     else:
-                        print("Error: Variable '{}' not defined".format(key), file=fh)
+                        console.error("Variable '{}' not defined".format(key), file=fh)
                         ret = False
 
         for key in dir(self._config):
             if key not in self.__EXPECTED_KEYS:
                 if not key.startswith('__'):
-                    print("Warning: Extra variable '{}' defined".format(key), file=fh)
+                    console.warning("Extra variable '{}' defined".format(key), file=fh)
 
         return ret
 
