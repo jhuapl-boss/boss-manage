@@ -164,9 +164,11 @@ if __name__ == '__main__':
 
     if args.bosslet_config.OUTBOUND_BASTION:
         bastion_config = """-var 'aws_bastion_ip={}'
+                            -var 'aws_bastion_port={}'
                             -var 'aws_bastion_user={}'
                             -var 'aws_bastion_priv_key_file={}'
                          """.format(args.bosslet_config.OUTBOUND_IP,
+                                    args.bosslet_config.OUTBOUND_PORT,
                                     args.bosslet_config.OUTBOUND_USER,
                                     utils.keypair_to_file(args.bosslet_config.OUTBOUND_KEY))
     else:
