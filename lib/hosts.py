@@ -33,6 +33,10 @@ Author:
 #          10.0.0.255: Network broadcast address. We do not support broadcast in a VPC, therefore we reserve this address.
 ##
 
+# SUBNETS contains the list of all possible subnets and is used to determine the number of a
+#         given subnet. Example: 'internal' is subnet 0, 'external' is subnet 1, etc
+# NOTE: Do not reorder subnets as this will bork any existing Boss stacks. If new subnets are
+#       needed they should be added to the end of the list
 SUBNETS = [
     'internal',
     'external',
