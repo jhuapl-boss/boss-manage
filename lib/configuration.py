@@ -76,6 +76,9 @@ class BossConfiguration(object):
         'BILLING_THRESHOLDS', # Conditional, required if setting up account
         'BILLING_CURRENCY', # Optional
         'ALERT_TOPIC', # Optional
+        'SLACK_WEBHOOK_HOST', # Optional
+        'SLACK_WEBHOOK_PATH_DYNAMODB_AUTOSCALE', # Conditional, to use Slack integration
+        'DYNAMODB_AUTOSCALE_PROVISIONER', # Optional
     ]
 
     __DEFAULTS = {
@@ -90,6 +93,9 @@ class BossConfiguration(object):
         "BILLING_TOPIC": "BossBillingList",
         "BILLING_CURRENCY": "USD",
         "ALERT_TOPIC": "BossMailingList",
+        'SLACK_WEBHOOK_HOST': 'hooks.slack.com',
+        'SLACK_WEBHOOK_PATH_DYNAMODB_AUTOSCALE': None,
+        'DYNAMODB_AUTOSCALE_PROVISIONER': 'BossDefaultProvisioners',
     }
 
     def __init__(self, bosslet, **kwargs):
