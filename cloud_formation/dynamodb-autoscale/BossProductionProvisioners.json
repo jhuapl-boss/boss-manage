@@ -1,0 +1,362 @@
+{
+    "default": {
+        "ReadCapacity": {
+          "Min": 1,
+          "Max": 100,
+          "Increment": {
+            "When": {
+              "UtilisationIsAbovePercent": 75,
+              "ThrottledEventsPerMinuteIsAbove": 25
+            },
+            "By": {
+              "Units": 3,
+              "ProvisionedPercent": 30,
+              "ThrottledEventsWithMultiplier": 0.7
+            },
+            "To": {
+              "ConsumedPercent": 130
+            }
+          },
+          "Decrement": {
+            "When": {
+              "UtilisationIsBelowPercent": 30,
+              "AfterLastIncrementMinutes": 60,
+              "AfterLastDecrementMinutes": 60,
+              "UnitAdjustmentGreaterThan": 2
+            },
+            "To": {
+              "ConsumedPercent": 100
+            }
+          }
+        },
+        "WriteCapacity": {
+          "Min": 1,
+          "Max": 100,
+          "Increment": {
+            "When": {
+              "UtilisationIsAbovePercent": 75,
+              "ThrottledEventsPerMinuteIsAbove": 25
+            },
+            "By": {
+              "Units": 3,
+              "ProvisionedPercent": 30,
+              "ThrottledEventsWithMultiplier": 0.7
+            },
+            "To": {
+              "ConsumedPercent": 130
+            }
+          },
+          "Decrement": {
+            "When": {
+              "UtilisationIsBelowPercent": 30,
+              "AfterLastIncrementMinutes": 60,
+              "AfterLastDecrementMinutes": 60,
+              "UnitAdjustmentGreaterThan": 2
+            },
+            "To": {
+              "ConsumedPercent": 100
+            }
+          }
+        }
+    },
+    "bossmeta_cfg": {
+        "ReadCapacity": {
+          "Min": 5,
+          "Max": 5000,
+          "Increment": {
+            "When": {
+              "UtilisationIsAbovePercent": 75,
+              "ThrottledEventsPerMinuteIsAbove": 25
+            },
+            "By": {
+              "Units": 3,
+              "ProvisionedPercent": 30,
+              "ThrottledEventsWithMultiplier": 0.7
+            },
+            "To": {
+              "ConsumedPercent": 130
+            }
+          },
+          "Decrement": {
+            "When": {
+              "UtilisationIsBelowPercent": 30,
+              "AfterLastIncrementMinutes": 60,
+              "AfterLastDecrementMinutes": 60,
+              "UnitAdjustmentGreaterThan": 5
+            },
+            "To": {
+              "ConsumedPercent": 100
+            }
+          }
+        },
+        "WriteCapacity": {
+          "Min": 5,
+          "Max": 5000,
+          "Increment": {
+            "When": {
+              "UtilisationIsAbovePercent": 75,
+              "ThrottledEventsPerMinuteIsAbove": 25
+            },
+            "By": {
+              "Units": 3,
+              "ProvisionedPercent": 30,
+              "ThrottledEventsWithMultiplier": 0.7
+            },
+            "To": {
+              "ConsumedPercent": 130
+            }
+          },
+          "Decrement": {
+            "When": {
+              "UtilisationIsBelowPercent": 30,
+              "AfterLastIncrementMinutes": 60,
+              "AfterLastDecrementMinutes": 60,
+              "UnitAdjustmentGreaterThan": 5
+            },
+            "To": {
+              "ConsumedPercent": 100
+            }
+          }
+        }
+    },
+    "idCount_cfg": {
+        "ReadCapacity": {
+          "Min": 5,
+          "Max": 5000,
+          "Increment": {
+            "When": {
+              "UtilisationIsAbovePercent": 75,
+              "ThrottledEventsPerMinuteIsAbove": 25
+            },
+            "By": {
+              "Units": 3,
+              "ProvisionedPercent": 30,
+              "ThrottledEventsWithMultiplier": 0.7
+            },
+            "To": {
+              "ConsumedPercent": 130
+            }
+          },
+          "Decrement": {
+            "When": {
+              "UtilisationIsBelowPercent": 30,
+              "AfterLastIncrementMinutes": 60,
+              "AfterLastDecrementMinutes": 60,
+              "UnitAdjustmentGreaterThan": 5
+            },
+            "To": {
+              "ConsumedPercent": 100
+            }
+          }
+        },
+        "WriteCapacity": {
+          "Min": 10,
+          "Max": 5000,
+          "Increment": {
+            "When": {
+              "UtilisationIsAbovePercent": 75,
+              "ThrottledEventsPerMinuteIsAbove": 25
+            },
+            "By": {
+              "Units": 3,
+              "ProvisionedPercent": 30,
+              "ThrottledEventsWithMultiplier": 0.7
+            },
+            "To": {
+              "ConsumedPercent": 130
+            }
+          },
+          "Decrement": {
+            "When": {
+              "UtilisationIsBelowPercent": 30,
+              "AfterLastIncrementMinutes": 60,
+              "AfterLastDecrementMinutes": 60,
+              "UnitAdjustmentGreaterThan": 5
+            },
+            "To": {
+              "ConsumedPercent": 100
+            }
+          }
+        }
+    },
+    "idIndex_cfg": {
+        "ReadCapacity": {
+          "Min": 25,
+          "Max": 35000,
+          "Increment": {
+            "When": {
+              "UtilisationIsAbovePercent": 75,
+              "ThrottledEventsPerMinuteIsAbove": 25
+            },
+            "By": {
+              "Units": 3,
+              "ProvisionedPercent": 30,
+              "ThrottledEventsWithMultiplier": 0.7
+            },
+            "To": {
+              "ConsumedPercent": 130
+            }
+          },
+          "Decrement": {
+            "When": {
+              "UtilisationIsBelowPercent": 30,
+              "AfterLastIncrementMinutes": 60,
+              "AfterLastDecrementMinutes": 60,
+              "UnitAdjustmentGreaterThan": 5
+            },
+            "To": {
+              "ConsumedPercent": 100
+            }
+          }
+        },
+        "WriteCapacity": {
+          "Min": 50,
+          "Max": 35000,
+          "Increment": {
+            "When": {
+              "UtilisationIsAbovePercent": 75,
+              "ThrottledEventsPerMinuteIsAbove": 25
+            },
+            "By": {
+              "Units": 3,
+              "ProvisionedPercent": 50,
+              "ThrottledEventsWithMultiplier": 0.7
+            },
+            "To": {
+              "ConsumedPercent": 200
+            }
+          },
+          "Decrement": {
+            "When": {
+              "UtilisationIsBelowPercent": 30,
+              "AfterLastIncrementMinutes": 60,
+              "AfterLastDecrementMinutes": 60,
+              "UnitAdjustmentGreaterThan": 5
+            },
+            "To": {
+              "ConsumedPercent": 100
+            }
+          }
+        }
+    },
+    "s3index_cfg": {
+        "ReadCapacity": {
+          "Min": 25,
+          "Max": 40000,
+          "Increment": {
+            "When": {
+              "UtilisationIsAbovePercent": 75,
+              "ThrottledEventsPerMinuteIsAbove": 25
+            },
+            "By": {
+              "Units": 3,
+              "ProvisionedPercent": 30,
+              "ThrottledEventsWithMultiplier": 0.7
+            },
+            "To": {
+              "ConsumedPercent": 130
+            }
+          },
+          "Decrement": {
+            "When": {
+              "UtilisationIsBelowPercent": 30,
+              "AfterLastIncrementMinutes": 60,
+              "AfterLastDecrementMinutes": 60,
+              "UnitAdjustmentGreaterThan": 5
+            },
+            "To": {
+              "ConsumedPercent": 100
+            }
+          }
+        },
+        "WriteCapacity": {
+          "Min": 25,
+          "Max": 40000,
+          "Increment": {
+            "When": {
+              "UtilisationIsAbovePercent": 75,
+              "ThrottledEventsPerMinuteIsAbove": 25
+            },
+            "By": {
+              "Units": 3,
+              "ProvisionedPercent": 30,
+              "ThrottledEventsWithMultiplier": 0.7
+            },
+            "To": {
+              "ConsumedPercent": 130
+            }
+          },
+          "Decrement": {
+            "When": {
+              "UtilisationIsBelowPercent": 30,
+              "AfterLastIncrementMinutes": 60,
+              "AfterLastDecrementMinutes": 60,
+              "UnitAdjustmentGreaterThan": 5
+            },
+            "To": {
+              "ConsumedPercent": 100
+            }
+          }
+        }
+    },
+    "tileindex_cfg": {
+        "ReadCapacity": {
+          "Min": 5,
+          "Max": 40000,
+          "Increment": {
+            "When": {
+              "UtilisationIsAbovePercent": 75,
+              "ThrottledEventsPerMinuteIsAbove": 25
+            },
+            "By": {
+              "Units": 3,
+              "ProvisionedPercent": 30,
+              "ThrottledEventsWithMultiplier": 0.7
+            },
+            "To": {
+              "ConsumedPercent": 130
+            }
+          },
+          "Decrement": {
+            "When": {
+              "UtilisationIsBelowPercent": 30,
+              "AfterLastIncrementMinutes": 60,
+              "AfterLastDecrementMinutes": 60,
+              "UnitAdjustmentGreaterThan": 5
+            },
+            "To": {
+              "ConsumedPercent": 100
+            }
+          }
+        },
+        "WriteCapacity": {
+          "Min": 5,
+          "Max": 40000,
+          "Increment": {
+            "When": {
+              "UtilisationIsAbovePercent": 75,
+              "ThrottledEventsPerMinuteIsAbove": 25
+            },
+            "By": {
+              "Units": 3,
+              "ProvisionedPercent": 30,
+              "ThrottledEventsWithMultiplier": 0.7
+            },
+            "To": {
+              "ConsumedPercent": 130
+            }
+          },
+          "Decrement": {
+            "When": {
+              "UtilisationIsBelowPercent": 30,
+              "AfterLastIncrementMinutes": 60,
+              "AfterLastDecrementMinutes": 60,
+              "UnitAdjustmentGreaterThan": 5
+            },
+            "To": {
+              "ConsumedPercent": 100
+            }
+          }
+        }
+    }
+}

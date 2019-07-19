@@ -70,6 +70,14 @@ BILLING_CURRENCY : str = "USD" # (Optional) Currency that the threasholds are se
 ALERT_TOPIC : str = "BossMailingList" # (Optional) SNS topic for receiving alerts or error messages from a running Boss process
                                       #            Different Boss components are configured to send notifications to this topic
 
+SLACK_WEBHOOK_HOST : str = "hooks.slack.com" # (Optional) Hostname for Slack webhooks
+SLACK_WEBHOOK_PATH_DYNAMODB_AUTOSCALE : str = None # (Optional) Webhook path for submitting details about the DynamoDB autoscale lambda changes
+                                                   #            If not provided the autoscale lambda will not use Slack for notifications
+
+DYNAMODB_AUTOSCALE_PROVISIONER : str = "BossDefaultProvisioners" # (Optional) The name of the JSON file in the cloud_formation/dynamodb-autoscale/ directory
+                                                                 #            The JSON file contains the autoscale rules used by the DynamoDB autoscale lambda
+
+
 ###
 # Minimal Config for Account Setup
 # When using the bin/boss-account.py and bin/iam_utils.py scripts to initially
