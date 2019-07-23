@@ -23,6 +23,13 @@ names.json
     "groups": [],
     "policies": [],
 }
+
+removed.json
+{
+    "roles": [],
+    "groups": [],
+    "policies": [],
+}
 """
 
 import argparse
@@ -51,6 +58,7 @@ DEFAULT_POLICY_FILE = os.path.join(IAM_CONFIG_DIR, "policies.json")
 DEFAULT_GROUP_FILE = os.path.join(IAM_CONFIG_DIR, "groups.json")
 DEFAULT_ROLES_FILE = os.path.join(IAM_CONFIG_DIR, "roles.json")
 DEFAULT_NAMES_FILE = os.path.join(IAM_CONFIG_DIR, "names.json")
+DEFAULT_REMOVED_FILE = os.path.join(IAM_CONFIG_DIR, "removed.json")
 
 class AllResources(object):
     """Class that always returns True for any `obj in AllResources()`"""
@@ -118,6 +126,7 @@ class DryRunWrapper(object):
             'create_instance_profile',
             'remove_role_from_instance_profile',
             'delete_instance_profile',
+            'delete_group',
 
             # Roles
             'create_role',
@@ -126,11 +135,14 @@ class DryRunWrapper(object):
             'attach_role_policy',
             'delete_role_policy',
             'detach_role_policy',
+            'delete_role',
 
             # Policies
             'create_policy',
             'delete_policy_version',
             'create_policy_version',
+            'detach_user_policy',
+            'delete_policy',
         ]
         # ???: Redirect any function starting with create/put/attach/delete/detach/add/remove/update
 
@@ -157,10 +169,13 @@ class IamUtils(object):
         """
         self.bosslet_config = bosslet_config
         self.session = bosslet_config.session
+        self.resource = self.session.resource('iam')
         self.client = self.session.client('iam')
         if dry_run:
             self.client = DryRunWrapper(self.client)
         self.iw = IamWrapper(self.client)
+
+        self._policy_lookup = None
 
     ######################################################
     ## Generic functions the are resource type agnostic ##
@@ -395,6 +410,22 @@ class IamUtils(object):
                 elif resource_type == 'policies':
                     self.policy_update(resource, resource_)
 
+    def remove(self, resource_type, resources):
+        """Remove the given groups/roles/policies from IAM
+
+        Args:
+            resource_type (str): One of - groups, roles, policies
+            resources (list[str]): List of group/role/policy names that should be removed
+        """
+
+        for resource in resources:
+            if resource_type == 'groups':
+                self.group_remove(resource)
+            elif resource_type == 'roles':
+                self.role_remove(resource)
+            elif resource_type == 'policies':
+                self.policy_remove(resource)
+
     ######################################################
     ## Resource type specific create / update functions ##
     ######################################################
@@ -454,6 +485,31 @@ class IamUtils(object):
             if arn not in resource['AttachedManagedPolicies']:
                 # AWS has a managed policy that is not in the desired version, it should be deleted.
                 self.iw.detach_group_policy(resource["GroupName"], arn)
+
+    def group_remove(self, resource):
+        """Remove the referenced IAM Group
+
+        Args:
+            resource (str): Name of the IAM Group to remove
+        """
+        group = self.resource.Group(resource)
+        try:
+            group.load()
+        except self.client.exceptions.NoSuchEntityException:
+            console.info("Group {} doesn't exist".format(resource))
+            return
+
+        # Attached resources
+        for policy in group.attached_policies.all():
+            self.client.detach_group_policy(GroupName = resource,
+                                            PolicyArn = policy.arn)
+
+        for policy in group.policies.all():
+            self.client.delete_group_policy(GroupName = resource,
+                                            PolicyName = policy.name)
+
+        # The role itself
+        self.client.delete_group(GroupName = resource)
 
     #########
     # Roles
@@ -548,6 +604,35 @@ class IamUtils(object):
             self.iw.remove_role_from_instance_profile(resource['RoleName'], profile)
             self.iw.delete_instance_profile(profile)
 
+    def role_remove(self, resource):
+        """Remove the referenced IAM Role
+
+        Args:
+            resource (str): Name of the IAM Role to remove
+        """
+        role = self.resource.Role(resource)
+        try:
+            role.load()
+        except self.client.exceptions.NoSuchEntityException:
+            console.info("Role {} doesn't exist".format(resource))
+            return
+
+        # Attached resources
+        for policy in role.attached_policies.all():
+            self.client.detach_role_policy(RoleName = resource,
+                                           PolicyArn = policy.arn)
+
+        for profile in role.instance_profiles.all():
+            self.client.remove_role_from_instance_profile(InstanceProfileName = profile.name,
+                                                          RoleName = resource)
+
+            self.client.delete_instance_profile(InstanceProfileName = profile.name)
+
+        # TODO ??? Inline policies?
+
+        # The role itself
+        self.client.delete_role(RoleName = resource)
+
     ############
     # Policies
 
@@ -596,6 +681,61 @@ class IamUtils(object):
                                               PolicyDocument = resource['PolicyDocument'],
                                               SetAsDefault = True)
 
+    def policy_lookup(self, resource):
+        """Lookup the Policy ARN based on the Policy name"""
+
+        # Memorize the mapping of policy name to arn as all policy removals will use it
+        if self._policy_lookup is None:
+            self._policy_lookup = {}
+            kwargs = {}
+            while kwargs.get('Marker', '') is not None:
+                resp = self.client.list_policies(**kwargs)
+                for policy in resp['Policies']:
+                    self._policy_lookup[policy['PolicyName']] = policy['Arn']
+
+                if resp['IsTruncated']:
+                    kwargs['Marker'] = resp['Marker']
+                else:
+                    kwargs['Marker'] = None
+
+        return self._policy_lookup.get(resource)
+
+    def policy_remove(self, resource):
+        """Remove the referenced IAM Policy
+
+        Args:
+            resource (str): Name of the IAM Policy to remove
+        """
+        arn = self.policy_lookup(resource)
+        if arn is None:
+            console.info("Policy {} doesn't exist".format(resource))
+            return
+
+        policy = self.resource.Policy(arn)
+
+        # Attached resources
+        for group in policy.attached_groups.all():
+            self.client.detach_group_policy(GroupName = group.group_id,
+                                            PolicyArn = arn)
+
+        for role in policy.attached_roles.all():
+            self.client.detach_role_policy(RoleName = role.name,
+                                           PolicyArn = arn)
+
+        for user in policy.attached_users.all():
+            self.client.detach_user_policy(UserName = user.name,
+                                           PolicyArn = arn)
+
+        # Non-default versions
+        resp = self.client.list_policy_versions(PolicyArn = arn)
+        for version in resp['Versions']:
+            if not version['IsDefaultVersion']:
+                self.client.delete_policy_version(PolicyArn = arn,
+                                                  VersionId = version['VersionId'])
+
+        # The policy itself
+        self.client.delete_policy(PolicyArn = arn)
+
 if __name__ == '__main__':
     parser = configuration.BossParser(description="Load Policies, Roles and Groups into and out of AWS",
                                       formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -612,12 +752,15 @@ if __name__ == '__main__':
     parser.add_argument('--policies', '-p',
                         default=DEFAULT_POLICY_FILE,
                         help='JSON document where exported data is saved to or data to import is read from')
+    parser.add_argument('--removed',
+                        default=DEFAULT_REMOVED_FILE,
+                        help='JSON document containing the list of resource names that should be deleted')
     parser.add_argument('--dry-run', '-d',
                         action='store_true',
                         help='If the import should be dry runned')
     parser.add_bosslet()
     parser.add_argument("command",
-                        choices = ['export', 'import'])
+                        choices = ['export', 'import', 'remove'])
     parser.add_argument("resource_type",
                         choices = ['groups', 'roles', 'policies'],
                         nargs='+')
@@ -631,7 +774,12 @@ if __name__ == '__main__':
     if args.command == 'import':
         for resource_type in args.resource_type:
             iam.import_(resource_type, getattr(args, resource_type), filters[resource_type])
-    else: # export
+    elif args.command == 'export':
         for resource_type in args.resource_type:
             iam.export(resource_type, getattr(args, resource_type), filters[resource_type])
+    else: # remove
+        with open(args.removed, 'r') as fh:
+            filters = json.load(fh)
 
+        for resource_type in args.resource_type:
+            iam.remove(resource_type, filters[resource_type])
