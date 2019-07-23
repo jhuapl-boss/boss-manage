@@ -192,9 +192,6 @@ class Vault(object):
         as needed for BOSS. This includes:
             * Configuring the Audit Backend
             * Adding all of the policies from policies/*.hcl
-            * Creating a provisioner token with all of the policies added
-                - Required so that the provisioner token can issue tokens
-                  for any policy
             * Configure the AWS backend (if there are AWS credentials to use)
             * Configure AWS backend roles from policies/*.iam
 
@@ -215,15 +212,13 @@ class Vault(object):
             print("audit_backend already created.")
 
         # Policies
-        provisioner_policies = []
+        policies = []
         path = os.path.join(POLICY_DIR, "*.hcl")
         for policy in glob.glob(path):
             name = os.path.basename(policy).split('.')[0]
+            policies.append(name)
             with open(policy, 'r') as fh:
                 client.sys.create_or_update_policy(name, fh.read())
-            # Add every policy to the provisioner, as it has to have the
-            # superset of any policies that it will provision
-            provisioner_policies.append(name)
 
         # AWS Authentication Backend
         # Enable AWS auth in Vault
@@ -236,8 +231,8 @@ class Vault(object):
             print("aws auth backend already created.")
 
         #Define policies and arn                                     
-        policies = [p for p in provisioner_policies if p not in ('provisioner',)]
         arn = 'arn:aws:iam::{}:instance-profile/'.format(account_id)
+
         #For each policy configure the policies on a role of the same name
         for policy in policies:
             client.create_ec2_role(policy,
