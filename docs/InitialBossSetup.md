@@ -14,7 +14,7 @@
 Any Bosslet using the domain can now lookup the certificate(s) needed and attach them to the load balancers to provide HTTPS traffic
 
 ## Scalyr
-Decide if you plan to use Scalyr for capture and view logs.  You can register for a free 30 day trail on their www.scalyr.com
+Decide if you plan to use Scalyr for capture and view logs.  You can register for a free 30 day trial on their www.scalyr.com
 
 ### Using Scalyr
 To setup scalyr with a new account

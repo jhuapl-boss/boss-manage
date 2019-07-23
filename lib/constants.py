@@ -102,9 +102,6 @@ VAULT_KEYCLOAK_DB = "secret/keycloak/db"
 VAULT_ENDPOINT = "secret/endpoint/django"
 VAULT_ENDPOINT_DB = "secret/endpoint/django/db"
 VAULT_ENDPOINT_AUTH = "secret/endpoint/auth"
-VAULT_PROOFREAD = "secret/proofreader/django"
-VAULT_PROOFREAD_DB = "secret/proofreader/django/db"
-VAULT_PROOFREAD_AUTH = "secret/proofreader/auth"
 
 
 ########################
@@ -149,7 +146,10 @@ ENDPOINT_DB_CONFIG = {
     "port": "3306"
 }
 
+# NOTE: The boss-mange code assumes that this AMI will be an Amazon AMI
+#       that uses the 'ec2-user' user account
 BASTION_AMI = "amzn-ami-vpc-nat-hvm-2015.03.0.x86_64-ebs"
+
 # Configure Squid to allow clustered Vault access, restricted to connections from the Bastion
 BASTION_USER_DATA = """#cloud-config
 packages:

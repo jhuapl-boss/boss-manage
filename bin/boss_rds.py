@@ -54,7 +54,7 @@ if __name__ == '__main__':
     instructions = list(HELP)
     commands_help = create_help("command supports the following:", instructions)
     
-    parser = configuration.BossParser(description = "Script for manipulating endpoint instances",
+    parser = configuration.BossParser(description = "Script for manipulating the endpoint's RDS instance",
                                       formatter_class=argparse.RawDescriptionHelpFormatter,
                                       epilog=commands_help)
     parser.add_argument("--quiet", "-q",

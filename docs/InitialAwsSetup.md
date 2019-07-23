@@ -3,11 +3,13 @@
 ## Requirements
 
 ### Workstation
-You will need a Linux machine installed with the following software packages:
+You will need a machine installed with the following software packages:
 * Python 3.5
 * pip install virtualenv virtualenvwrapper
 * Packer ([download](https://www.packer.io/)) Version 1.1.1 (add it to your path)
-* NodeJS ([download](https://nodejs.org/en/download/)) Version 6.10.X (add it to your path)
+* NodeJS ([download](https://nodejs.org/en/download/)) Version 8.10.X (add it to your path)
+
+Note: The boss-manage software was developed and tested under Linux and Mac. It has not been tested under Windows, including under Windows Subsystem for Linux.
 
 ## Starting IAM User
 * Manually create IAM user with API keys and full permissions in AWS Console

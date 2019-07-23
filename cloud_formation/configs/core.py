@@ -344,11 +344,6 @@ def post_init(bosslet_config):
             print("Updating {}".format(const.VAULT_ENDPOINT_AUTH))
             vault.update(const.VAULT_ENDPOINT_AUTH, url = auth_discovery_url, client_id = "endpoint")
 
-        if not vault.read(const.VAULT_PROOFREAD_AUTH):
-            # DP TODO: Move this update call into the proofreader config
-            print("Updating {}".format(const.VAULT_PROOFREAD_AUTH))
-            vault.update(const.VAULT_PROOFREAD_AUTH, url = auth_discovery_url, client_id = "endpoint")
-
     # Configure Keycloak
     print("Waiting for Keycloak to bootstrap")
     call.check_keycloak(const.TIMEOUT_KEYCLOAK)

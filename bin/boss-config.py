@@ -14,12 +14,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import textwrap
+
 import alter_path
 from lib import configuration
 
 class ConfigCLI(configuration.BossCLI):
     def get_parser(self, ParentParser=configuration.BossParser):
-        self.parser = ParentParser(description = 'Command for interacting with bosslet configuration files')
+        extended_help = textwrap.dedent("""Currently the following actions are supported:
+        * No arguments: Verify and print the current bosslet configuration file, allowing a user
+                        to see the final value of any computed values within the configuration file.
+        * Expression: Evaluate the given expression that has access to the loaded bosslet configuration
+                      object.
+                      Example: --expression "bosslet.names.public_dns('api')" # to get the public hostname
+                                                                              # of the bosslet's API server
+        """)
+        self.parser = ParentParser(description = 'Command for interacting with bosslet configuration files',
+                                   formatter_class = argparse.RawDescriptionHelpFormatter,
+                                   epilog = extended_help)
         self.parser.add_bosslet()
         self.parser.add_argument('--expression', '-e',
                                  metavar = '<expression>',

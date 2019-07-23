@@ -293,12 +293,6 @@ class IamUtils(object):
         Returns:
             object: Converted IAM object
         """
-        key = {
-            'groups': 'GroupName',
-            'roles': 'RoleName',
-            'policies': 'PolicyName',
-        }[resource_type]
-
         if resource_type == 'groups':
             group = {
                 'GroupName': resource['GroupName'],

@@ -17,10 +17,6 @@ path "secret/endpoint/*" {
     policy = "write"
 }
 
-path "secret/proofreader/*" {
-    policy = "write"
-}
-
 path "secret/auth" {
     policy = "write"
 }

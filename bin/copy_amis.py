@@ -32,7 +32,6 @@ from lib import configuration
 # TODO: Just read the packer config variables files
 AMIS = ["endpoint",
         "cachemanager",
-        "proofreader-web",
         "auth",
         "vault",
         "activities"]

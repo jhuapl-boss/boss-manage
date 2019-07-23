@@ -53,6 +53,8 @@ os.environ["PATH"] += ":" + repo_path("bin") # allow executing Packer from the b
 def lambda_ami():
     # Amazon Linux AMI 2017.09.0 (HVM), SSD Volume Type
     # Should match runtime used by AWS Lambda
+    # NOTE: The boss-manage code assumes that this will be an Amazon AMI
+    #       that uses the 'ec2-user' user account
     return "ami-8c1be5f6"
 
 def get_commit():

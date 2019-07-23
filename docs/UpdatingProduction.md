@@ -418,17 +418,11 @@ To be filled out
 ## Have you created the production sprintXX IAMs yet?
 If not copy the latest versions with the sprintXX label.
 
-## Change AWS Credentials back to dev account
-Make sure your:
-**boss-manage/config/aws_credentials** file contains the developer account keys
-**boss-manage/vault/private/vault_aws_credentials** file contains the developer vault account keys
-**boss-manage/config/set_var.sh** should have SSH_KEY=<yourdefault key>
-
 ## Create SprintXX AMIs in developer account 
 Its best to create new hash versions of the AMIs like this:
 ```shell
 $ cd boss-manage/bin
-$  ./packer.py auth vault endpoint proofreader-web cachemanager
+$  ./packer.py auth vault endpoint cachemanager
 ```
 And then copy the latest AMIs from the console to become sprintXX 
 (this way developers can get the latest AMIs without explicitly specifying sprintXX)

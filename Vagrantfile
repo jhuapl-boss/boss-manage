@@ -41,21 +41,6 @@ Vagrant.configure(2) do |config|
     end
   end
 
-  config.vm.define "proofreader" do |proofreader|
-    proofreader.vm.box = "packer/output/vagrant-virtualbox-proofreader-web.box"
-    proofreader.vm.network "forwarded_port", guest: 8080, host: 8080
-  end
-
-  config.vm.define "prj" do |prj|
-    prj.vm.box = "packer/output/vagrant-virtualbox-pr-jenkins.box"
-    prj.vm.network "forwarded_port", guest: 8080, host: 8080
-    prj.vm.synced_folder "../proofread", "/proofread"
-    prj.vm.provision "shell" do |s|
-      s.inline = $salt
-      s.args = ["pr-jenkins"]
-    end
-  end
-
   config.vm.define "desktop" do |desktop|
     desktop.vm.box = "virtualbox_ubuntu_desktop.box"
     desktop.vm.synced_folder "../boss-tools", "/boss-tools"
