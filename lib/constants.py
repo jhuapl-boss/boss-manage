@@ -144,13 +144,13 @@ CACHE_MANAGER_TYPE = {
 
 CONSUL_TYPE = {
     "development": "t3.micro",
-    "production": "t3.medium",
+    "production": "m5.large",
     "ha-development": "t3.large",
 }
 
 VAULT_TYPE = {
     "development": "t3.micro",
-    "production": "t3.medium",
+    "production": "m5.large",
     "ha-development": "t3.large",
 }
 
@@ -162,27 +162,27 @@ ACTIVITIES_TYPE = {
 
 AUTH_TYPE = {
     "development": "t2.micro",
-    "production": "m5.xlarge",
+    "production": "m5.2xlarge",
     "ha-development": "t2.micro",
 }
 
 ########################
 # Machine Cluster Sizes
 AUTH_CLUSTER_SIZE = { # Auth Server Cluster is a fixed size
-    "development" : 1,
+    "development": 1,
     "production": 1, # should be an odd number
     "ha-development": 1,  # should be an odd number
 }
 
 CONSUL_CLUSTER_SIZE = { # Consul Cluster is a fixed size
-    "development" : 1,
+    "development": 1,
     "production": 5, # can tolerate 2 failures
     "ha-development": 3,  # can tolerate 1 failures
 }
 
 VAULT_CLUSTER_SIZE = { # Vault Cluster is a fixed size
-    "development" : 1,
-    "production": 3, # should be an odd number
+    "development": 1,
+    "production": 2,
     "ha-development": 1,  # should be an odd number
 }
 
