@@ -105,7 +105,7 @@ class Vault(object):
         client = self.connect(VAULT_TOKEN)
         code.interact(local=locals())
 
-    def initialize(self, account_id, secrets = 1, threashold = 1):
+    def initialize(self, account_id, secrets = 1, threshold = 1):
         """Initialize a Vault. Connect using get_client() and if the Vault is not
         initialized then initialize it with 1 recovery key (and only requiring the
         1 key when used). The recovery key is stored as VAULT_KEY and root token
@@ -120,7 +120,7 @@ class Vault(object):
         Args:
             account_id (str) : AWS Account ID that Vault is running under, passed to configure()
             secrets (int) : Total number of secrets to split the master key into
-            threashold (int) : The number of secrets required to reconstruct the master key
+            threshold (int) : The number of secrets required to reconstruct the master key
         """
 
         client = self.connect()
@@ -132,12 +132,12 @@ class Vault(object):
             else:
                 print("Vault already unsealed")
         else:
-            print("Initializing with {} secrets and {} needed to unseal".format(secrets, threashold))
+            print("Initializing with {} secrets and {} needed to unseal".format(secrets, threshold))
             result = client.sys.initialize(secret_shares=1,
                                            secret_threshold=1,
                                            stored_shares=1,
                                            recovery_shares=secrets,
-                                           recovery_threshold=threashold)
+                                           recovery_threshold=threshold)
 
             token_file = self.path(VAULT_TOKEN)
             key_file = self.path(VAULT_KEY)

@@ -89,7 +89,7 @@ def sql_resource_lookup_key(bosslet_config, resource_params):
         if collection is not None:
             cursor.execute(coll_query, (collection,))
             coll_set = cursor.fetchall()
-            if len(coll_set) != 1:
+            if len(coll_set) != 1: # TODO: Alert the user when there are more than one results
                 raise Exception(
                     "Can't find collection: {}".format(collection))
             else:
@@ -98,7 +98,7 @@ def sql_resource_lookup_key(bosslet_config, resource_params):
         if experiment is not None:
             cursor.execute(exp_query, (experiment,))
             exp_set = cursor.fetchall()
-            if len(exp_set) != 1:
+            if len(exp_set) != 1: # TODO: Alert the user when there are more than one results
                 raise Exception(
                     "Can't find experiment: {}".format(experiment))
             else:
@@ -107,7 +107,7 @@ def sql_resource_lookup_key(bosslet_config, resource_params):
         if channel is not None:
             cursor.execute(chan_query, (channel,))
             chan_set = cursor.fetchall()
-            if len(chan_set) != 1:
+            if len(chan_set) != 1: # TODO: Alert the user when there are more than one results
                 raise Exception(
                     "Can't find channel: {}".format(channel))
             else:

@@ -14,6 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Script for searching for AWS resources that can be removed.
+ * Search for Packer resources that are not cleanned up correctly
+ * Search for old AMIs that are no longer used
+"""
+
 import re
 import os
 import argparse
@@ -52,7 +58,7 @@ if __name__ == '__main__':
     parser.add_bosslet()
     parser.add_argument('--exclude', '-e',
                         action = 'append',
-                        help = 'Whitelist the given resource(s) from being deleted')
+                        help = 'Whitelist the given resource(s) from being deleted (supports regex)')
     parser.add_argument('--delete',
                         action = 'store_true',
                         help = 'Delete the indicated resources')

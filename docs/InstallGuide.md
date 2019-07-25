@@ -492,8 +492,6 @@ To be filled out
 * https://api.theboss.io/ping/
 * https://api.theboss.io/v0.4/resource/collections
 * https://api.theboss.io/v0.5/resource/collections
-* Login into Scalyr and verify that the new instances appear on the overview page.
-* Also on Scalyr, check the cloudwatch log for the presence of the instance ID of the endpoint.
 
 
 ### Setting Up Web Page
