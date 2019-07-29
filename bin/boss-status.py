@@ -67,6 +67,10 @@ class StatusCLI(configuration.BossCLI):
         existing = aws.get_existing_stacks(bosslet_config)
         print(" complete")
 
+        if len(existing) == 0:
+            print("No templates running")
+            return
+
         # Trigger the detection of drift for the stacks
         print("Detecting drift .", end="", flush=True)
         drift_ids = { name: client.detect_stack_drift(StackName = obj['StackName'])['StackDriftDetectionId']
