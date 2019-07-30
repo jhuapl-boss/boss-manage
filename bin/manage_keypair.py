@@ -58,7 +58,7 @@ if __name__ == '__main__':
 
     if args.action == 'create':
         try:
-            response = aws.create_keypair(session, args.keypairName)
+            response = aws.create_keypair(args.bosslet_config.session, args.keypairName)
             print('Protect this keypair and make sure you have access to it.')
         except Exception as e:
             print('Failed to create keypair due to: {}'.format(e))
@@ -76,7 +76,7 @@ if __name__ == '__main__':
                 pass
 
     elif args.action == 'delete':
-        response = aws.delete_keypair(session, args.keypairName)
+        response = aws.delete_keypair(args.bosslet_config.session, args.keypairName)
         if response['ResponseMetadata']['HTTPStatusCode'] == 200:
             try:
                  key_file_path.unlink()
