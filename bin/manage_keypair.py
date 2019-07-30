@@ -54,7 +54,7 @@ if __name__ == '__main__':
 
     #Define key pair path
     # DP NOTE: Path.home() is Python 3.5+ and the Auto Build Test uses Python 3.4
-    key_file_path = os.path.expanduser('~') / '.ssh' / (args.keypairName + '.pem')
+    key_file_path = Path(os.path.expanduser('~')) / '.ssh' / (args.keypairName + '.pem')
 
     if args.action == 'create':
         try:
