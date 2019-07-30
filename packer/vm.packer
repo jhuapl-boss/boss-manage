@@ -17,7 +17,7 @@
         "aws_bastion_ip": "IP of the APL bastion server",
         "aws_bastion_ip": "",
         "aws_bastion_port": "Port on the APL bastion server",
-        "aws_bastion_port": "",
+        "aws_bastion_port": "22",
         "aws_bastion_user": "User name to login to the bastion server",
         "aws_bastion_user": "",
         "aws_bastion_priv_key_file": "Path to the bastion's private key file",
