@@ -46,27 +46,44 @@ echo ' '
 echo 'echo "----------------------Init_Script----------------------'
 echo ' '
 
-set -e 
+# Run this command before the `set -e`, as the set will
+# cause the script to stop if the `command` returns non-zero
+command -v apt-get >/dev/null; RET=$?
 
-#Install python3.5 and guide pip to it
-yes | apt-get update
-yes | ufw allow 22
-yes | apt-get install python3.5
-yes | apt-get install zip unzip
-yes | apt-get install jq
-yes | apt-get install python3-pip
+# Exit the script if any commands return a non-zero return value
+set -e
 
-cd /home/ubuntu/
+if [ $RET -eq 0 ]; then
+    #Install python3.5 and guide pip to it
+    yes | apt-get update
+    yes | ufw allow 22
+    yes | apt-get install python3.5
+    yes | apt-get install zip unzip
+    yes | apt-get install jq
+    yes | apt-get install python3-pip
 
-# Create dummy .aws configs
-mkdir .aws
-cd .aws
-touch credentials
-touch config
-cd ..
+    cd /home/ubuntu/
 
-#Install git
-yes | apt-get install git
+    # Create dummy .aws configs
+    mkdir .aws
+    cd .aws
+    touch credentials
+    touch config
+    cd ..
+
+    #Install git
+    yes | apt-get install git
+
+    PYTHON=python3.5
+else
+    yes | yum install jq
+    yes | yum install git
+
+    cd /home/ec2-user
+
+    # Current Lambda AMI contains Python 3.6 by default
+    PYTHON=python3.6
+fi
 
 # Download Packer
 wget https://releases.hashicorp.com/packer/0.12.0/packer_0.12.0_linux_amd64.zip
@@ -87,7 +104,7 @@ git checkout refactor
 #Install all requirements
 git submodule init
 git submodule update
-python3.5 -m pip install -r requirements.txt
+$PYTHON -m pip install -r requirements.txt
 
 # # Set-up log records on Cloudwatch:
 # export EC2_REGION=`curl --silent http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region`
@@ -103,66 +120,64 @@ python3.5 -m pip install -r requirements.txt
 #Make vault private directory
 mkdir vault/private
 
-#Manage scalyr formula:
-touch salt_stack/pillar/scalyr.sls
-rm -r salt_stack/salt/scalyr
-mkdir salt_stack/salt/scalyr
-touch salt_stack/salt/scalyr/init.sls && touch salt_stack/salt/scalyr/map.jinja && touch salt_stack/salt/scalyr/update_host.sls
+cd bin/
 
 #Create  keypair to attach to ec2 instances made by cloudformation.
 touch ~/.ssh/auto-build-keypair.pem # so the bosslet config is considered valid
-python3.5 ./manage_keypair.py auto-build-test.boss delete auto-build-keypair
-python3.5 ./manage_keypair.py auto-build-test.boss create auto-build-keypair
+$PYTHON ./manage_keypair.py auto-build-test.boss delete auto-build-keypair
+
+touch ~/.ssh/auto-build-keypair.pem # so the bosslet config is considered valid
+$PYTHON ./manage_keypair.py auto-build-test.boss create auto-build-keypair
 wait
 
 #Build AMIs
 echo " "
 echo "----------------------Building AMIs----------------------"
-echo " " 
-python3.5 ./packer.py auto-build-test.boss all --ami-version autotest --force
+echo " "
+$PYTHON ./packer.py auto-build-test.boss all --ami-version autotest --force
 wait
 
 echo " "
 echo "----------------------Create Stack----------------------"
-echo " " 
+echo " "
 
 echo "Env:"
 env
 
 #Run building cloudformation
-yes | python3.5 ./cloudformation.py create auto-build-test.boss all --ami-version autotest
+yes | $PYTHON ./cloudformation.py create auto-build-test.boss all --ami-version autotest
 wait
 
 echo " "
 echo "----------------------Performing Tests----------------------"
-echo " " 
+echo " "
 
 #Perform tests on temporary test stacks
 
 #Endpoint tests:
 echo 'Performing tests...'
-python3.5 ./bastion.py endpoint.auto-build-test.boss ssh-cmd "cd /srv/www/django && python3 manage.py test"# python3 manage.py test -- -c inttest.cfg
+$PYTHON ./bastion.py endpoint.auto-build-test.boss ssh-cmd "cd /srv/www/django && python3 manage.py test"# python3 manage.py test -- -c inttest.cfg
 
 #ndingest library
-python3.5 ./bastion.py endpoint.auto-build-test.boss ssh-cmd "python3 -m pip install pytest"
-python3.5 ./bastion.py endpoint.auto-build-test.boss ssh-cmd "cd /usr/local/lib/python3/site-packages/ndingest && export NDINGEST_TEST=1 && pytest -c test_apl.cfg"
+$PYTHON ./bastion.py endpoint.auto-build-test.boss ssh-cmd "python3 -m pip install pytest"
+$PYTHON ./bastion.py endpoint.auto-build-test.boss ssh-cmd "cd /usr/local/lib/python3/site-packages/ndingest && export NDINGEST_TEST=1 && pytest -c test_apl.cfg"
 
 #cachemanage VM
-python3.5 ./bastion.py cachemanager.auto-build-test.boss ssh-cmd "cd /srv/salt/boss-tools/files/boss-tools.git/cachemgr && sudo nose2 && sudo nose2 -c inttest.cfg"
+$PYTHON ./bastion.py cachemanager.auto-build-test.boss ssh-cmd "cd /srv/salt/boss-tools/files/boss-tools.git/cachemgr && sudo nose2 && sudo nose2 -c inttest.cfg"
 
 echo " "
 echo "----------------------Delete Stacks----------------------"
-echo " " 
+echo " "
 
-yes | python3.5 ./cloudformation.py delete auto-build-test.boss all
+yes | $PYTHON ./cloudformation.py delete auto-build-test.boss all
 wait
 
 # echo " "
 # echo "----------------------Cleanup environment----------------------"
-# echo " " 
+# echo " "
 
 Delete keypairs from aws
-python3.5 ./manage_keypair.py auto-build-test.boss delete auto-build-keypair
+$PYTHON ./manage_keypair.py auto-build-test.boss delete auto-build-keypair
 Shutdown the instance an hour after script executes.
 shutdown -h +3600"""
 
@@ -183,7 +198,7 @@ shutdown -h +3600"""
         UserData=init_script # file to run on instance init
     )
     instance_id = instance['Instances'][0]['InstanceId']
-    
+
     tag = EC2.create_tags(
         Resources=[
             instance_id,
