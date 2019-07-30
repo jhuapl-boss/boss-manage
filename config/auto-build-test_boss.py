@@ -44,4 +44,9 @@ LOCAL_IP = urllib.request.urlopen(META_URL).read().decode("utf-8")
 
 HTTPS_INBOUND = LOCAL_IP + "/32"
 SSH_INBOUND = LOCAL_IP + "/32"
+
 SSH_KEY = "auto-build-keypair"
+
+from pathlib import Path
+if not (Path.home() / '.ssh' / (SSH_KEY + '.pem')).exists():
+    SSH_KEY = None # Makes creating the keypairs easier

@@ -123,10 +123,7 @@ mkdir vault/private
 cd bin/
 
 #Create  keypair to attach to ec2 instances made by cloudformation.
-touch ~/.ssh/auto-build-keypair.pem # so the bosslet config is considered valid
 $PYTHON ./manage_keypair.py auto-build-test.boss delete auto-build-keypair
-
-touch ~/.ssh/auto-build-keypair.pem # so the bosslet config is considered valid
 $PYTHON ./manage_keypair.py auto-build-test.boss create auto-build-keypair
 wait
 

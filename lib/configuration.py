@@ -155,7 +155,7 @@ class BossConfiguration(object):
         # Load ssh key path in one location
         if self._config.SSH_KEY:
             keyfile = keypair_to_file(self._config.SSH_KEY)
-            if not os.path.exists(keyfile):
+            if keyfile is None or not os.path.exists(keyfile):
                 raise ValueError("SSH_KEY '{}' doesn't exist".format(keyfile))
             self.ssh_key = keyfile
         else:
