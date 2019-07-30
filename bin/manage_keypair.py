@@ -53,7 +53,8 @@ if __name__ == '__main__':
     client = args.bosslet_config.session.client('ec2')
 
     #Define key pair path
-    key_file_path = Path.home() / '.ssh' / (args.keypairName + '.pem')
+    # DP NOTE: Path.home() is Python 3.5+ and the Auto Build Test uses Python 3.4
+    key_file_path = os.path.expanduser('~') / '.ssh' / (args.keypairName + '.pem')
 
     if args.action == 'create':
         try:
