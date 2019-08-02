@@ -68,7 +68,7 @@ def get_commit():
     result = subprocess.run(shlex.split(cmd), stdout=subprocess.PIPE)
     return result.stdout.decode("utf-8").strip()
 
-def execute(cmd, output_file):
+def execute(cmd, output_file, env={}):
     """Execuit the given command and redirect STDOUT and STDERR to output_file.
     Args:
         cmd (string) : Command to execute
@@ -76,7 +76,11 @@ def execute(cmd, output_file):
     Returns:
         (Popen) : Popen object representing the executing command
     """
-    return subprocess.Popen(shlex.split(cmd), stderr=subprocess.STDOUT, stdout=open(output_file, "w"))
+    print("{}\n{}".format(env, cmd))
+    return subprocess.Popen(shlex.split(cmd),
+                            stderr=subprocess.STDOUT,
+                            stdout=open(output_file, "w"),
+                            env = dict(os.environ, **env))
 
 def locate_ami(session):
     def contains(x, ys):
@@ -176,11 +180,10 @@ if __name__ == '__main__':
     else:
         bastion_config = ""
 
-    aws_creds = args.bosslet_config.session.get_credentials()
-    credentials_config = """-var 'aws_access_key={}'
-                            -var 'aws_secret_key={}'
-                         """.format(aws_creds.access_key,
-                                    aws_creds.secret_key)
+    env_vars = {}
+    aws_profile = args.bosslet_config.PROFILE
+    if aws_profile is not None:
+        env_vars['AWS_PROFILE'] = aws_profile
 
     packer_file = repo_path("packer", "vm.packer")
 
@@ -194,7 +197,7 @@ if __name__ == '__main__':
         ami = locate_ami(args.bosslet_config.session)
 
     cmd = """{packer} build
-             {bastion} {credentials}
+             {bastion}
              -var 'name={machine}' -var 'ami_version={ami_version}'
              -var 'ami_suffix={ami_suffix}' -var 'aws_region={region}'
              -var 'commit={commit}' -var 'force_deregister={deregister}'
@@ -203,7 +206,6 @@ if __name__ == '__main__':
     cmd_args = {
         "packer" : "packer",
         "bastion" : bastion_config,
-        "credentials" : credentials_config,
         "packer_file" : packer_file,
         "region": args.bosslet_config.REGION,
         "ami_suffix": args.bosslet_config.AMI_SUFFIX,
@@ -223,7 +225,7 @@ if __name__ == '__main__':
         cmd_args['ami'] = lambda_ami() if config == 'lambda' else ami
         cmd_args['user'] = 'ec2-user' if config == 'lambda' else 'ubuntu'
 
-        proc = execute(cmd.format(**cmd_args), log_file)
+        proc = execute(cmd.format(**cmd_args), log_file, env_vars)
 
         if args.single_thread:
             print("Waiting for build to finish")

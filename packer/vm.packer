@@ -1,18 +1,11 @@
 {
     "variables": {
-        "aws_access_key": "If the default value is null, then the user variable will be required",
-        "aws_access_key": "",
-        "aws_secret_key": "",
-
         "aws_region": "us-east-1",
 
         "aws_instance_type": "m4.large",
 
         "aws_source_ami": null,
         "aws_source_user": null,
-
-        "aws_force": "Overwrite an existing image",
-        "aws_force": "false",
 
         "aws_bastion_ip": "IP of the APL bastion server",
         "aws_bastion_ip": "",
@@ -39,14 +32,11 @@
 
     "builders": [{
         "type": "amazon-ebs",
-        "access_key": "{{user `aws_access_key`}}",
-        "secret_key": "{{user `aws_secret_key`}}",
         "ssh_username": "{{ user `aws_source_user`}}",
         "ami_name": "Using the 'ami_suffix' to make sure our names are unique in AWS",
         "ami_name": "{{user `name`}}{{user `ami_suffix`}}{{user `ami_version`}}",
         "ami_description": "AMI configured for running as a / the {{user `name`}} server",
         "source_ami": "{{user `aws_source_ami`}}",
-        "force_deregister": "{{user `aws_force`}}",
         "instance_type": "{{user `aws_instance_type`}}",
         "region": "{{user `aws_region`}}",
         "tags": {
