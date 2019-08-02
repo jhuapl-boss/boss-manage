@@ -28,6 +28,8 @@ for annotation (object) id indexing.  When building from scratch, it should
 be run after the CloudFormation cachedb config.
 """
 
+DEPENDENCIES = ['activities', 'cachedb']
+
 def STEP_FUNCTIONS(bosslet_config):
     names = bosslet_config.names
     return [
