@@ -76,7 +76,6 @@ def execute(cmd, output_file, env={}):
     Returns:
         (Popen) : Popen object representing the executing command
     """
-    print("{}\n{}".format(env, cmd))
     return subprocess.Popen(shlex.split(cmd),
                             stderr=subprocess.STDOUT,
                             stdout=open(output_file, "w"),
