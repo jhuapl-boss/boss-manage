@@ -237,7 +237,7 @@ class AWSNames(object):
         'index_fanout_id_writers': {'name': 'Index.FanoutIdWriters',
                                     'type': 'sfn'},
         'index_find_cuboids': {'name': 'indexFindCuboidsLambda',
-                               'type': 'lambda_'},
+                               'types': ['lambda_', 'sfn']},
         'index_get_num_cuboid_keys_msgs': {'name': 'indexGetNumCuboidKeysMsgsLambda',
                                            'type': 'lambda_'},
         'index_id_writer': {'name': 'Index.IdWriter',
