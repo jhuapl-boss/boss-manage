@@ -1403,10 +1403,135 @@ class CloudFormationConfiguration:
             }
         }
 
+    def add_app_loadbalancer(self, key, name, listeners, vpc_id=None, instances=None, subnets=None, security_groups=None,
+                         healthcheck_path="/ping/", public=True, internal_dns=False, depends_on=None ):
+        """
+        Add an Application LoadBalancer to the configuration
+
+        Args:
+            key (str) : Unique name for the resource in the template
+            name (str) : The name to give this elb
+            listeners (list) : A list of tuples for the elb
+                               (elb_port, instance_port, protocol [, ssl_cert_id])
+                                   elb_port (str) : The port for the elb to listening on
+                                   instance_port (str) : The port on the instance that the elb sends traffic to
+                                   protocol (str) : The protocol used, ex: HTTP, HTTPS
+                                   ssl_cert_id (Optional string) : The AWS ID of the SSL cert to use
+            vpc_id (None|str) : Required unless directing traffic to a lambda
+            instances (None|list) : A list of Instance IDs or Refs to attach to the LoadBalancer
+            subnets (None|list) : A list of Subnet IDs or Refsto attach the LoadBalancer to
+            security_groups (None|list) : A list of SecurityGroup IDs or Refs to apply to the LoadBalancer
+            healthcheck_path (str) : The path used for for health checks Ex: "/alive/"
+            public (bool) : If the ELB is public facing or internal
+            internal_dns (bool) : If the ELB should have an internal Router53 entry
+            depends_on (None|string|list): A unique name or list of unique names of resources within the
+                                           configuration and is used to determine the launch order of resources
+
+        Returns:
+            (list) : List of CloudFormation template keys of the target groups created.
+        """
+
+        target_group_keys = []
+
+        for ind, listener in enumerate(listeners):
+            target_group_key = "{}TargetGroup".format(key)
+            target_group_keys.append(target_group_key)
+
+            self.resources[target_group_key] = {
+                "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+                "Properties": {
+                    "HealthCheckEnabled": True,
+                    "HealthCheckPath": healthcheck_path,
+                    "HealthCheckIntervalSeconds": 30,
+                    "HealthCheckTimeoutSeconds": 5,
+                    "HealthyThresholdCount": 2,
+                    "UnhealthyThresholdCount": 5,
+                    "Protocol": "HTTP",
+                    "Port": listener[1],
+                    "TargetType": "instance"
+                }
+            }
+
+            if vpc_id is not None:
+                self.resources[target_group_key]["Properties"]["VpcId"] = vpc_id
+
+            listener_props = {
+                "LoadBalancerArn": Ref(key),
+                "Port": str(listener[0]),
+                "Protocol": listener[2],
+                "DefaultActions": [ {
+                    "Type": "forward",
+                    "TargetGroupArn": Ref(target_group_key)
+                } ]
+                #"InstancePort": str(listener[1]),
+                #"SslPolicy": 'probably dont need to specify',
+                #"PolicyNames": [key + "Policy"],
+            }
+
+            using_https = len(listener) == 4 and listener[3] is not None
+            if using_https:
+                listener_props["Certificates"] = [ { "CertificateArn": listener[3] } ]
+
+            listener_key = "{}Listener{}".format(key, ind)
+            self.resources[listener_key] = {
+                "Type": "AWS::ElasticLoadBalancingV2::Listener",
+                "Properties": listener_props
+            }
+
+            if using_https:
+                # Redirect all requests to port 443.
+                redirect_action = {
+                    "Type": "redirect",
+                    "RedirectConfig": {
+                        "Protocol": "HTTPS",
+                        "Port": "443",
+                        "Host": "#{host}",
+                        "Path": "/#{path}",
+                        "Query": "#{query}",
+                        "StatusCode": "HTTP_301"
+                    }
+                }
+                self.resources["{}Listener{}Redirect".format(key, ind)] = {
+                    "Type": "AWS::ElasticLoadBalancingV2::Listener",
+                    "Properties": {
+                        "LoadBalancerArn": Ref(key),
+                        "DefaultActions": [redirect_action],
+                        "Port": "80",
+                        "Protocol": "HTTP"
+                    }
+                }
+
+
+        self.resources[key] = {
+            "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+            "Properties": {
+                "Type": "application",
+                "Name": name.replace(".", "-"),  #elb names can't have periods in them
+                "Scheme": "internet-facing" if public else "internal",
+                "Tags": [
+                    {"Key": "Stack", "Value": Ref("AWS::StackName")}
+                ]
+            }
+        }
+
+        if security_groups is not None:
+            self.resources[key]["Properties"]["SecurityGroups"] = security_groups
+        if subnets is not None:
+            self.resources[key]["Properties"]["Subnets"] = subnets
+        if depends_on is not None:
+            self.resources[key]["DependsOn"] = depends_on
+
+        # Most ELB front ASGs that are generating their own DNS records
+        if internal_dns:
+            self._add_record_cname(key, name, elb = True)
+
+        return target_group_keys
+
+
     def add_loadbalancer(self, key, name, listeners, instances=None, subnets=None, security_groups=None,
                          healthcheck_target="HTTP:80/ping/", public=True, internal_dns=False, depends_on=None ):
         """
-        Add LoadBalancer to the configuration
+        Add a Classic LoadBalancer to the configuration
 
         Args:
             key (str) : Unique name for the resource in the template
@@ -1484,7 +1609,8 @@ class CloudFormationConfiguration:
 
     def add_autoscale_group(self, key, hostname, ami, keypair, subnets=[Ref("Subnet")], type_="t2.micro", public_ip=False,
                             security_groups=[], user_data=None, min=1, max=1, elb=None, notifications=None,
-                            role=None, health_check_grace_period=30, support_update=True, detailed_monitoring=False, depends_on=None):
+                            role=None, health_check_grace_period=30, support_update=True, detailed_monitoring=False,
+                            target_group_arns=None, depends_on=None):
         """Add an AutoScalingGroup to the configuration
 
         Args:
@@ -1495,16 +1621,17 @@ class CloudFormationConfiguration:
             type_ (str) : The instance type to create
             public_ip (bool) : Should the instances gets public IP addresses
             security_groups (list) : A list of SecurityGroup IDs or Refs to apply to the instances
-            user_data (None|string) : A string of user-data to give to the instance when launching
-            min (int|string) : The minimimum number of instances in the AutoScalingGroup
-            max (int|string) : The maximum number of instances in the AutoScalingGroup
-            elb (None|string) : The LoadBalancer ID or Ref to attach the AutoScalingGroup to
-            notifications (None|List|string) : list or single topic ARN or Ref to send ASG notifications to
-            role (None|string) : Role name to use when creating instances
+            user_data (None|str) : A string of user-data to give to the instance when launching
+            min (int|str) : The minimimum number of instances in the AutoScalingGroup
+            max (int|str) : The maximum number of instances in the AutoScalingGroup
+            elb (None|str) : The LoadBalancer ID or Ref to attach the AutoScalingGroup to
+            notifications (None|List|str) : list or single topic ARN or Ref to send ASG notifications to
+            role (None|str) : Role name to use when creating instances
             health_check_grace_period (int) : grace period in seconds to wait before checking newly created instances.
             support_update (bool) : If the ASG should include RollingUpdate UpdatePolicy
             detailed_monitoring (bool) : Enable detailed monitoring of the instances. False means 5 minute statistics.
-            depends_on (None|string|list): A unique name or list of unique names of resources within the
+            target_group_arns (None|str|list): Place instances in the given target group(s) (used with app load balancers).
+            depends_on (None|str|list): A unique name or list of unique names of resources within the
                                            configuration and is used to determine the launch order of resources
         """
 
@@ -1559,6 +1686,9 @@ class CloudFormationConfiguration:
                     "TopicARN" : topic
                 } for topic in notifications
             ]
+
+        if target_group_arns is not None:
+            self.resources[key]["Properties"]["TargetGroupARNs"] = target_group_arns
 
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
