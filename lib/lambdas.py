@@ -24,6 +24,7 @@ import tempfile
 import subprocess
 import shlex
 import shutil
+import pwd
 
 # Location of settings files for ndingest.
 NDINGEST_SETTINGS_FOLDER = const.repo_path('salt_stack', 'salt', 'ndingest', 'files', 'ndingest.git', 'settings')
@@ -137,6 +138,10 @@ def load_lambdas_on_s3(bosslet_config):
         full_target_file = '/home/ec2-user/' + target_file
         shutil.copy(zipname, full_target_file)
         os.remove(zipname)
+
+        cur_user = pwd.getpwuid(os.getuid()).pw_name
+        if cur_user != 'ec2-user':
+            build_cmd = 'su -m ec2-user -c "{}"'.format(build_cmd)
 
         try:
             print("calling makedomainenv on localhost")
