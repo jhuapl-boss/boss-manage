@@ -34,6 +34,8 @@ LAMBDA_SERVER_KEY = None
 ACCOUNT_ID = 256215146792
 PROFILE = None # Use EC2 credentials
 
+ALERT_TOPIC = 'ProductionMicronsMailingList'
+
 OUTBOUND_BASTION = False
 
 # Get the local IP of the EC2 instance, so that the machine can
