@@ -218,8 +218,8 @@ def create_config(bosslet_config):
                               [("tcp", "22", "22", incoming_subnet)])
 
     incoming_subnet = bosslet_config.HTTPS_INBOUND
-    boss_subnet = {"Fn:Join": ["/", [Ref("NATIP"), "32"]]} # Allow requests from the endpoint via the NAT gateway
-                                                           # Needed in case HTTPS_INBOUND doesn't include the gateway's IP
+    boss_subnet = {"Fn::Join": ["/", [Ref("NATIP"), "32"]]} # Allow requests from the endpoint via the NAT gateway
+                                                            # Needed in case HTTPS_INBOUND doesn't include the gateway's IP
     config.add_security_group("AuthSecurityGroup",
                               #names.https.sg, DP XXX: hack until we can get production updated correctly
                               names.auth.sg,
