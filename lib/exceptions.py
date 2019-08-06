@@ -21,7 +21,7 @@ class BossManageCanceled(BossManageError):
 
 class MissingResourceError(BossManageError):
     def __init__(self, resource_type, resource_name):
-        msg = "{} {} resource does not exist yet".format(resource)
+        msg = "{} {} does not exist yet".format(resource_type, resource_name)
         super().__init__(msg)
 
 class DependencyError(BossManageError):
