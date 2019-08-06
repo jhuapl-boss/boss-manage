@@ -222,7 +222,7 @@ def create_config(bosslet_config):
                               #names.https.sg, DP XXX: hack until we can get production updated correctly
                               names.auth.sg,
                               [("tcp", "443", "443", incoming_subnet), # Allow external requests
-                               ("tcp", "443", "443", Ref("NAT")])      # Allow requests from the endpoint and other
+                               ("tcp", "443", "443", Ref("NAT"))])      # Allow requests from the endpoint and other
                                                                        # services contained within the VPC
 
     # Create the internal route table to route traffic to the NAT Bastion
