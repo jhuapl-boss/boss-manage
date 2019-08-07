@@ -74,7 +74,7 @@ def create_config(bosslet_config):
 
     # Lambda input data
     json_str = json.dumps({
-        'hostname': names.vault,
+        'hostname': names.vault.dns,
     })
 
     config.add_cloudwatch_rule('VaultCheck',
