@@ -22,6 +22,7 @@ Author:
 import os
 import time
 import json
+from collections import namedtuple
 from botocore.exceptions import ClientError
 
 from . import hosts
@@ -31,6 +32,19 @@ from . import console
 from . import constants as const
 from .migrations import MigrationManager
 from .exceptions import BossManageError, BossManageCanceled
+
+"""
+Input for CloudFormationConfiguration.add_app_loadbalancer().
+
+Defines configuration for a listener.
+
+Fields:
+    in_port (str): Port to listen on.
+    to_port (str): Port to send traffic to.
+    protocol (str): HTTP or HTTPS.
+    cert (None|str): ARN of SSL certificate.
+"""
+AppLoadBalancerListenerCfg = namedtuple('AppLoadBalancerListenerCfg', ['in_port', 'to_port', 'protocol', 'cert'])
 
 def bool_str(val):
     """CloudFormation Template formatted boolean string.
@@ -1411,12 +1425,7 @@ class CloudFormationConfiguration:
         Args:
             key (str) : Unique name for the resource in the template
             name (str) : The name to give this elb
-            listeners (list) : A list of tuples for the elb
-                               (elb_port, instance_port, protocol [, ssl_cert_id])
-                                   elb_port (str) : The port for the elb to listening on
-                                   instance_port (str) : The port on the instance that the elb sends traffic to
-                                   protocol (str) : The protocol used, ex: HTTP, HTTPS
-                                   ssl_cert_id (Optional string) : The AWS ID of the SSL cert to use
+            listeners (list) : A list of AppLoadBalancerListenerCfg for the elb
             vpc_id (None|str) : Required unless directing traffic to a lambda
             instances (None|list) : A list of Instance IDs or Refs to attach to the LoadBalancer
             subnets (None|list) : A list of Subnet IDs or Refsto attach the LoadBalancer to
@@ -1447,7 +1456,7 @@ class CloudFormationConfiguration:
                     "HealthyThresholdCount": 2,
                     "UnhealthyThresholdCount": 5,
                     "Protocol": "HTTP",
-                    "Port": listener[1],
+                    "Port": listener.to_port,
                     "TargetType": "instance"
                 }
             }
@@ -1457,20 +1466,17 @@ class CloudFormationConfiguration:
 
             listener_props = {
                 "LoadBalancerArn": Ref(key),
-                "Port": str(listener[0]),
-                "Protocol": listener[2],
+                "Port": str(listener.in_port),
+                "Protocol": listener.protocol,
                 "DefaultActions": [ {
                     "Type": "forward",
                     "TargetGroupArn": Ref(target_group_key)
                 } ]
-                #"InstancePort": str(listener[1]),
-                #"SslPolicy": 'probably dont need to specify',
-                #"PolicyNames": [key + "Policy"],
             }
 
-            using_https = len(listener) == 4 and listener[3] is not None
+            using_https = listener.cert is not None
             if using_https:
-                listener_props["Certificates"] = [ { "CertificateArn": listener[3] } ]
+                listener_props["Certificates"] = [ { "CertificateArn": listener.cert } ]
 
             listener_key = "{}Listener{}".format(key, ind)
             self.resources[listener_key] = {
