@@ -196,8 +196,9 @@ def build_node(bosslet_config):
     args = ('npm', 'run', 'build')
     # Use env vars to pass credentials / region instead of as arguments to build call
     env = os.environ.copy()
-    env['AWS_PROFILE'] = bosslet_config.PROFILE
     env['AWS_REGION'] = bosslet_config.REGION
+    if bosslet_config.PROFILE is not None:
+        env['AWS_PROFILE'] = bosslet_config.PROFILE
     popen = subprocess.Popen(args, cwd=LAMBDA_ROOT_FOLDER, env=env, stdout=subprocess.PIPE)
     exit_code = popen.wait()
     output = popen.stdout.read()
