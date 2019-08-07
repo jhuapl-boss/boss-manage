@@ -129,7 +129,7 @@ def load_lambdas_on_s3(bosslet_config):
     #copy the zip file to lambda_build_server and run makedomainenv
     lambda_bucket = bosslet_config.LAMBDA_BUCKET
 
-    build_cmd = 'source /etc/profile && source ~/.bash_profile && /home/ec2-user/makedomainenv {} {}'.format(domain, lambda_bucket)
+    build_cmd = 'source /etc/profile && source ~/.bash_profile && ~/makedomainenv {} {}'.format(domain, lambda_bucket)
     target_file = "sitezips/{}.zip".format(domain)
 
     lambda_build_server = bosslet_config.LAMBDA_SERVER
@@ -141,7 +141,9 @@ def load_lambdas_on_s3(bosslet_config):
 
         cur_user = pwd.getpwuid(os.getuid()).pw_name
         if cur_user != 'ec2-user':
-            build_cmd = 'su -m ec2-user -c "{}"'.format(build_cmd)
+            # Correctly set the $HOME directory so the makedomainenv script works correctly
+            build_cmd = build_cmd.replace('~', '/home/ec2-user')
+            build_cmd = 'HOME=/home/ec2-user su -m ec2-user -c "{}"'.format(build_cmd)
 
         try:
             print("calling makedomainenv on localhost")
