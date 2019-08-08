@@ -182,13 +182,11 @@ def create_config(bosslet_config, db_config={}):
                                user_data=parsed_user_data,
                                min=const.ENDPOINT_CLUSTER_MIN,
                                max=const.ENDPOINT_CLUSTER_MAX,
-                               #elb=Ref("EndpointLoadBalancer"),
                                notifications=dns_arn,
                                role=aws.instance_profile_arn_lookup(session, 'endpoint'),
                                health_check_grace_period=90,
                                detailed_monitoring=True,
                                target_group_arns=target_group_arns,
-                               #depends_on=["EndpointLoadBalancer", "EndpointDB"])
                                depends_on=["EndpointDB"])
 
     # Endpoint servers are not CPU bound typically, so react quickly to load

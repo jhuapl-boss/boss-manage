@@ -1428,7 +1428,7 @@ class CloudFormationConfiguration:
             listeners (list) : A list of AppLoadBalancerListenerCfg for the elb
             vpc_id (None|str) : Required unless directing traffic to a lambda
             instances (None|list) : A list of Instance IDs or Refs to attach to the LoadBalancer
-            subnets (None|list) : A list of Subnet IDs or Refsto attach the LoadBalancer to
+            subnets (None|list) : A list of Subnet IDs or Refs to attach the LoadBalancer to
             security_groups (None|list) : A list of SecurityGroup IDs or Refs to apply to the LoadBalancer
             healthcheck_path (str) : The path used for for health checks Ex: "/alive/"
             public (bool) : If the ELB is public facing or internal
