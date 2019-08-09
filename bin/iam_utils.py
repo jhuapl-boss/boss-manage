@@ -57,9 +57,10 @@ class IamUtils:
         self.session = session
         self.iam_details = None
         self.iw = iw(session.client("iam"))
-        self.policy_keyword_filters = ["-client-policy-"]  # Any keywords in the policy name should be skipped.
+        self.policy_keyword_filters = ["-client-policy-", "AWSLambdaTracerAccessExecutionRole-"]  # Any keywords in the policy name should be skipped.
         self.policy_whole_filters = ["gion-test-policy", "aplAllowAssumeRoleInProduction",
-                                     "aplDenyAssumeRoleInProduction", "aplSpeedTestPolicy", "drenkng1-agents-rw-policy"]
+                                     "aplDenyAssumeRoleInProduction", "aplSpeedTestPolicy", "drenkng1-agents-rw-policy",
+                                     "EKS-Full-Access", "apl-PassRole"]
         self.role_keyword_filters = ["cowlehp1"]
         self.role_whole_filters = ["drenkng1-agents-rw-policy", "alexaSkillsRole", "ecrReadOnlyRole", "ecsInstanceRole",
                                    "meshparty-dev-ZappaLambdaExecutionRole", "meshparty-jordan-jdev-ZappaLambdaExecutionRole",
@@ -461,9 +462,9 @@ class IamUtils:
         self.save_groups(DEFAULT_GROUP_FILE)
 
     def change_account_memory(self):
-        self.policies = iam.to_sessions_account(self.policies)
-        self.roles = iam.to_sessions_account(self.roles)
-        self.groups = iam.to_sessions_account(self.groups)
+        self.policies = self.to_sessions_account(self.policies)
+        self.roles = self.to_sessions_account(self.roles)
+        self.groups = self.to_sessions_account(self.groups)
 
     def load_from_files(self):
         self.load_policies_from_file(DEFAULT_POLICY_FILE)

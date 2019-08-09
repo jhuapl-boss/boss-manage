@@ -6,6 +6,67 @@
           "Action": "sts:AssumeRole",
           "Effect": "Allow",
           "Principal": {
+            "AWS": "arn:aws:iam::256215146792:root"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [],
+    "InstanceProfileList": [],
+    "Path": "/",
+    "RoleName": "DeveloperAccess",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "ecs.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/aws-service-role/AmazonECSServiceRolePolicy"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/aws-service-role/ecs.amazonaws.com/",
+    "RoleName": "AWSServiceRoleForECS",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "events.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/aws-service-role/CloudWatchEventsServiceRolePolicy"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/aws-service-role/events.amazonaws.com/",
+    "RoleName": "AWSServiceRoleForCloudWatchEvents",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
             "Service": "ec2.amazonaws.com"
           }
         }
@@ -13,20 +74,19 @@
       "Version": "2012-10-17"
     },
     "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/service-role/AWSQuickSightListIAM",
-      "arn:aws:iam::451493790433:policy/aplDeleteCuboid",
-      "arn:aws:iam::451493790433:policy/aplResolutionHierarchy",
-      "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess",
-      "arn:aws:iam::451493790433:policy/aplPopulateUploadQueue"
+      "arn:aws:iam::aws:policy/IAMFullAccess",
+      "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
+      "arn:aws:iam::451493790433:policy/aplVaultAttachUserPolicy",
+      "arn:aws:iam::451493790433:policy/aplVaultPolicy"
     ],
     "InstanceProfileList": [
       {
-        "InstanceProfileName": "activities",
+        "InstanceProfileName": "apl-vault",
         "Path": "/"
       }
     ],
     "Path": "/",
-    "RoleName": "activities",
+    "RoleName": "apl-vault",
     "RolePolicyList": []
   },
   {
@@ -455,16 +515,27 @@
           "Action": "sts:AssumeRole",
           "Effect": "Allow",
           "Principal": {
-            "AWS": "arn:aws:iam::256215146792:root"
+            "Service": "ec2.amazonaws.com"
           }
         }
       ],
       "Version": "2012-10-17"
     },
-    "AttachedManagedPolicies": [],
-    "InstanceProfileList": [],
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/service-role/AWSQuickSightListIAM",
+      "arn:aws:iam::451493790433:policy/aplDeleteCuboid",
+      "arn:aws:iam::451493790433:policy/aplResolutionHierarchy",
+      "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess",
+      "arn:aws:iam::451493790433:policy/aplPopulateUploadQueue"
+    ],
+    "InstanceProfileList": [
+      {
+        "InstanceProfileName": "activities",
+        "Path": "/"
+      }
+    ],
     "Path": "/",
-    "RoleName": "DeveloperAccess",
+    "RoleName": "activities",
     "RolePolicyList": []
   },
   {

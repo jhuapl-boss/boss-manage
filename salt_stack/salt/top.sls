@@ -81,3 +81,11 @@ base:
 
         # NTP
         - chrony
+
+    'backup*':
+        - sun-java
+        - sun-java.env
+        - unzip
+        - users.ec2-user
+        - backup
+

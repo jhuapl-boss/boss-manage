@@ -34,6 +34,7 @@ from lib import scalyr
 from lib import constants as const
 
 import os
+import sys
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -74,7 +75,6 @@ def create_config(session, domain):
 
     global keypair
     keypair = aws.keypair_lookup(session)
-
     config.add_vpc()
 
     # Create the internal and external subnets
@@ -103,6 +103,7 @@ def create_config(session, domain):
                                aws.ami_lookup(session, "consul.boss"),
                                keypair,
                                subnets = internal_subnets_lambda,
+                               type_ = const.CONSUL_TYPE,
                                security_groups = [Ref("InternalSecurityGroup")],
                                user_data = str(user_data),
                                min = const.CONSUL_CLUSTER_SIZE,
@@ -120,11 +121,13 @@ def create_config(session, domain):
                                aws.ami_lookup(session, "vault.boss"),
                                keypair,
                                subnets = internal_subnets_lambda,
+                               type_ = const.VAULT_TYPE,
                                security_groups = [Ref("InternalSecurityGroup")],
                                user_data = str(user_data),
                                min = const.VAULT_CLUSTER_SIZE,
                                max = const.VAULT_CLUSTER_SIZE,
                                notifications = Ref("DNSSNS"),
+                               role = aws.instance_profile_arn_lookup(session, 'apl-vault'),
                                depends_on = ["Consul", "DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
 
@@ -306,6 +309,17 @@ def post_init(session, domain, startup_wait=False):
             print("Updating {}".format(const.VAULT_KEYCLOAK))
             vault.update(const.VAULT_KEYCLOAK, password = password, username = username, client_id = "admin-cli", realm = "master")
 
+        if not vault.read(const.VAULT_KEYCLOAK_DB):
+            print("Writing {}".format(const.VAULT_KEYCLOAK_DB))
+            # Values are hardcodded both here and in the add_rds
+            # as the values are also hardcodded in the Keycloak config
+            #
+            # These values are for use by the backup / restore process
+            vault.write(const.VAULT_KEYCLOAK_DB,
+                        name = "keycloak",
+                        user = "keycloak",
+                        password = "keycloak")
+
         if not vault.read(const.VAULT_ENDPOINT_AUTH):
             # DP TODO: Move this update call into the api config
             print("Updating {}".format(const.VAULT_ENDPOINT_AUTH))
@@ -417,9 +431,10 @@ def update(session, domain):
 
 def delete(session, domain):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
-    names = AWSNames(domain)
-    aws.route53_delete_records(session, domain, names.auth)
-    aws.route53_delete_records(session, domain, names.consul)
-    aws.route53_delete_records(session, domain, names.vault)
-    aws.sns_unsubscribe_all(session, names.dns)
-    CloudFormationConfiguration('core', domain).delete(session)
+    if utils.get_user_confirm("All data will be lost. Are you sure you want to proceed?"):
+        names = AWSNames(domain)
+        aws.route53_delete_records(session, domain, names.auth)
+        aws.route53_delete_records(session, domain, names.consul)
+        aws.route53_delete_records(session, domain, names.vault)
+        aws.sns_unsubscribe_all(session, names.dns)
+        CloudFormationConfiguration('core', domain).delete(session)

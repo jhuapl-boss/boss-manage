@@ -18,7 +18,7 @@ python35:
   cmd.run:
     - name: |
         cd /tmp
-        JUSTVERSION="3.5.1"
+        JUSTVERSION="3.5.7"
         VERSION="Python-"$JUSTVERSION
         curl -O https://www.python.org/ftp/python/$JUSTVERSION/$VERSION.tgz
         tar -zxvf $VERSION.tgz > /dev/null

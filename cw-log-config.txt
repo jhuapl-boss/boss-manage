@@ -1,0 +1,10 @@
+
+
+
+
+/var/log/cloud-init-output.log
+1
+1
+1
+1
+N

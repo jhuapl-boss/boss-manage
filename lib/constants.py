@@ -19,7 +19,7 @@ from .cloudformation import get_scenario
 # Region api is created in.  Later versions of boto3 should allow us to
 # extract this from the session variable.  Hard coding for now.
 REGION = 'us-east-1'
-INCOMING_SUBNET = "52.3.13.189/32"  # microns-bastion elastic IP
+INCOMING_SUBNET = os.environ.get('_BASTION_ALLOW_IP', '52.3.13.189') + '/32'  # microns-bastion elastic IP
 
 PRODUCTION_MAILING_LIST = "ProductionMicronsMailingList"
 PRODUCTION_BILLING_TOPIC = "ProductionBillingList"
@@ -73,6 +73,10 @@ DYNAMO_ID_INDEX_SCHEMA = SALT_DIR + '/spdb/files/spdb.git/spatialdb/dynamo/id_in
 # Annotation id count table (allows for reserving the next id in a channel).
 DYNAMO_ID_COUNT_SCHEMA = SALT_DIR + '/spdb/files/spdb.git/spatialdb/dynamo/id_count_schema.json'
 
+# Threshold when a new chunk should be added to the partition key of the id
+# index.  If the consumed write capacity is >= this number, write new
+# morton ids to a new key.
+DYNAMO_ID_INDEX_NEW_CHUNK_THRESHOLD = 100
 
 ########################
 # Other Salt Files
@@ -84,6 +88,7 @@ KEYCLOAK_REALM = SALT_DIR + '/keycloak/files/BOSS.realm'
 VAULT_AUTH = "secret/auth"
 VAULT_REALM = "secret/auth/realm"
 VAULT_KEYCLOAK = "secret/keycloak"
+VAULT_KEYCLOAK_DB = "secret/keycloak/db"
 VAULT_ENDPOINT = "secret/endpoint/django"
 VAULT_ENDPOINT_DB = "secret/endpoint/django/db"
 VAULT_ENDPOINT_AUTH = "secret/endpoint/auth"
@@ -137,6 +142,18 @@ CACHE_MANAGER_TYPE = {
     "ha-development": "t2.micro",
 }
 
+CONSUL_TYPE = {
+    "development": "t3.micro",
+    "production": "m5.large",
+    "ha-development": "t3.large",
+}
+
+VAULT_TYPE = {
+    "development": "t3.micro",
+    "production": "m5.large",
+    "ha-development": "t3.large",
+}
+
 ACTIVITIES_TYPE = {
     "development": "m5.large",
     "production": "m5.xlarge",
@@ -145,27 +162,27 @@ ACTIVITIES_TYPE = {
 
 AUTH_TYPE = {
     "development": "t2.micro",
-    "production": "m5.xlarge",
+    "production": "m5.2xlarge",
     "ha-development": "t2.micro",
 }
 
 ########################
 # Machine Cluster Sizes
 AUTH_CLUSTER_SIZE = { # Auth Server Cluster is a fixed size
-    "development" : 1,
+    "development": 1,
     "production": 1, # should be an odd number
     "ha-development": 1,  # should be an odd number
 }
 
 CONSUL_CLUSTER_SIZE = { # Consul Cluster is a fixed size
-    "development" : 1,
+    "development": 1,
     "production": 5, # can tolerate 2 failures
     "ha-development": 3,  # can tolerate 1 failures
 }
 
 VAULT_CLUSTER_SIZE = { # Vault Cluster is a fixed size
-    "development" : 1,
-    "production": 3, # should be an odd number
+    "development": 1,
+    "production": 2,
     "ha-development": 1,  # should be an odd number
 }
 

@@ -3,10 +3,12 @@
 This should be done in sync with production updates that change the API. 
 
 ## Update Version
-First you must be sure that the version has been updated. This needs to be done in two places
+First you must be sure that the version has been updated.
 
-1. setup.py - change line 11 `__version__ = 'X.X.X'` to the appropriate version
-2. intern/\_\_init__.py - change line 5 `version = "X.X.X"` to the appropriate version
+
+intern/\_\_init__.py - change the line `version = "X.X.X"` to the appropriate version
+
+Update the CHANGELOG.md to reflect the new features / bug fixes.
  
 
 ## Generate Docs
@@ -18,11 +20,15 @@ pip install -r docs_requirements.txt
 
 Then generate the docs using the script `gendocs`.  It's safe to delete the `docs/` directory before running the script as they are completely re-created:
 
+If you don't already have a PYTHONPATH remove the : from the line in the box:
+
 ```
 export PYTHONPATH=$PYTHONPATH:~/intern
+mv docs docs-old
 pdoc intern --html --html-dir="docs" --overwrite --docstring-style=google
 mv ./docs/intern/* ./docs/
 rm -rf ./docs/intern
+rm -rf docs-old
 ```
 
 Once pushed to master, the website will automatically be updated.
@@ -40,4 +46,3 @@ python setup.py bdist_wheel
 twine upload dist/*
 ```
 
-Contact @dkleissa for the username and password for the pypi account that is required to publish the updated package.
