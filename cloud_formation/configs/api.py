@@ -31,7 +31,7 @@ MIGRATION CHANGELOG:
 DEPENDENCIES = ['core', 'redis'] # also depends on activities for step functions
                                  # but this forms a circular dependency
 
-from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, Arn, AppLoadBalancerListenerCfg
+from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, Arn
 from lib.userdata import UserData
 from lib.keycloak import KeyCloakClient
 from lib.exceptions import BossManageCanceled, MissingResourceError
@@ -160,9 +160,17 @@ def create_config(bosslet_config, db_config={}):
     # Create the endpoint ASG, ELB, and RDS instance
 
     cert = aws.cert_arn_lookup(session, names.public_dns("api"))
+    """
+    config.add_loadbalancer("EndpointLoadBalancer",
+                            names.endpoint_elb.dns,
+                            [("443", "80", "HTTPS", cert)],
+                            subnets=external_subnets_asg,
+                            security_groups=[sgs[names.internal.sg], sgs[names.https.sg]],
+                            public=True)
+    """
     target_group_keys = config.add_app_loadbalancer("EndpointAppLoadBalancer",
                             names.endpoint_elb.dns,
-                            [AppLoadBalancerListenerCfg("443", "80", "HTTPS", cert)],
+                            [("443", "80", "HTTPS", cert)],
                             vpc_id=vpc_id,
                             subnets=external_subnets_asg,
                             security_groups=[sgs[names.internal.sg], sgs[names.https.sg]],
@@ -171,7 +179,6 @@ def create_config(bosslet_config, db_config={}):
     target_group_arns = [Ref(key) for key in target_group_keys]
 
     config.add_public_dns('EndpointAppLoadBalancer', names.public_dns('api'))
-
     config.add_autoscale_group("Endpoint",
                                names.endpoint.dns,
                                aws.ami_lookup(bosslet_config, names.endpoint.ami),
