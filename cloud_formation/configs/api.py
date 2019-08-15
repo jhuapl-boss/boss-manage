@@ -39,11 +39,9 @@ from lib import aws
 from lib import console
 from lib import utils
 from lib import constants as const
-from lib import console
 
 import json
 import uuid
-import sys
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 
@@ -160,14 +158,6 @@ def create_config(bosslet_config, db_config={}):
     # Create the endpoint ASG, ELB, and RDS instance
 
     cert = aws.cert_arn_lookup(session, names.public_dns("api"))
-    """
-    config.add_loadbalancer("EndpointLoadBalancer",
-                            names.endpoint_elb.dns,
-                            [("443", "80", "HTTPS", cert)],
-                            subnets=external_subnets_asg,
-                            security_groups=[sgs[names.internal.sg], sgs[names.https.sg]],
-                            public=True)
-    """
     target_group_keys = config.add_app_loadbalancer("EndpointAppLoadBalancer",
                             names.endpoint_elb.dns,
                             [("443", "80", "HTTPS", cert)],
@@ -314,7 +304,6 @@ def create(bosslet_config):
     post_init(bosslet_config)
 
 def post_init(bosslet_config):
-    session = bosslet_config.session
     call = bosslet_config.call
     names = bosslet_config.names
 
