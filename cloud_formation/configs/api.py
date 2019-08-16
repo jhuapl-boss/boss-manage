@@ -39,11 +39,9 @@ from lib import aws
 from lib import console
 from lib import utils
 from lib import constants as const
-from lib import console
 
 import json
 import uuid
-import sys
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 
@@ -124,8 +122,11 @@ def create_config(bosslet_config, db_config={}):
     sgs = aws.sg_lookup_all(session, vpc_id)
 
     # DP XXX: hack until we can get productio updated correctly
-    config.add_security_group('AllHTTPSSecurityGroup', names.https.sg, [('tcp', '443', '443', bosslet_config.HTTPS_INBOUND)])
-    sgs[names.https.sg] = Ref('AllHTTPSSecurityGroup')
+    config.add_security_group('AllHttpHttpsSecurityGroup', names.https.sg, [
+        ('tcp', '443', '443', bosslet_config.HTTPS_INBOUND),
+        ('tcp', '80', '80', bosslet_config.HTTPS_INBOUND)
+    ])
+    sgs[names.https.sg] = Ref('AllHttpHttpsSecurityGroup')
 
 
     # Create SQS queues and apply access control policies.
@@ -155,6 +156,19 @@ def create_config(bosslet_config, db_config={}):
                           cachemanager_role_arn)
 
     # Create the endpoint ASG, ELB, and RDS instance
+
+    cert = aws.cert_arn_lookup(session, names.public_dns("api"))
+    target_group_keys = config.add_app_loadbalancer("EndpointAppLoadBalancer",
+                            names.endpoint_elb.dns,
+                            [("443", "80", "HTTPS", cert)],
+                            vpc_id=vpc_id,
+                            subnets=external_subnets_asg,
+                            security_groups=[sgs[names.internal.sg], sgs[names.https.sg]],
+                            public=True)
+
+    target_group_arns = [Ref(key) for key in target_group_keys]
+
+    config.add_public_dns('EndpointAppLoadBalancer', names.public_dns('api'))
     config.add_autoscale_group("Endpoint",
                                names.endpoint.dns,
                                aws.ami_lookup(bosslet_config, names.endpoint.ami),
@@ -165,21 +179,12 @@ def create_config(bosslet_config, db_config={}):
                                user_data=parsed_user_data,
                                min=const.ENDPOINT_CLUSTER_MIN,
                                max=const.ENDPOINT_CLUSTER_MAX,
-                               elb=Ref("EndpointLoadBalancer"),
                                notifications=dns_arn,
                                role=aws.instance_profile_arn_lookup(session, 'endpoint'),
                                health_check_grace_period=90,
                                detailed_monitoring=True,
-                               depends_on=["EndpointLoadBalancer", "EndpointDB"])
-
-    cert = aws.cert_arn_lookup(session, names.public_dns("api"))
-    config.add_loadbalancer("EndpointLoadBalancer",
-                            names.endpoint_elb.dns,
-                            [("443", "80", "HTTPS", cert)],
-                            subnets=external_subnets_asg,
-                            security_groups=[sgs[names.internal.sg], sgs[names.https.sg]],
-                            public=True)
-    config.add_public_dns('EndpointLoadBalancer', names.public_dns('api'))
+                               target_group_arns=target_group_arns,
+                               depends_on=["EndpointDB"])
 
     # Endpoint servers are not CPU bound typically, so react quickly to load
     config.add_autoscale_policy("EndpointScaleUp",
@@ -299,7 +304,6 @@ def create(bosslet_config):
     post_init(bosslet_config)
 
 def post_init(bosslet_config):
-    session = bosslet_config.session
     call = bosslet_config.call
     names = bosslet_config.names
 
