@@ -78,11 +78,26 @@ if [ $RET -eq 0 ]; then
 else
     yes | yum install jq
     yes | yum install git
+    yes | yum install nodejs npm --enablerepo=epel
+
+    # There seems to be an issue using the HTTPS version of the registry
+    # and verifying the SSL certificate
+    npm config set registry http://registry.npmjs.org/
+
+    # The cracklib package has a symlink packer -> cracklib-packer
+    # that will interfer with our use of Hashicorp's packer for building AMIs
+    if [ -e /usr/sbin/packer ]; then
+        rm /usr/sbin/packer
+    fi
 
     cd /home/ec2-user
 
     # Current Lambda AMI contains Python 3.6 by default
     PYTHON=python3.6
+
+    # PyMinifier is installed in /usr/local/bin, which is not part of
+    # the PATH for the root user
+    export PATH=${PATH}:/usr/local/bin
 fi
 
 # Download Packer
@@ -131,7 +146,7 @@ wait
 echo " "
 echo "----------------------Building AMIs----------------------"
 echo " "
-$PYTHON ./packer.py auto-build-test.boss all --ami-version autotest --force
+$PYTHON ./packer.py auto-build-test.boss core redis api activities cloudwatch --ami-version autotest --force
 wait
 
 echo " "
@@ -156,11 +171,11 @@ echo 'Performing tests...'
 $PYTHON ./bastion.py endpoint.auto-build-test.boss ssh-cmd "cd /srv/www/django && python3 manage.py test"# python3 manage.py test -- -c inttest.cfg
 
 #ndingest library
-$PYTHON ./bastion.py endpoint.auto-build-test.boss ssh-cmd "python3 -m pip install pytest"
+$PYTHON ./bastion.py endpoint.auto-build-test.boss ssh-cmd "sudo python3 -m pip install pytest"
 $PYTHON ./bastion.py endpoint.auto-build-test.boss ssh-cmd "cd /usr/local/lib/python3/site-packages/ndingest && export NDINGEST_TEST=1 && pytest -c test_apl.cfg"
 
 #cachemanage VM
-$PYTHON ./bastion.py cachemanager.auto-build-test.boss ssh-cmd "cd /srv/salt/boss-tools/files/boss-tools.git/cachemgr && sudo nose2 && sudo nose2 -c inttest.cfg"
+$PYTHON ./bastion.py cache_manager.auto-build-test.boss ssh-cmd "cd /srv/salt/boss-tools/files/boss-tools.git/cachemgr && sudo nose2 && sudo nose2 -c inttest.cfg"
 
 echo " "
 echo "----------------------Delete Stacks----------------------"
@@ -173,7 +188,7 @@ wait
 # echo "----------------------Cleanup environment----------------------"
 # echo " "
 
-Delete keypairs from aws
+# Delete keypairs from aws
 $PYTHON ./manage_keypair.py auto-build-test.boss delete auto-build-keypair
 Shutdown the instance an hour after script executes.
 shutdown -h +3600"""
