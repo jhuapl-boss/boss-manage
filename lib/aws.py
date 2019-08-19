@@ -678,12 +678,22 @@ def lb_lookup(session, lb_name):
 
     lb_name = lb_name.replace('.', '-')
 
+    ###
+    # ELB
     client = session.client('elb')
     response = client.describe_load_balancers()
-
     for i in range(len(response['LoadBalancerDescriptions'])):
         if (response['LoadBalancerDescriptions'][i]['LoadBalancerName']) == lb_name:
             return True
+
+    ###
+    # ELB v2
+    client = session.client('elbv2')
+    response = client.describe_load_balancers()
+    for i in range(len(response['LoadBalancers'])):
+        if (response['LoadBalancers'][i]['LoadBalancerName']) == lb_name:
+            return True
+
     return False
 
 
