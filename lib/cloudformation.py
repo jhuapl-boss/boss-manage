@@ -2405,3 +2405,15 @@ class CloudFormationConfiguration:
 
         if depends_on is not None:
             self.resources[key]['DependsOn'] = depends_on
+
+    def add_custom_resource(self, key, name, token, depends_on=None, **properties):
+        self.resources[key] = {
+            "Type": "Custom::{}".format(name),
+            "Properties": {
+                "ServiceToken": token,
+                **properties
+            }
+        }
+
+        if depends_on is not None:
+            self.resources[key]['DependsOn'] = depends_on

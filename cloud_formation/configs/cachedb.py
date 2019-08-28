@@ -175,6 +175,13 @@ def create_config(bosslet_config, user_data=None):
                                            internal_route_table_id,
                                            lambda_subnet)
 
+    # Create a custom resource to help delete ENIs from lambdas
+    # DP NOTE: After deleting a lambda the ENIs may stick around for while, causing the stack delete to fail
+    #          See https://stackoverflow.com/a/41310289
+    config.add_arg(Arg.String('StackName', config.stack_name))
+    config.add_arg(Arg.String('DeleteENILambda', aws.lambda_arn_lookup(session, names.delete_eni.lambda_)))
+    config.add_custom_resource('DeleteENI', 'DeleteENI', Ref('DeleteENILambda'), StackName = Ref('StackName'))
+
     # Lookup the External Subnet, Internal Security Group IDs that are
     # needed by other resources
     internal_subnet_id = aws.subnet_id_lookup(session, names.internal.subnet)

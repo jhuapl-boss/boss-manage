@@ -178,6 +178,8 @@ class AWSNames(object):
                                'type': 'sfn'},
         'delete_cuboid': {'name': 'Delete.Cuboid',
                           'type': 'sfn'},
+        'delete_eni': {'name': 'deleteENI',
+                       'type': 'lambda_'},
         'delete_event_rule': {'name': 'deleteEventRule',
                               'type': 'dns'}, # XXX: rule type?
         'delete_experiment': {'name': 'Delete.Experiment',

@@ -43,7 +43,7 @@ MIGRATION CHANGELOG:
 
 DEPENDENCIES = None
 
-from lib.cloudformation import CloudFormationConfiguration, Ref, Arn
+from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, Arg
 from lib.userdata import UserData
 from lib.keycloak import KeyCloakClient
 from lib.exceptions import BossManageError, BossManageCanceled
@@ -99,6 +99,19 @@ def create_config(bosslet_config):
     config.add_subnet('ExternalSubnet', names.external.subnet)
     internal_subnets, external_subnets = config.add_all_subnets()
     internal_subnets_asg, external_subnets_asg = config.find_all_subnets('asg')
+
+    # Create a custom resource to help delete ENIs from lambdas
+    # DP NOTE: After deleting a lambda the ENIs may stick around for while, causing the stack delete to fail
+    #          See https://stackoverflow.com/a/41310289
+    config.add_arg(Arg.String('StackName', config.stack_name))
+    config.add_custom_resource('DeleteENI', 'DeleteENI', Arn('DeleteENILambda'), StackName = Ref('StackName'))
+    config.add_lambda("DeleteENILambda",
+                      names.delete_eni.lambda_,
+                      aws.role_arn_lookup(session, 'DeleteENI'),
+                      const.DELETE_ENI_LAMBDA,
+                      handler="index.handler",
+                      timeout=60,
+                      runtime='python3.6')
 
     user_data = const.BASTION_USER_DATA.format(bosslet_config.NETWORK)
     config.add_ec2_instance("Bastion",
