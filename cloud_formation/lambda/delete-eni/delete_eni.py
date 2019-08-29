@@ -11,11 +11,12 @@ def handler(event, context):
 
 
     try:
-        ec2 = boto3.client('ec2')
+        client = boto3.client('ec2')
+        resource = boto3.resource('ec2')
 
         stack_name = event['ResourceProperties']['StackName']
 
-        resp = ec2.describe_subnets(
+        resp = client.describe_subnets(
                     Filters = [
                         {'Name': 'tag:aws:cloudformation:stack-name',
                          'Values': [stack_name]},
@@ -23,7 +24,7 @@ def handler(event, context):
                 )
         subnets = [subnet['SubnetId'] for subnet in resp['Subnets']]
 
-        resp = ec2.describe_network_interfaces(
+        resp = client.describe_network_interfaces(
                     Filters = [
                         {'Name': 'subnet-id',
                          'Values': subnets},
@@ -36,13 +37,20 @@ def handler(event, context):
             print('No Lambda ENI to delete')
         else:
             for iface in resp['NetworkInterfaces']:
-                # DP ???: Should there only be the check for existance
                 if 'Attachment' in iface and iface['Attachment']['Status'] == 'attached':
                     print('Detaching {}'.format(iface['PrivateIpAddress']))
-                    ec2.detach_network_interface(AttachmentId = iface['Attachment']['AttachmentId'])
+                    client.detach_network_interface(AttachmentId = iface['Attachment']['AttachmentId'])
+
+                    # Wait and poll until the ENI is detached, so it can be deleted
+                    obj = resource.NetworkInterface(iface['NetworkInterfaceId'])
+                    while True:
+                        obj.reload()
+                        if obj.attachment is None or obj.attachment['Status'] == 'detached':
+                            break
+                        time.sleep(30)
 
                 print('Deleting {}'.format(iface['PrivateIpAddress']))
-                ec2.delete_network_interface(NetworkInterfaceId = iface['NetworkInterfaceId'])
+                client.delete_network_interface(NetworkInterfaceId = iface['NetworkInterfaceId'])
     except:
         send_response(event, context, failure = True)
         raise
