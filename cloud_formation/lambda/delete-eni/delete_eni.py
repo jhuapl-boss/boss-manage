@@ -1,5 +1,6 @@
 import boto3
 import json
+import time
 from urllib.request import build_opener, HTTPHandler, Request
 
 def handler(event, context):
