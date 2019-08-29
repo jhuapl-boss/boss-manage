@@ -78,7 +78,15 @@ if [ $RET -eq 0 ]; then
 else
     yes | yum install jq
     yes | yum install git
-    yes | yum install nodejs npm --enablerepo=epel
+
+    # Install the NodeJS Version Manager to install NodeJS as the system packages
+    # are very out of date
+    set +e
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | bash
+    export NVM_DIR="$HOME/.nvm"
+    source $NVM_DIR/nvm.sh
+    nvm install 8
+    set -e
 
     # There seems to be an issue using the HTTPS version of the registry
     # and verifying the SSL certificate
@@ -137,6 +145,12 @@ mkdir vault/private
 
 cd bin/
 
+# Delete any existing test stack
+echo " "
+echo "----------------------Deleting Existing Stacks----------------------"
+echo " "
+yes | $PYTHON ./cloudformation.py delete auto-build-test.boss all
+
 #Create  keypair to attach to ec2 instances made by cloudformation.
 $PYTHON ./manage_keypair.py auto-build-test.boss delete auto-build-keypair
 $PYTHON ./manage_keypair.py auto-build-test.boss create auto-build-keypair
@@ -146,7 +160,7 @@ wait
 echo " "
 echo "----------------------Building AMIs----------------------"
 echo " "
-$PYTHON ./packer.py auto-build-test.boss core redis api activities cloudwatch --ami-version autotest --force
+$PYTHON ./packer.py auto-build-test.boss all --ami-version autotest --force
 wait
 
 echo " "
@@ -158,17 +172,21 @@ env
 
 #Run building cloudformation
 yes | $PYTHON ./cloudformation.py create auto-build-test.boss all --ami-version autotest
+
 wait
 
 echo " "
 echo "----------------------Performing Tests----------------------"
 echo " "
 
+# Disable error catching for tests, so that failed tests don't stop the script
+set +e
+
 #Perform tests on temporary test stacks
 
 #Endpoint tests:
 echo 'Performing tests...'
-$PYTHON ./bastion.py endpoint.auto-build-test.boss ssh-cmd "cd /srv/www/django && python3 manage.py test"# python3 manage.py test -- -c inttest.cfg
+$PYTHON ./bastion.py endpoint.auto-build-test.boss ssh-cmd "cd /srv/www/django && python3 manage.py test" # python3 manage.py test -- -c inttest.cfg
 
 #ndingest library
 $PYTHON ./bastion.py endpoint.auto-build-test.boss ssh-cmd "sudo python3 -m pip install pytest"
@@ -176,6 +194,8 @@ $PYTHON ./bastion.py endpoint.auto-build-test.boss ssh-cmd "cd /usr/local/lib/py
 
 #cachemanage VM
 $PYTHON ./bastion.py cache_manager.auto-build-test.boss ssh-cmd "cd /srv/salt/boss-tools/files/boss-tools.git/cachemgr && sudo nose2 && sudo nose2 -c inttest.cfg"
+
+set -e
 
 echo " "
 echo "----------------------Delete Stacks----------------------"
@@ -190,7 +210,8 @@ wait
 
 # Delete keypairs from aws
 $PYTHON ./manage_keypair.py auto-build-test.boss delete auto-build-keypair
-Shutdown the instance an hour after script executes.
+
+# Shutdown the instance an hour after script executes.
 shutdown -h +3600"""
 
     print('Running script...')

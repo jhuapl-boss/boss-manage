@@ -110,8 +110,8 @@ def create_config(bosslet_config):
                       aws.role_arn_lookup(session, 'DeleteENI'),
                       const.DELETE_ENI_LAMBDA,
                       handler="index.handler",
-                      timeout=60,
-                      runtime='python3.6')
+                      timeout=180, # 3 minutes, so that there is enough time to wait for the ENI detach to complete
+                      runtime='python3.6') # If the lambda times out CF will retry a couple of times
 
     user_data = const.BASTION_USER_DATA.format(bosslet_config.NETWORK)
     config.add_ec2_instance("Bastion",
