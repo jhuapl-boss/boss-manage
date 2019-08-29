@@ -38,7 +38,7 @@ def handler(event, context):
             for iface in resp['NetworkInterfaces']:
                 if iface['Attachment']['Status'] == 'attached':
                     print('Detaching {}'.format(iface['PrivateIpAddress']))
-                    ec2.detach_network_iface(AttachmentId = iface['Attachment']['AttachmentId'])
+                    ec2.detach_network_interface(AttachmentId = iface['Attachment']['AttachmentId'])
 
                 print('Deleting {}'.format(iface['PrivateIpAddress']))
                 ec2.delete_network_interface(NetworkInterfaceId = iface['NetworkInterfaceId'])
