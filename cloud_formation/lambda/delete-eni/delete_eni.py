@@ -36,7 +36,8 @@ def handler(event, context):
             print('No Lambda ENI to delete')
         else:
             for iface in resp['NetworkInterfaces']:
-                if iface['Attachment']['Status'] == 'attached':
+                # DP ???: Should there only be the check for existance
+                if 'Attachment' in iface and iface['Attachment']['Status'] == 'attached':
                     print('Detaching {}'.format(iface['PrivateIpAddress']))
                     ec2.detach_network_interface(AttachmentId = iface['Attachment']['AttachmentId'])
 
