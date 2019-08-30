@@ -454,6 +454,19 @@ class CloudFormationConfiguration:
 
             return get_status(response)
 
+    def _raise_error(self, status):
+        """A common method for raising an error if create/update/delete didn't
+        result in the expected status. If the status if FAILED then the failures
+        are included in the exception.
+        """
+        msg = "Status of stack '{}' is '{}'".format(self.stack_name, status)
+        causes = None
+
+        if 'FAILED' in status or 'ROLLBACK' in status:
+            causes = self.get_failed_reasons()
+
+        raise BossManageError(msg, causes=causes)
+
     def create(self, wait = True):
         """Launch the template this object represents in CloudFormation.
 
@@ -498,8 +511,7 @@ class CloudFormationConfiguration:
             if status == 'CREATE_COMPLETE':
                 print("Created stack '{}'".format(self.stack_name))
             else:
-                msg = "Status of stack '{}' is '{}'".format(self.stack_name, status)
-                raise BossManageError(msg)
+                self._raise_error(status)
 
     def update(self, wait = True):
         """Update the template this object represents in CloudFormation.
@@ -619,8 +631,7 @@ class CloudFormationConfiguration:
                 status = self._poll(client, self.stack_name, 'update cleanup', 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS')
                 print("Updated stack '{}'".format(self.stack_name))
             else:
-                msg = "Status of stack '{}' is '{}'".format(self.stack_name, status)
-                raise BossManageError(msg)
+                self._raise_error(status)
 
         migrations.post_update(self.bosslet_config)
 
@@ -654,8 +665,7 @@ class CloudFormationConfiguration:
                 if status == 'DELETE_COMPLETE':
                     print("Deleted stack '{}'".format(self.stack_name))
                 else:
-                    msg = "Status of stack '{}' is '{}'".format(self.stack_name, status)
-                    raise BossManageError(msg)
+                    self._raise_error(status)
             except ClientError:
                 # Stack doesn't exist anymore
                 print(" done")

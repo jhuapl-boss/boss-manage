@@ -13,7 +13,9 @@
 # limitations under the License.
 
 class BossManageError(Exception):
-    pass
+    def __init__(self, *args, causes=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.causes = causes
 
 class BossManageCanceled(BossManageError):
     def __init__(self):

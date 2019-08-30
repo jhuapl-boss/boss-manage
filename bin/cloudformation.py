@@ -328,6 +328,9 @@ if __name__ == '__main__':
     except exceptions.BossManageError as ex:
         print()
         print("Boss Manage Error: {}".format(ex))
+        if ex.causes is not None:
+            for cause in ex.causes:
+                print("\t", cause)
         sys.exit(2)
     except Exception as ex:
         print()
