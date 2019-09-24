@@ -9,7 +9,7 @@
 [submodule "salt_stack/salt/spdb/files/spdb.git"]
 	path = salt_stack/salt/spdb/files/spdb.git
 	url = ../spdb.git
-	branch = integration
+	branch = refactor
 [submodule "salt_stack/salt/ndingest/files/ndingest.git"]
 	path = salt_stack/salt/ndingest/files/ndingest.git
 	url = ../ndingest.git
