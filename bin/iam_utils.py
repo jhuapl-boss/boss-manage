@@ -585,19 +585,22 @@ class IamUtils(object):
         lookup = { profile['InstanceProfileName']: profile
                    for profile in resource_['InstanceProfileList'] }
         for profile in resource['InstanceProfileList']:
+            print('profile: {}'.format(profile))
             profile_ = lookup.get(profile['InstanceProfileName'])
+            print('profile_ {}'.format(profile_))
             if policy_ is None:
                 self.iw.create_instance_profile(profile['InstanceProfileName'],
                                                 profile['Path'])
                 self.iw.add_role_to_instance_profile(role['RoleName'],
                                                      profile['InstanceProfileName'])
             else:
-                if profile['Path'] != profile_['Path']:
-                    console.warning("Paths differ for {} Instance Profile {}: '{}' != '{}'".format(resource['RoleName'],
-                                                                                                   profile['InstanceProfileName'],
-                                                                                                   profile['Path'],
-                                                                                                   profile_['Path']))
-                    console.info('You will need to manually delete the old instance profile for the Path to be changed')
+                if profile_ is not None:
+                    if profile['Path'] != profile_['Path']:
+                        console.warning("Paths differ for {} Instance Profile {}: '{}' != '{}'".format(resource['RoleName'],
+                                                                                                       profile['InstanceProfileName'],
+                                                                                                       profile['Path'],
+                                                                                                       profile_['Path']))
+                        console.info('You will need to manually delete the old instance profile for the Path to be changed')
 
         for profile in lookup.keys():
             # AWS has an instance profile that is not in the desired version, it should be deleted
