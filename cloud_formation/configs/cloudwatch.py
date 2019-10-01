@@ -78,7 +78,7 @@ def create_config(bosslet_config):
     })
 
     config.add_cloudwatch_rule('VaultCheck',
-                               name=names.vault_consul_check.cw,
+                               name=names.vault_check.cw,
                                description='Check health of vault instances.',
                                targets=[
                                    {
@@ -108,6 +108,6 @@ def create(bosslet_config):
 
     config.create()
 
-def update(session, domain):
+def update(bosslet_config):
     config = create_config(bosslet_config)
     config.update()

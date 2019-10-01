@@ -25,6 +25,7 @@
         "CuboidImportLambdaRole",
         "DataPipelineDefaultResourceRole",
         "DataPipelineDefaultRole",
+        "DeleteENI",
         "DynamoDBAutoscaleRole",
         "IngestQueueUpload",
         "LambdaExecutionRole",

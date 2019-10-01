@@ -146,7 +146,7 @@ class AWSNames(object):
         'cache': {'name': 'cache', # Redis server to cache cuboids
                   'type': 'redis'},
         'cachedb': {'type': 'stack'},
-        'cache_manager': {'name': 'cachemanager',
+        'cachemanager': {'name': 'cachemanager',
                           'types': ['dns', 'ami']},
         'cache_session': {'name': 'cache-session', # Redis server for Django sessions
                           'type': 'redis'},
@@ -297,7 +297,7 @@ class AWSNames(object):
                           'type': 'lambda_'},
         'trigger_dynamo_autoscale': {'name': 'triggerDynamoAutoscale',
                                      'type': 'cw'},
-        'vault_consul_check': {'name': 'checkVaultConsul',
+        'vault_check': {'name': 'checkVault',
                                'type': 'cw'},
         'vault_monitor': {'name': 'vaultMonitor',
                           'type': 'lambda_'},
@@ -407,7 +407,7 @@ class AWSNames(object):
         'cache_session': 'cache-session',   # Redis server for Django sessions.
         "cache": "cache",                   # Redis server to cache cuboids.
         "cache_state": "cache-state",
-        "cache_manager": "cachemanager",
+        "cachemanager": "cachemanager",
         "cache_db": "cachedb",
         "cuboid_bucket": "cuboids",
         "multi_lambda": "multiLambda",
@@ -425,7 +425,7 @@ class AWSNames(object):
         'write_lock_topic': 'WriteLockAlert',
         'write_lock': 'WriteLockAlert',
         'vault_monitor': 'vaultMonitor',
-        'vault_consul_check': 'checkVaultConsul',
+        'vault_check': 'checkVault',
         'activities': 'activities',
         'delete_cuboid': 'Delete.Cuboid',
         'delete_bucket': 'delete',
@@ -491,7 +491,7 @@ class AWSNames(object):
 
         fq_hostname = hostname + self.base_dot
 
-        if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'vault_consul_check',
+        if name in ['multi_lambda', 'write_lock', 'vault_monitor', 'vault_check',
                     'delete_lambda', 'ingest_lambda', 'dynamo_lambda', 
                     'index_s3_writer_lambda', 'index_fanout_id_writer_lambda',
                     'downsample_dlq', 'downsample_volume_lambda',

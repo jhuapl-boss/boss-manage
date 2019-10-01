@@ -66,7 +66,7 @@ to see if DNS has been changed to cloudfront servers.
 You can either create new AMIs:
 ```shell
 $ cd boss-manage/bin
-$  ./packer.py auth vault endpoint cachemanager activities --name sprintXX
+$  ./packer.py production.boss auth vault endpoint cachemanager activities --name sprintXX
 ```
 or copy the latest AMIs from the console to become sprintXX (this way is faster if the AMIs will end up being the same version of code.)
 
@@ -82,7 +82,9 @@ Verify IAM Policy, Groups and Roles are the latest.  Master IAM scripts are loca
 Make sure your AWS_CREDENTIALS is set for the dev account
 ```shell
 $ cd boss-manage.git/bin
-$ ./iam_utils.py export
+$ ./iam_utils.py production.boss export groups
+$ ./iam_utils.py production.boss export roles
+$ ./iam_utils.py production.boss export policies
 ```
 this will update the boss-manage.git/config/iam files with the latest changes added
 to the dev account.  I use git diff on the three files to look over the changes.
@@ -98,7 +100,7 @@ excluded groups, policies and roles that should not to into the config/iam files
 Make sure your AWS_CREDENTIALS is set for the production account
 ```shell
 $ cd boss-manage.git/bin
-$ ./iam_utils.py import
+$ ./iam_utils.py production.boss import
 ```
 
 ### Remove Subscriptions to ProductionMicronsMailingList in SNS 
