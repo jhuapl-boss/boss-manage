@@ -589,7 +589,7 @@ class IamUtils(object):
             if profile_ is None:
                 self.iw.create_instance_profile(profile['InstanceProfileName'],
                                                 profile['Path'])
-                self.iw.add_role_to_instance_profile(role['RoleName'],
+                self.iw.add_role_to_instance_profile(resource['RoleName'],
                                                      profile['InstanceProfileName'])
             else:
                 if profile['Path'] != profile_['Path']:
