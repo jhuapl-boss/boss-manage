@@ -585,16 +585,11 @@ class IamUtils(object):
         lookup = { profile['InstanceProfileName']: profile
                    for profile in resource_['InstanceProfileList'] }
         for profile in resource['InstanceProfileList']:
-            print('profile: {}'.format(profile))
             profile_ = lookup.get(profile['InstanceProfileName'])
-            print('profile_ {}'.format(profile_))
             if profile_ is None:
-                pprint(profile)
-                continue
-            if policy_ is None:
                 self.iw.create_instance_profile(profile['InstanceProfileName'],
                                                 profile['Path'])
-                self.iw.add_role_to_instance_profile(role['RoleName'],
+                self.iw.add_role_to_instance_profile(resource['RoleName'],
                                                      profile['InstanceProfileName'])
             else:
                 if profile['Path'] != profile_['Path']:
