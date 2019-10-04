@@ -296,6 +296,9 @@ class IamUtils(object):
                               for item in resp[list_key]
                               if item[name_key] in names])
 
+        # remove any resources that were excluded for other reasons
+        resources = [r for r in resources if r is not None]
+
         return resources
 
     def extract(self, resource_type, resource):
@@ -320,6 +323,10 @@ class IamUtils(object):
             }
             return group
         elif resource_type == 'roles':
+            if resource['Path'].startswith('/aws-service-role/'):
+                console.warn('Cannot export AWS created Role')
+                return None
+
             role = {
                 'RoleName': resource['RoleName'],
                 'Path': resource['Path'],
