@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+LOGGER = logging.getLogger(__name__)
 
 def sql_tables(bosslet_config):
     """
@@ -29,7 +30,7 @@ def sql_tables(bosslet_config):
         cursor.execute(query)
         tables = cursor.fetchall()
         for i in tables:
-            logging.info(tables)
+            LOGGER.info(tables)
         return tables
 
 def sql_list(bosslet_config, db_table):
@@ -52,7 +53,7 @@ def sql_list(bosslet_config, db_table):
                 "Can't find table name: {}".format(db_table))
         else:
             for i in ans:
-                logging.info(i)
+                LOGGER.info(i)
         return ans
 
 def sql_resource_lookup_key(bosslet_config, resource_params):
@@ -94,7 +95,7 @@ def sql_resource_lookup_key(bosslet_config, resource_params):
                     "Can't find collection: {}".format(collection))
             else:
                 cuboid_str = "{}&".format(coll_set[0][0])
-                logging.info("{} collection id: {}".format(collection, coll_set[0][0]))
+                LOGGER.info("{} collection id: {}".format(collection, coll_set[0][0]))
         if experiment is not None:
             cursor.execute(exp_query, (experiment,))
             exp_set = cursor.fetchall()
@@ -103,7 +104,7 @@ def sql_resource_lookup_key(bosslet_config, resource_params):
                     "Can't find experiment: {}".format(experiment))
             else:
                 cuboid_str = cuboid_str + "{}&".format(exp_set[0][0])
-                logging.info("{} experiment id: {}".format(experiment, exp_set[0][0]))
+                LOGGER.info("{} experiment id: {}".format(experiment, exp_set[0][0]))
         if channel is not None:
             cursor.execute(chan_query, (channel,))
             chan_set = cursor.fetchall()
@@ -112,9 +113,9 @@ def sql_resource_lookup_key(bosslet_config, resource_params):
                     "Can't find channel: {}".format(channel))
             else:
                 cuboid_str = cuboid_str + "{}&".format(chan_set[0][0])
-                logging.info("{} channel id: {}".format(channel, chan_set[0][0]))
+                LOGGER.info("{} channel id: {}".format(channel, chan_set[0][0]))
     
-    logging.info("Cuboid key: {} \n".format(cuboid_str))
+    LOGGER.info("Cuboid key: {} \n".format(cuboid_str))
     return cuboid_str
 
 def sql_coordinate_frame_lookup_key(bosslet_config, coordinate_frame):
@@ -137,7 +138,7 @@ def sql_coordinate_frame_lookup_key(bosslet_config, coordinate_frame):
             raise Exception(
                 "Can't find coordinate frame: {}".format(coordinate_frame))
         else:
-            logging.info("{} coordinate frame id: {}".format(coordinate_frame, coordinate_set[0][0]))
+            LOGGER.info("{} coordinate frame id: {}".format(coordinate_frame, coordinate_set[0][0]))
     
     return coordinate_set[0][0]
 
@@ -166,8 +167,41 @@ def sql_channel_job_ids(bosslet_config, resource):
             raise Exception(
                 "Can't find resource name: {}/{}/{}".format(coll,exp,chan))
         else:
-            logging.info("\n Job-Ids corresponding to {}/{}/{}".format(coll,exp,chan))
-            logging.info("< id,                      start_date,                     x_start,y_start,z_start,x_stop, y_stop, z_stop>")
+            LOGGER.info("\n Job-Ids corresponding to {}/{}/{}".format(coll,exp,chan))
+            LOGGER.info("< id,                      start_date,                     x_start,y_start,z_start,x_stop, y_stop, z_stop>")
             for i in job_ids:
-                logging.info(i)
+                LOGGER.info(i)
         return job_ids
+
+def sql_get_names_from_lookup_keys(bosslet_config, lookup_keys):
+    """
+    Gets collection/experiment/channel names from lookup keys.
+
+    Args:
+        bosslet_config (BossConfiguration): Bosslet configuration object
+        lookup_keys (list[str]): List of lookup keys to get col/exp/chan names for.
+                                 Expected format f'{col_id}&{exp_id}&{chan_id}'
+
+    Returns:
+        (list[tuple(str, str, str)]): List of tuples of collection/exp/chan names.
+                                      If a look up key is not found, empty strings
+                                      will be returned for that key's corresponding tuple.
+    """
+    names = []
+    if len(lookup_keys) < 1:
+        LOGGER.error('No lookup keys provided, aborting.')
+        return names
+
+    query = 'SELECT collection_name, experiment_name, channel_name FROM lookup WHERE lookup_key = %(key)s'
+    with bosslet_config.call.connect_rds() as cursor:
+        for key in lookup_keys:
+            cursor.execute(query, { 'key': key })
+            rows = cursor.fetchall()
+            if(len(rows) > 0):
+                this_row = (rows[0][0], rows[0][1], rows[0][2])
+            else:
+                this_row = ('', '', '')
+            names.append(this_row)
+            LOGGER.info('key: {}, coll: {}, exp: {}, chan: {}'.format(key, this_row[0], this_row[1], this_row[2]))
+        
+    return names

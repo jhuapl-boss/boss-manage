@@ -20,7 +20,7 @@ COMMANDS : A dictionary of available commands and the functions to call
 """
 
 import argparse
-import sys, os
+import os
 import logging
 import alter_path
 
@@ -33,6 +33,7 @@ COMMANDS = {
     "sql-resource-lookup": boss_rds.sql_resource_lookup_key,
     "sql-coord-frame-lookup": boss_rds.sql_coordinate_frame_lookup_key,
     "sql-job-ids-lookup": boss_rds.sql_channel_job_ids,
+    "sql-get-names-from-lookup-keys": boss_rds.sql_get_names_from_lookup_keys,
 }
 HELP = {
     "sql-tables",
@@ -40,6 +41,7 @@ HELP = {
     "sql-resource-lookup <coll/exp/chan> | <coll/exp> | <coll>",
     "sql-coord-frame-lookup <coordinate_frame>",
     "sql-job-ids-lookup <coll/exp/channel>",
+    'sql-get-names-from-lookup-keys "col1&exp1&chan1" . . . "coln&expn&chann"',
 }
 
 if __name__ == '__main__':
@@ -77,10 +79,14 @@ if __name__ == '__main__':
         logging.basicConfig(level=logging.INFO)
         
     if args.command in COMMANDS:
-        COMMANDS[args.command](args.bosslet_config, *args.arguments)
+        if args.command == "sql-get-names-from-lookup-keys":
+            # This command needs its args as a list.
+            COMMANDS[args.command](args.bosslet_config, args.arguments)
+        else:
+            COMMANDS[args.command](args.bosslet_config, *args.arguments)
     else:
         parser.print_usage()
-        sys.exit(1)
+        parser.exit(1)
     
 
 
