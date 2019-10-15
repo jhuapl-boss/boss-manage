@@ -242,7 +242,7 @@ def resume_indexing(bosslet_config):
     Args:
         bosslet_config (BossConfiguration): Bosslet configuration object
     """
-    resume_args = get_common_args(bosslet_config):
+    resume_args = get_common_args(bosslet_config)
     resume_args['queue_empty'] = False
     arn = resume_args['id_supervisor_step_fcn']
 
