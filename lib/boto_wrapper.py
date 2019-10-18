@@ -19,6 +19,7 @@ Wrapper class to wrap boto calls to catch errors and make it easier to read code
 
 import json
 from botocore.exceptions import ClientError
+from pprint import pprint
 
 class IamWrapper:
 
@@ -87,7 +88,7 @@ class IamWrapper:
             self.client.create_instance_profile(InstanceProfileName=instance_profile_name, Path=path)
         except ClientError as e:
             if e.response['Error']['Code'] == 'EntityAlreadyExists':
-                print("WARNING Instance Profile {} already exists: {}".format(instance_profile_name))
+                print("WARNING Instance Profile {} already exists: {}".format(instance_profile_name, str(e)))
             else:
                 print("ERROR occured creating instance profile: {}".format(instance_profile_name))
                 print("   Details: {}".format(str(e)))
@@ -123,14 +124,18 @@ class IamWrapper:
             self.client.update_assume_role_policy(RoleName=role_name, PolicyDocument=pol_doc_str)
         except ClientError as e:
             print("ERROR occured updating role {}'s assume role policy document: ".format(role_name))
-            pprint.pprint(policy_document)
+            pprint(policy_document)
             print("   Details: {}".format(str(e)))
 
 
     def put_role_policy(self, role_name, policy_name, policy_document):
+        if( role_name == 'lambda_basic_execution'):
+            print("lambda_basic_execution")
         pol_doc_str = json.dumps(policy_document, indent=2, sort_keys=True)
         try:
-            self.client.put_role_policy(RoleName=role_name, PolicyName=policy_name, PolicyDocument=pol_doc_str)
+            resp = self.client.put_role_policy(RoleName=role_name, PolicyName=policy_name, PolicyDocument=pol_doc_str)
+            print("Printing {} resp for put_role_policy:".format(role_name))
+            pprint(resp)
         except ClientError as e:
             print("ERROR occured creating role {}'s inline policy: {}".format(role_name, policy_name))
             print("   Details: {}".format(str(e)))
