@@ -73,10 +73,15 @@ def create_config(bosslet_config, db_config={}):
     else:
         # Don't create a Redis server for dev stacks.
         user_data["aws"]["cache-session"] = ''
+    if const.REDIS_THROTTLE_TYPE is not None:
+        user_data["aws"]["cache-throttle"] = names.cache_throttle.redis
+    else:
+        user_data["aws"]["cache-throttle"] = ''
 
     ## cache-db and cache-stat-db need to be in user_data for lambda to access them.
     user_data["aws"]["cache-db"] = "0"
     user_data["aws"]["cache-state-db"] = "0"
+    user_data["aws"]["cache-throttle-db"] = "0"
     user_data["aws"]["cache-session-db"] = "0"
     user_data["aws"]["meta-db"] = names.meta.ddb
 
@@ -277,6 +282,7 @@ def create(bosslet_config):
     with bosslet_config.call.vault() as vault:
         vault.write(const.VAULT_ENDPOINT, secret_key = str(uuid.uuid4()))
         vault.write(const.VAULT_ENDPOINT_DB, **db_config)
+        vault.write(const.VAULT_ENDPOINT_THROTTLE, config = json.dumps(const.THROTTLE))
 
         dns = bosslet_config.names.public_dns("api")
         uri = "https://{}".format(dns)
@@ -365,6 +371,11 @@ def update(bosslet_config):
     config = create_config(bosslet_config, db_config)
 
     config.update()
+
+    # DP NOTE: If there is a migration error then throttling will not be updated...
+    print("Updating Throttling Config")
+    with bosslet_config.call.vault() as vault:
+        vault.write(const.VAULT_ENDPOINT_THROTTLE, config = json.dumps(const.THROTTLE))
 
 def delete(bosslet_config):
     session = bosslet_config.session

@@ -6,6 +6,7 @@ ENDPOINT_TYPE: m5.2xlarge
 RDS_TYPE: db.t3.micro
 REDIS_CACHE_TYPE: cache.m5.large
 REDIS_SESSION_TYPE: cache.t2.small
+REDIS_THROTTLE_TYPE: cache.t2.small
 REDIS_TYPE: cache.t2.small
 CACHE_MANAGER_TYPE: t3.micro
 VAULT_TYPE: t3.medium
@@ -21,3 +22,16 @@ REDIS_CLUSTER_SIZE: 2
 
 # Memory Size
 REDIS_RESERVED_MEMORY_PERCENT: 25
+
+# Throttle Configuration
+THROTTLE:
+    system: null
+    apis:
+        cutout_egress: null
+        cutout_ingress: null
+        image_egress: null
+        tile_egress: null
+    users:
+        bossadmin: null
+    groups:
+        public: null
