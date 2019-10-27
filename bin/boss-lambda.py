@@ -76,12 +76,21 @@ class LambdaUpdateCLI(configuration.BossCLI):
                                    help = 'Rebuild and upload the multi-lambda code zip and refresh all lambda definitions',
                                    fromfile_prefix_chars = '@')
         self.parser.add_bosslet()
-        self.parser.add_argument('zip_name',
-                                 help='Name of zip file to upload to S3.')
 
     def run(self, args):
-        return lambdas.upload_lambda_zip(args.bosslet_config,
-                                         args.zip_name)
+        lambdas.load_lambdas_on_s3(args.bosslet_config)
+        return lambdas.update_lambda_code(args.bosslet_config)
+
+class LambdaBuildCLI(configuration.BossCLI):
+    def get_parser(self, ParentParser=configuration.BossParser):
+        self.parser = ParentParser(description = "Script for build lambda packages",
+                                   help = 'Build lambda packages')
+        self.parser.add_bosslet()
+        self.parser.add_argument('lambda_name',
+                                 help='Name of lambda to build')
+
+    def run(self, args):
+        lambdas.build_lambda(args.bosslet_config, args.lambda_name)
 
 class LambdaCLI(configuration.NestedBossCLI):
     COMMANDS = {
@@ -89,6 +98,7 @@ class LambdaCLI(configuration.NestedBossCLI):
         'download': LambdaDownloadCLI,
         'upload': LambdaUploadCLI,
         'update': LambdaUpdateCLI,
+        'build': LambdaBuildCLI,
     }
 
     PARSER_ARGS = {

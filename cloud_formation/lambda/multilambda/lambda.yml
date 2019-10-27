@@ -1,0 +1,27 @@
+name: multilambda
+runtime: python3.6
+include:
+        salt_stack/salt/spdb/files/spdb.git: spdb
+        salt_stack/salt/boss-tools/files/boss-tools.git/bossutils: bossutils
+        salt_stack/salt/boss-tools/files/boss-tools.git/cloudwatchwrapper: cloudwatchwrapper
+        salt_stack/salt/boss-tools/files/boss-tools.git/lambda: lambda
+        salt_stack/salt/boss-tools/files/boss-tools.git/lambdautils: lambdautils
+        salt_stack/salt/ndingest/files/ndingest.git: ndingest
+        lib/heaviside.git/heaviside: heaviside
+        lib/heaviside.git/requirements.txt: heaviside/requirements.txt
+        lib/names.py: bossnames/names.py
+        lib/bucket_object_tags.py: bossnames/bucket_object_tags.py
+        lib/__init__.py: bossnames/__init__.py
+system_packages:
+        - atlas
+        - atlas-devel
+python_packages:
+        - spdb/requirements.txt
+        - heaviside/requirements.txt
+manual_commands:
+        - |
+                cd spdb/c_lib/c_version
+                cp makefile_LINUX makefile
+                make
+        - | # Should this be a manual command or a list of files to be copied into the staging directory
+                cp /usr/lib64/atlas/libatlas.so.3 .

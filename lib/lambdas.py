@@ -19,18 +19,144 @@ from lib import zip
 
 import botocore
 import configparser
+import yaml
+import glob
 import os
 import tempfile
 import subprocess
 import shlex
 import shutil
 import pwd
+import pathlib
 
 # Location of settings files for ndingest.
 NDINGEST_SETTINGS_FOLDER = const.repo_path('salt_stack', 'salt', 'ndingest', 'files', 'ndingest.git', 'settings')
 
 # Template used for ndingest settings.ini generation.
 NDINGEST_SETTINGS_TEMPLATE = NDINGEST_SETTINGS_FOLDER + '/settings.ini.apl'
+
+def build_lambda(bosslet_config, lambda_name):
+    lambda_dir = pathlib.Path(const.repo_path('cloud_formation', 'lambda', lambda_name))
+    lambda_config = lambda_dir / 'lambda.yml'
+    with lambda_config.open() as fh:
+        lambda_config = yaml.load(fh.read())
+
+    domain = bosslet_config.INTERNAL_DOMAIN
+    tempname = tempfile.NamedTemporaryFile(delete=True)
+    zipname = pathlib.Path(tempname.name + '.zip')
+    tempname.close()
+    print('Using temp zip file: {}'.format(zipname))
+
+    cwd = os.getcwd()
+
+    # Copy the lambda files into the zip
+    for filename in lambda_dir.glob('*'):
+        zip.write_to_zip(str(filename), zipname, arcname=filename.name)
+
+    # Copy the other files that should be included
+    if 'include' in lambda_config:
+        for src in lambda_config['include']:
+            dst = lambda_config['include'][src]
+            src_path, src_file = src.rsplit('/', 1)
+
+            os.chdir(src_path)
+
+            # Generate dynamic configuration files, as needed
+            if src_file == 'ndingest.git':
+                with open(NDINGEST_SETTINGS_TEMPLATE, 'r') as tmpl:
+                    # Generate settings.ini file for ndingest.
+                    create_ndingest_settings(bosslet_config, tmpl)
+
+            zip.write_to_zip(src_file, zipname, arcname=dst)
+            os.chdir(cwd)
+
+    CONTAINER_CMD = 'podman run --rm -it --volume {HOST_DIR}:/var/task/ lambci/lambda:build-{RUNTIME} {CMD}'
+
+    BUILD_CMD = 'python3 {PREFIX}/build_lambda.py {DOMAIN} {BUCKET}'
+    BUILD_ARGS = {
+        'DOMAIN': domain,
+        'BUCKET': bosslet_config.LAMBDA_BUCKET,
+    }
+
+    lambda_build_server = None #bosslet_config.LAMBDA_SERVER
+    container_command = True
+    if lambda_build_server is None:
+        staging_target = pathlib.Path(const.repo_path('salt_stack', 'salt', 'lambda-dev', 'files', 'staging'))
+        if not staging_target.exists():
+            staging_target.mkdir()
+
+        stdout = subprocess.check_output('ls -la {}'.format(zipname), shell=True)
+        print(stdout.decode('utf-8'))
+
+        print("Copying build zip to {}".format(staging_target))
+        staging_zip = staging_target / (domain + '.zip')
+        try:
+            zipname.rename(staging_zip)
+        except OSError:
+            # rename only works within the same filesystem
+            stdout = subprocess.check_output('mv {} {}'.format(zipname, staging_zip), shell=True)
+            print(stdout.decode('utf-8'))
+            """
+            shutil.copy2(zipname, staging_zip)
+
+            import stat
+            st = zipname.stat()
+            # chown under a virtual box share doesn't seem to work
+            os.chown(staging_zip, st[stat.ST_UID], st[stat.ST_GID])
+            zipname.unlink()
+            """
+
+        if container_command is None:
+            BUILD_ARGS['PREFIX'] = const.repo_path('salt_stack', 'salt', 'lambda-dev', 'files')
+            CMD = BUILD_CMD.format(**BUILD_ARGS)
+        else:
+            BUILD_ARGS['PREFIX'] = '/var/task'
+            CMD = BUILD_CMD.format(**BUILD_ARGS)
+            CMD = CONTAINER_CMD.format(HOST_DIR = const.repo_path('salt_stack', 'salt', 'lambda-dev', 'files'),
+                                       RUNTIME = lambda_config['runtime'],
+                                       CMD = CMD)
+
+        print(CMD)
+
+        try:
+            print("calling makedomainenv on localhost")
+
+            proc = subprocess.Popen(shlex.split(CMD),
+                                    stderr=subprocess.STDOUT,
+                                    stdout=subprocess.PIPE)
+            while proc.poll() is None:
+                try:
+                    stdout, _ = proc.communicate(timeout = 10)
+                    print(stdout.decode('utf-8'), end='', flush=True)
+                except subprocess.TimeoutExpired:
+                    pass
+
+            if proc.returncode != 0:
+                print("makedomainenv return code: {}".format(proc.returncode))
+                # DP NOTE: currently eating the error, as there is no checking of error if there is a build server
+        finally:
+            os.remove(staging_zip)
+
+    else:
+        BUILD_ARGS['PREFIX'] = '~'
+        CMD = BUILD_CMD.format(**BUILD_ARGS)
+        print(CMD); return
+
+        lambda_build_server_key = bosslet_config.LAMBDA_SERVER_KEY
+        lambda_build_server_key = utils.keypair_to_file(lambda_build_server_key)
+        ssh_target = SSHTarget(lambda_build_server_key, lambda_build_server, 22, 'ec2-user')
+        bastions = [bosslet_config.outbound_bastion] if bosslet_config.outbound_bastion else []
+        ssh = SSHConnection(ssh_target, bastions)
+
+        print("Copying build zip to lambda-build-server")
+        ret = ssh.scp(zipname, target_file, upload=True)
+        print("scp return code: " + str(ret))
+
+        os.remove(zipname)
+
+        print("calling makedomainenv on lambda-build-server")
+        ret = ssh.cmd(CMD)
+        print("ssh return code: " + str(ret))
 
 def update_lambda_code(bosslet_config):
     """Update all lambdas that use the multilambda zip file.
