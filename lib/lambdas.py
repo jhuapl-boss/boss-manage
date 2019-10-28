@@ -85,8 +85,7 @@ def build_lambda(bosslet_config, lambda_name):
         if not staging_target.exists():
             staging_target.mkdir()
 
-        stdout = subprocess.check_output('ls -la {}'.format(zipname), shell=True)
-        print(stdout.decode('utf-8'))
+        utils.run('ls -la {}'.format(zipname), shell=True)
 
         print("Copying build zip to {}".format(staging_target))
         staging_zip = staging_target / (domain + '.zip')
@@ -94,17 +93,8 @@ def build_lambda(bosslet_config, lambda_name):
             zipname.rename(staging_zip)
         except OSError:
             # rename only works within the same filesystem
-            stdout = subprocess.check_output('mv {} {}'.format(zipname, staging_zip), shell=True)
-            print(stdout.decode('utf-8'))
-            """
-            shutil.copy2(zipname, staging_zip)
-
-            import stat
-            st = zipname.stat()
-            # chown under a virtual box share doesn't seem to work
-            os.chown(staging_zip, st[stat.ST_UID], st[stat.ST_GID])
-            zipname.unlink()
-            """
+            # Using the shell version, as chmod doesn't always work depending on the filesystem
+            utils.run('mv {} {}'.format(zipname, staging_zip), shell=True)
 
         if container_command is None:
             BUILD_ARGS['PREFIX'] = const.repo_path('salt_stack', 'salt', 'lambda-dev', 'files')
@@ -121,18 +111,10 @@ def build_lambda(bosslet_config, lambda_name):
         try:
             print("calling makedomainenv on localhost")
 
-            proc = subprocess.Popen(shlex.split(CMD),
-                                    stderr=subprocess.STDOUT,
-                                    stdout=subprocess.PIPE)
-            while proc.poll() is None:
-                try:
-                    stdout, _ = proc.communicate(timeout = 10)
-                    print(stdout.decode('utf-8'), end='', flush=True)
-                except subprocess.TimeoutExpired:
-                    pass
-
-            if proc.returncode != 0:
-                print("makedomainenv return code: {}".format(proc.returncode))
+            try:
+                utils.run(CMD)
+            except Exception as ex:
+                print("makedomainenv return code: {}".format(ex))
                 # DP NOTE: currently eating the error, as there is no checking of error if there is a build server
         finally:
             os.remove(staging_zip)

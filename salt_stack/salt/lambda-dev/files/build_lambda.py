@@ -2,9 +2,11 @@
 
 import os
 import sys
+import time
 import glob
 import yaml
 import zipfile
+import shlex
 import shutil
 import subprocess
 import pathlib
@@ -19,7 +21,7 @@ def load_config(staging_dir):
     with open(os.path.join(staging_dir, 'lambda.yml'), 'r') as fh:
         return yaml.load(fh.read())
 
-def run(cmd):
+def script(cmd):
     print("----------------------------------------------------------------------------------")
     print(cmd)
 
@@ -28,22 +30,40 @@ def run(cmd):
 
     proc = subprocess.Popen(['/bin/bash'],
                             env=env,
+                            cwd=staging_dir,
+                            bufsize=1, # line bufferred
+                            #universal_newlines=True, # so we don't have to encode/decode
                             stderr=subprocess.STDOUT,
                             stdout=subprocess.PIPE,
                             stdin=subprocess.PIPE)
 
-    cmd = cmd.encode()
-    while proc.poll() is None:
-        try:
-            stdout, _ = proc.communicate(input=cmd,
-                                         timeout=10)
-            print(stdout.decode('utf-8'), end='', flush=True)
-        except subprocess.TimeoutExpired:
-            pass
-        cmd = None
+    proc.stdin.write(cmd.encode())
+    proc.stdin.close()
 
-    if proc.returncode != 0:
-        raise Exception()
+    for line in proc.stdout:
+        print(line.decode('utf8'), end='', flush=True)
+
+    if proc.poll() != 0:
+        raise Exception("Return code: {}".format(proc.returncode))
+
+def run(cmd):
+    print("----------------------------------------------------------------------------------")
+    print(cmd)
+
+    proc = subprocess.Popen(shlex.split(cmd),
+                            bufsize=1, # line bufferred
+                            #universal_newlines=True, # so we don't have to encode/decode
+                            stderr=subprocess.STDOUT,
+                            stdout=subprocess.PIPE)
+
+    for line in proc.stdout:
+        print(line.decode('utf8'), end='', flush=True)
+
+    while proc.poll() is None:
+        time.sleep(1)
+
+    if proc.poll() != 0:
+        raise Exception("Return code: {}".format(proc.returncode))
 
 if __name__ == '__main__':
     cur_dir = pathlib.Path(__file__).parent
@@ -55,12 +75,9 @@ if __name__ == '__main__':
         print("Usage: {} <domain name> <bucket name>".format(sys.argv[0]))
         sys.exit(-1)
 
-    stdout = subprocess.check_output('ls -la', shell=True)
-    print(stdout.decode('utf-8'))
-    stdout = subprocess.check_output('ls -la staging', shell=True)
-    print(stdout.decode('utf-8'))
-    stdout = subprocess.check_output('whoami', shell=True)
-    print(stdout.decode('utf-8'))
+    run('ls -la')
+    run('ls -la staging')
+    run('whoami')
 
     domain = sys.argv[1]
     bucket = sys.argv[2]
@@ -73,7 +90,8 @@ if __name__ == '__main__':
             shutil.rmtree(staging_dir)
         except OSError:
             # DP NOTE: Sometimes rmtree fails with 'file busy' error for me
-            subprocess.check_output('rm -r {}'.format(staging_dir), shell=True)
+            run('rm -r {}'.format(staging_dir))
+
     staging_dir.mkdir()
     unzip(zip_file, staging_dir)
 
@@ -96,16 +114,20 @@ if __name__ == '__main__':
         packages = []
         cmd = 'pip3 install -t {} -r {{}}'.format(staging_dir)
         for entry in lambda_config['python_packages']:
-            if os.path.exists(entry):
-                run(cmd.format(entry))
+            if (staging_dir / entry).exists():
+                run(cmd.format(staging_dir / entry))
             else:
                 packages.append(entry)
-        cmd = 'pip3 install -t {} {}'.format(staging_dir, ' '.join(packages))
-        run(cmd)
+
+        if len(packages) > 0:
+            cmd = 'pip3 install -t {} {}'.format(staging_dir, ' '.join(packages))
+            run(cmd)
 
     # Run Manual Commands
     if 'manual_commands' in lambda_config:
         for cmd in lambda_config['manual_commands']:
-            run(cmd)
+            script(cmd)
 
-    # TODO zip up staging directory
+    output_file = cur_dir / 'staging' / (lambda_config['name'] + '.' + domain)
+    output_file = shutil.make_archive(output_file, 'zip', staging_dir)
+    print(output_file)
