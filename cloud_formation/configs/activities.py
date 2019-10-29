@@ -105,7 +105,8 @@ def create_config(bosslet_config, lookup=True):
                           names.delete_event_rule.dns,
                           role_arn=role_arn,
                           schedule_expression=schedule_expression,
-                          target_list=target_list)
+                          target_list=target_list,
+                          state='DISABLED')   # Disabled until new delete is finished.
 
     # Events have to be given permission to run lambda.
     config.add_lambda_permission('DeleteRulePerm',
