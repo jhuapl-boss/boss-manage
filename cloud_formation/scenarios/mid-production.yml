@@ -4,7 +4,7 @@
 
 ENDPOINT_TYPE: m5.2xlarge
 RDS_TYPE: db.t3.micro
-REDIS_CACHE_TYPE: cache.m5.large
+REDIS_CACHE_TYPE: cache.m5.xlarge
 REDIS_SESSION_TYPE: cache.t2.small
 REDIS_TYPE: cache.t2.small
 CACHE_MANAGER_TYPE: t3.micro
