@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
-import boto3
 import os
 import sys
 import time
 import glob
-import yaml
 import zipfile
 import shlex
 import shutil
@@ -98,6 +96,12 @@ if __name__ == '__main__':
     domain = sys.argv[1]
     bucket = sys.argv[2]
 
+    # Not all AWS Lambda containers have these libraries installed
+    # verify that they are installed before importing them
+    run('python3 -m pip install boto3 PyYaml')
+    import boto3
+    import yaml
+
     zip_file = cur_dir / 'staging' / (domain + '.zip')
     staging_dir = cur_dir / 'staging' / domain
 
@@ -153,6 +157,7 @@ if __name__ == '__main__':
 
         output_file = cur_dir / 'staging' / target_name
         output_file = shutil.make_archive(output_file, 'zip', staging_dir)
+        output_file = pathlib.Path(output_file)
 
     target_name += '.zip' # shutil.make_archive request the name without extension
 
