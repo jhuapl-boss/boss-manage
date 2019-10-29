@@ -85,8 +85,6 @@ def build_lambda(bosslet_config, lambda_name):
         if not staging_target.exists():
             staging_target.mkdir()
 
-        utils.run('ls -la {}'.format(zipname), shell=True)
-
         print("Copying build zip to {}".format(staging_target))
         staging_zip = staging_target / (domain + '.zip')
         try:
@@ -117,9 +115,6 @@ def build_lambda(bosslet_config, lambda_name):
                 creds = bosslet_config.session.get_credentials()
                 env_extras['AWS_ACCESS_KEY_ID'] = creds.access_key
                 env_extras['AWS_SECRET_ACCESS_KEY'] = creds.secret_key
-
-        print(env_extras)
-        print(CMD)
 
         try:
             print("calling makedomainenv on localhost")
