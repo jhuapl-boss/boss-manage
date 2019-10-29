@@ -43,6 +43,9 @@ def script(cmd):
     for line in proc.stdout:
         print(line.decode('utf8'), end='', flush=True)
 
+    while proc.poll() is None:
+        time.sleep(1)
+
     if proc.poll() != 0:
         raise Exception("Return code: {}".format(proc.returncode))
 
@@ -78,6 +81,9 @@ if __name__ == '__main__':
     run('ls -la')
     run('ls -la staging')
     run('whoami')
+
+    import pprint
+    pprint.pprint(os.environ)
 
     domain = sys.argv[1]
     bucket = sys.argv[2]
@@ -128,6 +134,17 @@ if __name__ == '__main__':
         for cmd in lambda_config['manual_commands']:
             script(cmd)
 
+    # Chmod the results
+    for path, _, files in os.walk(staging_dir):
+        for filename in files:
+            os.chmod(os.path.join(path, filename), 0o777)
+    #run('chmod -R 0777 {staging_dir}')
+
     output_file = cur_dir / 'staging' / (lambda_config['name'] + '.' + domain)
     output_file = shutil.make_archive(output_file, 'zip', staging_dir)
-    print(output_file)
+
+    cmd = 'python3 {} {} {} {} --upload-only'.format((staging_dir / 'lambdautils' / 'deploy_lambdas.py'),
+                                                     staging_dir,
+                                                     output_file,
+                                                     bucket)
+    run(cmd)

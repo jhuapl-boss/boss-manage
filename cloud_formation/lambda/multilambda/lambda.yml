@@ -51,3 +51,6 @@ manual_commands:
                 echo configuring logging
                 cd bossutils
                 mv ./lambda_logger_conf.json ./logger_conf.json
+        - |
+                # copy the lambda handlers into the root of the package
+                cp lambda/* .

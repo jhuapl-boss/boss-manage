@@ -70,7 +70,7 @@ def build_lambda(bosslet_config, lambda_name):
             zip.write_to_zip(src_file, zipname, arcname=dst)
             os.chdir(cwd)
 
-    CONTAINER_CMD = 'podman run --rm -it --volume {HOST_DIR}:/var/task/ lambci/lambda:build-{RUNTIME} {CMD}'
+    CONTAINER_CMD = 'podman run --rm -it --env AWS_* --volume {HOST_DIR}:/var/task/ lambci/lambda:build-{RUNTIME} {CMD}'
 
     BUILD_CMD = 'python3 {PREFIX}/build_lambda.py {DOMAIN} {BUCKET}'
     BUILD_ARGS = {
@@ -96,9 +96,15 @@ def build_lambda(bosslet_config, lambda_name):
             # Using the shell version, as chmod doesn't always work depending on the filesystem
             utils.run('mv {} {}'.format(zipname, staging_zip), shell=True)
 
+        # TODO: Only need to be set if they don't exist in the current environment?
+        env_extras = { 'AWS_REGION': bosslet_config.REGION }
+
         if container_command is None:
             BUILD_ARGS['PREFIX'] = const.repo_path('salt_stack', 'salt', 'lambda-dev', 'files')
             CMD = BUILD_CMD.format(**BUILD_ARGS)
+
+            if bosslet_config.PROFILE is not None:
+                env_extras['AWS_PROFILE'] = bosslet_config.PROFILE
         else:
             BUILD_ARGS['PREFIX'] = '/var/task'
             CMD = BUILD_CMD.format(**BUILD_ARGS)
@@ -106,13 +112,20 @@ def build_lambda(bosslet_config, lambda_name):
                                        RUNTIME = lambda_config['runtime'],
                                        CMD = CMD)
 
+            if bosslet_config.PROFILE is not None:
+                # Cannot set the profile as the container will not have the credentials file
+                creds = bosslet_config.session.get_credentials()
+                env_extras['AWS_ACCESS_KEY_ID'] = creds.access_key
+                env_extras['AWS_SECRET_ACCESS_KEY'] = creds.secret_key
+
+        print(env_extras)
         print(CMD)
 
         try:
             print("calling makedomainenv on localhost")
 
             try:
-                utils.run(CMD)
+                utils.run(CMD, env_extras=env_extras)
             except Exception as ex:
                 print("makedomainenv return code: {}".format(ex))
                 # DP NOTE: currently eating the error, as there is no checking of error if there is a build server
