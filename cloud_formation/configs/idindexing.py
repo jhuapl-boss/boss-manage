@@ -43,6 +43,7 @@ def STEP_FUNCTIONS(bosslet_config):
         (names.index_fanout_id_writers.sfn, 'index_fanout_id_writers.hsd'),
     ]
 
+
 def create_config(bosslet_config):
     """Create the CloudFormationConfiguration object."""
     config = CloudFormationConfiguration('idindexing', bosslet_config)
@@ -151,6 +152,7 @@ def generate(bosslet_config):
     config = create_config(bosslet_config)
     config.generate()
 
+
 def create(bosslet_config):
     """Create the configuration and launch."""
     if console.confirm("Rebuild multilambda", default = True):
@@ -160,6 +162,7 @@ def create(bosslet_config):
     config.create()
 
     post_init(bosslet_config)
+
 
 def pre_init(bosslet_config):
     """Build multilambda zip file and put in S3."""
@@ -189,7 +192,7 @@ def update(bosslet_config):
     config = create_config(bosslet_config)
     config.update()
 
-    post_update(session, domain)
+    post_update(bosslet_config)
 
 
 def delete(bosslet_config):

@@ -213,7 +213,7 @@ def update(bosslet_config):
     config = create_config(bosslet_config)
     config.update()
 
-    post_update(session, domain)
+    post_update(bosslet_config)
 
 def post_init(bosslet_config):
     role = 'StatesExecutionRole-us-east-1 '

@@ -310,7 +310,7 @@ class AWSNames(object):
 
     def build(self, name, resource_type):
         if resource_type not in self.TYPES:
-            raise AttributeError("'{}' is not a valide resource type".format(resource_type))
+            raise AttributeError("'{}' is not a valid resource type".format(resource_type))
 
         if name not in self.RESOURCES:
             raise AttributeError("'{}' is not a valid resource name".format(name))
