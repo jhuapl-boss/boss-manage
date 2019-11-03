@@ -1,0 +1,14 @@
+name: spdb.layer
+runtime: python3.6
+include:
+        salt_stack/salt/spdb/files/spdb.git: python/spdb
+
+        # Bossutils is required for logging / get_region / testing support
+        salt_stack/salt/boss-tools/files/boss-tools.git/bossutils: python/bossutils
+python_packages:
+        python/spdb/requirements.txt: python/
+manual_commands:
+        - |
+                cd python/spdb/c_lib/c_version
+                cp makefile_LINUX makefile
+                make
