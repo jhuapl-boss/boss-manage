@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from lib.exceptions import BossManageError
 from lib.ssh import SSHConnection, SSHTarget
 from lib import utils
 from lib import constants as const
 from lib import zip
+from lib import console
 
 import botocore
 import configparser
@@ -36,6 +38,24 @@ NDINGEST_SETTINGS_FOLDER = const.repo_path('salt_stack', 'salt', 'ndingest', 'fi
 NDINGEST_SETTINGS_TEMPLATE = NDINGEST_SETTINGS_FOLDER + '/settings.ini.apl'
 
 def build_lambda(bosslet_config, lambda_name):
+    """Package up the lambda files and send them through the lambda build process
+    where the lambda zip package is produced and uploaded to S3
+
+    NOTE: This function is also used to build lambda layer packages, the only requirement
+          for a layer is that the files in the resulting zip should be in the correct
+          subdirectory (`python/` for Python libraries) so that when a lambda uses the
+          layer the libraries included in the layer can be correctly loaded
+
+    Args:
+        bosslet_config (BossConfiguration): Configuration object of the stack the
+                                            lambda will be deployed into
+        lambda_name (str): Name of the directory in `cloud_formation/lambda/` that
+                           contains the `lambda.yml` configuration file for the lambda
+
+    Raises:
+        BossManageError: If there was a problem with building the lambda package or
+                         uploading it to the given S3 bucket
+    """
     lambda_dir = pathlib.Path(const.repo_path('cloud_formation', 'lambda', lambda_name))
     lambda_config = lambda_dir / 'lambda.yml'
     with lambda_config.open() as fh:
@@ -45,7 +65,7 @@ def build_lambda(bosslet_config, lambda_name):
     tempname = tempfile.NamedTemporaryFile(delete=True)
     zipname = pathlib.Path(tempname.name + '.zip')
     tempname.close()
-    print('Using temp zip file: {}'.format(zipname))
+    console.debug('Using temp zip file: {}'.format(zipname))
 
     cwd = os.getcwd()
 
@@ -54,7 +74,7 @@ def build_lambda(bosslet_config, lambda_name):
         zip.write_to_zip(str(filename), zipname, arcname=filename.name)
 
     # Copy the other files that should be included
-    if 'include' in lambda_config:
+    if lambda_config.get('include'):
         for src in lambda_config['include']:
             dst = lambda_config['include'][src]
             src_path, src_file = src.rsplit('/', 1)
@@ -70,7 +90,8 @@ def build_lambda(bosslet_config, lambda_name):
             zip.write_to_zip(src_file, zipname, arcname=dst)
             os.chdir(cwd)
 
-    CONTAINER_CMD = 'podman run --rm -it --env AWS_* --volume {HOST_DIR}:/var/task/ lambci/lambda:build-{RUNTIME} {CMD}'
+    # Currently any Docker CLI compatible container setup can be used (like podman)
+    CONTAINER_CMD = '{EXECUTABLE} run --rm -it --env AWS_* --volume {HOST_DIR}:/var/task/ lambci/lambda:build-{RUNTIME} {CMD}'
 
     BUILD_CMD = 'python3 {PREFIX}/build_lambda.py {DOMAIN} {BUCKET}'
     BUILD_ARGS = {
@@ -78,23 +99,26 @@ def build_lambda(bosslet_config, lambda_name):
         'BUCKET': bosslet_config.LAMBDA_BUCKET,
     }
 
-    lambda_build_server = None #bosslet_config.LAMBDA_SERVER
-    container_command = True
+    # DP NOTE: not sure if this should be in the bosslet_config, as it is more about the local dev
+    #          environment instead of the stack's environment. Different maintainer may have different
+    #          container commands installed.
+    container_executable = os.environ.get('LAMBDA_BUILD_CONTAINER')
+    lambda_build_server = bosslet_config.LAMBDA_SERVER
     if lambda_build_server is None:
         staging_target = pathlib.Path(const.repo_path('salt_stack', 'salt', 'lambda-dev', 'files', 'staging'))
         if not staging_target.exists():
             staging_target.mkdir()
 
-        print("Copying build zip to {}".format(staging_target))
+        console.debug("Copying build zip to {}".format(staging_target))
         staging_zip = staging_target / (domain + '.zip')
         try:
             zipname.rename(staging_zip)
         except OSError:
             # rename only works within the same filesystem
-            # Using the shell version, as chmod doesn't always work depending on the filesystem
+            # Using the shell version, as using copy +  chmod doesn't always work depending on the filesystem
             utils.run('mv {} {}'.format(zipname, staging_zip), shell=True)
 
-        # TODO: Only need to be set if they don't exist in the current environment?
+        # Provide the AWS Region and Credentials (for S3 upload) via environmental variables
         env_extras = { 'AWS_REGION': bosslet_config.REGION }
 
         if container_command is None:
@@ -106,31 +130,30 @@ def build_lambda(bosslet_config, lambda_name):
         else:
             BUILD_ARGS['PREFIX'] = '/var/task'
             CMD = BUILD_CMD.format(**BUILD_ARGS)
-            CMD = CONTAINER_CMD.format(HOST_DIR = const.repo_path('salt_stack', 'salt', 'lambda-dev', 'files'),
+            CMD = CONTAINER_CMD.format(EXECUTABLE = container_executable,
+                                       HOST_DIR = const.repo_path('salt_stack', 'salt', 'lambda-dev', 'files'),
                                        RUNTIME = lambda_config['runtime'],
                                        CMD = CMD)
 
             if bosslet_config.PROFILE is not None:
                 # Cannot set the profile as the container will not have the credentials file
+                # So extract the underlying keys and provide those instead
                 creds = bosslet_config.session.get_credentials()
                 env_extras['AWS_ACCESS_KEY_ID'] = creds.access_key
                 env_extras['AWS_SECRET_ACCESS_KEY'] = creds.secret_key
 
         try:
-            print("calling makedomainenv on localhost")
+            console.info("calling makedomainenv on localhost")
 
-            try:
-                utils.run(CMD, env_extras=env_extras)
-            except Exception as ex:
-                print("makedomainenv return code: {}".format(ex))
-                # DP NOTE: currently eating the error, as there is no checking of error if there is a build server
+            utils.run(CMD, env_extras=env_extras)
+        except Exception as ex:
+            raise BossManageError("Problem building {} lambda package: {}".format(lambda_name, ex))
         finally:
             os.remove(staging_zip)
 
     else:
         BUILD_ARGS['PREFIX'] = '~'
         CMD = BUILD_CMD.format(**BUILD_ARGS)
-        print(CMD); return
 
         lambda_build_server_key = bosslet_config.LAMBDA_SERVER_KEY
         lambda_build_server_key = utils.keypair_to_file(lambda_build_server_key)
@@ -138,15 +161,17 @@ def build_lambda(bosslet_config, lambda_name):
         bastions = [bosslet_config.outbound_bastion] if bosslet_config.outbound_bastion else []
         ssh = SSHConnection(ssh_target, bastions)
 
-        print("Copying build zip to lambda-build-server")
+        console.debug("Copying build zip to lambda-build-server")
+        target_file = '~/staging/{}.zip'.format(domain)
         ret = ssh.scp(zipname, target_file, upload=True)
-        print("scp return code: " + str(ret))
+        console.debug("scp return code: " + str(ret))
 
         os.remove(zipname)
 
-        print("calling makedomainenv on lambda-build-server")
+        console.info("calling makedomainenv on lambda-build-server")
         ret = ssh.cmd(CMD)
-        print("ssh return code: " + str(ret))
+        if ret != 0:
+            raise BossManageError("Problem building {} lambda package: Return code: {}".format(lambda_name, ret))
 
 def update_lambda_code(bosslet_config):
     """Update all lambdas that use the multilambda zip file.
