@@ -26,7 +26,7 @@ def upload_to_s3(zip_file, target_name, bucket):
     except s3.exceptions.BucketAlreadyOwnedByYou:
         pass # Only us-east-1 will not throw an exception if the bucket already exists
 
-    print("{} -> {}".format(zip_file, bucket))
+    print("{} -> {}/{}".format(zip_file, bucket, target_name))
     with zip_file.open('rb') as fh:
         s3.put_object(Bucket=bucket, Key=target_name, Body=fh)
 
@@ -120,28 +120,40 @@ if __name__ == '__main__':
     lambda_config = load_config(staging_dir)
 
     # Install System Packages
-    if 'system_packages' in lambda_config:
+    if lambda_config.get('system_packages'):
         packages = ' '.join(lambda_config['system_packages'])
         cmd = 'yum install -y ' + packages
 
         run(cmd)
 
     # Install Python Packages
-    if 'python_packages' in lambda_config:
-        packages = []
-        cmd = 'pip3 install -t {} -r {{}}'.format(staging_dir)
-        for entry in lambda_config['python_packages']:
-            if (staging_dir / entry).exists():
-                run(cmd.format(staging_dir / entry))
-            else:
-                packages.append(entry)
+    if lambda_config.get('python_packages'):
+        cmd_req = 'pip3 install -t {location} -r {requirements}'
+        cmd_pkgs = 'pip3 install -t {location} {packages}'
 
-        if len(packages) > 0:
-            cmd = 'pip3 install -t {} {}'.format(staging_dir, ' '.join(packages))
-            run(cmd)
+        entries = lambda_config['python_packages']
+        if type(entries) == list: # list of packages, convert to the dict format with
+                                  # the staging directory as the location to install
+            entries = { entry : '.'
+                        for entry in entries }
+
+        packages = {}
+        for entry in entries:
+            if (staging_dir / entry).exists(): # pointing to requirements file
+                run(cmd_req.format(location = staging_dir / entries[entry],
+                                   requirements = staging_dir / entry))
+            else:
+                location = entries[entry]
+                if location not in packages:
+                    packages[location] = []
+                packages[location].append(entry)
+
+        for loc, pkgs in packages.items():
+            run(cmd_pkgs.format(location = staging_dir / loc,
+                                packages = ' '.join(pkgs)))
 
     # Run Manual Commands
-    if 'manual_commands' in lambda_config:
+    if lambda_config.get('manual_commands'):
         for cmd in lambda_config['manual_commands']:
             script(cmd)
 
