@@ -59,7 +59,7 @@ def build_lambda(bosslet_config, lambda_name):
     lambda_dir = pathlib.Path(const.repo_path('cloud_formation', 'lambda', lambda_name))
     lambda_config = lambda_dir / 'lambda.yml'
     with lambda_config.open() as fh:
-        lambda_config = yaml.load(fh.read())
+        lambda_config = yaml.full_load(fh.read())
 
     domain = bosslet_config.INTERNAL_DOMAIN
     tempname = tempfile.NamedTemporaryFile(delete=True)

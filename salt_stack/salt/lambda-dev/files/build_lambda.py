@@ -60,7 +60,7 @@ def load_config(staging_dir):
         dict: Dictionary of the parsed configuration file
     """
     with open(os.path.join(staging_dir, 'lambda.yml'), 'r') as fh:
-        return yaml.load(fh.read())
+        return yaml.full_load(fh.read())
 
 def script(cmd):
     """Run the given bash shell script
@@ -153,7 +153,11 @@ if __name__ == '__main__':
     # Not all AWS Lambda containers have these libraries installed
     # verify that they are installed before importing them
     # (This can happen with non-python runtimes)
-    run('python3 -m pip install boto3 PyYaml')
+    # DP NOTE: using --user in case the script is not run as root
+    #          this can sometimes result in an import error, though
+    #          running the script again (after the packages have been
+    #          installed) normally works
+    run('python3 -m pip install --user boto3 PyYaml')
     import boto3
     import yaml
 
