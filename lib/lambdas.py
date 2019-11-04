@@ -121,12 +121,14 @@ def build_lambda(bosslet_config, lambda_name):
         # Provide the AWS Region and Credentials (for S3 upload) via environmental variables
         env_extras = { 'AWS_REGION': bosslet_config.REGION }
 
-        if container_command is None:
+        if container_executable is None:
             BUILD_ARGS['PREFIX'] = const.repo_path('salt_stack', 'salt', 'lambda-dev', 'files')
             CMD = BUILD_CMD.format(**BUILD_ARGS)
 
             if bosslet_config.PROFILE is not None:
                 env_extras['AWS_PROFILE'] = bosslet_config.PROFILE
+
+            console.info("calling build lambda on localhost")
         else:
             BUILD_ARGS['PREFIX'] = '/var/task'
             CMD = BUILD_CMD.format(**BUILD_ARGS)
@@ -142,9 +144,9 @@ def build_lambda(bosslet_config, lambda_name):
                 env_extras['AWS_ACCESS_KEY_ID'] = creds.access_key
                 env_extras['AWS_SECRET_ACCESS_KEY'] = creds.secret_key
 
-        try:
-            console.info("calling makedomainenv on localhost")
+            console.info("calling build lambda in {}".format(container_executable))
 
+        try:
             utils.run(CMD, env_extras=env_extras)
         except Exception as ex:
             raise BossManageError("Problem building {} lambda package: {}".format(lambda_name, ex))
@@ -168,7 +170,7 @@ def build_lambda(bosslet_config, lambda_name):
 
         os.remove(zipname)
 
-        console.info("calling makedomainenv on lambda-build-server")
+        console.info("calling build lambda on lambda-build-server")
         ret = ssh.cmd(CMD)
         if ret != 0:
             raise BossManageError("Problem building {} lambda package: Return code: {}".format(lambda_name, ret))

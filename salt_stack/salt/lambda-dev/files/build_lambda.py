@@ -177,18 +177,19 @@ if __name__ == '__main__':
 
     # Install System Packages
     if lambda_config.get('system_packages'):
-        # DP ???: Should probably wrap the `yum` call in `sudo` in case it is
-        #         a non-root user running the script. How to handle the password
-        #         request? (foreground the yum process?)
+        # DP NOTE: Expectation is that if no matter where run sudo will be able
+        #          to prompt for password, if it is needed
         packages = ' '.join(lambda_config['system_packages'])
         cmd = 'yum install -y ' + packages
+        if os.geteuid() != 0:
+            cmd = 'sudo ' + cmd
 
         run(cmd)
 
     # Install Python Packages
     if lambda_config.get('python_packages'):
-        cmd_req = 'pip3 install -t {location} -r {requirements}'
-        cmd_pkgs = 'pip3 install -t {location} {packages}'
+        cmd_req = 'python3 -m pip install -t {location} -r {requirements}'
+        cmd_pkgs = 'python3 -m pip install -t {location} {packages}'
 
         entries = lambda_config['python_packages']
         if type(entries) == list: # list of packages, convert to the dict format with
