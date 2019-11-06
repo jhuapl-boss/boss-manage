@@ -129,8 +129,6 @@ class IamWrapper:
 
 
     def put_role_policy(self, role_name, policy_name, policy_document):
-        if( role_name == 'lambda_basic_execution'):
-            print("lambda_basic_execution")
         pol_doc_str = json.dumps(policy_document, indent=2, sort_keys=True)
         try:
             resp = self.client.put_role_policy(RoleName=role_name, PolicyName=policy_name, PolicyDocument=pol_doc_str)
