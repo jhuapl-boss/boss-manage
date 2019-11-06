@@ -95,3 +95,7 @@ cloud_formation/configs/dynamo_config.template
 # Ignore bosslet configuration files
 /config/*.py
 /config/custom/
+
+# config migrations 
+progress
+
