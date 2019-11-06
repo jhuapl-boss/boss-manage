@@ -332,6 +332,8 @@ def post_init(bosslet_config):
 
         #Check and see if these secrets already exist before we overwrite them with new ones.
         # Write data into Vault
+        # DP TODO: update checks to also verify the passwords / pull the passwords from Vault
+        #          so we don't use a different password in Keycloak then what is stored in Vault
         if not vault.read(const.VAULT_AUTH):
             print("Writing {}".format(const.VAULT_AUTH))
             vault.write(const.VAULT_AUTH, password = password, username = username, client_id = "admin-cli")
