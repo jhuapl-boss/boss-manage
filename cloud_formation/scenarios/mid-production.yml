@@ -8,9 +8,9 @@ REDIS_CACHE_TYPE: cache.m5.xlarge
 REDIS_SESSION_TYPE: cache.t2.small
 REDIS_TYPE: cache.t2.small
 CACHE_MANAGER_TYPE: t3.micro
-VAULT_TYPE: t3.medium
+VAULT_TYPE: m5.large
 ACTIVITIES_TYPE: m5.large
-AUTH_TYPE: t3.large
+AUTH_TYPE: m5.xlarge
 
 # Cluster / ASG sizes
 AUTH_CLUSTER_SIZE: 1

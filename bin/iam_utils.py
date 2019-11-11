@@ -324,7 +324,7 @@ class IamUtils(object):
             return group
         elif resource_type == 'roles':
             if resource['Path'].startswith('/aws-service-role/'):
-                console.warn('Cannot export AWS created Role')
+                console.warning('Cannot export AWS created Role')
                 return None
 
             role = {
