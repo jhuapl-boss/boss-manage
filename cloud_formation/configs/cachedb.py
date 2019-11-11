@@ -250,8 +250,8 @@ def create_config(bosslet_config, user_data=None):
         { 'AWS': cuboid_import_role})
 
     config.add_ec2_instance("CacheManager",
-                            names.cache_manager.dns,
-                            aws.ami_lookup(bosslet_config, names.cache_manager.ami),
+                            names.cachemanager.dns,
+                            aws.ami_lookup(bosslet_config, names.cachemanager.ami),
                             keypair,
                             subnet=Ref("InternalSubnet"),
                             public_ip=False,
@@ -378,7 +378,7 @@ def build_user_data(bosslet_config):
     session = bosslet_config.session
 
     user_data = UserData()
-    user_data["system"]["fqdn"] = names.cache_manager.dns
+    user_data["system"]["fqdn"] = names.cachemanager.dns
     user_data["system"]["type"] = "cachemanager"
     user_data["aws"]["cache"] = names.cache.redis
     user_data["aws"]["cache-state"] = names.cache_state.redis
@@ -530,7 +530,7 @@ def delete(bosslet_config):
     domain = bosslet_config.INTERNAL_DOMAIN
     names = bosslet_config.names
 
-    aws.route53_delete_records(session, domain, names.cache_manager.dns)
+    aws.route53_delete_records(session, domain, names.cachemanager.dns)
 
     config = CloudFormationConfiguration("cachedb", bosslet_config)
     config.delete()

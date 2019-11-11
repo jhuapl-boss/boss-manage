@@ -370,7 +370,7 @@ class IamUtils(object):
         Args:
             resource_type (str): One of - groups, roles, policies
             current (list[object]): List of objects loaded from IAM
-            desired (list[object]): Lost of objects loaded from disk
+            desired (list[object]): List of objects loaded from disk
         """
         key = {
             'groups': 'GroupName',

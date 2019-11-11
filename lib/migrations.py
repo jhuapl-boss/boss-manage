@@ -47,8 +47,21 @@ class MigrationManager(object):
 
         self.load_migrations()
 
+    def check_config_migration_dir(self, dir):
+        """
+        Checks to see if a migrations directory is already created for a given CF config.  If it is not, it creates it.
+        Args:
+            dir: config migration directory
+
+        Returns:
+        """
+        if not os.path.exists(dir):
+            os.makedirs(dir, exist_ok=True)
+
     def load_migrations(self):
         lookup = {}
+        config_dir = const.repo_path('cloud_formation', 'configs', 'migrations', self.config)
+        self.check_config_migration_dir(config_dir)
 
         path = const.repo_path('cloud_formation', 'configs', 'migrations', self.config, '*.py')
         for fn in glob(path):

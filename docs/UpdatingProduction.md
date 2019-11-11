@@ -66,7 +66,7 @@ to see if DNS has been changed to cloudfront servers.
 You can either create new AMIs:
 ```shell
 $ cd boss-manage/bin
-$  ./packer.py auth vault endpoint cachemanager activities --name sprintXX
+$  ./packer.py production.boss auth vault endpoint cachemanager activities --name sprintXX
 ```
 or copy the latest AMIs from the console to become sprintXX (this way is faster if the AMIs will end up being the same version of code.)
 
@@ -82,7 +82,9 @@ Verify IAM Policy, Groups and Roles are the latest.  Master IAM scripts are loca
 Make sure your AWS_CREDENTIALS is set for the dev account
 ```shell
 $ cd boss-manage.git/bin
-$ ./iam_utils.py export
+$ ./iam_utils.py production.boss export groups
+$ ./iam_utils.py production.boss export roles
+$ ./iam_utils.py production.boss export policies
 ```
 this will update the boss-manage.git/config/iam files with the latest changes added
 to the dev account.  I use git diff on the three files to look over the changes.
@@ -94,12 +96,6 @@ If there new information that you believe should not be included in these files 
 can edit iam_utils.py file.  It has keyword filters and whole word filters to 
 excluded groups, policies and roles that should not to into the config/iam files.
 
-
-Make sure your AWS_CREDENTIALS is set for the production account
-```shell
-$ cd boss-manage.git/bin
-$ ./iam_utils.py import
-```
 
 ### Remove Subscriptions to ProductionMicronsMailingList in SNS 
 *Make a note of mailing subscribers so you can add them back in later.*
@@ -139,7 +135,7 @@ run the following command. You have to wait for each command to finish before
 launching the next configuration as they build upon each other.  
 
 ```shell
-$ ./cloudformation.py update production.boss --scenario production core
+$ ./cloudformation.py update production.boss core
 ```
 
 *Note: The cloudformation.py script will automatically use the latest created AMIs
@@ -153,7 +149,7 @@ After completion check that vault still works, look for password:
 Try to update redis
 
 ```shell
-$ ./cloudformation.py update production.boss --scenario production redis
+$ ./cloudformation.py update production.boss redis
 ```
 
 If the size is not identical you may have to delete the redis config and create it again.
@@ -171,13 +167,13 @@ keys WRITE-CUBOID*
 **Only peform this step if the redis update did not work** If no keys come back it is OK to delete the cache. If keys exist, keep checking, the keys 
 should all disappear eventually.  Then delete and create the redis clusters
 ```shell
-$ ./cloudformation.py delete production.boss --scenario production redis
-$ ./cloudformation.py create production.boss --scenario production redis
+$ ./cloudformation.py delete production.boss redis
+$ ./cloudformation.py create production.boss redis
 ```
 
 Make another template for api and compare it in cloud formation.
 ```shell
-$ ./cloudformation.py generate production.boss --scenario production api 
+$ ./cloudformation.py generate production.boss api 
 ```
 
 _WARNING if updating API after sprint18 (7/19/18): We have modified the Global Secondary Indexes (GSI) on the Tile DynamoDB Table. If you try and update the API Cloudformation script, it may fail if it tries to remove an old GSI and add a new one.  You'll receive a failure that only once GSI change can occur at a time.  To resolve this edit the ndingest/nddynamo/schemas/boss_tile_index.json file.  If the GSI in your table is different then the named GSI in DynamoDB, edit this file and remove the GSI completely.  Update API and your GSI will be removed. Now put the GSI back in the boss_tile_index.json file and run API update again.  The new GSI will be created._    
@@ -186,9 +182,9 @@ _WARNING if updating API after sprint18 (7/19/18): We have modified the Global S
 For *api*, *cachedb*, and *activities* update each stack in sequence
 
 ```shell
-$ ./cloudformation.py update production.boss --scenario production api
-$ ./cloudformation.py update production.boss --scenario production cachedb
-$ ./cloudformation.py update production.boss --scenario production activities
+$ ./cloudformation.py update production.boss api
+$ ./cloudformation.py update production.boss cachedb
+$ ./cloudformation.py update production.boss activities
 ```
 
 If cachedb or activities has new lambdas being created for the first time you may get errors like this:
@@ -197,26 +193,32 @@ In which case you'll need to delete and create both cachedb and activities again
 
 Error updated cachedb or activities?  do this step:
 ```shell
-$ ./cloudformation.py delete production.boss --scenario production cachedb
-$ ./cloudformation.py create production.boss --scenario production cachedb
-$ ./cloudformation.py delete production.boss --scenario production activities
-$ ./cloudformation.py create production.boss --scenario production activities
+$ ./cloudformation.py delete production.boss cachedb
+$ ./cloudformation.py create production.boss cachedb
+$ ./cloudformation.py delete production.boss activities
+$ ./cloudformation.py create production.boss activities
 ```
 
-**Until Delete Step Functions are updated,  turn off the Cloudwatch Rule for Deletes**
-
-* Go to Cloudwatch in the AWS Console
-* Under Events -> Rules, select the deleteEventRule.production.boss Rule
-* Under the Action menu select Disable
 
 
-For *cloudwatch* and *dynamolambda* delete and create the cloud formation stacks again.
+For *cloudwatch* it is much faster to update it.  But it is possible to delete and create it. If update doesn't work for some reason.
 
 ```shell
-$ ./cloudformation.py delete production.boss --scenario production cloudwatch
-$ ./cloudformation.py create production.boss --scenario production cloudwatch
-$ ./cloudformation.py delete production.boss --scenario production dynamolambda
-$ ./cloudformation.py create production.boss --scenario production dynamolambda
+$ ./cloudformation.py update production.boss cloudwatch
+```
+
+For *idindexing* run update
+
+```shell
+$ ./cloudformation.py update production.boss idindexing
+```
+
+
+For *dynamolambda* delete and create the cloud formation stacks again.  It is fast and does not support update
+
+```shell
+$ ./cloudformation.py delete production.boss dynamolambda
+$ ./cloudformation.py create production.boss dynamolambda
 ```
 
 ## Get bossadmin password

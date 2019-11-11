@@ -258,8 +258,8 @@
           "Effect": "Allow",
           "Principal": {
             "Service": [
-              "elasticmapreduce.amazonaws.com",
-              "datapipeline.amazonaws.com"
+              "datapipeline.amazonaws.com",
+              "elasticmapreduce.amazonaws.com"
             ]
           }
         }
@@ -272,6 +272,28 @@
     "InstanceProfileList": [],
     "Path": "/",
     "RoleName": "DataPipelineDefaultRole",
+    "RolePolicyList": []
+  },
+  {
+    "AssumeRolePolicyDocument": {
+      "Statement": [
+        {
+          "Action": "sts:AssumeRole",
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "lambda.amazonaws.com"
+          }
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/AmazonEC2FullAccess",
+      "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+    ],
+    "InstanceProfileList": [],
+    "Path": "/",
+    "RoleName": "DeleteENI",
     "RolePolicyList": []
   },
   {

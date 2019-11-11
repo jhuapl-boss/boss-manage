@@ -193,7 +193,7 @@ $PYTHON ./bastion.py endpoint.auto-build-test.boss ssh-cmd "sudo python3 -m pip 
 $PYTHON ./bastion.py endpoint.auto-build-test.boss ssh-cmd "cd /usr/local/lib/python3/site-packages/ndingest && export NDINGEST_TEST=1 && pytest -c test_apl.cfg"
 
 #cachemanage VM
-$PYTHON ./bastion.py cache_manager.auto-build-test.boss ssh-cmd "cd /srv/salt/boss-tools/files/boss-tools.git/cachemgr && sudo nose2 && sudo nose2 -c inttest.cfg"
+$PYTHON ./bastion.py cachemanager.auto-build-test.boss ssh-cmd "cd /srv/salt/boss-tools/files/boss-tools.git/cachemgr && sudo nose2 && sudo nose2 -c inttest.cfg"
 
 set -e
 
