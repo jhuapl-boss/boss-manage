@@ -132,8 +132,6 @@ class IamWrapper:
         pol_doc_str = json.dumps(policy_document, indent=2, sort_keys=True)
         try:
             resp = self.client.put_role_policy(RoleName=role_name, PolicyName=policy_name, PolicyDocument=pol_doc_str)
-            print("Printing {} resp for put_role_policy:".format(role_name))
-            pprint(resp)
         except ClientError as e:
             print("ERROR occured creating role {}'s inline policy: {}".format(role_name, policy_name))
             print("   Details: {}".format(str(e)))
