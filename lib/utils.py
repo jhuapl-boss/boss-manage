@@ -99,6 +99,24 @@ def get_commit():
     except:
         return "unknown"
 
+def get_submodule_commit(submodule_path):
+    try:
+        cmd = "git submodule status"
+        result = subprocess.run(shlex.split(cmd), stdout=subprocess.PIPE)
+        for line in result.stdout.decode("utf-8").splitlines():
+            if submodule_path in line:
+                commit, _ = line.strip().split(' ', 1)
+
+                # Remove the indicator that the commit was changed but not committed
+                if commit[0] == '+':
+                    commit = commit[1:]
+
+                return commit
+    except:
+        pass
+
+    return "unknown"
+
 def keypair_to_file(keypair):
     """Looks for the SSH private key for keypair under ~/.ssh/
 
