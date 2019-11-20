@@ -28,6 +28,7 @@ from . import hosts
 from . import aws
 from . import utils
 from . import console
+from . import lambdas
 from . import constants as const
 from .migrations import MigrationManager
 from .exceptions import BossManageError, BossManageCanceled
@@ -582,6 +583,10 @@ class CloudFormationConfiguration:
                     )
 
                 if response['Status'] != 'CREATE_COMPLETE':
+                    if "didn't contain changes" in response['StatusReason']:
+                        console.info("No changes detected, nothing to update")
+                        return
+
                     print("ChangeSet status is {}".format(response['Status']))
                     raise BossManageError(response['StatusReason'])
 
@@ -1878,7 +1883,7 @@ class CloudFormationConfiguration:
             })
 
 
-    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python2.7", reserved_executions=None, dlq=None):
+    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python2.7", reserved_executions=None, dlq=None, layers=None):
         """Create a Python Lambda
 
         Args:
@@ -1886,7 +1891,7 @@ class CloudFormationConfiguration:
             name (str) : Function name
             role (str) : IAM role the lambda will execute under
             file (None|string) : File path to file containing lambda source code
-            handler (None|string) : Name of lambda's handler function (the entry point).  If using a file, than the handler should be 'index.<name of function>'.  This value is ignored if using s3.
+            handler (None|string) : Name of lambda's handler function (the entry point).  If using a file, than the handler should be 'index.<name of function>'.  If `file` is not provided the lambda package is built and uploaded to S3.
             s3 (None|tuple) : Tuple (bucket, key, handler) for the S3 location containing lambda source code
                               handler is the Python function to execute
             description (str) : Lambda description
@@ -1898,8 +1903,9 @@ class CloudFormationConfiguration:
             depends_on (None|str|list) : A unique name or list of unique names of resources within the
                                             configuration and is used to determine the launch order of resources
             runtime (optional[str]) : Lambda runtime to use.  Defaults to "python2.7".
-            dlq (optional[str]): ARN of dead letter queue.  Defaults to None.
             reserved_executions (optional[int]): Number of reserved concurrent executions for the lambda.
+            dlq (optional[str]): ARN of dead letter queue.  Defaults to None.
+            layers (optional[list[str]]): List of lambda layer ARNs with version
         """
 
         if file is not None:
@@ -1920,8 +1926,15 @@ class CloudFormationConfiguration:
                 "S3Bucket": bucket,
                 "S3Key": s3key
             }
+        elif handler is not None:
+            s3, runtime, layers = lambdas.s3_config(self.bosslet_config, name, handler)
+            bucket, s3key, handler = s3
+            code = {
+                "S3Bucket": bucket,
+                "S3Key": s3key
+            }
         else:
-            raise Exception("Need source file or S3 bucket")
+            raise Exception("Need source file or S3 bucket or S3 package handler")
 
         memory = int(memory)
         if memory < 128 or 3008 < memory:
@@ -1958,15 +1971,13 @@ class CloudFormationConfiguration:
             self.resources[key]['Properties']['ReservedConcurrentExecutions'] = reserved_executions
 
         if dlq is not None:
-            self.resources[key]['Properties']['DeadLetterConfig'] = {
-                'TargetArn': dlq
-            }
-
-        if dlq is not None:
             self.resources[key]['Properties']['DeadLetterConfig'] = {'TargetArn': dlq}
 
         if reserved_executions is not None:
             self.resources[key]['Properties']['ReservedConcurrentExecutions'] = reserved_executions
+
+        if layers is not None:
+            self.resources[key]['Properties']['Layers'] = layers
 
     def add_lambda_permission(self, key, lambda_, action="lambda:invokeFunction", principal="sns.amazonaws.com", source=None, depends_on=None):
         """Add permissions to a Lambda (typically to allow another resource to invoke the lambda)

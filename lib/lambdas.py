@@ -37,7 +37,103 @@ NDINGEST_SETTINGS_FOLDER = const.repo_path('salt_stack', 'salt', 'ndingest', 'fi
 # Template used for ndingest settings.ini generation.
 NDINGEST_SETTINGS_TEMPLATE = NDINGEST_SETTINGS_FOLDER + '/settings.ini.apl'
 
-def build_lambda(bosslet_config, lambda_name):
+def load_lambda_config(lambda_dir):
+    lambda_config = const.repo_path('cloud_formation', 'lambda', lambda_dir, 'lambda.yml')
+    with open(lambda_config, 'r') as fh:
+        return yaml.full_load(fh.read())
+
+def package_lookup(bosslet_config):
+    n = bosslet_config.names
+    # DP NOTE: Values must be the name of a directory under cloud_formation/lambdas/
+    return {
+        n.multi_lambda.lambda_: 'multi_lambda',
+        n.downsample_volume.lambda_: 'multi_lambda',
+        n.delete_tile_objs.lambda_: 'multi_lambda',
+        n.delete_tile_index_entry.lambda_: 'multi_lambda',
+        n.index_s3_writer.lambda_: 'multi_lambda', 
+        n.index_fanout_id_writer.lambda_: 'multi_lambda',
+        n.index_write_id.lambda_: 'multi_lambda',
+        n.index_write_failed.lambda_: 'multi_lambda',
+        n.index_find_cuboids.lambda_: 'multi_lambda',
+        n.index_split_cuboids.lambda_: 'multi_lambda',
+        n.index_fanout_enqueue_cuboid_keys.lambda_: 'multi_lambda',
+        n.index_batch_enqueue_cuboids.lambda_: 'multi_lambda',
+        n.index_fanout_dequeue_cuboid_keys.lambda_: 'multi_lambda',
+        n.index_dequeue_cuboid_keys.lambda_: 'multi_lambda',
+        n.index_get_num_cuboid_keys_msgs.lambda_: 'multi_lambda',
+        n.index_check_for_throttling.lambda_: 'multi_lambda',
+        n.index_invoke_index_supervisor.lambda_: 'multi_lambda',
+        n.index_load_ids_from_s3.lambda_: 'multi_lambda',
+        n.start_sfn.lambda_: 'multi_lambda',
+        n.copy_cuboid_lambda.lambda_: 'multi_lambda',
+        n.cuboid_import_lambda.lambda_: 'multi_lambda',
+        n.volumetric_ingest_queue_upload_lambda.lambda_: 'multi_lambda',
+        n.tile_uploaded.lambda_: 'multi_lambda',
+        n.tile_ingest.lambda_: 'multi_lambda',
+        n.delete_tile_index_entry.lambda_: 'multi_lambda',
+    }
+
+def package_zip(bosslet_config, lambda_config):
+    # DP NOTE: Must match what salt_stack/salt/lambda-dev/files/build_lambda.py does
+    #          when uploading the results to S3
+    return lambda_config['name'] + '.' + bosslet_config.INTERNAL_DOMAIN + '.zip'
+
+def get_layer_arns(bosslet_config, layer_dirs):
+    client = bosslet_config.session.client('lambda')
+
+    layers = []
+    for layer_dir in layer_dirs:
+        # DP NOTE: Must match what salt_stack/salt/lambda-dev/files/build_lambda.py does
+        #          when creating a Lambda Layer
+        layer_config = load_lambda_config(layer_dir)
+        layer_name = (layer_config['name'] + '.' + bosslet_config.INTERNAL_DOMAIN).replace('.', '-')
+
+        resp = client.list_layer_versions(LayerName=layer_name)
+        arn = resp['LayerVersions'][0]['LayerVersionArn']
+        layers.append(arn)
+
+    return layers
+
+def s3_config(bosslet_config, lambda_name, lambda_handler):
+    # Used by lib.cloudformation.CloudFormationTemplate.add_lambda if only a lambda handler is defined
+    package_name = package_lookup(bosslet_config)[lambda_name]
+
+    config = load_lambda_config(package_name)
+
+    layers = None
+    if config.get('layers'):
+        layers = get_layer_arns(bosslet_config, config['layers'])
+
+    return ((bosslet_config.LAMBDA_BUCKET,
+             package_zip(bosslet_config, config),
+             lambda_handler),
+            config['runtime'],
+            layers)
+
+def update_lambda_code(bosslet_config):
+    """Update all lambdas that use the multilambda zip file.
+
+    Args:
+        bosslet_config: Bosslet configuration object
+    """
+    names = bosslet_config.names
+    uses_multilambda = [k for k, v in package_lookup(bosslet_config).items()
+                          if v == 'multi_lambda']
+    config = load_lambda_config('multi_lambda')
+    client = bosslet_config.session.client('lambda')
+    for lambda_name in uses_multilambda:
+        try:
+            resp = client.update_function_code(
+                FunctionName=lambda_name,
+                S3Bucket=bosslet_config.LAMBDA_BUCKET,
+                S3Key=package_zip(bosslet_config, config['name']),
+                Publish=True)
+            print(resp)
+        except botocore.exceptions.ClientError as ex:
+            print('Error updating {}: {}'.format(lambda_name, ex))
+
+BUILT_PACKAGES = []
+def load_lambdas_on_s3(bosslet_config, lambda_name = None, package_name = None):
     """Package up the lambda files and send them through the lambda build process
     where the lambda zip package is produced and uploaded to S3
 
@@ -49,17 +145,48 @@ def build_lambda(bosslet_config, lambda_name):
     Args:
         bosslet_config (BossConfiguration): Configuration object of the stack the
                                             lambda will be deployed into
-        lambda_name (str): Name of the directory in `cloud_formation/lambda/` that
-                           contains the `lambda.yml` configuration file for the lambda
+        lambda_name (str): Name of the lambda, which will be mapped to the name of the
+                           lambda package that contains the lambda's code
+        package_name (str): Name of the directory in `cloud_formation/lambda/` that
+                            contains the `lambda.yml` configuration file for the lambda
+                            Defaults to 'multi_lambda' for backwards compatibility
 
     Raises:
         BossManageError: If there was a problem with building the lambda package or
                          uploading it to the given S3 bucket
     """
-    lambda_dir = pathlib.Path(const.repo_path('cloud_formation', 'lambda', lambda_name))
+    # For backwards compatibility build the multi_lambda package
+    if lambda_name is None and package_name is None:
+        package_name = 'multi_lambda'
+
+    # Map from lambda_name to package_name if needed
+    if package_name is None:
+        try:
+            package_name = package_lookup(bosslet_config)[lambda_name]
+        except KeyError:
+            console.error("Cannot build a lambda that doesn't use a code zip file")
+            return None
+
+    # To prevent rubuilding a package multiple times during an individual execution memorize what has been built
+    if package_name in BUILT_PACKAGES:
+        console.debug('Lambda package {} has already be build recently, skipping...'.format(package_name))
+        return
+    BUILT_PACKAGES.append(package_name)
+
+    lambda_dir = pathlib.Path(const.repo_path('cloud_formation', 'lambda', package_name))
     lambda_config = lambda_dir / 'lambda.yml'
     with lambda_config.open() as fh:
         lambda_config = yaml.full_load(fh.read())
+
+    if lambda_config.get('layers'):
+        for layer in lambda_config['layers']:
+            # Layer names should end with `layer`
+            if not layer.endswith('layer'):
+                console.warning("Layer '{}' doesn't conform to naming conventions".format(layer))
+
+            load_lambdas_on_s3(bosslet_config, package_name=layer)
+
+    console.debug("Building {} lambda package".format(package_name))
 
     domain = bosslet_config.INTERNAL_DOMAIN
     tempname = tempfile.NamedTemporaryFile(delete=True)
@@ -79,7 +206,7 @@ def build_lambda(bosslet_config, lambda_name):
             dst = lambda_config['include'][src]
             src_path, src_file = src.rsplit('/', 1)
 
-            os.chdir(src_path)
+            os.chdir(const.repo_path(src_path))
 
             # Generate dynamic configuration files, as needed
             if src_file == 'ndingest.git':
@@ -119,7 +246,8 @@ def build_lambda(bosslet_config, lambda_name):
             utils.run('mv {} {}'.format(zipname, staging_zip), shell=True)
 
         # Provide the AWS Region and Credentials (for S3 upload) via environmental variables
-        env_extras = { 'AWS_REGION': bosslet_config.REGION }
+        env_extras = { 'AWS_REGION': bosslet_config.REGION,
+                       'AWS_DEFAULT_REGION': bosslet_config.REGION }
 
         if container_executable is None:
             BUILD_ARGS['PREFIX'] = const.repo_path('salt_stack', 'salt', 'lambda-dev', 'files')
@@ -149,7 +277,7 @@ def build_lambda(bosslet_config, lambda_name):
         try:
             utils.run(CMD, env_extras=env_extras)
         except Exception as ex:
-            raise BossManageError("Problem building {} lambda package: {}".format(lambda_name, ex))
+            raise BossManageError("Problem building {} lambda package: {}".format(package_name, ex))
         finally:
             os.remove(staging_zip)
 
@@ -173,152 +301,7 @@ def build_lambda(bosslet_config, lambda_name):
         console.info("calling build lambda on lambda-build-server")
         ret = ssh.cmd(CMD)
         if ret != 0:
-            raise BossManageError("Problem building {} lambda package: Return code: {}".format(lambda_name, ret))
-
-def update_lambda_code(bosslet_config):
-    """Update all lambdas that use the multilambda zip file.
-
-    Args:
-        bosslet_config: Bosslet configuration object
-    """
-    names = bosslet_config.names
-    uses_multilambda = [
-        names.multi_lambda.lambda_, 
-        names.downsample_volume.lambda_,
-        names.delete_tile_objs.lambda_,
-        names.delete_tile_index_entry.lambda_,
-        names.index_s3_writer.lambda_, 
-        names.index_fanout_id_writer.lambda_,
-        names.index_write_id.lambda_,
-        names.index_write_failed.lambda_,
-        names.index_find_cuboids.lambda_,
-        names.index_split_cuboids.lambda_,
-        names.index_fanout_enqueue_cuboid_keys.lambda_,
-        names.index_batch_enqueue_cuboids.lambda_,
-        names.index_fanout_dequeue_cuboid_keys.lambda_,
-        names.index_dequeue_cuboid_keys.lambda_,
-        names.index_get_num_cuboid_keys_msgs.lambda_,
-        names.index_check_for_throttling.lambda_,
-        names.index_invoke_index_supervisor.lambda_,
-        names.index_load_ids_from_s3.lambda_,
-        names.start_sfn.lambda_,
-        names.copy_cuboid_lambda.lambda_,
-        names.cuboid_import_lambda.lambda_,
-        names.volumetric_ingest_queue_upload_lambda.lambda_,
-        names.tile_uploaded.lambda_,
-        names.tile_ingest.lambda_,
-        names.delete_tile_index_entry.lambda_,
-    ]
-    client = bosslet_config.session.client('lambda')
-    for lambda_name in uses_multilambda:
-        try:
-            resp = client.update_function_code(
-                FunctionName=lambda_name,
-                S3Bucket=bosslet_config.LAMBDA_BUCKET,
-                S3Key=names.multi_lambda.zip,
-                Publish=True)
-            print(resp)
-        except botocore.exceptions.ClientError as ex:
-            print('Error updating {}: {}'.format(lambda_name, ex))
-
-def load_lambdas_on_s3(bosslet_config):
-    """Zip up spdb, bossutils, lambda and lambda_utils.  Upload to S3.
-
-    Uses the lambda build server (an Amazon Linux AMI) to compile C code and
-    prepare the virtualenv that's ultimately contained in the zip file placed
-    in S3.
-
-    Args:
-        session (Session): boto3.Session
-        domain (str): The VPC's domain name such as integration.boss.
-        bucket (str): Name of bucket that contains the lambda zip file.
-    """
-    domain = bosslet_config.INTERNAL_DOMAIN
-    tempname = tempfile.NamedTemporaryFile(delete=True)
-    zipname = tempname.name + '.zip'
-    tempname.close()
-    print('Using temp zip file: ' + zipname)
-
-    cwd = os.getcwd()
-    os.chdir(const.repo_path("salt_stack", "salt", "spdb", "files"))
-    zip.write_to_zip('spdb.git', zipname, False)
-    os.chdir(cwd)
-
-    os.chdir(const.repo_path("salt_stack", "salt", "boss-tools", "files", "boss-tools.git"))
-    zip.write_to_zip('bossutils', zipname)
-    zip.write_to_zip('cloudwatchwrapper', zipname)
-    zip.write_to_zip('lambda', zipname)
-    zip.write_to_zip('lambdautils', zipname)
-    os.chdir(cwd)
-
-    with open(NDINGEST_SETTINGS_TEMPLATE, 'r') as tmpl:
-        # Generate settings.ini file for ndingest.
-        create_ndingest_settings(bosslet_config, tmpl)
-
-    os.chdir(const.repo_path("salt_stack", "salt", "ndingest", "files"))
-    zip.write_to_zip('ndingest.git', zipname)
-    os.chdir(cwd)
-
-    os.chdir(const.repo_path("lib"))
-    zip.write_to_zip('heaviside.git', zipname)
-
-    # Let lambdas look up names by creating a bossnames module.
-    zip.write_to_zip('names.py', zipname, arcname='bossnames/names.py')
-    zip.write_to_zip('bucket_object_tags.py', zipname, arcname='bossnames/bucket_object_tags.py')
-    zip.write_to_zip('__init__.py', zipname, arcname='bossnames/__init__.py')
-    os.chdir(cwd)
-
-
-    #copy the zip file to lambda_build_server and run makedomainenv
-    lambda_bucket = bosslet_config.LAMBDA_BUCKET
-
-    build_cmd = 'source /etc/profile && source ~/.bash_profile && ~/makedomainenv {} {}'.format(domain, lambda_bucket)
-    target_file = "sitezips/{}.zip".format(domain)
-
-    lambda_build_server = bosslet_config.LAMBDA_SERVER
-    if lambda_build_server is None:
-        print("Copying local modules to localhost")
-        full_target_file = '/home/ec2-user/' + target_file
-        shutil.copy(zipname, full_target_file)
-        os.remove(zipname)
-
-        cur_user = pwd.getpwuid(os.getuid()).pw_name
-        if cur_user != 'ec2-user':
-            # Correctly set the $HOME directory so the makedomainenv script works correctly
-            build_cmd = build_cmd.replace('~', '/home/ec2-user')
-            build_cmd = 'HOME=/home/ec2-user su -m ec2-user -c "{}"'.format(build_cmd)
-
-        try:
-            print("calling makedomainenv on localhost")
-
-            output = subprocess.check_output(build_cmd,
-                                             shell=True,
-                                             executable='/bin/bash',
-                                             stderr=subprocess.STDOUT)
-            print(output.decode('utf-8'))
-        except subprocess.CalledProcessError as ex:
-            print("makedomainenv return code: {}".format(ex.returncode))
-            print(ex.output.decode('utf-8'))
-            # DP NOTE: currently eating the error, as there is no checking of error if there is a build server
-        finally:
-            os.remove(full_target_file)
-    else:
-        lambda_build_server_key = bosslet_config.LAMBDA_SERVER_KEY
-        lambda_build_server_key = utils.keypair_to_file(lambda_build_server_key)
-        ssh_target = SSHTarget(lambda_build_server_key, lambda_build_server, 22, 'ec2-user')
-        bastions = [bosslet_config.outbound_bastion] if bosslet_config.outbound_bastion else []
-        ssh = SSHConnection(ssh_target, bastions)
-
-        print("Copying local modules to lambda-build-server")
-        ret = ssh.scp(zipname, target_file, upload=True)
-        print("scp return code: " + str(ret))
-
-        os.remove(zipname)
-
-        # This section will run makedomainenv on lambda-build-server
-        print("calling makedomainenv on lambda-build-server")
-        ret = ssh.cmd(build_cmd)
-        print("ssh return code: " + str(ret))
+            raise BossManageError("Problem building {} lambda package: Return code: {}".format(package_name, ret))
 
 def create_ndingest_settings(bosslet_config, fp):
     """Create the settings.ini file for ndingest.
@@ -356,33 +339,52 @@ def freshen_lambda(bosslet_config, lambda_name):
     Useful when developing and small changes need to be made to a lambda function, 
     but a full rebuild of the entire zip file isn't required.
     """
-    zip_name = bosslet_config.names.multi_lambda.zip
-    full_name = bosslet_config.names[lambda_name].lambda_
+    package_dir = package_lookup(bosslet_config)[lambda_name]
+    lambda_config = load_lambda_config(package_dir)
+
+    zip_name = package_zip(bosslet_config, lambda_config)
+
     client = bosslet_config.session.client('lambda')
     resp = client.update_function_code(
-        FunctionName=full_name,
+        FunctionName=lambda_name,
         S3Bucket=bosslet_config.LAMBDA_BUCKET,
         S3Key=zip_name,
         Publish=True)
-    print(resp)
+    console.info("Updated {} function code".format(lambda_name))
 
-def download_lambda_zip(bosslet_config, path):
+    if lambda_config.get('layers'):
+        layer_arns = get_layer_arns(bosslet_config, lambda_config['layers'])
+        resp = client.update_function_configuration(FunctionName=full_name,
+                                                    Layers=layer_arns)
+        console.info("Updated {} layer references".format(lambda_name))
+
+def download_lambda_zip(bosslet_config, lambda_name, path):
     """
     Download the existing multilambda.domain.zip from the S3 bucket.  Useful when
     developing and small changes need to be made to a lambda function, but a full
     rebuild of the entire zip file isn't required.
     """
+    package_dir = package_lookup(bosslet_config)[lambda_name]
+    lambda_config = load_lambda_config(package_dir)
+
     s3 = bosslet_config.session.client('s3')
-    zip_name = bosslet_config.names.multi_lambda.zip
-    full_path = '{}/{}'.format(path, zip_name)
-    resp = s3.get_object(Bucket=bosslet_config.LAMBDA_BUCKET, Key=zip_name)
 
-    bytes = resp['Body'].read()
+    def download(zip_name):
+        full_path = os.path.join(path, zip_name)
+        resp = s3.get_object(Bucket=bosslet_config.LAMBDA_BUCKET, Key=zip_name)
 
-    with open(full_path , 'wb') as out:
-        out.write(bytes)
+        bytes = resp['Body'].read()
 
-    print('Saved zip to {}'.format(full_path))
+        with open(full_path , 'wb') as out:
+            out.write(bytes)
+        print('Saved zip to {}'.format(full_path))
+
+    download(package_zip(bosslet_config, lambda_config))
+
+    if lambda_config.get('layers'):
+        for layer in lambda_config['layers']:
+            layer_config = load_lambda_config(layer)
+            download(package_zip(bosslet_config, layer_config))
 
 def upload_lambda_zip(bosslet_config, path):
     """

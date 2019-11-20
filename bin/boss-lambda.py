@@ -90,7 +90,7 @@ class LambdaBuildCLI(configuration.BossCLI):
                                  help='Name of lambda to build')
 
     def run(self, args):
-        lambdas.build_lambda(args.bosslet_config, args.lambda_name)
+        lambdas.load_lambdas_on_s3(args.bosslet_config, args.lambda_name)
 
 class LambdaCLI(configuration.NestedBossCLI):
     COMMANDS = {

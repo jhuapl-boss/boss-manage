@@ -24,13 +24,14 @@ import subprocess
 import pathlib
 
 
-def upload_to_s3(zip_file, target_name, bucket):
+def upload_to_s3(zip_file, target_name, bucket, metadata={}):
     """Upload the zip file to the given S3 bucket.
 
     Args:
         zip_file (Path): Name of zip file.  The name (after any path is stripped) is used as the key.
         target_name (string): Name to give the zip_File in S3
         bucket (string): Name of bucket to use.
+        metadata (dict): Metadata to attach to the file
     """
     session = boto3.session.Session()
     s3 = session.client('s3')
@@ -41,7 +42,21 @@ def upload_to_s3(zip_file, target_name, bucket):
 
     print("{} -> {}/{}".format(zip_file, bucket, target_name))
     with zip_file.open('rb') as fh:
-        s3.put_object(Bucket=bucket, Key=target_name, Body=fh)
+        s3.put_object(Bucket=bucket, Key=target_name, Body=fh, Metadata=metadata)
+
+def create_layer(bucket, target_name, description):
+    session = boto3.session.Session()
+    layer_name = target_name[:-4].replace('.', '-') # remove the `.zip`
+    
+    client = boto3.session.Session().client('lambda')
+    resp = client.publish_layer_version(LayerName = layer_name,
+                                        Description = description,
+                                        Content = {
+                                            'S3Bucket': bucket,
+                                            'S3Key': target_name
+                                        },
+                                        LicenseInfo = 'Apache-2.0')
+    print("Created Layer {}".format(resp['LayerVersionArn']))
 
 def unzip(zippath, path):
     """Unzip the given zip file to the given directory
@@ -61,6 +76,23 @@ def load_config(staging_dir):
     """
     with open(os.path.join(staging_dir, 'lambda.yml'), 'r') as fh:
         return yaml.full_load(fh.read())
+
+def script_stdout(cmd):
+    """Run the following bash script and return the output
+
+    Args:
+        cmd (str): The contents of the bash script to run
+
+    Returns:
+        str: The results of the script
+    """
+    proc = subprocess.Popen(['/bin/bash'],
+                            cwd = staging_dir,
+                            universal_newlines = True, # stdin / stdout are strings instead of bytes
+                            stdout = subprocess.PIPE,
+                            stdin = subprocess.PIPE)
+    stdout, _ = proc.communicate(input = cmd)
+    return stdout
 
 def script(cmd):
     """Run the given bash shell script
@@ -174,10 +206,25 @@ if __name__ == '__main__':
 
     staging_dir.mkdir()
     unzip(zip_file, staging_dir)
-
-    print("Building lambda")
+    starting_hash = script_stdout('find . -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum').split()[0]
 
     lambda_config = load_config(staging_dir)
+
+    # Check the current hash against the existing S3 object's hash
+    # DP NOTE: This is done as rebuilding twice with the same input hash can result in two different results
+    #          as if dependencies are not competely pinned then there may be a version change in a dependency
+    s3 = boto3.session.Session().client('s3')
+    try:
+        target_name = lambda_config['name'] + '.' + domain + '.zip'
+        resp = s3.head_object(Bucket = bucket, Key = target_name)
+        metadata = resp['Metadata']
+        if metadata['build-hash'] == starting_hash:
+            print("Input hash matches existing S3 object, not rebuilding")
+            sys.exit(0)
+    except Exception:
+        pass # If there was an error with the check just rebuild
+
+    print("Building lambda")
 
     # Install System Packages
     if lambda_config.get('system_packages'):
@@ -242,4 +289,8 @@ if __name__ == '__main__':
 
     # Extracted from boss-tools.git/lambdautils/deploy_lambdas.py as not all lambdas will zip up that file
     # to be included in the build process
-    upload_to_s3(output_file, target_name, bucket)
+    metadata = {'build-hash': starting_hash} # will become x-amz-meta-build-bash
+    upload_to_s3(output_file, target_name, bucket, metadata)
+
+    if lambda_config.get('is_layer', False):
+        create_layer(bucket, target_name, starting_hash)
