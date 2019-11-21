@@ -21,6 +21,13 @@ if [ $# -ne 2 ] ; then
 fi
 
 PROFILE=$2
+if [ "$PROFILE" != "all" ] ; then
+    COUNT=`grep -c -E "\[${PROFILE}(_inactive)?\]" $PROFILE_FILE`
+    if [ "$COUNT" == "0" ] ; then
+        echo "Profile '${PROFILE}' is not valid"
+        exit 2
+    fi
+fi
 
 case "${ACTION}-${PROFILE}" in
     activate-all) sed -i -e "s/\[\(.*\)_inactive\]/\[\1\]/" $PROFILE_FILE ;;
