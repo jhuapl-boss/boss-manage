@@ -23,6 +23,7 @@ import alter_path
 from lib import aws
 from lib import configuration
 from lib import console
+from pprint import pprint
 
 try:
     import simpleeval
@@ -106,7 +107,7 @@ class BillingList(SubscriptionList):
 
         threshold_names = ['Billing_{}'.format(str(t)) for t in thresholds]
 
-        resp = self.client_cw.describe_alarms(AlarmNamePrefix = 'Billing_')
+        resp = self.client_cw.describe_alarms(AlarmNamePrefix = 'Billing_', MaxRecords=100)  # more then 100 records.
         alarm_names = [a['AlarmName'] for a in resp['MetricAlarms']]
 
         missing_alarms = 0
@@ -117,6 +118,57 @@ class BillingList(SubscriptionList):
         console.error("Missing {} alarms".format(missing_alarms))
 
         return missing_alarms == 0
+
+    def delete_billing_alarms(self):
+        """
+        delete all the alarms that start with "Billing". Needed if you want to change the number of billing alarms
+        being monitored.
+        Returns:
+
+        """
+        # Using paginator since there could be more then 100 alarms.
+        paginator = self.client_cw.get_paginator('describe_alarms')
+        # Create a PageIterator from the Paginator
+        page_iterator = paginator.paginate(AlarmNamePrefix='Billing')
+
+        alarms = []
+        for page in page_iterator:
+            alarms.extend(page['MetricAlarms'])
+        print("Alarms count = {}".format(len(alarms)))
+
+        delete_alarms = []
+        count = 0
+        for alarm in alarms:
+            count += 1
+            delete_alarms.append(alarm['AlarmName'])
+            if count >= 10:
+                # delete alarms in batches of 10.
+                resp = self.client_cw.delete_alarms(AlarmNames=delete_alarms)
+                if resp['ResponseMetadata']['HTTPStatusCode'] is not 200:
+                    raise ConnectionError("Received HTTPStatusCode: {} when trying to delete following alarms: {}"
+                                          .format(resp['ResponseMetadata']['HTTPStatusCode'], ", ".join(delete_alarms)))
+                delete_alarms.clear()
+                count = 0
+        if count > 0:
+            resp = self.client_cw.delete_alarms(AlarmNames=delete_alarms)
+            if resp['ResponseMetadata']['HTTPStatusCode'] is not 200:
+                raise ConnectionError("Received HTTPStatusCode: {} when trying to delete following alarms: {}"
+                                      .format(resp['ResponseMetadata']['HTTPStatusCode'], ", ".join(delete_alarms)))
+        print("finished deleting billing alarms")
+
+
+    def list(self):
+        # Using paginator since there could be more then 100 alarms.
+        paginator = self.client_cw.get_paginator('describe_alarms')
+        # Create a PageIterator from the Paginator
+        page_iterator = paginator.paginate(AlarmNamePrefix='Billing')
+
+        alarms = []
+        for page in page_iterator:
+            alarms.extend(page['MetricAlarms'])
+        print("Alarms count = {}".format(len(alarms)))
+        print("end of list")
+
 
     def create(self):
         if super().create() is False:
@@ -138,7 +190,7 @@ class BillingList(SubscriptionList):
             'Namespace': 'AWS/Billing',
             'Statistic': 'Maximum',
             'Dimensions': [{'Name': 'Currency', 'Value': currency}],
-            'Period': 21600,  # This should be at least 21600 (6 hrs) or all alarms will reset and fire every 6 hrs.
+            'Period': 32400,  # This should be at least 21600 (6 hrs) or all alarms will reset and fire every 6 hrs, I read 9 hours 32400 is a good number allow for billing metric data is ever slightly delayed.
             'EvaluationPeriods': 1,
             'Threshold': None,
             'ComparisonOperator': 'GreaterThanOrEqualToThreshold'
@@ -146,7 +198,7 @@ class BillingList(SubscriptionList):
 
         for threshold in thresholds:
             console.debug("\tAlert level: {:,}".format(threshold))
-            alarm_parms['AlarmName'] = "Billing_{}".format(str(threshold))
+            alarm_parms['AlarmName'] = "Billing_{}_Acc#_{}".format(str(threshold), str(self.bosslet_config.ACCOUNT_ID))
             alarm_parms['AlarmDescription'] = "Alarm when spending reaches {:,}".format(threshold)
             alarm_parms['Threshold'] = float(threshold)
             response = self.client_cw.put_metric_alarm(**alarm_parms)
@@ -179,11 +231,19 @@ if __name__ == '__main__':
     parser.add_argument('--ls',
                         action = 'store_true',
                         help = 'List current subscriptions to the target SNS topic')
+    parser.add_argument('--delete-billing-alarms',
+                        action='store_true',
+                        default=False,
+                        help='Delete all alarms that start with "Billing", must be used with billing command.')
 
     args = parser.parse_args()
 
     if args.command == 'billing':
         list = BillingList(args.bosslet_config)
+        if args.delete_billing_alarms:
+            list.delete_billing_alarms()
+            sys.exit(0)
+
     elif args.command == 'alerts':
         list = AlertList(args.bosslet_config)
 
