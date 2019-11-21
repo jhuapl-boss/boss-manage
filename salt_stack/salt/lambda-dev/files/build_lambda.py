@@ -45,6 +45,13 @@ def upload_to_s3(zip_file, target_name, bucket, metadata={}):
         s3.put_object(Bucket=bucket, Key=target_name, Body=fh, Metadata=metadata)
 
 def create_layer(bucket, target_name, description):
+    """New a new Lambda Layer version
+
+    Args:
+        bucket (string): Name of bucket to use.
+        target_name (string): Name to give the zip_File in S3
+        description (string): Metadata to attach to the file
+    """
     session = boto3.session.Session()
     layer_name = target_name[:-4].replace('.', '-') # remove the `.zip`
     

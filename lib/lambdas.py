@@ -38,11 +38,31 @@ NDINGEST_SETTINGS_FOLDER = const.repo_path('salt_stack', 'salt', 'ndingest', 'fi
 NDINGEST_SETTINGS_TEMPLATE = NDINGEST_SETTINGS_FOLDER + '/settings.ini.apl'
 
 def load_lambda_config(lambda_dir):
+    """Load the lambda.yml config file
+
+    Args:
+        lambda_dir (str): Name of the directory under cloud_formation/lambda/ that
+                          contains the lambda.yml file to load
+
+    Returns:
+        dict: Dictionary of configuration file data
+    """
     lambda_config = const.repo_path('cloud_formation', 'lambda', lambda_dir, 'lambda.yml')
     with open(lambda_config, 'r') as fh:
         return yaml.full_load(fh.read())
 
 def package_lookup(bosslet_config):
+    """Create a mapping of lambda name to lambda_dir / package_name
+
+    DP NOTE: lambda_dir / package_dir / layer_dir are used interchangeably and
+             all refer to the name of a directory under cloud_formation/lambdas/
+
+    Args:
+        bosslet_config: Bosslet configuration object
+
+    Returns:
+        dict: Mapping of lambda name to lambda dir
+    """
     n = bosslet_config.names
     # DP NOTE: Values must be the name of a directory under cloud_formation/lambdas/
     return {
@@ -74,17 +94,37 @@ def package_lookup(bosslet_config):
     }
 
 def package_zip(bosslet_config, lambda_config):
-    # DP NOTE: Must match what salt_stack/salt/lambda-dev/files/build_lambda.py does
-    #          when uploading the results to S3
+    """Get the name of the lambda package's zip file
+
+    DP NOTE: Must match what salt_stack/salt/lambda-dev/files/build_lambda.py does
+             when uploading the results to S3
+
+    Args:
+        bosslet_config: Bosslet configuration object
+        lambda_config (dict): Lambda configuration data
+
+    Returns:
+        str: Name of the lambda package zip file
+    """
     return lambda_config['name'] + '.' + bosslet_config.INTERNAL_DOMAIN + '.zip'
 
 def get_layer_arns(bosslet_config, layer_dirs):
+    """Lookup the latest version ARNs for the given layers
+
+    DP NOTE: Must match what salt_stack/salt/lambda-dev/files/build_lambda.py does
+             when creating a Lambda Layer
+
+    Args:
+        bosslet_config: Bosslet configuration object
+        layer_dirs (list[str]): List of layer_dir names
+
+    Returns:
+        list[str]: List of Lambda Layer Version ARNs
+    """
     client = bosslet_config.session.client('lambda')
 
     layers = []
     for layer_dir in layer_dirs:
-        # DP NOTE: Must match what salt_stack/salt/lambda-dev/files/build_lambda.py does
-        #          when creating a Lambda Layer
         layer_config = load_lambda_config(layer_dir)
         layer_name = (layer_config['name'] + '.' + bosslet_config.INTERNAL_DOMAIN).replace('.', '-')
 
@@ -95,7 +135,22 @@ def get_layer_arns(bosslet_config, layer_dirs):
     return layers
 
 def s3_config(bosslet_config, lambda_name, lambda_handler):
-    # Used by lib.cloudformation.CloudFormationTemplate.add_lambda if only a lambda handler is defined
+    """Look up the configuration information needed by CloudFormationTemplate
+
+    Used by lib.cloudformation.CloudFormationTemplate.add_lambda if only a lambda
+    handler is defined
+
+    Args:
+        bosslet_config: Bosslet configuration object
+        lambda_name (str): Full name of the lambda
+        lambda_handler (str): Name of the lambda handler
+
+    Returns:
+        tuple[tuple[str, str, str], str, optional[list[str]]]:
+            Tuple of arguments for CloudFormationTemplate.add_lambda
+            kwargs s3, runtime, and layers
+
+    """
     package_name = package_lookup(bosslet_config)[lambda_name]
 
     config = load_lambda_config(package_name)
@@ -395,7 +450,7 @@ def upload_lambda_zip(bosslet_config, path):
     s3 = bosslet_config.session.client('s3')
     with open(path, 'rb') as in_file:
         resp = s3.put_object(Bucket=bosslet_config.LAMBDA_BUCKET,
-                             Key=bosslet_config.names.multi_lambda.zip,
+                             Key=os.path.basename(path),
                              Body=in_file)
     print(resp)
 
