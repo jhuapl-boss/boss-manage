@@ -277,7 +277,7 @@ if __name__ == '__main__':
 
     target_name = lambda_config['name'] + '.' + domain
     if 'output_file' in lambda_config:
-        # The lambda build process may create its own package zip, so use that instead
+        # The lambda build process may create its own code zip, so use that instead
         output_file = staging_dir / lambda_config['output_file']
     else:
         # Automatically zip up all of the files in the build directory

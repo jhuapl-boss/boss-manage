@@ -52,8 +52,8 @@ class LambdaUploadCLI(configuration.BossCLI):
 
 class LambdaBuildCLI(configuration.BossCLI):
     def get_parser(self, ParentParser=configuration.BossParser):
-        self.parser = ParentParser(description = "Script for build lambda packages",
-                                   help = 'Build lambda packages')
+        self.parser = ParentParser(description = "Script for build lambda code zip",
+                                   help = 'Build lambda code zip')
         self.parser.add_bosslet()
         self.parser.add_argument('lambda_name',
                                  help='Name of lambda to build')
@@ -66,18 +66,19 @@ class LambdaFreshenCLI(configuration.BossCLI):
         self.parser = ParentParser(description = "Script for freshening lambda " +
                                    "function code from S3.",
                                    help = 'Refresh Lambda definition with a new code zip')
-        self.parser.add_argument('--package',
+        self.parser.add_argument('--code',
                                  action='store_true',
-                                 help='The lambda_name is the name of the lambda package ' +
-                                      'and all lambdas using the package will be updated')
+                                 help='The lambda_name is the name of the lambda directory ' +
+                                      'used to built the code zip. All lambdas that used the ' +
+                                      'code zip will be updated')
         self.parser.add_bosslet()
         self.parser.add_argument('lambda_name',
                                  help='Name of lambda function to refresh.')
 
     def run(self, args):
-        if args.package:
-            lambda_names = [k for k, v in lambdas.package_lookup(args.bosslet_config).items()
-                         if v == args.lambda_name]
+        if args.code:
+            lambda_names = [k for k, v in lambdas.lambda_dirs(args.bosslet_config).items()
+                              if v == args.lambda_name]
         else:
             lambda_names = [args.lambda_name]
 

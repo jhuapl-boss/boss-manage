@@ -51,17 +51,17 @@ def load_lambda_config(lambda_dir):
     with open(lambda_config, 'r') as fh:
         return yaml.full_load(fh.read())
 
-def package_lookup(bosslet_config):
-    """Create a mapping of lambda name to lambda_dir / package_name
+def lambda_dirs(bosslet_config):
+    """Create a mapping of lambda name to lambda directory
 
-    DP NOTE: lambda_dir / package_dir / layer_dir are used interchangeably and
-             all refer to the name of a directory under cloud_formation/lambdas/
+    Note: The lambda directory is the directory in cloud_formation/lambdas/ that
+          contains the lambda.yml for building the lambda's code zip
 
     Args:
         bosslet_config: Bosslet configuration object
 
     Returns:
-        dict: Mapping of lambda name to lambda dir
+        dict: Mapping of lambda name to lambda directory
     """
     n = bosslet_config.names
     # DP NOTE: Values must be the name of a directory under cloud_formation/lambdas/
@@ -109,10 +109,11 @@ def package_lookup(bosslet_config):
         n.downsample_volume.lambda_: 'multi_lambda',
         n.copy_cuboid_lambda.lambda_: 'multi_lambda',
         n.dynamo_lambda.lambda_: 'dynamodb-lambda-autoscale',
+        n.cache_throttle.lambda_: 'cache_throttle',
     }
 
-def package_zip(bosslet_config, lambda_config):
-    """Get the name of the lambda package's zip file
+def code_zip(bosslet_config, lambda_config):
+    """Get the name of the lambda code zip file
 
     DP NOTE: Must match what salt_stack/salt/lambda-dev/files/build_lambda.py does
              when uploading the results to S3
@@ -122,7 +123,7 @@ def package_zip(bosslet_config, lambda_config):
         lambda_config (dict): Lambda configuration data
 
     Returns:
-        str: Name of the lambda package zip file
+        str: Name of the lambda code zip file
     """
     return lambda_config['name'] + '.' + bosslet_config.INTERNAL_DOMAIN + '.zip'
 
@@ -169,16 +170,16 @@ def s3_config(bosslet_config, lambda_name, lambda_handler):
             kwargs s3, runtime, and layers
 
     """
-    package_name = package_lookup(bosslet_config)[lambda_name]
+    lambda_dir = lambda_dirs(bosslet_config)[lambda_name]
 
-    config = load_lambda_config(package_name)
+    config = load_lambda_config(lambda_dir)
 
     layers = None
     if config.get('layers'):
         layers = get_layer_arns(bosslet_config, config['layers'])
 
     return ((bosslet_config.LAMBDA_BUCKET,
-             package_zip(bosslet_config, config),
+             code_zip(bosslet_config, config),
              lambda_handler),
             config['runtime'],
             layers)
@@ -190,7 +191,7 @@ def update_lambda_code(bosslet_config):
         bosslet_config: Bosslet configuration object
     """
     names = bosslet_config.names
-    uses_multilambda = [k for k, v in package_lookup(bosslet_config).items()
+    uses_multilambda = [k for k, v in lambda_dirs(bosslet_config).items()
                           if v == 'multi_lambda']
     config = load_lambda_config('multi_lambda')
     client = bosslet_config.session.client('lambda')
@@ -199,54 +200,56 @@ def update_lambda_code(bosslet_config):
             resp = client.update_function_code(
                 FunctionName=lambda_name,
                 S3Bucket=bosslet_config.LAMBDA_BUCKET,
-                S3Key=package_zip(bosslet_config, config['name']),
+                S3Key=code_zip(bosslet_config, config['name']),
                 Publish=True)
             print(resp)
         except botocore.exceptions.ClientError as ex:
             print('Error updating {}: {}'.format(lambda_name, ex))
 
-BUILT_PACKAGES = []
-def load_lambdas_on_s3(bosslet_config, lambda_name = None, package_name = None):
+BUILT_ZIPS = []
+def load_lambdas_on_s3(bosslet_config, lambda_name = None, lambda_dir = None):
     """Package up the lambda files and send them through the lambda build process
-    where the lambda zip package is produced and uploaded to S3
+    where the lambda code zip is produced and uploaded to S3
 
-    NOTE: This function is also used to build lambda layer packages, the only requirement
+    NOTE: This function is also used to build lambda layer code zips, the only requirement
           for a layer is that the files in the resulting zip should be in the correct
           subdirectory (`python/` for Python libraries) so that when a lambda uses the
           layer the libraries included in the layer can be correctly loaded
+
+    NOTE: If lambda_name and lambda_dir are both None then lambda_dir is set to
+          'multi_lambda' for backwards compatibility
 
     Args:
         bosslet_config (BossConfiguration): Configuration object of the stack the
                                             lambda will be deployed into
         lambda_name (str): Name of the lambda, which will be mapped to the name of the
-                           lambda package that contains the lambda's code
-        package_name (str): Name of the directory in `cloud_formation/lambda/` that
-                            contains the `lambda.yml` configuration file for the lambda
-                            Defaults to 'multi_lambda' for backwards compatibility
+                           lambda directory that contains the lambda's code
+        lambda_dir (str): Name of the directory in `cloud_formation/lambda/` that
+                          contains the `lambda.yml` configuration file for the lambda
 
     Raises:
-        BossManageError: If there was a problem with building the lambda package or
+        BossManageError: If there was a problem with building the lambda code zip or
                          uploading it to the given S3 bucket
     """
-    # For backwards compatibility build the multi_lambda package
-    if lambda_name is None and package_name is None:
-        package_name = 'multi_lambda'
+    # For backwards compatibility build the multi_lambda code zip
+    if lambda_name is None and lambda_dir is None:
+        lambda_dir = 'multi_lambda'
 
-    # Map from lambda_name to package_name if needed
-    if package_name is None:
+    # Map from lambda_name to lambda_dir if needed
+    if lambda_dir is None:
         try:
-            package_name = package_lookup(bosslet_config)[lambda_name]
+            lambda_dir = lambda_dirs(bosslet_config)[lambda_name]
         except KeyError:
             console.error("Cannot build a lambda that doesn't use a code zip file")
             return None
 
-    # To prevent rubuilding a package multiple times during an individual execution memorize what has been built
-    if package_name in BUILT_PACKAGES:
-        console.debug('Lambda package {} has already be build recently, skipping...'.format(package_name))
+    # To prevent rubuilding a lambda code zip multiple times during an individual execution memorize what has been built
+    if lambda_dir in BUILT_ZIPS:
+        console.debug('Lambda code {} has already be build recently, skipping...'.format(lambda_dir))
         return
-    BUILT_PACKAGES.append(package_name)
+    BUILT_ZIPS.append(lambda_dir)
 
-    lambda_dir = pathlib.Path(const.repo_path('cloud_formation', 'lambda', package_name))
+    lambda_dir = pathlib.Path(const.repo_path('cloud_formation', 'lambda', lambda_dir))
     lambda_config = lambda_dir / 'lambda.yml'
     with lambda_config.open() as fh:
         lambda_config = yaml.full_load(fh.read())
@@ -257,9 +260,9 @@ def load_lambdas_on_s3(bosslet_config, lambda_name = None, package_name = None):
             if not layer.endswith('layer'):
                 console.warning("Layer '{}' doesn't conform to naming conventions".format(layer))
 
-            load_lambdas_on_s3(bosslet_config, package_name=layer)
+            load_lambdas_on_s3(bosslet_config, lambda_dir=layer)
 
-    console.debug("Building {} lambda package".format(package_name))
+    console.debug("Building {} lambda code zip".format(lambda_dir))
 
     domain = bosslet_config.INTERNAL_DOMAIN
     tempname = tempfile.NamedTemporaryFile(delete=True)
@@ -350,7 +353,7 @@ def load_lambdas_on_s3(bosslet_config, lambda_name = None, package_name = None):
         try:
             utils.run(CMD, env_extras=env_extras)
         except Exception as ex:
-            raise BossManageError("Problem building {} lambda package: {}".format(package_name, ex))
+            raise BossManageError("Problem building {} lambda code zip: {}".format(lambda_dir, ex))
         finally:
             os.remove(staging_zip)
 
@@ -374,7 +377,7 @@ def load_lambdas_on_s3(bosslet_config, lambda_name = None, package_name = None):
         console.info("calling build lambda on lambda-build-server")
         ret = ssh.cmd(CMD)
         if ret != 0:
-            raise BossManageError("Problem building {} lambda package: Return code: {}".format(package_name, ret))
+            raise BossManageError("Problem building {} lambda code zip: Return code: {}".format(lambda_dir, ret))
 
 def create_ndingest_settings(bosslet_config, fp):
     """Create the settings.ini file for ndingest.
@@ -412,10 +415,10 @@ def freshen_lambda(bosslet_config, lambda_name):
     Useful when developing and small changes need to be made to a lambda function, 
     but a full rebuild of the entire zip file isn't required.
     """
-    package_dir = package_lookup(bosslet_config)[lambda_name]
-    lambda_config = load_lambda_config(package_dir)
+    lambda_dir = lambda_dirs(bosslet_config)[lambda_name]
+    lambda_config = load_lambda_config(lambda_dir)
 
-    zip_name = package_zip(bosslet_config, lambda_config)
+    zip_name = code_zip(bosslet_config, lambda_config)
 
     client = bosslet_config.session.client('lambda')
     resp = client.update_function_code(
@@ -437,8 +440,8 @@ def download_lambda_zip(bosslet_config, lambda_name, path):
     developing and small changes need to be made to a lambda function, but a full
     rebuild of the entire zip file isn't required.
     """
-    package_dir = package_lookup(bosslet_config)[lambda_name]
-    lambda_config = load_lambda_config(package_dir)
+    lambda_dir = lambda_dirs(bosslet_config)[lambda_name]
+    lambda_config = load_lambda_config(lambda_dir)
 
     s3 = bosslet_config.session.client('s3')
 
@@ -452,12 +455,12 @@ def download_lambda_zip(bosslet_config, lambda_name, path):
             out.write(bytes)
         print('Saved zip to {}'.format(full_path))
 
-    download(package_zip(bosslet_config, lambda_config))
+    download(code_zip(bosslet_config, lambda_config))
 
     if lambda_config.get('layers'):
         for layer in lambda_config['layers']:
             layer_config = load_lambda_config(layer)
-            download(package_zip(bosslet_config, layer_config))
+            download(code_zip(bosslet_config, layer_config))
 
 def upload_lambda_zip(bosslet_config, path):
     """
