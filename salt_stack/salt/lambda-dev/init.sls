@@ -9,12 +9,16 @@
 {% set lambda_home = venv_home + '/usr/lib/python3.6/site-packages/lambda' %}
 {% set lambdautils_home = venv_home + '/usr/lib/python3.6/site-packages/lambdautils' %}
 
+include:
+    - node
+
 python36:
     pkg.installed:
         - pkgs:
             - python36
             - python36-pip
             - python36-virtualenv
+
 
 lib-dependencies:
     pkg.installed:
@@ -35,31 +39,17 @@ numpy-blosc-dependencies:
             - gcc
             - gcc-c++
 
-make-domain:
+build-lambda:
     file.managed:
-        - name: /home/ec2-user/makedomainenv
-        - source: salt://lambda-dev/files/makedomainenv
+        - name: /home/ec2-user/build_lambda.py
+        - source: salt://lambda-dev/files/build_lambda.py
         - mode: 755
         - user: {{ user }}
         - group: {{ user }}
 
-sitezips-dir:
+staging-dir:
     file.directory:
-        - name: /home/ec2-user/sitezips
-        - user: {{ user }}
-        - group: {{ user }}
-        - dir_mode: 755
-
-lambdazips-dir:
-    file.directory:
-        - name: /home/ec2-user/lambdazips
-        - user: {{ user }}
-        - group: {{ user }}
-        - dir_mode: 755
-
-virtualenvs-dir:
-    file.directory:
-        - name: /home/ec2-user/virtualenvs
+        - name: /home/ec2-user/staging
         - user: {{ user }}
         - group: {{ user }}
         - dir_mode: 755
