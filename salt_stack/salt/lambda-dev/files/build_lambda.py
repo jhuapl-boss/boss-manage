@@ -257,9 +257,12 @@ if __name__ == '__main__':
 
         packages = {}
         for entry in entries:
-            if (staging_dir / entry).exists(): # pointing to requirements file
+            if (staging_dir / entry).is_file(): # pointing to requirements file
                 run(cmd_req.format(location = staging_dir / entries[entry],
                                    requirements = staging_dir / entry))
+            elif (staging_dir / entry).is_dir(): # pointing to a local repository
+                run(cmd_pkgs.format(location = staging_dir / entries[entry],
+                                    packages = staging_dir / entry))
             else:
                 location = entries[entry]
                 if location not in packages:
