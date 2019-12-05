@@ -75,7 +75,19 @@ def json_dumps(obj):
     Returns:
         str: String containing formatted JSON
     """
-    return json.dumps(obj, indent=2, sort_keys=True)
+    def sort(o):
+        if isinstance(o, list):
+            if len(o) > 0 and isinstance(o[0], str):
+                o.sort()
+            else:
+                for i in o:
+                    sort(i)
+        elif isinstance(o, dict):
+            for k,v in o.items():
+                sort(v)
+        return o
+
+    return json.dumps(sort(obj), indent=2, sort_keys=True)
 
 def pformat_truncate(o, width=50):
     """Convert the object to printable representation and truncate it if too long
@@ -324,7 +336,6 @@ class IamUtils(object):
             return group
         elif resource_type == 'roles':
             if resource['Path'].startswith('/aws-service-role/'):
-                console.warning('Cannot export AWS created Role')
                 return None
 
             role = {
@@ -400,8 +411,7 @@ class IamUtils(object):
                         console.error("Problem creating {}: {}".format(resource_type, resource[key]))
                         console.error("\tDetails: {}".format(str(ex)))
             else: # Currently exists, compare and update
-                updating = False;
-                console.info("Comparing {} {}".format(key[:-4], resource[key]))
+                console.info("Updating {} {}".format(key[:-4], resource[key]))
 
                 if resource['Path'] != resource_['Path']:
                     console.warning("Paths differ for {} {}: '{}' != '{}'".format(key,
@@ -414,9 +424,7 @@ class IamUtils(object):
                 if resource_type == 'groups':
                     self.group_update(resource, resource_)
                 elif resource_type == 'roles':
-                    updating = updating or self.role_update(resource, resource_)
-                    if updating:
-                        console.info("Updating {} {}".format(key[:-4], resource[key]))
+                    self.role_update(resource, resource_)
                 elif resource_type == 'policies':
                     self.policy_update(resource, resource_)
 
@@ -555,16 +563,11 @@ class IamUtils(object):
         Args:
             resource (object): Desired IAM Role definition
             resource_ (object): Current IAM Role definition
-
-        Returns:
-            (bool) role was updated.
         """
-        updating = False
         policy = json_dumps(resource['AssumeRolePolicyDocument'])
         policy_ = json_dumps(resource_['AssumeRolePolicyDocument'])
         if policy != policy_:
             console.warning('Role policy document differs')
-            updating = True
             self.iw.update_assume_role_policy(resource['RoleName'],
                                               resource['AssumeRolePolicyDocument'])
 
@@ -573,33 +576,29 @@ class IamUtils(object):
         for policy in resource['RolePolicyList']:
             policy_ = lookup.get(policy['PolicyName'])
             if policy_ is None:
-                updating = True
                 self.iw.put_role_policy(resource['RoleName'],
                                         policy['PolicyName'],
                                         policy['PolicyDocument'])
             else:
+                del lookup[policy['PolicyName']]
                 document = json_dumps(policy['PolicyDocument'])
                 document_ = json_dumps(policy_)
                 if document != document_:
-                    updating = True
                     self.iw.put_role_policy(resource['RoleName'],
                                             policy['PolicyName'],
                                             policy['PolicyDocument'])
 
         for policy in lookup.keys():
             # AWS has a policy that is not in the desired version, it should be deleted
-            updating = True
             self.iw.delete_role_policy(resource['RoleName'], policy)
 
         for arn in resource['AttachedManagedPolicies']:
             if arn not in resource_['AttachedManagedPolicies']:
-                updating = True
                 self.iw.attach_role_policy(resource["RoleName"], arn)
 
         for arn in resource_['AttachedManagedPolicies']:
             if arn not in resource['AttachedManagedPolicies']:
                 # AWS has a managed policy that is not in the desired version, it should be deleted.
-                updating = True
                 self.iw.detach_role_policy(resource["RoleName"], arn)
 
         lookup = { profile['InstanceProfileName']: profile
@@ -607,12 +606,12 @@ class IamUtils(object):
         for profile in resource['InstanceProfileList']:
             profile_ = lookup.get(profile['InstanceProfileName'])
             if profile_ is None:
-                updating = True
                 self.iw.create_instance_profile(profile['InstanceProfileName'],
                                                 profile['Path'])
                 self.iw.add_role_to_instance_profile(resource['RoleName'],
                                                      profile['InstanceProfileName'])
             else:
+                del lookup[profile['InstanceProfileName']]
                 if profile['Path'] != profile_['Path']:
                     console.warning("Paths differ for {} Instance Profile {}: '{}' != '{}'".format(resource['RoleName'],
                                                                                                    profile['InstanceProfileName'],
@@ -622,11 +621,8 @@ class IamUtils(object):
 
         for profile in lookup.keys():
             # AWS has an instance profile that is not in the desired version, it should be deleted
-            updating = True
             self.iw.remove_role_from_instance_profile(resource['RoleName'], profile)
             self.iw.delete_instance_profile(profile)
-
-        return updating
 
     def role_remove(self, resource):
         """Remove the referenced IAM Role

@@ -17,13 +17,13 @@
   },
   {
     "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess",
-      "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetAutoscaleRole",
-      "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetRole",
-      "arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole",
       "arn:aws:iam::aws:policy/AWSBatchFullAccess",
+      "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess",
       "arn:aws:iam::aws:policy/AmazonEC2ContainerServiceFullAccess",
-      "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole"
+      "arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole",
+      "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole",
+      "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetAutoscaleRole",
+      "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetRole"
     ],
     "GroupName": "aplCompute",
     "GroupPolicyList": [],
@@ -47,11 +47,11 @@
   },
   {
     "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/IAMFullAccess",
       "arn:aws:iam::==account==:policy/aplCloudFormationFullAccess",
-      "arn:aws:iam::aws:policy/CloudFrontFullAccess",
       "arn:aws:iam::aws:policy/AWSCloudTrailFullAccess",
-      "arn:aws:iam::aws:policy/AmazonVPCFullAccess"
+      "arn:aws:iam::aws:policy/AmazonVPCFullAccess",
+      "arn:aws:iam::aws:policy/CloudFrontFullAccess",
+      "arn:aws:iam::aws:policy/IAMFullAccess"
     ],
     "GroupName": "aplNetworkGroup",
     "GroupPolicyList": [],
@@ -67,8 +67,8 @@
   },
   {
     "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess",
       "arn:aws:iam::aws:policy/AmazonDynamoDBReadOnlyAccess",
+      "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess",
       "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
     ],
     "GroupName": "aplProofReader",
@@ -78,8 +78,8 @@
   {
     "AttachedManagedPolicies": [
       "arn:aws:iam::==account==:policy/aplCloudFormationFullAccess",
-      "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess",
-      "arn:aws:iam::aws:policy/AWSSupportAccess"
+      "arn:aws:iam::aws:policy/AWSSupportAccess",
+      "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess"
     ],
     "GroupName": "aplSWDevGroup",
     "GroupPolicyList": [],
