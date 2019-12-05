@@ -751,8 +751,6 @@
       "Version": "2012-10-17"
     },
     "AttachedManagedPolicies": [
-      "arn:aws:iam::==account==:policy/service-role/AWSLambdaTracerAccessExecutionRole-683aea08-9fc8-4468-adfc-7d4af2c826bc",
-      "arn:aws:iam::==account==:policy/service-role/AWSLambdaTracerAccessExecutionRole-ff12834d-2eb4-44cb-9130-1ce3a86f1b76",
       "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess"
     ],
     "InstanceProfileList": [],
