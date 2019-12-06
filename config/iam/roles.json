@@ -840,7 +840,9 @@
     "AttachedManagedPolicies": [
       "arn:aws:iam::aws:policy/AWSLambdaExecute",
       "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-      "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+      "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
+      "arn:aws:iam::aws:policy/AmazonSNSFullAccess",
+      "arn:aws:iam::aws:policy/AmazonRoute53FullAccess"
     ],
     "InstanceProfileList": [],
     "Path": "/",
