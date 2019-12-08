@@ -61,12 +61,9 @@ def create_config(bosslet_config):
         config.add_lambda(key,
                           name,
                           Ref('LambdaCacheExecutionRole'),
-                          s3=(bosslet_config.LAMBDA_BUCKET,
-                              names.multi_lambda.zip,
-                              handler),
+                          handler=handler,
                           timeout = timeout,
-                          memory = memory,
-                          runtime='python3.6')
+                          memory = memory)
 
     add_lambda("indexS3WriterLambda",
                names.index_s3_writer.lambda_,

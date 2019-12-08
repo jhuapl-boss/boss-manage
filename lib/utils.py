@@ -19,6 +19,7 @@ import shlex
 import getpass
 import string
 import warnings
+import time
 
 from contextlib import contextmanager
 
@@ -97,6 +98,24 @@ def get_commit():
         return result.stdout.decode("utf-8").strip()
     except:
         return "unknown"
+
+def get_submodule_commit(submodule_path):
+    try:
+        cmd = "git submodule status"
+        result = subprocess.run(shlex.split(cmd), stdout=subprocess.PIPE)
+        for line in result.stdout.decode("utf-8").splitlines():
+            if submodule_path in line:
+                commit, _ = line.strip().split(' ', 1)
+
+                # Remove the indicator that the commit was changed but not committed
+                if commit[0] == '+':
+                    commit = commit[1:]
+
+                return commit
+    except:
+        pass
+
+    return "unknown"
 
 def keypair_to_file(keypair):
     """Looks for the SSH private key for keypair under ~/.ssh/
@@ -200,3 +219,51 @@ def parse_hostname(hostname):
 
     return (idx, machine, bosslet_name)
 
+def run(cmd, input=None, env_extras=None, checkreturn=True, shell=False, **kwargs):
+    """Run a command and stream the output
+
+    Args:
+        cmd (str): String with the command to run
+        input (optional[str]): String with data to sent to the processes stdin
+        env_extras (optional[dict]): Dictionary of extra environmental variable to provide
+        checkreturn (bool): If the return code should be checked and an exception raised if not zero
+        kwargs: Other arguments to pass to the Popen constructor
+
+    Return:
+        int: The return code of the process
+
+    Raises:
+        Exception: If checkreturn is True and the return code is 0 (zero)
+    """
+
+    if env_extras is not None:
+        env = os.environ.copy()
+        env.update(env_extras)
+    else:
+        env = None
+
+    proc = subprocess.Popen(shlex.split(cmd) if not shell else cmd,
+                            env=env,
+                            shell=shell,
+                            bufsize=1, # line bufferred
+                            #universal_newlines=True, # so we don't have to encode/decode
+                            stderr=subprocess.STDOUT,
+                            stdout=subprocess.PIPE,
+                            stdin=subprocess.PIPE if input is not None else None,
+                            **kwargs)
+
+    if input is not None:
+        proc.stdin.write(cmd.encode())
+        proc.stdin.close()
+
+    for line in proc.stdout:
+        print(line.decode('utf8'), end='', flush=True)
+
+    while proc.poll() is None:
+        time.sleep(1) # sometimes stdout is closed before the process has completely finished
+
+    if checkreturn:
+        if proc.returncode != 0:
+            raise Exception("Return code: {}".format(proc.returncode))
+
+    return proc.returncode

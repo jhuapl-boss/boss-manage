@@ -1,0 +1,56 @@
+name: multilambda
+runtime: python3.6
+include:
+        salt_stack/salt/spdb/files/spdb.git: spdb
+        salt_stack/salt/boss-tools/files/boss-tools.git/bossutils: bossutils
+        salt_stack/salt/boss-tools/files/boss-tools.git/cloudwatchwrapper: cloudwatchwrapper
+        salt_stack/salt/boss-tools/files/boss-tools.git/lambda: lambda
+        salt_stack/salt/boss-tools/files/boss-tools.git/lambdautils: lambdautils
+        salt_stack/salt/ndingest/files/ndingest.git: ndingest
+        lib/heaviside.git/heaviside: heaviside
+        lib/heaviside.git/requirements.txt: heaviside/requirements.txt
+        lib/names.py: bossnames/names.py
+        lib/bucket_object_tags.py: bossnames/bucket_object_tags.py
+        lib/__init__.py: bossnames/__init__.py
+system_packages:
+        # lib dependencies
+        - libjpeg-turbo-devel.x86_64
+        - zlib-devel.x86_64
+        - libtiff-devel.x86_64
+        - freetype.x86_64
+        - lcms2-devel.x86_64
+        - libwebp-devel.x86_64
+        - openjpeg-devel.x86_64
+
+        # numpy-blosc dependencies
+        - atlas
+        - atlas-devel
+        - gcc
+        - gcc-c++
+python_packages:
+        - spdb/requirements.txt
+        - heaviside/requirements.txt
+manual_commands:
+        - |
+                cd spdb/c_lib/c_version
+                cp makefile_LINUX makefile
+                make
+        - | # Should this be a manual command or a list of files to be copied into the staging directory
+                # copy the BLAS libraries into relative directories
+                cp /usr/lib64/atlas/libatlas.so.3 .
+                cp /usr/lib64/atlas/libptf77blas.so.3 .
+                cp /usr/lib64/atlas/libf77blas.so.3 .
+                cp /usr/lib64/atlas/libptcblas.so.3 .
+                cp /usr/lib64/atlas/libcblas.so.3 .
+                cp /usr/lib64/atlas/liblapack.so.3 .
+
+                cp /usr/lib64/libgfortran.so.3 .
+                cp /usr/lib64/libquadmath.so.0 .
+        - |
+                # set the correct log config
+                echo configuring logging
+                cd bossutils
+                mv ./lambda_logger_conf.json ./logger_conf.json
+        - |
+                # copy the lambda handlers into the root of the package
+                cp lambda/* .

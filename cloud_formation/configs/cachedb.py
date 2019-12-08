@@ -34,7 +34,7 @@ from lib import aws
 from lib import constants as const
 from lib import utils
 from lib import console
-from lib.lambdas import load_lambdas_on_s3, update_lambda_code
+from lib.lambdas import load_lambdas_on_s3, freshen_lambda
 
 import botocore
 
@@ -48,6 +48,18 @@ MARKED_FOR_DELETION_DAYS = 3
 INGEST_BUCKET_TRIGGER = 'ingestBucketInvokeCuboidImportLambda'
 
 CUBOID_IMPORT_ROLE = 'CuboidImportLambdaRole'
+
+def get_lambdas(bosslet_config):
+    names = bosslet_config.names
+    return [
+        names.multi_lambda.lambda_,
+        names.tile_uploaded.lambda_,
+        names.tile_ingest.lambda_,
+        names.delete_tile_objs.lambda_,
+        names.delete_tile_index_entry.lambda_,
+        names.cuboid_import_lambda.lambda_,
+        names.volumetric_ingest_queue_upload_lambda.lambda_,
+    ]
 
 
 def get_cf_bucket_life_cycle_rules():
@@ -271,71 +283,50 @@ def create_config(bosslet_config, user_data=None):
     config.add_lambda("MultiLambda",
                       names.multi_lambda.lambda_,
                       Ref("LambdaCacheExecutionRole"),
-                      s3=(bosslet_config.LAMBDA_BUCKET,
-                          names.multi_lambda.zip,
-                          "lambda_loader.handler"),
+                      handler='lambda_loader.handler',
                       timeout=120,
                       memory=1536,
                       security_groups=[Ref('InternalSecurityGroup')],
-                      subnets=lambda_subnets,
-                      runtime='python3.6')
+                      subnets=lambda_subnets)
     config.add_lambda("TileUploadedLambda",
                       names.tile_uploaded.lambda_,
                       Ref("LambdaCacheExecutionRole"),
-                      s3=(bosslet_config.LAMBDA_BUCKET,
-                          names.multi_lambda.zip,
-                          "tile_uploaded_lambda.handler"),
+                      handler='tile_uploaded_lambda.handler',
                       timeout=5,
-                      memory=1024,
-                      runtime='python3.6')
+                      memory=1024)
     config.add_lambda("TileIngestLambda",
                       names.tile_ingest.lambda_,
                       Ref("LambdaCacheExecutionRole"),
-                      s3=(bosslet_config.LAMBDA_BUCKET,
-                          names.multi_lambda.zip,
-                          "tile_ingest_lambda.handler"),
+                      handler='tile_ingest_lambda.handler',
                       timeout=30,
-                      memory=1536,
-                      runtime='python3.6')
+                      memory=1536)
     config.add_lambda("DeleteTileObjsLambda",
                       names.delete_tile_objs.lambda_,
                       Ref("LambdaCacheExecutionRole"),
-                      s3=(bosslet_config.LAMBDA_BUCKET,
-                          names.multi_lambda.zip,
-                          "delete_tile_objs_lambda.handler"),
+                      handler='delete_tile_objs_lambda.handler',
                       timeout=90,
                       memory=128,
-                      runtime='python3.6',
                       dlq=Arn(names.ingest_cleanup_dlq.sqs))
     config.add_lambda("DeleteTileEntryLambda",
                       names.delete_tile_index_entry.lambda_,
                       Ref("LambdaCacheExecutionRole"),
-                      s3=(bosslet_config.LAMBDA_BUCKET,
-                          names.multi_lambda.zip,
-                          "delete_tile_index_entry_lambda.handler"),
+                      handler='delete_tile_index_entry_lambda.handler',
                       timeout=90,
                       memory=128,
-                      runtime='python3.6',
                       dlq=Arn(names.ingest_cleanup_dlq.sqs))
     config.add_lambda("CuboidImportLambda",
                       names.cuboid_import_lambda.lambda_,
                       Ref(CUBOID_IMPORT_ROLE),
-                      s3=(bosslet_config.LAMBDA_BUCKET,
-                          names.multi_lambda.zip,
-                          "cuboid_import_lambda.handler"),
+                      handler='cuboid_import_lambda.handler',
                       timeout=90,
                       memory=128,
-                      runtime='python3.6',
                       dlq=Arn(names.cuboid_import_dlq.sqs))
     config.add_lambda("VolumetricIngestLambda",
                       names.volumetric_ingest_queue_upload_lambda.lambda_,
                       Ref("LambdaCacheExecutionRole"),
-                      s3=(bosslet_config.LAMBDA_BUCKET,
-                          names.multi_lambda.zip,
-                          "ingest_queue_upload_volumetric_lambda.handler"),
+                      handler='ingest_queue_upload_volumetric_lambda.handler',
                       timeout=120,
-                      memory=1024,
-                      runtime='python3.6')
+                      memory=1024)
 
     if creating_ingest_bucket:
         config.add_lambda_permission(
@@ -424,18 +415,26 @@ def pre_init(bosslet_config):
     """Send spdb, bossutils, lambda, and lambda_utils to the lambda build
     server, build the lambda environment, and upload to S3.
     """
-    load_lambdas_on_s3(bosslet_config)
+    for lambda_name in get_lambdas(bosslet_config):
+        load_lambdas_on_s3(bosslet_config, lambda_name)
 
 
 def update(bosslet_config):
+    # To correctly handle if a layer needs to be rebuilt build it
+    # before the CF update and then refresh the code files after the
+    # update.
+    rebuild_lambdas = console.confirm("Rebuild lambdas", default=True)
+    if rebuild_lambdas:
+        pre_init(bosslet_config)
+
     user_data = build_user_data(bosslet_config)
 
     config = create_config(bosslet_config, user_data)
     config.update()
 
-    if console.confirm("Rebuild multilambda", default = True):
-        pre_init(bosslet_config)
-        update_lambda_code(bosslet_config)
+    if rebuild_lambdas:
+        for lambda_name in get_lambdas(bosslet_config):
+            freshen_lambda(bosslet_config, lambda_name)
 
     post_init(bosslet_config)
 

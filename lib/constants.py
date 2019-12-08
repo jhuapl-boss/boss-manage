@@ -33,7 +33,7 @@ def load_scenario(scenario):
 
         try:
             with open(path, 'r') as fh:
-                config = yaml.load(fh.read())
+                config = yaml.full_load(fh.read())
         except Exception as ex:
             print("Problem loading scenario file")
             print(ex)
