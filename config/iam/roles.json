@@ -461,63 +461,14 @@
       ],
       "Version": "2012-10-17"
     },
-    "AttachedManagedPolicies": [],
+    "AttachedManagedPolicies": [
+      "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+      "arn:aws:iam::aws:policy/service-role/AWSLambdaENIManagementAccess"
+    ],
     "InstanceProfileList": [],
     "Path": "/",
     "RoleName": "lambda_basic_execution",
-    "RolePolicyList": [
-      {
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": [
-                "logs:CreateLogGroup",
-                "logs:CreateLogStream",
-                "logs:PutLogEvents"
-              ],
-              "Effect": "Allow",
-              "Resource": "arn:aws:logs:*:*:*"
-            }
-          ],
-          "Version": "2012-10-17"
-        },
-        "PolicyName": "oneClick_lambda_basic_execution_1466187700147"
-      },
-      {
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": [
-                "logs:CreateLogGroup",
-                "logs:CreateLogStream",
-                "logs:PutLogEvents"
-              ],
-              "Effect": "Allow",
-              "Resource": "arn:aws:logs:*:*:*"
-            }
-          ],
-          "Version": "2012-10-17"
-        },
-        "PolicyName": "oneClick_lambda_basic_execution_1466217358351"
-      },
-      {
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": [
-                "logs:CreateLogGroup",
-                "logs:CreateLogStream",
-                "logs:PutLogEvents"
-              ],
-              "Effect": "Allow",
-              "Resource": "arn:aws:logs:*:*:*"
-            }
-          ],
-          "Version": "2012-10-17"
-        },
-        "PolicyName": "oneClick_lambda_basic_execution_1466455247314"
-      }
-    ]
+    "RolePolicyList": []
   },
   {
     "AssumeRolePolicyDocument": {
