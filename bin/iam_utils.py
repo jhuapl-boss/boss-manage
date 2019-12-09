@@ -75,7 +75,19 @@ def json_dumps(obj):
     Returns:
         str: String containing formatted JSON
     """
-    return json.dumps(obj, indent=2, sort_keys=True)
+    def sort(o):
+        if isinstance(o, list):
+            if len(o) > 0 and isinstance(o[0], str):
+                o.sort()
+            else:
+                for i in o:
+                    sort(i)
+        elif isinstance(o, dict):
+            for k,v in o.items():
+                sort(v)
+        return o
+
+    return json.dumps(sort(obj), indent=2, sort_keys=True)
 
 def pformat_truncate(o, width=50):
     """Convert the object to printable representation and truncate it if too long
@@ -324,7 +336,6 @@ class IamUtils(object):
             return group
         elif resource_type == 'roles':
             if resource['Path'].startswith('/aws-service-role/'):
-                console.warn('Cannot export AWS created Role')
                 return None
 
             role = {
@@ -569,6 +580,7 @@ class IamUtils(object):
                                         policy['PolicyName'],
                                         policy['PolicyDocument'])
             else:
+                del lookup[policy['PolicyName']]
                 document = json_dumps(policy['PolicyDocument'])
                 document_ = json_dumps(policy_)
                 if document != document_:
@@ -599,6 +611,7 @@ class IamUtils(object):
                 self.iw.add_role_to_instance_profile(resource['RoleName'],
                                                      profile['InstanceProfileName'])
             else:
+                del lookup[profile['InstanceProfileName']]
                 if profile['Path'] != profile_['Path']:
                     console.warning("Paths differ for {} Instance Profile {}: '{}' != '{}'".format(resource['RoleName'],
                                                                                                    profile['InstanceProfileName'],

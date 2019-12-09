@@ -51,7 +51,6 @@
         },
         {
           "Action": [
-            "rds:*",
             "cloudwatch:DescribeAlarms",
             "cloudwatch:GetMetricStatistics",
             "ec2:DescribeAccountAttributes",
@@ -59,10 +58,11 @@
             "ec2:DescribeSecurityGroups",
             "ec2:DescribeSubnets",
             "ec2:DescribeVpcs",
-            "sns:ListSubscriptions",
-            "sns:ListTopics",
             "logs:DescribeLogStreams",
-            "logs:GetLogEvents"
+            "logs:GetLogEvents",
+            "rds:*",
+            "sns:ListSubscriptions",
+            "sns:ListTopics"
           ],
           "Effect": "Allow",
           "Resource": "*"
@@ -96,18 +96,33 @@
         },
         {
           "Action": [
-            "cloudwatch:*",
             "cloudformation:*",
+            "cloudwatch:*",
             "cognito-identity:ListIdentityPools",
             "cognito-sync:GetCognitoEvents",
             "cognito-sync:SetCognitoEvents",
             "dynamodb:*",
+            "ec2:DescribeSecurityGroups",
+            "ec2:DescribeSubnets",
+            "ec2:DescribeVpcs",
             "events:*",
-            "iam:List*",
             "iam:Get*",
+            "iam:List*",
             "iam:ListRolePolicies",
             "iam:ListRoles",
             "iam:PassRole",
+            "iot:AttachPrincipalPolicy",
+            "iot:AttachThingPrincipal",
+            "iot:CreateKeysAndCertificate",
+            "iot:CreatePolicy",
+            "iot:CreateThing",
+            "iot:CreateTopicRule",
+            "iot:DescribeEndpoint",
+            "iot:GetTopicRule",
+            "iot:ListPolicies",
+            "iot:ListThings",
+            "iot:ListTopicRules",
+            "iot:ReplaceTopicRule",
             "kinesis:DescribeStream",
             "kinesis:ListStreams",
             "kinesis:PutRecord",
@@ -118,22 +133,7 @@
             "sns:ListSubscriptionsByTopic",
             "sns:ListTopics",
             "sns:Subscribe",
-            "sns:Unsubscribe",
-            "ec2:DescribeVpcs",
-            "ec2:DescribeSubnets",
-            "ec2:DescribeSecurityGroups",
-            "iot:GetTopicRule",
-            "iot:ListTopicRules",
-            "iot:CreateTopicRule",
-            "iot:ReplaceTopicRule",
-            "iot:AttachPrincipalPolicy",
-            "iot:AttachThingPrincipal",
-            "iot:CreateKeysAndCertificate",
-            "iot:CreatePolicy",
-            "iot:CreateThing",
-            "iot:ListPolicies",
-            "iot:ListThings",
-            "iot:DescribeEndpoint"
+            "sns:Unsubscribe"
           ],
           "Effect": "Allow",
           "Resource": "*"
@@ -150,7 +150,6 @@
         },
         {
           "Action": [
-            "dynamodb:*",
             "cloudwatch:DeleteAlarms",
             "cloudwatch:DescribeAlarmHistory",
             "cloudwatch:DescribeAlarms",
@@ -167,22 +166,23 @@
             "datapipeline:ListPipelines",
             "datapipeline:PutPipelineDefinition",
             "datapipeline:QueryObjects",
+            "dynamodb:*",
             "iam:ListRoles",
+            "lambda:CreateEventSourceMapping",
+            "lambda:CreateFunction",
+            "lambda:DeleteEventSourceMapping",
+            "lambda:DeleteFunction",
+            "lambda:GetFunctionConfiguration",
+            "lambda:ListEventSourceMappings",
+            "lambda:ListFunctions",
             "sns:CreateTopic",
             "sns:DeleteTopic",
             "sns:ListSubscriptions",
             "sns:ListSubscriptionsByTopic",
             "sns:ListTopics",
-            "sns:Subscribe",
-            "sns:Unsubscribe",
             "sns:SetTopicAttributes",
-            "lambda:CreateFunction",
-            "lambda:ListFunctions",
-            "lambda:ListEventSourceMappings",
-            "lambda:CreateEventSourceMapping",
-            "lambda:DeleteEventSourceMapping",
-            "lambda:GetFunctionConfiguration",
-            "lambda:DeleteFunction"
+            "sns:Subscribe",
+            "sns:Unsubscribe"
           ],
           "Effect": "Allow",
           "Resource": "*"
@@ -231,11 +231,26 @@
             "cognito-sync:GetCognitoEvents",
             "cognito-sync:SetCognitoEvents",
             "dynamodb:*",
+            "ec2:DescribeSecurityGroups",
+            "ec2:DescribeSubnets",
+            "ec2:DescribeVpcs",
             "events:*",
             "iam:ListAttachedRolePolicies",
             "iam:ListRolePolicies",
             "iam:ListRoles",
             "iam:PassRole",
+            "iot:AttachPrincipalPolicy",
+            "iot:AttachThingPrincipal",
+            "iot:CreateKeysAndCertificate",
+            "iot:CreatePolicy",
+            "iot:CreateThing",
+            "iot:CreateTopicRule",
+            "iot:DescribeEndpoint",
+            "iot:GetTopicRule",
+            "iot:ListPolicies",
+            "iot:ListThings",
+            "iot:ListTopicRules",
+            "iot:ReplaceTopicRule",
             "kinesis:DescribeStream",
             "kinesis:ListStreams",
             "kinesis:PutRecord",
@@ -246,22 +261,7 @@
             "sns:ListSubscriptionsByTopic",
             "sns:ListTopics",
             "sns:Subscribe",
-            "sns:Unsubscribe",
-            "ec2:DescribeVpcs",
-            "ec2:DescribeSubnets",
-            "ec2:DescribeSecurityGroups",
-            "iot:GetTopicRule",
-            "iot:ListTopicRules",
-            "iot:CreateTopicRule",
-            "iot:ReplaceTopicRule",
-            "iot:AttachPrincipalPolicy",
-            "iot:AttachThingPrincipal",
-            "iot:CreateKeysAndCertificate",
-            "iot:CreatePolicy",
-            "iot:CreateThing",
-            "iot:ListPolicies",
-            "iot:ListThings",
-            "iot:DescribeEndpoint"
+            "sns:Unsubscribe"
           ],
           "Effect": "Allow",
           "Resource": "*"
@@ -284,8 +284,8 @@
           "Action": [
             "logs:CreateLogGroup",
             "logs:CreateLogStream",
-            "logs:PutLogEvents",
-            "logs:DescribeLogStreams"
+            "logs:DescribeLogStreams",
+            "logs:PutLogEvents"
           ],
           "Effect": "Allow",
           "Resource": [
@@ -354,9 +354,9 @@
         },
         {
           "Action": [
-            "s3:PutObject",
+            "s3:DeleteObject",
             "s3:GetObject",
-            "s3:DeleteObject"
+            "s3:PutObject"
           ],
           "Effect": "Allow",
           "Resource": [
@@ -374,7 +374,6 @@
       "Statement": [
         {
           "Action": [
-            "dynamodb:*",
             "cloudwatch:DeleteAlarms",
             "cloudwatch:DescribeAlarmHistory",
             "cloudwatch:DescribeAlarms",
@@ -391,22 +390,23 @@
             "datapipeline:ListPipelines",
             "datapipeline:PutPipelineDefinition",
             "datapipeline:QueryObjects",
+            "dynamodb:*",
             "iam:ListRoles",
+            "lambda:CreateEventSourceMapping",
+            "lambda:CreateFunction",
+            "lambda:DeleteEventSourceMapping",
+            "lambda:DeleteFunction",
+            "lambda:GetFunctionConfiguration",
+            "lambda:ListEventSourceMappings",
+            "lambda:ListFunctions",
             "sns:CreateTopic",
             "sns:DeleteTopic",
             "sns:ListSubscriptions",
             "sns:ListSubscriptionsByTopic",
             "sns:ListTopics",
-            "sns:Subscribe",
-            "sns:Unsubscribe",
             "sns:SetTopicAttributes",
-            "lambda:CreateFunction",
-            "lambda:ListFunctions",
-            "lambda:ListEventSourceMappings",
-            "lambda:CreateEventSourceMapping",
-            "lambda:DeleteEventSourceMapping",
-            "lambda:GetFunctionConfiguration",
-            "lambda:DeleteFunction"
+            "sns:Subscribe",
+            "sns:Unsubscribe"
           ],
           "Effect": "Allow",
           "Resource": "*"
@@ -418,7 +418,6 @@
         },
         {
           "Action": [
-            "rds:*",
             "cloudwatch:DescribeAlarms",
             "cloudwatch:GetMetricStatistics",
             "ec2:DescribeAccountAttributes",
@@ -426,10 +425,11 @@
             "ec2:DescribeSecurityGroups",
             "ec2:DescribeSubnets",
             "ec2:DescribeVpcs",
-            "sns:ListSubscriptions",
-            "sns:ListTopics",
             "logs:DescribeLogStreams",
-            "logs:GetLogEvents"
+            "logs:GetLogEvents",
+            "rds:*",
+            "sns:ListSubscriptions",
+            "sns:ListTopics"
           ],
           "Effect": "Allow",
           "Resource": "*"
@@ -481,15 +481,15 @@
       "Statement": [
         {
           "Action": [
-            "sns:*",
-            "iam:*",
-            "rds:*",
-            "s3:*",
-            "lambda:*",
             "cloudformation:*",
             "dynamodb:*",
             "ec2:*",
-            "elasticloadbalancing:*"
+            "elasticloadbalancing:*",
+            "iam:*",
+            "lambda:*",
+            "rds:*",
+            "s3:*",
+            "sns:*"
           ],
           "Effect": "Allow",
           "Resource": "*",
@@ -562,8 +562,8 @@
         },
         {
           "Action": [
-            "ec2:DescribeNetworkInterfaces",
-            "ec2:DeleteNetworkInterface"
+            "ec2:DeleteNetworkInterface",
+            "ec2:DescribeNetworkInterfaces"
           ],
           "Effect": "Allow",
           "Resource": "arn:aws:ec2:==region==:==account==:network-interface/*"
@@ -579,13 +579,13 @@
       "Statement": [
         {
           "Action": [
-            "dynamodb:DescribeTable",
-            "dynamodb:UpdateTable",
-            "cloudwatch:PutMetricAlarm",
+            "cloudwatch:DeleteAlarms",
             "cloudwatch:DescribeAlarms",
             "cloudwatch:GetMetricStatistics",
+            "cloudwatch:PutMetricAlarm",
             "cloudwatch:SetAlarmState",
-            "cloudwatch:DeleteAlarms"
+            "dynamodb:DescribeTable",
+            "dynamodb:UpdateTable"
           ],
           "Effect": "Allow",
           "Resource": "*"
@@ -626,12 +626,12 @@
         {
           "Effect": "Allow",
           "NotAction": [
-            "iam:*",
             "aws-portal:*",
-            "ses:*",
+            "devicefarm:*",
+            "iam:*",
             "iot:",
             "mobileanalytics:*",
-            "devicefarm:*",
+            "ses:*",
             "sns:*",
             "zocalo:*"
           ],
@@ -672,9 +672,9 @@
       "Statement": [
         {
           "Action": [
-            "sns:*",
-            "ec2:*",
             "cloudformation:*",
+            "ec2:*",
+            "sns:*",
             "sqs:*"
           ],
           "Effect": "Allow",
@@ -692,19 +692,19 @@
       "Statement": [
         {
           "Action": [
-            "dynamodb:PutItem",
-            "lambda:InvokeFunction",
             "dynamodb:DeleteItem",
+            "dynamodb:GetItem",
+            "dynamodb:PutItem",
             "dynamodb:Query",
             "dynamodb:UpdateItem",
-            "s3:ListBucket",
+            "lambda:InvokeFunction",
             "logs:CreateLogGroup",
-            "logs:PutLogEvents",
-            "s3:PutObject",
-            "s3:GetObject",
             "logs:CreateLogStream",
-            "sns:Publish",
-            "dynamodb:GetItem"
+            "logs:PutLogEvents",
+            "s3:GetObject",
+            "s3:ListBucket",
+            "s3:PutObject",
+            "sns:Publish"
           ],
           "Effect": "Allow",
           "Resource": "*",
@@ -712,14 +712,14 @@
         },
         {
           "Action": [
+            "sqs:CreateQueue",
             "sqs:DeleteMessage",
             "sqs:DeleteMessageBatch",
-            "sqs:SendMessageBatch",
-            "sqs:ReceiveMessage",
             "sqs:DeleteQueue",
-            "sqs:SendMessage",
             "sqs:GetQueueAttributes",
-            "sqs:CreateQueue"
+            "sqs:ReceiveMessage",
+            "sqs:SendMessage",
+            "sqs:SendMessageBatch"
           ],
           "Effect": "Allow",
           "Resource": "arn:aws:sqs:*:*:downsample-*",
@@ -736,23 +736,23 @@
       "Statement": [
         {
           "Action": [
-            "dynamodb:DescribeLimits",
-            "dynamodb:DescribeTimeToLive",
-            "dynamodb:ListTagsOfResource",
-            "dynamodb:DescribeReservedCapacityOfferings",
-            "dynamodb:DescribeReservedCapacity",
-            "dynamodb:ListTables",
             "dynamodb:BatchGetItem",
             "dynamodb:BatchWriteItem",
             "dynamodb:CreateTable",
             "dynamodb:DeleteItem",
+            "dynamodb:DescribeLimits",
+            "dynamodb:DescribeReservedCapacity",
+            "dynamodb:DescribeReservedCapacityOfferings",
+            "dynamodb:DescribeTable",
+            "dynamodb:DescribeTimeToLive",
             "dynamodb:GetItem",
             "dynamodb:GetRecords",
+            "dynamodb:ListTables",
+            "dynamodb:ListTagsOfResource",
             "dynamodb:PutItem",
             "dynamodb:Query",
-            "dynamodb:UpdateItem",
             "dynamodb:Scan",
-            "dynamodb:DescribeTable"
+            "dynamodb:UpdateItem"
           ],
           "Effect": "Allow",
           "Resource": [
@@ -764,8 +764,8 @@
           "Action": [
             "ec2:DescribeInstances",
             "iam:GetInstanceProfile",
-            "iam:GetUser",
-            "iam:GetRole"
+            "iam:GetRole",
+            "iam:GetUser"
           ],
           "Effect": "Allow",
           "Resource": "*",

@@ -13,11 +13,11 @@
       "Version": "2012-10-17"
     },
     "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/service-role/AWSQuickSightListIAM",
-      "arn:aws:iam::==account==:policy/aplPopulateUploadQueue",
       "arn:aws:iam::==account==:policy/aplDeleteCuboid",
+      "arn:aws:iam::==account==:policy/aplPopulateUploadQueue",
       "arn:aws:iam::==account==:policy/aplResolutionHierarchy",
-      "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess"
+      "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess",
+      "arn:aws:iam::aws:policy/service-role/AWSQuickSightListIAM"
     ],
     "InstanceProfileList": [
       {
@@ -69,8 +69,8 @@
       "Version": "2008-10-17"
     },
     "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/AWSElasticBeanstalkWebTier",
       "arn:aws:iam::aws:policy/AWSElasticBeanstalkMulticontainerDocker",
+      "arn:aws:iam::aws:policy/AWSElasticBeanstalkWebTier",
       "arn:aws:iam::aws:policy/AWSElasticBeanstalkWorkerTier"
     ],
     "InstanceProfileList": [
@@ -171,11 +171,11 @@
       "Version": "2012-10-17"
     },
     "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/AmazonSQSFullAccess",
       "arn:aws:iam::aws:policy/AWSLambdaFullAccess",
-      "arn:aws:iam::aws:policy/AmazonS3FullAccess",
       "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
-      "arn:aws:iam::aws:policy/AmazonSNSFullAccess"
+      "arn:aws:iam::aws:policy/AmazonS3FullAccess",
+      "arn:aws:iam::aws:policy/AmazonSNSFullAccess",
+      "arn:aws:iam::aws:policy/AmazonSQSFullAccess"
     ],
     "InstanceProfileList": [
       {
@@ -332,16 +332,16 @@
       "Version": "2012-10-17"
     },
     "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/AmazonSQSFullAccess",
+      "arn:aws:iam::==account==:policy/aplVaultPolicy",
       "arn:aws:iam::aws:policy/AWSLambdaFullAccess",
-      "arn:aws:iam::aws:policy/IAMFullAccess",
+      "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess",
+      "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
       "arn:aws:iam::aws:policy/AmazonElastiCacheFullAccess",
       "arn:aws:iam::aws:policy/AmazonS3FullAccess",
-      "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
-      "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess",
       "arn:aws:iam::aws:policy/AmazonSNSFullAccess",
-      "arn:aws:iam::==account==:policy/aplVaultPolicy",
-      "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess"
+      "arn:aws:iam::aws:policy/AmazonSQSFullAccess",
+      "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess",
+      "arn:aws:iam::aws:policy/IAMFullAccess"
     ],
     "InstanceProfileList": [
       {
@@ -368,12 +368,12 @@
       "Version": "2012-10-17"
     },
     "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/AmazonEC2FullAccess",
       "arn:aws:iam::aws:policy/AWSLambdaFullAccess",
-      "arn:aws:iam::aws:policy/service-role/CloudWatchEventsBuiltInTargetExecutionAccess",
+      "arn:aws:iam::aws:policy/AmazonEC2FullAccess",
+      "arn:aws:iam::aws:policy/CloudWatchEventsFullAccess",
       "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
       "arn:aws:iam::aws:policy/service-role/AWSLambdaRole",
-      "arn:aws:iam::aws:policy/CloudWatchEventsFullAccess"
+      "arn:aws:iam::aws:policy/service-role/CloudWatchEventsBuiltInTargetExecutionAccess"
     ],
     "InstanceProfileList": [],
     "Path": "/",
@@ -461,9 +461,9 @@
     },
     "AttachedManagedPolicies": [
       "arn:aws:iam::aws:policy/AWSLambdaFullAccess",
+      "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
       "arn:aws:iam::aws:policy/AmazonElastiCacheFullAccess",
-      "arn:aws:iam::aws:policy/AmazonS3FullAccess",
-      "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess"
+      "arn:aws:iam::aws:policy/AmazonS3FullAccess"
     ],
     "InstanceProfileList": [],
     "Path": "/",
@@ -582,14 +582,14 @@
       "Version": "2012-10-17"
     },
     "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/AmazonSQSFullAccess",
       "arn:aws:iam::aws:policy/AWSLambdaFullAccess",
+      "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess",
+      "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
       "arn:aws:iam::aws:policy/AmazonElastiCacheFullAccess",
       "arn:aws:iam::aws:policy/AmazonS3FullAccess",
-      "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
-      "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
       "arn:aws:iam::aws:policy/AmazonSNSFullAccess",
-      "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess"
+      "arn:aws:iam::aws:policy/AmazonSQSFullAccess",
+      "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
     ],
     "InstanceProfileList": [],
     "Path": "/",
@@ -669,8 +669,8 @@
           "Statement": [
             {
               "Action": [
-                "s3:GetBucketPolicy",
                 "s3:GetBucketLocation",
+                "s3:GetBucketPolicy",
                 "s3:ListBucketMultipartUploads"
               ],
               "Effect": "Allow",
@@ -678,9 +678,9 @@
             },
             {
               "Action": [
-                "s3:PutObject",
                 "s3:AbortMultipartUpload",
                 "s3:ListMultipartUploadParts",
+                "s3:PutObject",
                 "s3:PutObjectAcl"
               ],
               "Effect": "Allow",
@@ -707,8 +707,8 @@
       "Version": "2012-10-17"
     },
     "AttachedManagedPolicies": [
-      "arn:aws:iam::==account==:policy/service-role/AWSLambdaS3ExecutionRole-2a0110ca-6e60-4f94-8510-fdaf9ddfb583",
-      "arn:aws:iam::==account==:policy/service-role/AWSLambdaBasicExecutionRole-28085153-2e10-4740-8166-7090f779f1c7"
+      "arn:aws:iam::==account==:policy/service-role/AWSLambdaBasicExecutionRole-28085153-2e10-4740-8166-7090f779f1c7",
+      "arn:aws:iam::==account==:policy/service-role/AWSLambdaS3ExecutionRole-2a0110ca-6e60-4f94-8510-fdaf9ddfb583"
     ],
     "InstanceProfileList": [],
     "Path": "/service-role/",
@@ -729,8 +729,8 @@
       "Version": "2012-10-17"
     },
     "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/service-role/AWSLambdaRole",
-      "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess"
+      "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess",
+      "arn:aws:iam::aws:policy/service-role/AWSLambdaRole"
     ],
     "InstanceProfileList": [],
     "Path": "/service-role/",
@@ -751,8 +751,6 @@
       "Version": "2012-10-17"
     },
     "AttachedManagedPolicies": [
-      "arn:aws:iam::==account==:policy/service-role/AWSLambdaTracerAccessExecutionRole-683aea08-9fc8-4468-adfc-7d4af2c826bc",
-      "arn:aws:iam::==account==:policy/service-role/AWSLambdaTracerAccessExecutionRole-ff12834d-2eb4-44cb-9130-1ce3a86f1b76",
       "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess"
     ],
     "InstanceProfileList": [],
@@ -817,8 +815,8 @@
     },
     "AttachedManagedPolicies": [
       "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess",
-      "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
       "arn:aws:iam::aws:policy/AmazonRoute53FullAccess",
+      "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
       "arn:aws:iam::aws:policy/service-role/AWSLambdaRole"
     ],
     "InstanceProfileList": [],
@@ -842,7 +840,9 @@
     "AttachedManagedPolicies": [
       "arn:aws:iam::aws:policy/AWSLambdaExecute",
       "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-      "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+      "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
+      "arn:aws:iam::aws:policy/AmazonSNSFullAccess",
+      "arn:aws:iam::aws:policy/AmazonRoute53FullAccess"
     ],
     "InstanceProfileList": [],
     "Path": "/",
@@ -853,10 +853,10 @@
           "Statement": [
             {
               "Action": [
+                "autoscaling:SetInstanceHealth",
                 "ec2:DescribeInstances",
-                "route53:ListHostedZones",
                 "route53:ChangeResourceRecordSets",
-                "autoscaling:SetInstanceHealth"
+                "route53:ListHostedZones"
               ],
               "Effect": "Allow",
               "Resource": "*",
