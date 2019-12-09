@@ -1,9 +1,0 @@
-{
-    "groups": [
-    ],
-    "roles": [
-        "CuboidImportLambdaRole"
-    ],
-    "policies": [
-    ]
-}

@@ -107,7 +107,7 @@ class BillingList(SubscriptionList):
 
         threshold_names = ['Billing_{}'.format(str(t)) for t in thresholds]
 
-        resp = self.client_cw.describe_alarms(AlarmNamePrefix = 'Billing_', MaxRecords=100)  # more then 100 records.
+        resp = self.client_cw.describe_alarms(AlarmNamePrefix = 'Billing_', MaxRecords=100)  # No more then 100 records will work here.
         alarm_names = [a['AlarmName'] for a in resp['MetricAlarms']]
 
         missing_alarms = 0
