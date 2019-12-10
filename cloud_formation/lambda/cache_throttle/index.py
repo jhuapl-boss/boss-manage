@@ -19,6 +19,7 @@ def handler(event, context):
 
     conn = redis.StrictRedis(event['host'], 6379, 0)
     keys = conn.keys()
-    conn.delete(*keys)
+    if len(keys) > 0:
+        conn.delete(*keys)
 
     print("Deleted keys: {}".format(keys))
