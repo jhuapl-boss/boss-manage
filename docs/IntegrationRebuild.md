@@ -18,7 +18,6 @@ $ git submodule init
 $ git submodule update --remote
 $ git add salt_stack/salt/boss/files/boss.git
 $ git add salt_stack/salt/boss-tools/files/boss-tools.git
-$ git add salt_stack/salt/proofreader-web/files/proofread.git
 $ git add salt_stack/salt/spdb/files/spdb.git
 $ git add salt_stack/salt/ndingest/files/ndingest.git
 $ git add salt_stack/salt/ingest-client/files/ingest-client.git
@@ -66,7 +65,7 @@ Place `microns-bastion20151117.pem` in the `bin` folder.
 
 ```shell
 $ cd bin
-$  ./packer.py auth vault consul endpoint cachemanager activities
+$  ./packer.py auth vault endpoint cachemanager activities
 ```
 
 *Note: because the packer.py script is running builds in parallel it is redirecting

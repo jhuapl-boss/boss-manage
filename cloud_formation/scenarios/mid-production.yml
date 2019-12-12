@@ -1,0 +1,23 @@
+# Mid sized production levels.  Not as large a cache
+
+# Instance types
+
+ENDPOINT_TYPE: m5.2xlarge
+RDS_TYPE: db.t3.micro
+REDIS_CACHE_TYPE: cache.m5.xlarge
+REDIS_SESSION_TYPE: cache.t2.small
+REDIS_TYPE: cache.t2.small
+CACHE_MANAGER_TYPE: t3.micro
+VAULT_TYPE: m5.large
+ACTIVITIES_TYPE: m5.large
+AUTH_TYPE: m5.xlarge
+
+# Cluster / ASG sizes
+AUTH_CLUSTER_SIZE: 1
+VAULT_CLUSTER_SIZE: 1
+ENDPOINT_CLUSTER_MIN: 1
+ENDPOINT_CLUSTER_MAX: 30
+REDIS_CLUSTER_SIZE: 2
+
+# Memory Size
+REDIS_RESERVED_MEMORY_PERCENT: 25

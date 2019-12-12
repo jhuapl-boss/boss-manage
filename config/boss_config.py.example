@@ -1,0 +1,103 @@
+#
+# BOSS Configuration File
+# Defines BOSS instance configuration information
+#
+# NOTE: Optional variables can be omitted for the default value to be used.
+#       The default value is the value shown in this example file
+#
+# To verify or view the parsed BOSS configuration file use `bin/boss-config.py`
+
+EXTERNAL_DOMAIN : str = "external.tld" # External domain and Route53 Hosted Zone
+EXTERNAL_FORMAT : str = "{machine}" # (Optional) Allows names like api-integration.external.tld
+INTERNAL_DOMAIN : str = "internal.tld" # Unique suffix for AWS resources
+NETWORK : str = "10.0.0.0/16" # (Optional) Network allocation for VPC, in CIDR format
+SUBNET_CIDR : int = 24 # (Optional) CIDR for each subnet in VPC
+
+AMI_SUFFIX : str = ".tld"
+AMI_VERSION : str = "latest" # (Optional) The default AMI version to use if --ami-version is not used with cloudformation.py
+SCENARIO : str = "" # (Optional) The default scenario to use if --scenario is not used with cloudformation.py
+
+VERIFY_SSL : bool = True # (Optional) False if using a self-signed SSL cert for public DNS entries
+AUTH_RDS : bool = False # If Keycloak will use an external database. Cannot update the core config unless True
+
+# Lambda build server variables
+LAMBDA_BUCKET : str = None # Name of the S3 bucket where lambda code will be stored
+                           # Due to AWS Lambda requiring the S3 bucket to be in the same region as the lambdas
+                           # this is region specific, but may be shared by multiple stacks within the same region
+LAMBDA_SERVER : str = None # IP Address / Hostname of the Lambda Build Server instance created for building lambda code
+LAMBDA_SERVER_KEY : str = None # Name of the AWS keypair for authenticating to the Lambda Build Server
+                               # The SSH private key for the keypair must exist under ~/.ssh/
+
+REGION : str = "us-east-1" # Name of the AWS Region where the stack will be run
+AVAILABILITY_ZONE_USAGE = { # (Optional) Used to limit subnet usage for specific resources where AWS has issues
+                            # See test/availability_zones/ scripts for testing an account for problem AZs
+    'lambda': ['b', 'c', 'd', 'e', 'f'], # NOTE: AZ labels are not static across accounts in the same region
+    'asg': ['b', 'c', 'd', 'e', 'f'],    # Same as lambda
+    # Dev dont' use 'a'
+    # Prod don't use 'c'
+}
+
+ACCOUNT_ID : Union[int, str] = 123456789 # The AWS Account ID matching the API credentials that will be used
+                                         # May either be a string or integer
+PROFILE : str = None # (Optional) Name of the Boto3 profile to use for AWS credentials
+                     #            Set to None / don't provide to use the Boto3 defaults
+
+# An outbound bastion is an SSH host that will be the first machine connected to when making
+# external SSH connections to AWS resources. This supports the scenario where there is a
+# firewall restricting outbound SSH connections to a limited number of hosts. As long as
+# the outbound bastion machine accepts public key authentication it can be used.
+OUTBOUND_BASTION : bool = False # If an outbound bastion machine should be used
+                                # If False the other OUTBOUND_* variables are not required
+OUTBOUND_IP : str = "0.0.0.0"   # IP address / Hostname of the bastion machine
+OUTBOUND_PORT : Union[int, str] = 22 # Port on the bastion machine to connect to
+OUTBOUND_USER : str = "ec2-user" # Username of the user on the bastion machine to connect as
+OUTBOUND_KEY : str = "bastion-key" # Name of the SSH key for authenticating to the outbound bastion
+                                   # The SSH private key must exist as ~/.ssh/bastion-key.pem
+
+HTTPS_INBOUND : str = "0.0.0.0/0" # (Optional) Network CIDR of traffic allowed for HTTPS
+SSH_INBOUND : str = "0.0.0.0/32" # Network CIDR of traffic allowed for SSH
+                                 # Should include the OUTBOUND_IP if used
+SSH_KEY : str = "stack-key" # Name of the AWS keypair to be used for all EC2 instances that will be launched
+                            # The SSH private key for the keypair must exist under ~/.ssh/
+
+BILLING_TOPIC : str = "BossBillingList" # (Optional) SNS topic for receiving billing cost alerts
+BILLING_THRESHOLDS : str = "range(1000, 100001, 1000)" # (Conditional) Required if creating billing alerts
+                                                       # Must contain a Python fragment that produces an iterable when eval'd
+                                                       # Example creates alarms every $1,000 upto $100,000
+                                                       # You can also use "[10000, 50000, 100000]" if you only want a few alert levels
+BILLING_CURRENCY : str = "USD" # (Optional) Currency that the threasholds are set for
+
+ALERT_TOPIC : str = "BossMailingList" # (Optional) SNS topic for receiving alerts or error messages from a running Boss process
+                                      #            Different Boss components are configured to send notifications to this topic
+
+SLACK_WEBHOOK_HOST : str = "hooks.slack.com" # (Optional) Hostname for Slack webhooks
+SLACK_WEBHOOK_PATH_DYNAMODB_AUTOSCALE : str = None # (Optional) Webhook path for submitting details about the DynamoDB autoscale lambda changes
+                                                   #            If not provided the autoscale lambda will not use Slack for notifications
+
+DYNAMODB_AUTOSCALE_PROVISIONER : str = "BossDefaultProvisioners" # (Optional) The name of the JSON file in the cloud_formation/dynamodb-autoscale/ directory
+                                                                 #            The JSON file contains the autoscale rules used by the DynamoDB autoscale lambda
+
+
+###
+# Minimal Config for Account Setup
+# When using the bin/boss-account.py and bin/iam_utils.py scripts to initially
+# configure an AWS account the following keys are required. All other non-
+# optional keys can be set to None / False.
+#
+# ALERT_TOPIC
+# BILLING_TOPIC
+# BILLING_THRESHOLDS
+# BILLING_CURRENCY
+# REGION
+# ACCOUNT_ID
+# PROFILE - If using AWS profile credentials
+
+###
+# Minimal Config for Packer builds
+# When using bin/packer.py script to build the Boss AMIs the following keys are
+# required. All other non-optional keys can be set to None / False.
+#
+# AMI_SUFFIX
+# REGION
+# PROFILE - If using AWS profile credentials
+# OUTBOUND_BASTION - If True the the other OUTBOUND_* variables are required

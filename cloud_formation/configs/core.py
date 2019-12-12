@@ -14,32 +14,49 @@
 
 """
 Create the core configuration which consists of
-  * A new VPC
-  * An internal subnet containing a Vault server
-  * An external subnet containing a Bastion server
+  * A new VPC with an internal DNS Hosted Zone
+  * Internal and External subnets for every availability zone
+  * A Bastion server that allows SSH access to internal machines
+  * A Vault ASG clusters for secret storage
+  * A Vault DynamoDB table for Vault storage of data
+  * A Keycloak Authentication server ASG, ELB,  and (optional) RDS instance
+  * A lambda to handle DNS updates for ASG instance changes
+  * An Internet Gateway allowing network connections to the internet
+  * A S3 endpoint for internal access to S3
+  * A NAT instance allowing protected internet access from internal resources
+    - A NAT instance is used instead of the bastion machine as it provides
+      higher throughput
 
 The core configuration create all of the infrastructure that is required for
-the other production resources to function. In the furture this may include
-other servers for services like Authentication.
+the other production resources to function.
+
+MIGRATION CHANGELOG:
+    Version 1: Initial version of core config
+    Version 2: Vault updates
+               * Replaced Consul storage backend with DynamoDB storage backend
+               * Updated Vault configuration to use AWS KMS for key storage
+               * Code for migrating Vault data from Consul to DynamoDB
+               Public DNS updates
+               * Replaced manually created public Route53 DNS records with
+                 CloudFormation maintained records
 """
 
-from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, get_scenario
+DEPENDENCIES = None
+
+from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, Arg
 from lib.userdata import UserData
-from lib.names import AWSNames
 from lib.keycloak import KeyCloakClient
-from lib.external import ExternalCalls
+from lib.exceptions import BossManageError, BossManageCanceled
 from lib import aws
 from lib import utils
-from lib import scalyr
+from lib import console
 from lib import constants as const
+from lib import console
 
 import os
 import sys
 import json
 import time
-from concurrent.futures import ThreadPoolExecutor
-
-keypair = None
 
 def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, type_="t2.micro", public=True, depends_on=None):
     security_groups = [Ref("InternalSecurityGroup")]
@@ -68,71 +85,79 @@ def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnet
                             public = public,
                             depends_on = depends_on)
 
-def create_config(session, domain):
+def create_config(bosslet_config):
     """Create the CloudFormationConfiguration object."""
-    config = CloudFormationConfiguration('core', domain, const.REGION)
-    names = AWSNames(domain)
+    config = CloudFormationConfiguration('core', bosslet_config, version="2")
+    session = bosslet_config.session
+    keypair = bosslet_config.SSH_KEY
+    names = bosslet_config.names
 
-    global keypair
-    keypair = aws.keypair_lookup(session)
     config.add_vpc()
 
     # Create the internal and external subnets
-    config.add_subnet('InternalSubnet', names.subnet('internal'))
-    config.add_subnet('ExternalSubnet', names.subnet('external'))
-    internal_subnets, external_subnets = config.add_all_azs(session)
-    # it seems that both Lambdas and ASGs needs lambda_compatible_only subnets.
-    internal_subnets_lambda, external_subnets_lambda = config.add_all_azs(session, lambda_compatible_only=True)
+    config.add_subnet('InternalSubnet', names.internal.subnet)
+    config.add_subnet('ExternalSubnet', names.external.subnet)
+    internal_subnets, external_subnets = config.add_all_subnets()
+    internal_subnets_asg, external_subnets_asg = config.find_all_subnets('asg')
 
+    # Create a custom resource to help delete ENIs from lambdas
+    # DP NOTE: After deleting a lambda the ENIs may stick around for while, causing the stack delete to fail
+    #          See https://stackoverflow.com/a/41310289
+    config.add_arg(Arg.String('StackName', config.stack_name))
+    config.add_custom_resource('DeleteENI', 'DeleteENI', Arn('DeleteENILambda'), StackName = Ref('StackName'))
+    config.add_lambda("DeleteENILambda",
+                      names.delete_eni.lambda_,
+                      aws.role_arn_lookup(session, 'DeleteENI'),
+                      const.DELETE_ENI_LAMBDA,
+                      handler="index.handler",
+                      timeout=180, # 3 minutes, so that there is enough time to wait for the ENI detach to complete
+                      runtime='python3.6') # If the lambda times out CF will retry a couple of times
+
+    user_data = const.BASTION_USER_DATA.format(bosslet_config.NETWORK)
     config.add_ec2_instance("Bastion",
-                            names.bastion,
-                            aws.ami_lookup(session, const.BASTION_AMI),
+                            names.bastion.dns,
+                            aws.ami_lookup(bosslet_config, const.BASTION_AMI),
                             keypair,
                             subnet = Ref("ExternalSubnet"),
                             public_ip = True,
-                            user_data = const.BASTION_USER_DATA,
+                            user_data = user_data,
                             security_groups = [Ref("InternalSecurityGroup"), Ref("BastionSecurityGroup")],
                             depends_on = "AttachInternetGateway")
 
-    user_data = UserData()
-    user_data["system"]["fqdn"] = names.consul
-    user_data["system"]["type"] = "consul"
-    user_data["consul"]["cluster"] = str(get_scenario(const.CONSUL_CLUSTER_SIZE))
-    config.add_autoscale_group("Consul",
-                               names.consul,
-                               aws.ami_lookup(session, "consul.boss"),
-                               keypair,
-                               subnets = internal_subnets_lambda,
-                               type_ = const.CONSUL_TYPE,
-                               security_groups = [Ref("InternalSecurityGroup")],
-                               user_data = str(user_data),
-                               min = const.CONSUL_CLUSTER_SIZE,
-                               max = const.CONSUL_CLUSTER_SIZE,
-                               notifications = Ref("DNSSNS"),
-                               role = aws.instance_profile_arn_lookup(session, 'consul'),
-                               support_update = False, # Update will restart the instances manually
-                               depends_on = ["DNSLambda", "DNSSNS", "DNSLambdaExecute"])
+    vault_role = aws.role_arn_lookup(session, 'apl-vault')
+    vault_actions = ['kms:Encrypt', 'kms:Decrypt', 'kms:DescribeKey']
+    config.add_kms_key("VaultKey", names.vault.key, vault_role, vault_actions)
+
+    config.add_dynamo_table("VaultTable", names.vault.ddb,
+                            attributes = [('Path', 'S'),
+                                          ('Key', 'S')],
+                            key_schema = [('Path', 'HASH'),
+                                          ('Key', 'RANGE')],
+                            throughput = (5, 5))
 
     user_data = UserData()
-    user_data["system"]["fqdn"] = names.vault
+    user_data["system"]["fqdn"] = names.vault.dns
     user_data["system"]["type"] = "vault"
+    user_data["vault"]["kms_key"] = str(Ref("VaultKey"))
+    user_data["vault"]["ddb_table"] = names.vault.ddb
+    parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
     config.add_autoscale_group("Vault",
-                               names.vault,
-                               aws.ami_lookup(session, "vault.boss"),
+                               names.vault.dns,
+                               aws.ami_lookup(bosslet_config, names.vault.ami),
                                keypair,
-                               subnets = internal_subnets_lambda,
+                               subnets = internal_subnets_asg,
                                type_ = const.VAULT_TYPE,
                                security_groups = [Ref("InternalSecurityGroup")],
-                               user_data = str(user_data),
+                               user_data = parsed_user_data,
                                min = const.VAULT_CLUSTER_SIZE,
                                max = const.VAULT_CLUSTER_SIZE,
                                notifications = Ref("DNSSNS"),
                                role = aws.instance_profile_arn_lookup(session, 'apl-vault'),
-                               depends_on = ["Consul", "DNSLambda", "DNSSNS", "DNSLambdaExecute"])
+                               depends_on = ["VaultKey", "VaultTable", "DNSLambda", "DNSSNS", "DNSLambdaExecute"])
 
 
     user_data = UserData()
-    user_data["system"]["fqdn"] = names.auth
+    user_data["system"]["fqdn"] = names.auth.dns
     user_data["system"]["type"] = "auth"
     deps = ["AuthSecurityGroup",
             "AttachInternetGateway",
@@ -140,13 +165,12 @@ def create_config(session, domain):
             "DNSSNS",
             "DNSLambdaExecute"]
 
-    SCENARIO = os.environ["SCENARIO"]
-    USE_DB = SCENARIO in ("production", "ha-development",)
     # Problem: If development scenario uses a local DB. If the auth server crashes
     #          and is auto restarted by the autoscale group then the new auth server
     #          will not have any of the previous configuration, because the old DB
     #          was lost. Using an RDS for development fixes this at the cost of having
     #          the core config taking longer to launch.
+    USE_DB = bosslet_config.AUTH_RDS
     if USE_DB:
         deps.append("AuthDB")
         user_data["aws"]["db"] = "keycloak" # flag for init script for which config to use
@@ -154,22 +178,23 @@ def create_config(session, domain):
     cert = aws.cert_arn_lookup(session, names.public_dns('auth'))
     create_asg_elb(config,
                    "Auth",
-                   names.auth,
-                   aws.ami_lookup(session, "auth.boss"),
+                   names.auth.dns,
+                   aws.ami_lookup(bosslet_config, names.auth.ami),
                    keypair,
                    str(user_data),
                    const.AUTH_CLUSTER_SIZE,
-                   internal_subnets_lambda,
-                   external_subnets_lambda,
+                   internal_subnets_asg,
+                   external_subnets_asg,
                    [("443", "8080", "HTTPS", cert)],
                    "HTTP:8080/index.html",
                    sgs = [Ref("AuthSecurityGroup")],
                    type_=const.AUTH_TYPE,
                    depends_on=deps)
+    config.add_public_dns('AuthLoadBalancer', names.public_dns('auth'))
 
     if USE_DB:
         config.add_rds_db("AuthDB",
-                          names.auth_db,
+                          names.auth_db.rds,
                           "3306",
                           "keycloak",
                           "keycloak",
@@ -180,7 +205,7 @@ def create_config(session, domain):
 
 
     config.add_lambda("DNSLambda",
-                      names.dns,
+                      names.dns.lambda_,
                       aws.role_arn_lookup(session, 'UpdateRoute53'),
                       const.DNS_LAMBDA,
                       handler="index.handler",
@@ -190,30 +215,35 @@ def create_config(session, domain):
     config.add_lambda_permission("DNSLambdaExecute", Ref("DNSLambda"))
 
     config.add_sns_topic("DNSSNS",
-                         names.dns,
-                         names.dns,
+                         names.dns.sns,
+                         names.dns.sns,
                          [("lambda", Arn("DNSLambda"))])
 
 
     config.add_security_group("InternalSecurityGroup",
-                              names.internal,
-                              [("-1", "-1", "-1", "10.0.0.0/8")])
+                              names.internal.sg,
+                              [("-1", "-1", "-1", bosslet_config.NETWORK)])
 
     # Allow SSH access to bastion from anywhere
+    incoming_subnet = bosslet_config.SSH_INBOUND
     config.add_security_group("BastionSecurityGroup",
-                              names.ssh,
-                              [("tcp", "22", "22", const.INCOMING_SUBNET)])
+                              names.ssh.sg,
+                              [("tcp", "22", "22", incoming_subnet)])
 
+    incoming_subnet = bosslet_config.HTTPS_INBOUND
+    boss_subnet = {"Fn::Join": ["/", [Ref("NATIP"), "32"]]} # Allow requests from the endpoint via the NAT gateway
+                                                            # Needed in case HTTPS_INBOUND doesn't include the gateway's IP
     config.add_security_group("AuthSecurityGroup",
-                              #names.https, DP XXX: hack until we can get production updated correctly
-                              names.auth,
-                              [("tcp", "443", "443", "0.0.0.0/0")])
+                              #names.https.sg, DP XXX: hack until we can get production updated correctly
+                              names.auth.sg,
+                              [("tcp", "443", "443", incoming_subnet),
+                               ("tcp", "443", "443", boss_subnet)])
 
     # Create the internal route table to route traffic to the NAT Bastion
     all_internal_subnets = internal_subnets.copy()
     all_internal_subnets.append(Ref("InternalSubnet"))
     config.add_route_table("InternalRouteTable",
-                           names.internal,
+                           names.internal.rt,
                            subnets = all_internal_subnets)
 
     config.add_route_table_route("InternalNatRoute",
@@ -225,7 +255,7 @@ def create_config(session, domain):
     all_external_subnets = external_subnets.copy()
     all_external_subnets.append(Ref("ExternalSubnet"))
     config.add_route_table("InternetRouteTable",
-                           names.internet,
+                           names.internet.rt,
                            subnets = all_external_subnets)
 
     config.add_route_table_route("InternetRoute",
@@ -233,46 +263,55 @@ def create_config(session, domain):
                                  gateway = Ref("InternetGateway"),
                                  depends_on = "AttachInternetGateway")
 
-    config.add_internet_gateway("InternetGateway", names.internet)
+    config.add_internet_gateway("InternetGateway", names.internet.gw)
     config.add_endpoint("S3Endpoint", "s3", [Ref("InternalRouteTable"), Ref('InternetRouteTable')])
     config.add_endpoint("DynamoDBEndpoint", "dynamodb", [Ref("InternalRouteTable"), Ref('InternetRouteTable')])
     config.add_nat("NAT", Ref("ExternalSubnet"), depends_on="AttachInternetGateway")
 
     return config
 
-def generate(session, domain):
+def generate(bosslet_config):
     """Create the configuration and save it to disk"""
-    config = create_config(session, domain)
+    config = create_config(bosslet_config)
     config.generate()
 
-def create(session, domain):
+def pre_init(bosslet_config):
+    # NOTE: In version 2 the public DNS records are managed by CloudFormation
+    #       If the DNS record currently exists in Route53 the creation of the
+    #       CloudFormation template will fail, so check to see if it exists
+    #       due to previous launches of a Boss stack
+    session = bosslet_config.session
+    ext_domain = bosslet_config.EXTERNAL_DOMAIN
+    ext_cname = bosslet_config.names.public_dns('auth')
+
+    target = aws.get_dns_resource_for_domain_name(session, ext_cname, ext_domain)
+    if target is not None:
+        console.warning("Removing existing Auth public DNS entry, so CloudFormation can manage the DNS record")
+        aws.route53_delete_records(session, ext_domain, ext_cname)
+
+def create(bosslet_config):
     """Create the configuration, launch it, and initialize Vault"""
-    config = create_config(session, domain)
+    config = create_config(bosslet_config)
 
-    success = config.create(session)
-    if success:
-        vpc_id = aws.vpc_id_lookup(session, domain)
-        aws.rt_name_default(session, vpc_id, "default." + domain)
+    pre_init(bosslet_config)
+    config.create()
 
-        post_init(session, domain)
+    # NOTE: rename the default route table that is automatically created by AWS
+    session = bosslet_config.session
+    domain = bosslet_config.INTERNAL_DOMAIN
+    vpc_id = aws.vpc_id_lookup(session, domain)
+    aws.rt_name_default(session, vpc_id, "default." + domain)
 
-def post_init(session, domain, startup_wait=False):
-    # Keypair is needed by ExternalCalls
-    global keypair
-    if keypair is None:
-        keypair = aws.keypair_lookup(session)
-    call = ExternalCalls(session, keypair, domain)
-    names = AWSNames(domain)
+    post_init(bosslet_config)
 
-    # Figure out the external domain name of the auth server(s), matching the SSL cert
-    auth_domain = names.public_dns("auth")
+def post_init(bosslet_config):
+    session = bosslet_config.session
+    call = bosslet_config.call
+    names = bosslet_config.names
 
     # OIDC Discovery URL
+    auth_domain = names.public_dns("auth")
     auth_discovery_url = "https://{}/auth/realms/BOSS".format(auth_domain)
-
-    # Configure external DNS
-    auth_elb = aws.elb_public_lookup(session, names.auth)
-    aws.set_domain_to_dns_name(session, auth_domain, auth_elb, aws.get_hosted_zone(session))
 
     # Generate initial user accounts
     username = "admin"
@@ -282,21 +321,19 @@ def post_init(session, domain, startup_wait=False):
 
     # Initialize Vault
     print("Waiting for Vault...")
-    call.check_vault(const.TIMEOUT_VAULT)  # Expecting this to also check Consul
+    call.check_vault(const.TIMEOUT_VAULT)
 
     with call.vault() as vault:
         print("Initializing Vault...")
         try:
-            vault.initialize()
+            vault.initialize(bosslet_config.ACCOUNT_ID)
         except Exception as ex:
-            print(ex)
-            print("Could not initialize Vault")
-            print("Call: {}".format(utils.get_command("post-init")))
-            print("Before launching other stacks")
-            return
+            raise BossManageError("Problem initializing Vault: {}".format(str(ex)))
 
         #Check and see if these secrets already exist before we overwrite them with new ones.
         # Write data into Vault
+        # DP TODO: update checks to also verify the passwords / pull the passwords from Vault
+        #          so we don't use a different password in Keycloak then what is stored in Vault
         if not vault.read(const.VAULT_AUTH):
             print("Writing {}".format(const.VAULT_AUTH))
             vault.write(const.VAULT_AUTH, password = password, username = username, client_id = "admin-cli")
@@ -325,11 +362,6 @@ def post_init(session, domain, startup_wait=False):
             print("Updating {}".format(const.VAULT_ENDPOINT_AUTH))
             vault.update(const.VAULT_ENDPOINT_AUTH, url = auth_discovery_url, client_id = "endpoint")
 
-        if not vault.read(const.VAULT_PROOFREAD_AUTH):
-            # DP TODO: Move this update call into the proofreader config
-            print("Updating {}".format(const.VAULT_PROOFREAD_AUTH))
-            vault.update(const.VAULT_PROOFREAD_AUTH, url = auth_discovery_url, client_id = "endpoint")
-
     # Configure Keycloak
     print("Waiting for Keycloak to bootstrap")
     call.check_keycloak(const.TIMEOUT_KEYCLOAK)
@@ -339,7 +371,7 @@ def post_init(session, domain, startup_wait=False):
     ##          Also need to guard the writes to vault with the admin password
     #######
 
-    with call.ssh(names.auth) as ssh:
+    with call.ssh(names.auth.dns) as ssh:
         print("Creating initial Keycloak admin user")
         ssh("/srv/keycloak/bin/add-user.sh -r master -u {} -p {}".format(username, password))
 
@@ -354,7 +386,7 @@ def post_init(session, domain, startup_wait=False):
     print("Waiting for Keycloak to restart")
     call.check_keycloak(const.TIMEOUT_KEYCLOAK)
 
-    with call.tunnel(names.auth, 8080) as port:
+    with call.tunnel(names.auth.dns, 8080) as port:
         URL = "http://localhost:{}".format(port) # TODO move out of tunnel and use public address
 
         with KeyCloakClient(URL, username, password) as kc:
@@ -373,68 +405,42 @@ def post_init(session, domain, startup_wait=False):
             print("Uploading BOSS.realm configuration")
             kc.create_realm(realm)
 
-    # Tell Scalyr to get CloudWatch metrics for these instances.
-    instances = [ names.vault ]
-    scalyr.add_instances_to_scalyr(session, const.REGION, instances)
+def update(bosslet_config):
+    # Checks to make sure they update can happen and the user wants to wait the required time
+    if not bosslet_config.AUTH_RDS:
+        print("Cannot update Auth server as it is not using an external database")
+        print("Updating the Auth server would loose all Keycloak information")
+        raise BossManageError("Configuration doesn't support 'update'")
 
-def update(session, domain):
-    # Only in the production scenario will data be preserved over the update
-    if os.environ["SCENARIO"] not in ("production", "ha-development",):
-        print("Can only update the production and ha-development scenario")
-        return None
+    config = create_config(bosslet_config)
+    migrations = config.update()
 
-    consul_update_timeout = 5 # minutes
-    consul_size = int(get_scenario(const.CONSUL_CLUSTER_SIZE))
-    min_time = consul_update_timeout * consul_size
-    max_time = min_time + 5 # add some time to allow the CF update to happen
+    print("Waiting for Vault...")
+    if not bosslet_config.call.check_vault(90, exception=False):
+        print("Could not contact Vault, check networking and run the following command")
+        print("\tpython3 bastion.py vault.bosslet vault-status")
+        print("To verify that Vault is working correctly")
+        raise BossManageError("Could not contact Vault")
 
-    print("Update command will take {} - {} minutes to finish".format(min_time, max_time))
-    print("Stack will be available during that time")
-    resp = input("Update? [N/y] ")
-    if len(resp) == 0 or resp[0] not in ('y', 'Y'):
-        print("Canceled")
-        return
+    print("Stack should be ready for use")
 
-    config = create_config(session, domain)
-    success = config.update(session)
 
-    if success:
-        keypair = aws.keypair_lookup(session)
-        call = ExternalCalls(session, keypair, domain)
-        names = AWSNames(domain)
-
-        # Unseal Vault first, so the rest of the system can continue working
-        print("Waiting for Vault...")
-        if not call.check_vault(90, exception=False):
-            print("Could not contact Vault, check networking and run the following command")
-            print("python3 bastion.py bastion.521.boss vault.521.boss vault-unseal")
-            return
-
-        with call.vault() as vault:
-            vault.unseal()
-
-        print("Stack should be ready for use")
-        print("Starting to cycle consul cluster instances")
-
-        # DP NOTE: Cycling the instances is done manually (outside of CF)
-        #          so that Vault can be unsealed first, else the whole stacks
-        #          would not be usable until all consul instance were restarted
-        with ThreadPoolExecutor(max_workers=3) as tpe:
-            # Need time for the ASG to detect the terminated instance,
-            # launch the new instance, and have the instance cluster
-            tpe.submit(aws.asg_restart,
-                            session,
-                            names.consul,
-                            consul_update_timeout * 60)
-
-    return success
-
-def delete(session, domain):
+def delete(bosslet_config):
     # NOTE: CloudWatch logs for the DNS Lambda are not deleted
-    if utils.get_user_confirm("All data will be lost. Are you sure you want to proceed?"):
-        names = AWSNames(domain)
-        aws.route53_delete_records(session, domain, names.auth)
-        aws.route53_delete_records(session, domain, names.consul)
-        aws.route53_delete_records(session, domain, names.vault)
-        aws.sns_unsubscribe_all(session, names.dns)
-        CloudFormationConfiguration('core', domain).delete(session)
+    if not console.confirm("All data will be lost. Are you sure you want to proceed?"):
+        raise BossManageCanceled()
+
+    session = bosslet_config.session
+    domain = bosslet_config.INTERNAL_DOMAIN
+    names = bosslet_config.names
+
+    aws.route53_delete_records(session, domain, names.auth.dns)
+    aws.route53_delete_records(session, domain, names.vault.dns)
+
+    aws.sns_unsubscribe_all(bosslet_config, names.dns.sns)
+
+    config = CloudFormationConfiguration('core', bosslet_config)
+    if config.existing_version() == 1: # Deleting a stack that has not been updated
+        aws.route53_delete_records(session, domain, 'consul.' + domain)
+    config.delete()
+

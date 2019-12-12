@@ -12,78 +12,79 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+DEPENDENCIES = []
+
 import json
-from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, get_scenario, Arg
+from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, Arg
 from lib.userdata import UserData
-from lib.names import AWSNames
 from lib import aws
+from lib import utils
+from lib import console
 from lib import constants as const
 from lib import stepfunctions as sfn
-from update_lambda_fcn import load_lambdas_on_s3, update_lambda_code
+from lib.lambdas import load_lambdas_on_s3, update_lambda_code
 
 """
 This CloudFormation config file creates resources for copying cuboids from
 one channel to another.
 """
 
-def create_config(session, domain):
+def create_config(bosslet_config):
     """Create the CloudFormationConfiguration object."""
-    config = CloudFormationConfiguration('copycuboid', domain, const.REGION)
-    names = AWSNames(domain)
+    config = CloudFormationConfiguration('copycuboid', bosslet_config)
+    names = bosslet_config.names
+    session = bosslet_config.session
 
     role = aws.role_arn_lookup(session, "lambda_cache_execution")
     config.add_arg(Arg.String(
         "LambdaCacheExecutionRole", role,
-        "IAM role for multilambda." + domain))
+        "IAM role for multilambda." + bosslet_config.INTERNAL_DOMAIN))
 
-    config.add_sqs_queue(names.copy_cuboid_dlq, names.copy_cuboid_dlq, 30, 20160)
+    config.add_sqs_queue(names.copy_cuboid_dlq.sqs, names.copy_cuboid_dlq.sqs, 30, 20160)
 
     config.add_lambda("CopyCuboidLambda",
-                      names.copy_cuboid_lambda,
+                      names.copy_cuboid_lambda.lambda_,
                       Ref("LambdaCacheExecutionRole"),
-                      s3=(aws.get_lambda_s3_bucket(session),
-                          "multilambda.{}.zip".format(domain),
+                      s3=(bosslet_config.LAMBDA_BUCKET,
+                          names.multi_lambda.zip,
                           "copy_cuboid_lambda.handler"),
                       timeout=60,
                       memory=128,
                       runtime='python3.6',
-                      dlq=Arn(names.copy_cuboid_dlq))
+                      dlq=Arn(names.copy_cuboid_dlq.sqs))
 
     return config
 
 
-def generate(session, domain):
+def generate(bosslet_config):
     """Create the configuration and save it to disk."""
-    config = create_config(session, domain)
+    config = create_config(bosslet_config)
     config.generate()
 
 
-def create(session, domain):
+def create(bosslet_config):
     """Create the configuration and launch."""
-    resp = input('Rebuild multilambda: [Y/n]:')
-    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
-        pre_init(session, domain)
+    if console.confirm("Rebuild multilambda", default = True):
+        pre_init(bosslet_config)
 
-    config = create_config(session, domain)
-    config.create(session)
+    config = create_config(bosslet_config)
+    config.create()
 
 
-def pre_init(session, domain):
+def pre_init(bosslet_config):
     """Build multilambda zip file and put in S3."""
-    bucket = aws.get_lambda_s3_bucket(session)
-    load_lambdas_on_s3(session, domain, bucket)
+    load_lambdas_on_s3(bosslet_config)
 
 
-def update(session, domain):
-    resp = input('Rebuild multilambda: [Y/n]:')
-    if len(resp) == 0 or (len(resp) > 0 and resp[0] in ('Y', 'y')):
-        pre_init(session, domain)
-        bucket = aws.get_lambda_s3_bucket(session)
-        update_lambda_code(session, domain, bucket)
+def update(bosslet_config):
+    if console.confirm("Rebuild multilambda", default = True):
+        pre_init(bosslet_config)
+        update_lambda_code(bosslet_config)
 
-    config = create_config(session, domain)
-    return config.update(session)
+    config = create_config(bosslet_config)
+    config.update()
 
 
-def delete(session, domain):
-    CloudFormationConfiguration('copycuboid', domain).delete(session)
+def delete(bosslet_config):
+    config = CloudFormationConfiguration('copycuboid', bosslet_config)
+    config.delete()

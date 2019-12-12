@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.5
+#!/usr/bin/env python3
 
 # Copyright 2016 The Johns Hopkins University Applied Physics Laboratory
 #
@@ -18,7 +18,7 @@
    The instances should first be stood up by building stacks through cloudformation.
    ASG are shut down. Only execute this code if you are certain the boss will not
    be running for another hour.
-   Currently not all of the ASGs are supported. The auth and consul ASGs could present problems
+   Currently not all of the ASGs are supported. The auth ASG could present problems
    if shut down, since all their data would be lost and would not be recovered upon turning the boss on. 
    Supporting Auth ASG could be done using the same check the core config uses to see ig an auth RDS should be create.
    If there is an auth db then you should be able to shut the ec2 instances down."""
@@ -31,144 +31,351 @@ import os
 import subprocess
 import time
 import pickle
-import vault as vaultB
-from lib.ssh import SSHConnection, vault_tunnel
-from lib import aws, utils, vault, constants, external
 
-def main():
+import alter_path
+from lib import utils, constants, console
+from lib.configuration import BossParser
 
-    choice = utils.get_user_confirm("Are you sure you want to proceed?")
-    if choice:
-        if args.action == "on":
-            print("Turning the BossDB on...")
-            startInstances()
+"""
+Error conditions and handling
 
-        elif args.action == "off":
-            print("Turning the BossDB off...")
-            stopInstances()
+Code should be able to handle multiple calls to on or off in a row
+and only work with the machines that didn't get turned on or off
+
+ex: On -> Vault failure, Manually fix Vault, On to finish all other instances
+
+What about when no ASGs exist for the bosslet?
+
+Starting:
+    An error when starting ASG that is off - 
+    Starting ASG that already is on - 
+    Initializing Vault - 
+    Unsealing Vault - 
+    Exported Vault data not existing - 
+    Importing Vault data - 
+
+
+Stopping:
+    An error when stopping ASG that is on - 
+    Stopping ASG that is already off - 
+    Exporting Vault data - 
+    Stopping Auth without RDS - 
+"""
+KEY_PREFIX = 'boss_switch.'
+
+VAULT_FILE = constants.repo_path('vault', 'private', '{}', 'export.json')
+
+def load_aws(bosslet_config, method):
+    suffix = '.' + bosslet_config.INTERNAL_DOMAIN
+
+    client = bosslet_config.session.client('autoscaling')
+    response = client.describe_auto_scaling_groups()
+
+    def name(tags):
+        for tag in tags:
+            if tag['Key'] == 'Name':
+                return tag['Value']
+        return ""
+
+    asgs = [AutoScalingGroup(bosslet_config, asg)
+            for asg in response['AutoScalingGroups']
+            if name(asg['Tags']).endswith(suffix) ]
+
+    if method == 'on':
+        for asg in asgs:
+            asg.load_tags()
+    elif method == 'off':
+        for asg in asgs:
+            asg.save_tags()
+
+    return load_sort(asgs, method)
+
+def load_sort(asgs, method):
+    unsorted = asgs.copy()
+    sorted = []
+
+    def pop(name):
+        for i in range(len(unsorted)):
+            if name in unsorted[i].name:
+                return unsorted.pop(i)
+
+    def add(name):
+        obj = pop(name)
+        if obj:
+            sorted.append(obj)
+
+    add('Vault')
+    sorted.extend(unsorted)
+
+    if method == "off":
+        sorted.reverse()
+
+    return sorted
+
+class AutoScalingGroup(object):
+    def __init__(self, bosslet_config, definition):
+        self.bosslet_config = bosslet_config
+        self.client = bosslet_config.session.client('autoscaling')
+        self.definition = definition
+
+        self.name = definition['AutoScalingGroupName']
+
+        self.min = definition['MinSize']
+        self.max = definition['MaxSize']
+        self.desired = definition['DesiredCapacity']
+
+    def start(self):
+        if DRY_RUN:
+            print("Setting {} to {}/{}/{}".format(self.name,
+                                                  self.min,
+                                                  self.max,
+                                                  self.desired))
+        else:
+            self.client.update_auto_scaling_group(AutoScalingGroupName = self.name,
+                                                  MinSize = self.min,
+                                                  MaxSize = self.max,
+                                                  DesiredCapacity = self.desired)
+
+            self.client.resume_processes(AutoScalingGroupName = self.name,
+                                         ScalingProcesses = ['HealthCheck'])
+
+    def stop(self):
+        if DRY_RUN:
+            print("Setting {} to 0/0/0".format(self.name))
+        else:
+            self.client.update_auto_scaling_group(AutoScalingGroupName = self.name,
+                                                  MinSize = 0,
+                                                  MaxSize = 0,
+                                                  DesiredCapacity = 0)
+
+            self.client.suspend_processes(AutoScalingGroupName = self.name,
+                                          ScalingProcesses = ['HealthCheck'])
+
+    def save_tags(self):
+        if self.min == 0 and \
+           self.max == 0 and \
+           self.desired == 0:
+            console.debug("{} already turned off")
+            return
+
+        values = {'min': self.min,
+                  'max': self.max,
+                  'desired': self.desired}
+        self.write_tags(values)
+
+    def load_tags(self):
+        values = self.read_tags()
+        for key in ('min', 'max', 'desired'):
+            try:
+                # Check to see if the loaded value is a number
+                value = int(values[key])
+            except ValueError: # Not int
+                msg = '{} value for {} is not an integer'.format(key,self.name)
+                console.warning(msg)
+
+                value = 0
+            except IndexError: # Doesn't exist
+                value = 0
+
+            # ??? Is Zero a valid value? (use -1 instead?)
+
+            # If loaded value is invalid, warn and set to 1
+            if key not in values or value == 0:
+                if key not in values:
+                    fmt = 'No saved {} value for {}, setting to 1'
+                else:
+                    fmt = 'Save {} value is zero, setting to 1'
+                msg = fmt.format(key, self.name)
+                console.warning(msg)
+
+                value = 1
+
+            # Verify we won't override another value
+            current = getattr(self, key)
+            if current > 0 and current != value:
+                fmt = 'Override curent {} value ({}) with loaded value ({}) ?'
+                msg = fmt.format(key, current, value)
+                if not console.confirm(msg):
+                    value = current
+
+            setattr(self, key, value)
+
+    def read_tags(self):
+        resp = self.client.describe_tags(Filters=[{'Name': 'auto-scaling-group',
+                                                   'Values': [self.name]}])
+
+        values = {tag['Key'][len(KEY_PREFIX):]: tag['Value']
+                  for tag in resp['Tags']
+                  if tag['Key'].startswith(KEY_PREFIX)}
+        return values
+
+    def write_tags(self, values):
+        tags = [{'ResourceId': self.name,
+                 'ResourceType': 'auto-scaling-group',
+                 'Key': KEY_PREFIX + key,
+                 'Value': str(value),
+                 'PropagateAtLaunch': False}
+                for key, value in values.items()]
+        self.client.create_or_update_tags(Tags=tags)
+
+    def delete_tags(self, keys):
+        tags = [{'ResourceId': self.name,
+                 'ResourceType': 'auto-scaling-group',
+                 'Key': KEY_PREFIX + key}
+                for key in keys]
+        self.client.delete_tags(Tags=tags)
 
 #Executed actions
-def startInstances():
+def startInstances(bosslet_config):
     """
         Method used to start necessary instances
     """
-    #Use auto scaling groups last saved configuration
-    try:
-        ASGdescription = load_obj('ASGdescriptions')
-        activitiesD = [ASGdescription["AutoScalingGroups"][0]["MinSize"], ASGdescription["AutoScalingGroups"][0]["MaxSize"],ASGdescription["AutoScalingGroups"][0]["DesiredCapacity"]]
-        endpointD = [ASGdescription["AutoScalingGroups"][1]["MinSize"], ASGdescription["AutoScalingGroups"][1]["MaxSize"],ASGdescription["AutoScalingGroups"][1]["DesiredCapacity"]]
-        vaultD = [ASGdescription["AutoScalingGroups"][2]["MinSize"], ASGdescription["AutoScalingGroups"][2]["MaxSize"],ASGdescription["AutoScalingGroups"][2]["DesiredCapacity"]]
-        print("Successful ASG configuration")
-    except Exception as e:
-       utils.console.fail("Unsuccessful ASG configuration")
-       print("Error due to: %s" % e)
-       exit()
 
-    #Start vault instance
-    print("Starting vault...")
-    client.update_auto_scaling_group(AutoScalingGroupName=vaultg, MinSize = vaultD[0] , MaxSize =  vaultD[1], DesiredCapacity = vaultD[2])
-    client.resume_processes(AutoScalingGroupName=vaultg,ScalingProcesses=['HealthCheck'])
-    time.sleep(constants.TIMEOUT_VAULT)
-    print("Vault instance running")
+    # Verify Vault data exists before continuing
+    filename = VAULT_FILE.format(bosslet_config.names.vault.dns)
+    if not os.path.exists(filename):
+        msg = "File {} doesn't exist, cannot reimport Vault data".format(filename)
+        if DRY_RUN:
+            console.warning(msg)
+        else:
+            console.fail(msg)
+            return
 
-    #Import vault content:
-    print("Importing vault content")
-    try:
-        with vault_tunnel(args.ssh_key, bastion):
-            private = aws.machine_lookup(session,vpc,public_ip=False)
-            vaultB.vault_unseal(vault.Vault(vpc, private))
-            vaultB.vault_import(vault.Vault(vpc, private), REAL_PATH + '/config/vault_export.json')
-        utils.console.okgreen("Successful import")
-    except Exception as e:
-        utils.console.fail("Unsuccessful import")
-        print("Error due to %s" % e)
-        exit()
+    asg_problem = False
 
-    #Start endpoint and activities instances
-    print("Starting endpoint, and activities...")
-    try:
-        client.update_auto_scaling_group(AutoScalingGroupName=endpoint, MinSize = endpointD[0] , MaxSize = endpointD[1] , DesiredCapacity = endpointD[2])
-        client.resume_processes(AutoScalingGroupName=endpoint,ScalingProcesses=['HealthCheck'])
-        
-        client.update_auto_scaling_group(AutoScalingGroupName=activities, MinSize = activitiesD[0] , MaxSize = activitiesD[1] , DesiredCapacity = activitiesD[2])
-        client.resume_processes(AutoScalingGroupName=activities,ScalingProcesses=['HealthCheck'])
-    except Exception as e:
-        print('Error: %s' % e)
-        exit()
+    asgs = load_aws(bosslet_config, 'on')
+    with console.status_line(spin=True) as status:
+        for asg in asgs:
+            status('Working on {}'.format(asg.name))
+            # TODO: Add error handling
+            # If Vault error, stop
+            # If error starting ASG log error and continue
 
-    utils.console.okgreen("TheBoss is on")
+            ###############################
+            # Pre-start actions or checks #
+            ###############################
+
+            if 'Auth' in asg.name:
+                if not bosslet_config.AUTH_RDS:
+                    console.warning("Skipping starting Auth ASG, as it was not stopped")
+                    continue
+
+            ###################
+            # Start Instances #
+            ###################
+
+            print("Turning on {}".format(asg.name))
+            try:
+                asg.start()
+                console.green("{} is on".format(asg.name))
+            except Exception as ex:
+                asg_problem = True
+                console.warning("{} is not on".format(asg.name))
+                print(ex)
+
+            ################################
+            # Post-start actions or checks #
+            ################################
+
+            if 'Vault' in asg.name:
+                if DRY_RUN:
+                    print("Waiting for Vault to start")
+                    print("Vault import {}".format(filename))
+                    continue
+
+                print("Waiting for Vault to start")
+                # XXX: May need to wait a little before creating call, so that
+                #      vault instances are named and can be resolved
+                bosslet_config.call.check_vault(constants.TIMEOUT_VAULT)
+
+                with bosslet_config.call.vault() as vault:
+                    print("Importing previous Vault data")
+                    try:
+                        with open(filename) as fh:
+                            data = json.load(fh)
+                        vault.import_(data)
+                        console.green("Successful import")
+                    except Exception as e:
+                        console.fail("Unsuccessful import")
+                        print(ex)
+                        print("Cannot continue restore")
+                        return
+
+    if asg_problem:
+        console.warning("Problems turning on bosslet")
+    else:
+        console.blue("Bosslet is on")
 
 
-def stopInstances():
+def stopInstances(bosslet_config):
     """
         Method used to stop currently running instances
     """
-    #Save current ASG descriptions:
-    print("Saving current auto scaling group configuration...")
-    response = client.describe_auto_scaling_groups(AutoScalingGroupNames=[endpoint,activities,vaultg])
-    try:
-        response['AutoScalingGroups'][0]
-        save_obj(response,'ASGdescriptions')
-        print("Successfully saved ASG descriptions")
-    except IndexError as e:
-        utils.console.fail("Failed while saving ASG descriptions")
-        print("Error: %s" % e)
-        exit()
+    filename = VAULT_FILE.format(bosslet_config.names.vault.dns)
 
-    #Export vault content:
-    print("Exporting vault content...") 
-    try:
-        with vault_tunnel(args.ssh_key, bastion): 
-            vaultB.vault_export(vault.Vault(vpc, private), REAL_PATH+'/config/vault_export.json')
-        utils.console.warning("Please protect the vault_pexport.json file as it contains personal passwords.")
-        utils.console.okgreen("Successful vaul export")
-    except Exception as e:
-        utils.console.fail("Unsuccessful vault export")
-        print("Error: %s" % e)
-        exit()
+    asg_problem = False
 
-    #Switch off:
-    print("Stopping all Instances...")
-    client.update_auto_scaling_group(AutoScalingGroupName=endpoint, MinSize = 0 , MaxSize = 0 , DesiredCapacity = 0)
-    client.suspend_processes(AutoScalingGroupName=endpoint,ScalingProcesses=['HealthCheck'])
+    asgs = load_aws(bosslet_config, 'off')
+    with console.status_line(spin=True) as status:
+        for asg in asgs:
+            status('Working on ASG {}'.format(asg.name))
+            ##############################
+            # Pre-stop actions or checks #
+            ##############################
 
-    client.update_auto_scaling_group(AutoScalingGroupName=activities, MinSize = 0 , MaxSize = 0 , DesiredCapacity = 0)
-    client.suspend_processes(AutoScalingGroupName=activities,ScalingProcesses=['HealthCheck'])
+            if 'Vault' in asg.name:
+                if DRY_RUN:
+                    print("Export Vault data into {}".format(filename))
+                else:
+                    print("Exporting current Vault data")
+                    try:
+                        with bosslet_config.call.vault() as vault:
+                            # TODO: figure out what configuration information should be exported
+                            data = vault.export("secret/")
 
-    client.update_auto_scaling_group(AutoScalingGroupName=vaultg, MinSize = 0 , MaxSize = 0 , DesiredCapacity = 0)
-    client.suspend_processes(AutoScalingGroupName=vaultg,ScalingProcesses=['HealthCheck'])
+                            with open(filename, 'w') as fh:
+                                json.dump(data, fh, indent=3, sort_keys=True)
 
-    utils.console.fail("TheBoss is off")
+                        console.warning("Please protect {} as it contains personal passwords".format(filename))
+                        console.green("Successful Vault export")
+                    except Exception as e:
+                        console.fail("Unsuccessful vault export")
+                        print(ex)
+                        print("Cannot continue")
+                        return
+            elif 'Auth' in asg.name:
+                if not bosslet_config.AUTH_RDS:
+                    console.warning("Cannot turn off Auth ASG without an external RDS database")
+                    continue
 
-def save_obj(obj, name ):
-    """
-        Method to save objects as .pkl files
+            ##################
+            # Stop Instances #
+            ##################
 
-        Args:
-            obj : The object that will be saved
-            name : The .pkl file name under which the object will be saved
-    """
-    with open(REAL_PATH + '/' + name + '.pkl', 'wb') as f:
-        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+            print("Turning off {}".format(asg.name))
+            try:
+                asg.stop()
+                console.green("{} is off".format(asg.name))
+            except Exception as ex:
+                asg_problem = True
+                console.warning("{} is not off".format(asg.name))
+                print(ex)
+                # XXX: What to do?
 
-def load_obj(name):
-    """
-        Method to load saved objects in .pkl file
+            ###############################
+            # Post-stop actions or checks #
+            ###############################
+            # None right now
 
-        Args:
-            name : The .pkl file name to open
-        
-        Returns:
-            object saved within .pkl file
-    """
-    with open(REAL_PATH + '/' + name + '.pkl', 'rb') as f:
-        return pickle.load(f)
+    if asg_problem:
+        # XXX: The problem is that if 'off' is re-run the ASGs that were previously
+        #      turned off will have 0/0/0 saved to the DEFINITION_FILE and mess up
+        #      turning ASGs back on
+        console.warning("Problem turning off bosslet")
+    else:
+        console.blue("TheBoss is off")
 
 if __name__ == '__main__':
-
-    #Grab files path to use as reference.
-    REAL_PATH = constants.repo_path()
-
     def create_help(header, options):
         """Create formated help."""
         return "\n" + header + "\n" + \
@@ -177,69 +384,35 @@ if __name__ == '__main__':
     actions = ["on", "off"]
     actions_help = create_help("action supports the following:", actions)
 
-    parser = argparse.ArgumentParser(description = "Script to turn the boss on and off by stopping and restarting EC2 instances.",
-                                     formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     epilog=actions_help)
-    parser.add_argument("--aws-credentials", "-a",
-                        metavar = "<file>",
-                        default = os.environ.get("AWS_CREDENTIALS"),
-                        type = argparse.FileType('r'),
-                        help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
-    parser.add_argument("--config",
-                        metavar = "<config>",
-                        default ="asg-cfg-dev",
-                        help = "Name of auto scale group configuration file located inside boss-manage/config folder")
-    parser.add_argument("--private-ip", "-p",
-                        action='store_true',
-                        default=False,
-                        help = "add this flag to type in a private IP address in internal command instead of a DNS name which is looked up")
-    parser.add_argument("--port",
-                        default=22,
-                        type=int,
-                        help = "Port to connect to on the internal machine")
-    parser.add_argument("--ssh-key", "-s",
-                        metavar = "<file>",
-                        default = os.environ.get("SSH_KEY"),
-                        help = "SSH private key to use when connecting to AWS instances (default: SSH_KEY)")
-    parser.add_argument("--bastion","-b",  help="Hostname of the EC2 bastion server to create SSH Tunnels on")
+    parser = BossParser(description = "Script to turn the boss on and off by stopping and restarting EC2 instances.",
+                        formatter_class=argparse.RawDescriptionHelpFormatter,
+                        epilog=actions_help)
+    parser.add_argument("--dry-run", "-n",
+                        action = "store_true",
+                        help = "If the actions should be dry runned")
     parser.add_argument("action",
                         choices = actions,
                         metavar = "action",
                         help = "Action to execute")
-    parser.add_argument("domain_name",
-                    help="Domain in which to execute the configuration (example: subnet.vpc.boss)")
+    parser.add_bosslet()
+
     args = parser.parse_args()
 
-    #Check AWS configurations
-    if args.aws_credentials is None:
-        parser.print_usage()
-        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
-        sys.exit(1)
+    DRY_RUN = args.dry_run
+    bosslet_config = args.bosslet_config
 
-    # specify AWS keys, sets up connection to the client.
-    session = aws.create_session(args.aws_credentials)
-    client = session.client('autoscaling')
+    choice = console.confirm("Are you sure you want to proceed?", timeout=30)
+    if not choice:
+        sys.exit(0)
 
-    # This next code block was adopted from bin/bastion.py and sets up vault_tunnel
-    vpc = 'vault.' + args.domain_name
-    boss_position = 1
+    print("Turning the {} bosslet {}...".format(args.bosslet_name,
+                                                args.action))
+
     try:
-        int(vpc.split(".", 1)[0])
-        boss_position = 2
-    except ValueError:
-        pass
-    bastion_host = args.bastion if args.bastion else "bastion." + vpc.split(".", boss_position)[boss_position]
-    bastion = aws.machine_lookup(session, bastion_host)
-    if args.private_ip:
-        private = vpc
-    else:
-        private = aws.machine_lookup(session, vpc, public_ip=False)
-
-    #Loading ASG configuration files. Please specify your ASG names on asg-cfg found in the config file.
-    asg = json.load(open(str(REAL_PATH + '/config/' + args.config)))
-    activities = asg["activities"]
-    endpoint = asg["endpoint"]
-    vaultg = asg["vault"]
-    auth = asg["auth"]
-
-    main()
+        if args.action == "on":
+            startInstances(bosslet_config)
+        elif args.action == "off":
+            stopInstances(bosslet_config)
+    except Exception as ex:
+        print("Error due to {}".format(ex))
+        sys.exit(1)

@@ -112,146 +112,150 @@ def create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_u
 
     return proc
 
-def create_tunnel_aplnis(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user="ec2-user"):
-    """Create a SSH tunnel, possibly though an extra bastion defined by environmental variables.
-
-    Read environmental variables to either directly connect to the given
-    bastion_ip or use the given (second) bastion server as the first machine to
-    connect to and route other tunnels through.
-
-    This was added to support using a single machine given access through the
-    corporate firewall and tunnel all SSH connections through it.
+class SSHTarget(object):
+    """Object for containing information about a machine to connect to via SSH
 
     Args:
-        key (string) : Path to a SSH private key, protected as required by SSH
-        local_port : Port on the local machine to attach the local end of the tunnel to
-        remote_ip : IP of the machine the tunnel remote end should point at
-        remote_port : Port of on the remote_ip that the tunnel should point at
-        bastion_ip : IP of the machine to form the SSH tunnel through
-        bastion_user : The user account of the bastion_ip machine to use when creating the tunnel
-
-    Returns:
-        (Popen) : Popen process object of the SSH tunnel
-        (ProcWrapper) : ProcWrapper that contains multiple Popen objects, one for each tunnel
+        key (string): Path to SSH private key used for authentication
+        ip (string): IP address of the machine
+        port (string|int): Port on the machine
+        user (string): Username of the user that matches the private key
     """
-    apl_bastion_ip = os.environ.get("BASTION_IP")
-    apl_bastion_key = os.environ.get("BASTION_KEY")
-    apl_bastion_user = os.environ.get("BASTION_USER")
+    def __init__(self, key, ip, port='22', user='ec2-user'):
+        self.key = key
+        self.ip = ip
+        self.port = port
+        self.user = user
 
-    if apl_bastion_ip is None or apl_bastion_key is None or apl_bastion_user is None:
-        # traffic
-        # localhost -> bastion -> remote
-        print("Bastion information not defined, connecting directly")
-        proc = create_tunnel(key, local_port, remote_ip, remote_port, bastion_ip, bastion_user)
-        return proc
-    else:
-        # traffic
-        # localhost -> apl_bastion -> bastion -> remote
-        #print("Using Bastion host at {}".format(apl_bastion_ip))
-        wrapper = ProcWrapper()
-        port = locate_port()
-
-        # Used http://superuser.com/questions/96489/ssh-tunnel-via-multiple-hops mssh.pl
-        # to figure out the multiple tunnels
-
-        # Open up a SSH tunnel to bastion_ip:22 through apl_bastion_ip
-        # (to allow the second tunnel to be created)
-        proc = create_tunnel(apl_bastion_key, port, bastion_ip, 22, apl_bastion_ip, apl_bastion_user)
-        wrapper.prepend(proc)
-
-        try:
-            # Create our normal tunnel, but connect to localhost:port to use the
-            # first tunnel that we create
-            proc = create_tunnel(key, local_port, remote_ip, remote_port, "localhost", bastion_user, port)
-            wrapper.prepend(proc)
-            return wrapper
-        except:
-            # close the initial tunnel
-            wrapper.terminate()
-            wrapper.wait()
-            raise # raise initial exception
-
-def create_tunnel_bastion(local_port, remote_ip, remote_port):
-    """Create a SSH tunnel through the bastion machine defined by environmental variables.
-
-    If no bastion machine is defined an exception is raised
-
-    Args:
-        local_port : Port on the local machine to attach the local end of the tunnel to
-        remote_ip : IP of the machine the tunnel remote end should point at
-        remote_port : Port of on the remote_ip that the tunnel should point at
-
-    Returns:
-        (Popen) : Popen process object of the SSH tunnel
-    """
-    apl_bastion_ip = os.environ.get("BASTION_IP")
-    apl_bastion_key = os.environ.get("BASTION_KEY")
-    apl_bastion_user = os.environ.get("BASTION_USER")
-
-    if apl_bastion_ip is None or apl_bastion_key is None or apl_bastion_user is None:
-        print("Bastion information not defined, connecting directly")
-        return None
-    else:
-        # traffic
-        # localhost -> apl_bastion -> remote
-        proc = create_tunnel(apl_bastion_key, local_port, remote_ip, remote_port, apl_bastion_ip, apl_bastion_user)
-        return proc
-
-def unpack(obj, *args):
-    if type(obj) == tuple:
-        args_ = list(args)[len(obj)-1:]
-        return (*obj, *args_)
-    else:
-        return (obj, *args)
+    def __str__(self):
+        return "{}@{}:{}".format(self.user, self.ip, self.port)
 
 class SSHConnection(object):
-    def __init__(self, key, target, bastion=None, local_port=None):
-        self.key = key
-        self.remote_ip, self.remote_port, self.remote_user = unpack(target, 22, "ubuntu")
-        self.bastion_ip, self.bastion_port, self.bastion_user = unpack(bastion, 22, "ec2-user")
-        self.local_port = local_port if local_port else random.randint(10000,60000)
+    """Object for connecting to a remote machine via SSH using public keys
+
+    NOTE: The list of bastions has not required or fixed size, though each
+          bastion machine connection adds a 10 second sleep to verify that
+          the SSH tunnel was created and established.
+
+    Args:
+        target (SSHTarget): Target machine to connect to
+        bastions (SSHTarget|list[SSHTarget]): List of machines though which to
+                                              create SSH tunnels so that the
+                                              target machine can be reached
+        local_port (int): Local port number to use for SSH tunnels
+                          If not provided, one will be randomly picked
+    """
+    def __init__(self, target, bastions=[], local_port=None):
+        if isinstance(bastions, SSHTarget): # easy passing of a single bastion
+            bastions = [bastions]
+
+        self.target = target
+        self.bastions = bastions
+        self.local_port = local_port if local_port else locate_port()
 
     @contextmanager
     def _connect(self):
-        """Create the needed SSH tunnel(s) based on constructor arguments / environment
-        variables.
+        """Create the needed SSH tunnel(s) based on constructor arguments.
 
-        There are 4 different tunnel configurations
-        1) No tunnels are needed / requested
-        2) One tunnel though the bastion defined by environment variables
-        3) One tunnel though the bastion passed to the constructor
-        4) Two tunnels one through the bastion defined by environment variables
-           and on throught he bastion passed to the constructor
+        If no bastion machines were defined in the constructor a message is
+        printed and the target machine information is yielded so dependent
+        methods can connect directly to the target machine.
 
-        Returns:
-            (hostname/ip, port) : Tuple of hostname/ip and port to connect to
-                                  Needed so the calling method(s) know if they
-                                  connect to localhost or remote_ip (depending
-                                  on if a tunnel(s) was created
+        Yields:
+            SSHTarget: Object containing the information needed to connect to
+                       the target machine, either directly or via SSH tunnel(s)
         """
-        if self.bastion_ip:
-            proc = create_tunnel_aplnis(self.key,
-                                        self.local_port, 
-                                        self.remote_ip,
-                                        self.remote_port, 
-                                        self.bastion_ip, 
-                                        self.bastion_user)
-        else:
-            proc = create_tunnel_bastion(self.local_port,
-                                         self.remote_ip,
-                                         self.remote_port)
+        wrapper = ProcWrapper()
+        # create_tunnel(key, l_port, r_ip, r_port, b_ip, b_user, b_port)
+        # ssh -L l_port:r_ip:r_port -p b_port p_user@b_ip
+        # connect l_port to r_ip:r_port via p_user@b_ip:b_port
 
-        if proc:
-            args = ("localhost", self.local_port)
+        """
+        b[1].l_port - (b[0].user@b[0].ip:b[0].port) -> b[1].ip:b[1].port
+        b[n].l_port - (b[1].user@localhost:b[1].l_port) -> b[n].ip:b[n].port
+
+        l_port - (b[n].user@localhost:b[n].l_port) -> r_ip:r_port
+
+
+        b[-1].l_port, b[-1].ip, b[-1].port, b[-2].ip, b[-2].user, b[-2].l_port
+        l_port, remote.ip, remote.port, "localhost", b[-1].user, b[-1].l_port
+        """
+
+        if len(self.bastions) == 0:
+            print("No bastions defined, connecting directly")
+            args = self.target
         else:
-            args = (self.remote_ip, self.remote_port)
+            ########################################################################
+            # DP NOTE: Whats happening here is that bastion N is used to form a    #
+            #          tunnel to bastion N+1. This process happens until the       #
+            #          target machine is reached. When linking each of the tunnels #
+            #          together the local port of the previous tunnel is used when #
+            #          making the next connection                                  #
+            ########################################################################
+
+            # Connecting from local_port to remote via bastion
+            # all three lists will be the same length
+            local_ports = []
+            bastions = [(self.bastions[0].key,
+                         self.bastions[0].user,
+                         self.bastions[0].ip,
+                         self.bastions[0].port)]
+            remotes = []  # ip, port
+
+            for bastion in self.bastions[1:]:
+                port = locate_port()
+                local_ports.append(port)
+                bastions.append((bastion.key, bastion.user, "localhost", port))
+                remotes.append((bastion.ip, bastion.port))
+
+            # Finally add the target information for the final SSH tunnel
+            # This just defines a tunnel to the target and doesn't connect
+            # to the machine itself, that is done by the caller
+            local_ports.append(self.local_port)
+            remotes.append((self.target.ip, self.target.port))
+
+            # Information for the caller to use when forming the final connection
+            # through the established tunnels
+            args = SSHTarget(self.target.key,
+                             "localhost",
+                             self.local_port,
+                             self.target.user)
+
+            # Create each SSH tunnel and add it to the list of open processes
+            # to close when the tunnel is finished
+            for i in range(len(bastions)):
+                l_port = local_ports[i]
+                b = bastions[i]
+                r = remotes[i]
+                #print("Connecting {} -> ({}@{}:{}) -> {}:{}".format(l_port,
+                #                                                    b[1], # b.user
+                #                                                    b[2], # b.ip
+                #                                                    b[3], # b.port
+                #                                                    r[0], # r.ip
+                #                                                    r[1])) # r.port
+
+                try:
+                    proc = create_tunnel(b[0], # b.key
+                                         l_port,
+                                         r[0], # r.ip
+                                         r[1], # r.port
+                                         b[2], # b.ip
+                                         b[1], # b.user
+                                         b[3]) # b.port
+
+                    wrapper.prepend(proc)
+                except:
+                    # close the tunnels that have been already created
+                    wrapper.terminate()
+                    wrapper.wait()
+                    raise # raise initial exception
 
         try:
             yield args
         finally:
-            if proc:
-                proc.terminate()
-                proc.wait()
+            if wrapper:
+                wrapper.terminate()
+                wrapper.wait()
 
     def shell(self):
         """Create SSH tunnel(s) through bastion machine(s) and start a foreground
@@ -264,10 +268,9 @@ class SSHConnection(object):
         After the second SSH session is complete, the SSH tunnel is destroyed.
         """
 
-        with self._connect() as host_port:
-            host, port = host_port
+        with self._connect() as target:
             ssh_cmd = "ssh -i {} {} -p {} {}@{}" \
-                            .format(self.key, SSH_OPTIONS, port, self.remote_user, host)
+                            .format(target.key, SSH_OPTIONS, target.port, target.user, target.ip)
 
             ret = subprocess.call(shlex.split(ssh_cmd), close_fds=True, preexec_fn=become_tty_fg)
             check_ssh(ret)
@@ -283,13 +286,12 @@ class SSHConnection(object):
             scp(local_file, remote_file, upload=False)
             scp(local_file, remote_file, upload=True)
         """
-        with self._connect() as host_port:
-            host, port = host_port
+        with self._connect() as target:
             def scp(local_file, remote_file, upload=False):
                 first = local_file if upload else ""
                 second = "" if upload else local_file
                 scp_str = "scp -i {} {} -P {} {} {}@{}:{} {}" \
-                                .format(self.key, SSH_OPTIONS, port, first, self.remote_user, host, remote_file, second)
+                                .format(target.key, SSH_OPTIONS, target.port, first, target.user, target.ip, remote_file, second)
                 ret = subprocess.call(shlex.split(scp_str))
                 check_ssh(ret)
                 return ret
@@ -352,11 +354,10 @@ class SSHConnection(object):
             cmd("command to execute")
             cmd("command to execute")
         """
-        with self._connect() as host_port:
-            host, port = host_port
+        with self._connect() as target:
             def cmd(command):
                 ssh_cmd_str = "ssh -i {} {} -p {} {}@{} '{}'" \
-                                    .format(self.key, SSH_OPTIONS, port, self.remote_user, host, command)
+                                    .format(target.key, SSH_OPTIONS, target.port, target.user, target.ip, command)
 
                 ret = subprocess.call(shlex.split(ssh_cmd_str))
                 check_ssh(ret)
@@ -390,47 +391,14 @@ class SSHConnection(object):
         """Create SSH tunnel(s) through bastion machine(s), setup a SSH tunnel,
         and return the local port to connect to.
         """
+        if len(self.bastions) == 0:
+            raise Exception("Cannot tunnel without bastion machine(s)")
+
         with self._connect():
-            # DP NOTE: assume that the caller already configured a bastion machine
             yield self.local_port
 
-    def external_tunnel(self, port = None, local_port = None):
-        """Create SSH tunnel(s) through bastion machine(s) and setup a SSH tunnel.
-
-            Note: This function will block until the user tells it to close the tunnel
-                  if cmd argument is None.
-
-        Create an SSH tunnel from the local machine to bastion that gets
-        forwarded to remote. Launch a second SSH tunnel through the SSH tunnel
-        to the remote machine and wait for user input to close the tunnels.
-
-        Args:
-            port : Target port on remote_ip to form the SSH tunnel to
-                   If port is None then prompt the user for the port
-            local_port : Local port to connect the SSH tunnel to
-                         If local_port is None and cmd is None then the user is prompted
-                             for the local port to use
-                         If local_port is None and cmd is not None then a port is located
-                             and passed to cmd
-        """
-        if port is None:
-            port = int(input("Target Port: "))
-        self.remote_port = port
-
-        if local_port is None:
-            local_port = int(input("Local Port: "))
-        self.local_port = local_port
-
-        with self._connect() as host_port:
-            if host_port[0] != 'localhost':
-                print("No tunnel(s) created, connect directly to {}:{}".format(self.remote_ip, self.remote_port))
-                return
-
-            print("Connect to localhost:{} to be forwarded to {}:{}"
-                        .format(self.local_port, self.remote_ip, self.remote_port))
-            input("Waiting to close tunnel...")
-
-def vault_tunnel(key, bastion):
-    ssh = SSHConnection(key, ("localhost", 3128), bastion, local_port=3128)
+def vault_tunnel(key, bastions):
+    ssh = SSHConnection(SSHTarget(key, 'localhost', 3128, 'ubuntu'),
+                        bastions, local_port=3128)
     return ssh.tunnel()
 

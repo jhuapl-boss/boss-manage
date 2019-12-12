@@ -18,6 +18,7 @@ import subprocess
 import shlex
 import getpass
 import string
+import warnings
 
 from contextlib import contextmanager
 
@@ -164,41 +165,38 @@ def find_dict_with(list_of_dicts, key, value):
                 return d;
     return None
 
-def get_user_confirm(message):
-    """
-    General method to warn the user to read the message before proceeding
-    and prompt a yes or no answer.
-    
-    Args:
-        message(str): The message which will be showed to the user.
-    
-    Returns:
-        returns True if user confirms with yes
-    """
-    resp = input(message + " [y/N]")
-    if len(resp) == 0 or resp[0] not in ('y', 'Y'):
-        print("Canceled")
-        return False
-    else:
-        return True
+def deprecated(msg = "The called function is now deprecated"):
+    warnings.warn(msg, DeprecationWarning, stacklevel=2)
 
-class console:
-    """
-        Used to add coloring to terminal print statements
-    """
+def parse_hostname(hostname):
+    # handle one of the following
+    # - index.machine_name.bosslet_name
+    # - index.machine_name
+    # - machine_name.bosslet_name
+    # - machine_name
+    # where bosslet_name may contain a '.'
 
-    @staticmethod
-    def warning(message):
-        print('\033[93m' + message +'\033[0m')
+    # NOTE: Doesn't support passing an IP address
 
-    @staticmethod
-    def okgreen(message):
-        print('\033[92m' + message +'\033[0m')
+    # split out the index, machine name, and bosslet name
+    try:
+        # assume index.machine.bosslet
+        tmp = hostname.split(".", 1)
+        idx = int(tmp[0])
+        try:
+            _, machine, bosslet_name = hostname.split(".", 2)
+        except ValueError: # assume no bosslet_name
+            # handle just index.machine
+            _, machine = tmp
+            bosslet_name = None
+    except ValueError: # assume no index
+        idx = None
+        try:
+            # handle just machine.bosslet
+            machine, bosslet_name = tmp
+        except ValueError: # assume no bosslet_name
+            # handle just machine
+            machine, bosslet_name = tmp[0], None
 
-    @staticmethod
-    def okblue(message):
-        print('\033[94m' + message +'\033[0m')
+    return (idx, machine, bosslet_name)
 
-    @staticmethod
-    def fail(message):
-        print('\033[91m' + message +'\033[0m')

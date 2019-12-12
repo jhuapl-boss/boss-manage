@@ -17,18 +17,18 @@ Create a data pipeline that will periodically backup all RDS tables
 and DynaamoDB tables to S3 (protected by SSE-S3 data at rest).
 """
 
+DEPENDENCIES = ['core', 'api']
+
 from lib.cloudformation import CloudFormationConfiguration
 from lib.datapipeline import DataPipeline, Ref
-from lib.names import AWSNames
-from lib.external import ExternalCalls
 
 from lib import aws
 from lib import utils
-from lib import scalyr
 from lib import constants as const
 from lib.vault import POLICY_DIR as VAULT_POLICY_DIR
 
 import os
+import random
 
 def rds_copy(rds_name, subnet, image, s3_logs, s3_backup):
     pipeline = DataPipeline(log_uri = s3_logs, resource_role="backup")
@@ -43,23 +43,27 @@ def rds_copy(rds_name, subnet, image, s3_logs, s3_backup):
                                
     return pipeline
 
-def create_config(session, domain):
+def create_config(bosslet_config):
     """Create the CloudFormationConfiguration object."""
-    config = CloudFormationConfiguration('backup', domain, const.REGION)
-    names = AWSNames(domain)
+    config = CloudFormationConfiguration('backup', bosslet_config)
+    names = bosslet_config.names
 
-    # XXX: AZ `E` is incompatible with T2.Micro instances (used by backup)
-    internal_subnet = aws.subnet_id_lookup(session, 'b-' + names.internal)
-    backup_image = aws.ami_lookup(session, 'backup.boss')[0]
+    # DP NOTE: During implementation there was/is an availability zone that
+    #          could not run the T2.Micro instances used by this Data Pipeline
+    azs = aws.azs_lookup(bosslet_config, 'datapipeline')
+    az = random.choice(azs)[1] + '-'
+    internal_subnet = aws.subnet_id_lookup(bosslet_config.session,
+                                           az + bosslet_config.names.internal.subnet)
+    backup_image = aws.ami_lookup(bosslet_config, names.backup.ami)[0]
 
-    s3_backup = "s3://backup." + domain + "/#{format(@scheduledStartTime, 'YYYY-ww')}"
-    s3_logs = "s3://backup." + domain + "/logs"
+    s3_backup = "s3://" + names.backup.s3 + "/#{format(@scheduledStartTime, 'YYYY-ww')}"
+    s3_logs = "s3://" + names.backup.s3 + "/logs"
 
     # DP TODO: Create all BOSS S3 buckets as part of the account setup
     #          as the Cloud Formation delete doesn't delete the bucket,
     #          making this a conditional add
     BUCKET_DEPENDENCY = None # Needed as the pipelines try to execute when launched
-    if not aws.s3_bucket_exists(session, "backup." + domain):
+    if not aws.s3_bucket_exists(bosslet_config.session, names.backup.s3):
         life_cycle = {
             'Rules': [{
                 'Id': 'Delete Data',
@@ -75,30 +79,13 @@ def create_config(session, domain):
             }]
         }
         config.add_s3_bucket("BackupBucket",
-                             "backup." + domain,
+                             names.backup.s3,
                              life_cycle_config=life_cycle,
                              encryption=encryption)
         BUCKET_DEPENDENCY = "BackupBucket"
 
-    # Consul Backup
-    # DP NOTE: Currently having issue with Consul restore, hence both Consul and Vault backups
-    cmd = "/usr/local/bin/consulate --api-host consul.{} kv backup -b -f ${{OUTPUT1_STAGING_DIR}}/export.json".format(domain)
-    pipeline = DataPipeline(log_uri = s3_logs, resource_role="backup")
-    pipeline.add_shell_command("ConsulBackup",
-                               cmd,
-                               destination = Ref("ConsulBucket"),
-                               runs_on = Ref("ConsulInstance"))
-    pipeline.add_s3_bucket("ConsulBucket", s3_backup + "/consul")
-    pipeline.add_ec2_instance("ConsulInstance",
-                              subnet=internal_subnet,
-                              image = backup_image)
-    config.add_data_pipeline("ConsulBackupPipeline",
-                             "consul-backup."+domain,
-                             pipeline.objects,
-                             depends_on = BUCKET_DEPENDENCY)
-
     # Vault Backup
-    cmd = "/usr/local/bin/python3 ~/vault.py backup {}".format(domain)
+    cmd = "/usr/local/bin/python3 ~/vault.py backup {}".format(bosslet_config.INTERNAL_DOMAIN)
     pipeline = DataPipeline(log_uri = s3_logs, resource_role="backup")
     pipeline.add_shell_command("VaultBackup",
                                cmd,
@@ -109,89 +96,87 @@ def create_config(session, domain):
                               subnet=internal_subnet,
                               image = backup_image)
     config.add_data_pipeline("VaultBackupPipeline",
-                             "vault-backup."+domain,
+                             "vault-backup."+bosslet_config.INTERNAL_DOMAIN,
                              pipeline.objects,
                              depends_on = BUCKET_DEPENDENCY)
 
 
     # DynamoDB Backup
     tables = {
-        "BossMeta": names.meta,
-        "S3Index": names.s3_index,
-        "TileIndex": names.tile_index,
-        "IdIndex": names.id_index,
-        "IdCountIndex": names.id_count_index,
+        "BossMeta": names.meta.ddb,
+        "S3Index": names.s3_index.ddb,
+        "TileIndex": names.tile_index.ddb,
+        "IdIndex": names.id_index.ddb,
+        "IdCountIndex": names.id_count_index.ddb,
+        "VaultData": names.vault.ddb,
     }
 
     pipeline = DataPipeline(log_uri = s3_logs)
-    pipeline.add_emr_cluster("BackupCluster")
+    pipeline.add_emr_cluster("BackupCluster", region = bosslet_config.REGION)
 
     for name in tables:
         table = tables[name]
         pipeline.add_s3_bucket(name + "Bucket", s3_backup + "/DDB/" + table)
         pipeline.add_ddb_table(name, table)
-        pipeline.add_emr_copy(name+"Copy", Ref(name), Ref(name + "Bucket"), Ref("BackupCluster"))
+        pipeline.add_emr_copy(name+"Copy",
+                              Ref(name),
+                              Ref(name + "Bucket"),
+                              runs_on = Ref("BackupCluster"),
+                              region = bosslet_config.REGION)
 
     config.add_data_pipeline("DDBPipeline",
-                             "dynamo-backup."+domain,
+                             "dynamo-backup."+bosslet_config.INTERNAL_DOMAIN,
                              pipeline.objects,
                              depends_on = BUCKET_DEPENDENCY)
 
 
     # Endpoint RDS Backup
-    pipeline = rds_copy(names.endpoint_db, internal_subnet, backup_image, s3_logs, s3_backup)
+    pipeline = rds_copy(names.endpoint_db.rds, internal_subnet, backup_image, s3_logs, s3_backup)
     config.add_data_pipeline("EndpointPipeline",
-                             "endpoint-backup."+domain,
+                             "endpoint-backup."+bosslet_config.INTERNAL_DOMAIN,
                              pipeline.objects,
                              depends_on = BUCKET_DEPENDENCY)
 
 
     # Auth RDS Backup
-    SCENARIO = os.environ["SCENARIO"]
-    AUTH_DB = SCENARIO in ("production", "ha-development",)
-    if AUTH_DB:
-        pipeline = rds_copy(names.auth_db, internal_subnet, backup_image, s3_logs, s3_backup)
+    if bosslet_config.AUTH_RDS:
+        pipeline = rds_copy(names.auth_db.rds, internal_subnet, backup_image, s3_logs, s3_backup)
         config.add_data_pipeline("AuthPipeline",
-                                 "auth-backup."+domain,
+                                 "auth-backup."+bosslet_config.INTERNAL_DOMAIN,
                                  pipeline.objects,
                                  depends_on = BUCKET_DEPENDENCY)
 
 
     return config
 
-def generate(session, domain):
-    """Create the configuration and save it to disk"""
-    config = create_config(session, domain)
+def generate(bosslet_config):
+    config = create_config(bosslet_config)
     config.generate()
 
-def create(session, domain):
-    """Create the configuration, launch it, and initialize Vault"""
-    config = create_config(session, domain)
+def create(bosslet_config):
+    config = create_config(bosslet_config)
 
-    success = config.create(session)
-    if success:
-        post_init(session, domain)
+    config.create()
 
-def post_init(session, domain):
-    keypair = aws.keypair_lookup(session)
-    call = ExternalCalls(session, keypair, domain)
+    post_init(bosslet_config)
 
+def post_init(bosslet_config):
     # DP NOTE: For an existing stack the backup policy,
-    #          aws-ec2 login, and keycloak RDS credentials
+    #          aws login, and keycloak RDS credentials
     #          need to be configured in Vault
     #
     #          At some point this code can be deprecated and eventually removed
-    with call.vault() as vault:
+    with bosslet_config.call.vault() as vault:
         name = "backup"
         if name not in vault.list_policies(): # only update if needed
             policy = "{}/{}.hcl".format(VAULT_POLICY_DIR, name)
-            account_id = aws.get_account_id_from_session(session)
-            policy_arn = 'arn:aws:iam::{}:instance-profile/{}'.format(account_id, name)
+            policy_arn = 'arn:aws:iam::{}:instance-profile/{}'.format(bosslet_config.ACCOUNT_ID, name)
 
             with open(policy, 'r') as fh:
                 vault.set_policy(name, fh.read()) # Create Vault Policy
 
-            vault.write("/auth/aws-ec2/role/" + name, # Create AWS-EC2 login
+            vault.write("/auth/aws/role/" + name, # Create AWS login
+                        auth_type = 'ec2',
                         policies = name,
                         bound_iam_role_arn = policy_arn)
 
@@ -202,11 +187,10 @@ def post_init(session, domain):
         else:
             print("Vault already configured to provide AWS credentials for backup/restore")
 
-def update(session, domain):
-    config = create_config(session, domain)
-    success = config.update(session)
+def update(bosslet_config):
+    config = create_config(bosslet_config)
+    success = config.update()
 
-    return success
-
-def delete(session, domain):
-    CloudFormationConfiguration('backup', domain).delete(session)
+def delete(bosslet_config):
+    config = CloudFormationConfiguration('backup', bosslet_config)
+    config.delete()

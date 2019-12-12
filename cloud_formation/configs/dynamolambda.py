@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+DEPENDENCIES = ['api'] # No actual dependency in config,
+                       # but lambda targets DynamoDB tables from api config
+
 """
 Create the DynamoDB lambda configuration which consists of:
 
@@ -23,75 +26,43 @@ import boto3
 import configparser
 import io
 from lib.cloudformation import CloudFormationConfiguration, Arg, Arn, Ref
-from lib.names import AWSNames
-from lib.external import ExternalCalls
 from lib import aws
 from lib import constants as const
 import os
+import json
+import shutil
 import subprocess
 
-from update_lambda_fcn import load_lambdas_on_s3
-
 # Location of repo with the lambda autoscaler.
-LAMBDA_ROOT_FOLDER = os.path.join(
-    os.path.dirname(__file__), '../lambda/dynamodb-lambda-autoscale')
+LAMBDA_ROOT_FOLDER = const.repo_path('cloud_formation', 'lambda', 'dynamodb-lambda-autoscale')
 
 # Zip file created by `npm run build`
 LAMBDA_ZIP_FILE = os.path.join(LAMBDA_ROOT_FOLDER, 'dist.zip')
 
-CONFIG_TEMPLATE_PATH = os.path.join(
-    os.path.dirname(__file__), 'dynamo_config.template')
 CONFIG_OUTPUT_PATH = os.path.join(LAMBDA_ROOT_FOLDER, 'config.env.production')
+
+CONFIG_INPUT_DIR = const.repo_path('cloud_formation', 'dynamodb-autoscale')
+CONFIG_OUTPUT_DIR = os.path.join(LAMBDA_ROOT_FOLDER, 'src', 'configuration')
+PROVISIONER_FILENAME = 'BossProvisioners.json'
 
 DYNAMO_LAMBDA_KEY = 'DynamoLambda'
 TRIGGER_KEY = 'TriggerDynamoAutoscale'
 
-SLACK_WEBHOOK_HOST = 'SLACK_WEBHOOK_HOST'
 
-# This variable is the one used by the lambda function.
-SLACK_WEBHOOK_PATH = 'SLACK_WEBHOOK_PATH'
-
-# Value in this config variable will be written to SLACK_WEBHOOK_PATH when
-# standing up the service in production.
-SLACK_WEBHOOK_PATH_PRODUCTION = 'SLACK_WEBHOOK_PATH_PRODUCTION'
-
-# Value in this config variable will be written to SLACK_WEBHOOK_PATH when
-# standing up the service in a development stack or an integration stack.
-SLACK_WEBHOOK_PATH_DEV = 'SLACK_WEBHOOK_PATH_DEV'
-
-# Domain name will be included in messages to Slack and also determines
-# whether SLACK_WEBHOOK_PATH_DEV's or SLACK_WEBHOOK_PATH_PRODUCTION's value is 
-# written to SLACK_WEBHOOK_PATH.
-VPC_DOMAIN =  'VPC_DOMAIN'
-
-# Used to override normal autoscale rules when creating a developer's stack.
-# All tables will use the autoscale rules defined by the "default" config to
-# avoid spending too much.  The production autoscale rules have minimums that
-# are way too high for DynamoDB tables for developers.
-DEV_STACK = 'DEV_STACK'
-
-def create_config(session, domain):
-    """
-    Create the CloudFormationConfiguration object.
-    Args:
-        session (Session): amazon session object
-        domain (str): domain of the stack being created
-
-    Returns: the config for the Cloud Formation stack
-    """
-    names = AWSNames(domain)
-    config = CloudFormationConfiguration("dynamolambda", domain, const.REGION)
+def create_config(bosslet_config):
+    session = bosslet_config.session
+    names = bosslet_config.names
+    config = CloudFormationConfiguration("dynamolambda", bosslet_config)
 
     role = aws.role_arn_lookup(session, "lambda_cache_execution")
     config.add_arg(Arg.String("LambdaCacheExecutionRole", role,
-                              "IAM role for multilambda." + domain))
+                              "IAM role for " + names.multi_lambda.lambda_))
 
-    lambda_bucket = aws.get_lambda_s3_bucket(session)
-    lambda_key = generate_lambda_key(domain)
+    lambda_key = bosslet_config.names.dynamodb_autoscale.zip
     config.add_lambda(DYNAMO_LAMBDA_KEY,
-                      names.dynamo_lambda,
+                      names.dynamo_lambda.lambda_,
                       Ref("LambdaCacheExecutionRole"),
-                      s3=(aws.get_lambda_s3_bucket(session),
+                      s3=(bosslet_config.LAMBDA_BUCKET,
                           lambda_key,
                           "index.handler"),
                       timeout=120,
@@ -100,126 +71,106 @@ def create_config(session, domain):
                       reserved_executions=1)
 
     config.add_cloudwatch_rule(TRIGGER_KEY,
-                               name=names.trigger_dynamo_autoscale,
+                               name=names.trigger_dynamo_autoscale.cw,
                                description='Run DynamoDB table autoscaler',
                                targets=[
                                    {
                                        'Arn': Arn(DYNAMO_LAMBDA_KEY),
-                                       'Id': names.vault_monitor,
+                                       'Id': names.vault_monitor.lambda_,
                                    }
                                ],
                                schedule='rate(1 minute)',
                                depends_on=[DYNAMO_LAMBDA_KEY])
 
     config.add_lambda_permission('TriggerPerms',
-                                 names.dynamo_lambda,
+                                 names.dynamo_lambda.lambda_,
                                  principal='events.amazonaws.com',
                                  source=Arn(TRIGGER_KEY))
 
     return config
 
 
-def generate(session, domain):
+def generate(bosslet_config):
     """Create the configuration and save it to disk"""
-    config = create_config(session, domain)
+    config = create_config(bosslet_config)
     config.generate()
 
 
-def create(session, domain):
+def create(bosslet_config):
     """Create the configuration, and launch it"""
-    keypair = aws.keypair_lookup(session)
+    pre_init(bosslet_config)
 
-    try:
-        pre_init(session, domain)
-
-        config = create_config(session, domain)
-
-        success = config.create(session)
-        if not success:
-            raise Exception("Create Failed")
-        else:
-            post_init(session, domain)
-    except:
-        # DP NOTE: This will catch errors from pre_init, create, and post_init
-        print("Error detected")
-        raise
+    config = create_config(bosslet_config)
+    config.create()
 
 
-def pre_init(session, domain):
+def pre_init(bosslet_config):
     """
     Create NodeJS config file from template.  
     Package NodeJS lambda function.
     Upload .zip to S3 bucket.
     """
-    with open(CONFIG_TEMPLATE_PATH) as fh:
-        config_str = fh.read()
-    update_config_file(config_str, domain)
+    write_config_file(bosslet_config)
+    copy_provisioners(bosslet_config)
     
-    build_lambda()
-    bucket = aws.get_lambda_s3_bucket(session)
+    build_lambda(bosslet_config)
+
     zip_file = os.path.join(LAMBDA_ROOT_FOLDER, LAMBDA_ZIP_FILE)
-    zips_s3_key = upload_to_s3(session, domain, zip_file, bucket)
+    zips_s3_key = upload_to_s3(bosslet_config, zip_file)
 
 
-def post_init(session, domain):
-    pass
-
-
-def update_config_file(config_str, domain):
-    """Update config file that stores environment variables for the lambda
-    environment.
+def write_config_file(bosslet_config):
+    """Create the configuration file with environmental variables
+    for the lambda
 
     Args:
-        config_str (str): String representation of config file template.
+        bosslet_config (BossConfiguration): Bosslet where the lambda will be deployed
     """
-    parser = configparser.ConfigParser()
-    # Disable default transform to lowercase of keys.
-    parser.optionxform = lambda option: option
-    parser.read_string(config_str)
-    parser.set('default', VPC_DOMAIN, domain)
+    config_lines = []
 
-    slack_host = parser.get('default', SLACK_WEBHOOK_HOST)
-    slack_path_prod = parser.get('default', SLACK_WEBHOOK_PATH_PRODUCTION)
-    slack_path_dev = parser.get('default', SLACK_WEBHOOK_PATH_DEV)
-    if domain == 'production.boss':
-        parser.set('default', SLACK_WEBHOOK_PATH, slack_path_prod)
-    else:
-        parser.set('default', SLACK_WEBHOOK_PATH, slack_path_dev)
-        if domain != 'integration.boss':
-            # Override normal autoscale parameters when deploying to a
-            # developer stack.
-            parser.set('default', DEV_STACK, '')
-    slack_path = parser.get('default', SLACK_WEBHOOK_PATH)
+    config_lines.append('VPC_DOMAIN = {}'.format(bosslet_config.INTERNAL_DOMAIN))
 
-    # Remove stack specific variables before outputting.
-    parser.remove_option('default', SLACK_WEBHOOK_PATH_DEV)
-    parser.remove_option('default', SLACK_WEBHOOK_PATH_PRODUCTION)
+    val =  bosslet_config.SLACK_WEBHOOK_PATH_DYNAMODB_AUTOSCALE
+    if val:
+        host = bosslet_config.SLACK_WEBHOOK_HOST
+        print('\nWill post to Slack at https://{}{}'.format(host, val))
 
-    print('\nWill post to Slack at https://{}{}'.format(slack_host, slack_path))
+        config_lines.append('SLACK_WEBHOOK_HOST = "{}"'.format(host))
+        config_lines.append('SLACK_WEBHOOK_PATH = "{}"'.format(val))
 
-    updated_config = io.StringIO()
-    parser.write(updated_config)
-    config_str = updated_config.getvalue()
-    updated_config.close()
+    # if production.boss = prod path
+    # if * = prod path
+    #   if != integration.boss = BossDefaultProvisioners
 
-    # Strip default section header from config.  NodeJS config file does not
-    # use sections.
-    _, headerless_config = config_str.split('[default]', 1)
-
-    # Convert variable names back to upper case.
-    headerless_config = headerless_config.replace(
-        SLACK_WEBHOOK_HOST.lower(), SLACK_WEBHOOK_HOST).replace(
-            SLACK_WEBHOOK_PATH.lower(), SLACK_WEBHOOK_PATH).replace(
-                VPC_DOMAIN.lower(), VPC_DOMAIN)
+    config = "\n".join(config_lines)
 
     with open(CONFIG_OUTPUT_PATH, 'w') as out:
-        out.write(headerless_config)
-    #print(headerless_config)
+        out.write(config)
 
-def build_lambda():
+
+def copy_provisioners(bosslet_config):
+    """Copy the lambda's provisioner configuration files into the lambda code
+    directory so they are included in the build process
+
+    Args:
+        bosslet_config (BossConfiguration): Bosslet where the lambda will be deployed
+    """
+    filename = "BossTableConfig.json"
+    src = os.path.join(CONFIG_INPUT_DIR, filename)
+    dst = os.path.join(CONFIG_OUTPUT_DIR, filename)
+    shutil.copy(src, dst)
+
+    filename = "{}.json".format(bosslet_config.DYNAMODB_AUTOSCALE_PROVISIONER)
+    src = os.path.join(CONFIG_INPUT_DIR, filename)
+    dst = os.path.join(CONFIG_OUTPUT_DIR, PROVISIONER_FILENAME)
+    shutil.copy(src, dst)
+
+
+def build_lambda(bosslet_config):
     """Package lambda in preparation to upload to S3."""
     install_node_deps()
-    build_node()
+    build_node(bosslet_config)
+
 
 def install_node_deps():
     """npm install NodeJS dependencies."""
@@ -232,41 +183,49 @@ def install_node_deps():
         print(str(output))
         raise RuntimeError('Failed to install dependencies.')
 
-def build_node():
+
+def build_node(bosslet_config):
     """Build and package in dist.zip."""
     print('Packaging NodeJS app.')
+
+    # Inject the current region into the lambda code
+    region_json = const.repo_path('cloud_formation', 'lambda', 'dynamodb-lambda-autoscale', 'src', 'configuration', 'Region.json')
+    with open(region_json, 'w') as fh:
+        json.dump({'Region': bosslet_config.REGION}, fh)
+
     args = ('npm', 'run', 'build')
-    popen = subprocess.Popen(args, cwd=LAMBDA_ROOT_FOLDER, stdout=subprocess.PIPE)
+    # Use env vars to pass credentials / region instead of as arguments to build call
+    env = os.environ.copy()
+    env['AWS_REGION'] = bosslet_config.REGION
+    if bosslet_config.PROFILE is not None:
+        env['AWS_PROFILE'] = bosslet_config.PROFILE
+    popen = subprocess.Popen(args, cwd=LAMBDA_ROOT_FOLDER, env=env, stdout=subprocess.PIPE)
     exit_code = popen.wait()
     output = popen.stdout.read()
     if not exit_code == 0:
         print(str(output))
         raise RuntimeError('Failed to build Node application.')
 
-def upload_to_s3(session, domain, zip_file, bucket):
-    """Upload the zip file to the given S3 bucket.
+
+def upload_to_s3(bosslet_config, zip_file):
+    """Upload the zip file to the correct S3 bucket.
 
     Args:
-        session (Session): Boto3 Session.
-        domain (str): domain of the stack being created
+        bosslet_config (BossConfiguration): Bosslet configuration class which contains everything specific to a boss:
+                                            session, bucket, names
         zip_file (str): Name of zip file.
-        bucket (str): Name of bucket to use.
+
     """
     print('Uploading to S3.')
-    key = generate_lambda_key(domain)
+    bucket = bosslet_config.LAMBDA_BUCKET
+    session = bosslet_config.session
+    key = bosslet_config.names.dynamodb_autoscale.zip
     s3 = session.client('s3')
-    s3.create_bucket(Bucket=bucket)
+
+    try:
+        s3.create_bucket(Bucket=bucket)
+    except s3.exceptions.BucketAlreadyOwnedByYou:
+        pass # Only us-east-1 will not throw an exception if the bucket already exists
+
     s3.put_object(Bucket=bucket, Key=key, Body=open(zip_file, 'rb'))
-
-def generate_lambda_key(domain):
-    """Generate the S3 key name for the lambda's zip file.
-
-    Args:
-        domain (str): Use the domain as part of the key.
-
-    Returns:
-        (str)
-    """
-    key = 'dynamodb_autoscale.' + domain + '.zip'
-    return key
 

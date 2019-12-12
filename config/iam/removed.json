@@ -1,0 +1,30 @@
+{
+    "groups": [
+        "aplChurchDeliveryBucket",
+        "aplDenyProdDelete",
+        "readonly"
+    ],
+    "roles": [
+        "CloudWatchFullAccesss",
+        "DeveloperAccess",
+        "rds-monitoring-role",
+        "snowball-import-s3-only-role"
+    ],
+    "policies": [
+        "APLSelfAdminister",
+        "Princeton-Upload-Bucket-Access",
+        "Prod-DynamoDB-DeleteTable-DENY",
+        "Prod-RDS-DENY-Delete-Instance",
+        "aplChurchDeliveryBucketReadOnlyPolicy",
+        "aplDynamicVaultUserPolicy",
+        "aplRevokeVaultUserPolicy",
+        "aplTestCloudFormation",
+        "aplVaultAttachUserPolicy",
+        "baylor-uploader-policy",
+        "cmu-bucket-policy",
+        "harvard-church-bucket-policy",
+        "harvard-cox-uploader-policy",
+        "mesh-bucket-policy"
+    ]
+}
+

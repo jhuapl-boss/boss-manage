@@ -150,7 +150,7 @@ Make sure that the Packer executable is either in $PATH (you can call it by just
 calling packer) or in the `bin/` directory of the boss-manage repository.
 
 ```shell
-$ bin/packer.py auth vault endpoint proofreader-web consul cachemanager
+$ bin/packer.py auth vault endpoint cachemanager
 ```
 
 *Note: because the packer.py script is running builds in parallel it is redirecting
@@ -175,8 +175,7 @@ saving time overall.
 #### Running Lambda packer
 From the packer 
 ```shell
-$ cd boss-manage.git/packer
-$ packer build -var-file=../config/aws-credentials -var-file=variables/lambda -var-file=../config/aws-bastion -var 'force_deregister=true' lambda.packer
+$ boss-manage.git/bin/packer.py <bosslet.config> lambda --ami-version "" -f
 ```
 
 Manually create security group for the lambda_build_server
@@ -349,18 +348,6 @@ sudo -E python3 manage.py test
 	output should say 230 Tests OK with 11 skipped tests.
 
 
-## Proofreader Tests
-````shell
-cd vault
-./ssh.py proofreader-web.integration.boss
-cd /srv/www/app/proofreader_apis
-sudo python3 manage.py makemigrations --noinput
-sudo python3 manage.py makemigrations --noinput common
-sudo python3 manage.py migrate
-sudo python3 manage.py test
-````
-    output should say 350 Tests OK
-
 ## Integration Tests
 After the integration instance is launched the following tests need to be run,
 results recorded, and developers notified of any problems.
@@ -505,8 +492,6 @@ To be filled out
 * https://api.theboss.io/ping/
 * https://api.theboss.io/v0.4/resource/collections
 * https://api.theboss.io/v0.5/resource/collections
-* Login into Scalyr and verify that the new instances appear on the overview page.
-* Also on Scalyr, check the cloudwatch log for the presence of the instance IDs of the endpoint and proofreader.
 
 
 ### Setting Up Web Page

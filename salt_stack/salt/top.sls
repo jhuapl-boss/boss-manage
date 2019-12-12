@@ -1,9 +1,9 @@
-base:
-    'consul*':
-        - consul
-        - boss-tools.bossutils
-        - chrony
+#
+# Note Scalyr formulas are only applied if 'scalyr:log_key' set in
+# pillars.
 
+
+base:
     'vault*':
         - vault.server
         - boss-tools.bossutils
@@ -31,24 +31,12 @@ base:
 
     'lambda*':
         - lambda-dev
-        - chrony
 
     'ep-jenkins*':
         - jenkins-microns.endpoint
 
     'jenkins*':
         - jenkins-microns
-
-    # Jenkins server for proofreader-web Django tests.
-    'pr-jenkins*':
-        - jenkins-microns.proofreader
-
-    'proofreader-web*':
-        - django.rest-framework # install first and patch
-        - proofreader-web
-        - django.login # patch, expects django to already be installed
-        - scalyr
-        - scalyr.update_host
 
     'workstation*':
         - python.python35
@@ -88,4 +76,4 @@ base:
         - unzip
         - users.ec2-user
         - backup
-
+        - chrony

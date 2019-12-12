@@ -16,13 +16,12 @@
 # Currently backs up and restores
 # * KV data under secret/
 # * Vault policies
-# * AWS-EC2 Authentication configuration
+# * AWS Authentication configuration
 # * AWS secret backend configuration
 #
-# NOTE: Restore doesn't restore AWS credentials (the credentials Vault uses to
-#       communicate with AWS). Restore expects to restore into a Vault that has
-#       already been configured (using lib/vault.py:Vault.configure) so that
-#       the different backends are ready for data
+# NOTE: Restore expects to restore into a Vault that has already been configured
+#       (using lib/vault.py:Vault.configure) so that the different backends are
+#       ready for data
 
 from bossutils.vault import Vault
 import sys
@@ -74,7 +73,7 @@ token =
         data = {
             'policies': {},
             'secrets': {},
-            'aws-ec2': {},
+            'aws-auth': {},
             'aws': {},
         }
 
@@ -92,12 +91,13 @@ token =
         for role in v.client.read(prefix + '?list=true')['data']['keys']:
             data['aws'][role] = v.client.read(prefix + '/' + role)['data']['policy']
 
-        # Backup AWS-EC2 auth backend roles
-        prefix = '/auth/aws-ec2/role'
+        # Backup AWS auth backend roles
+        prefix = '/auth/aws/role'
         for role in v.client.read(prefix + '?list=true')['data']['keys']:
             d = v.client.read(prefix + '/' + role)['data']
 
-            data['aws-ec2'][role] = {
+            data['aws-auth'][role] = {
+                    'auth_type': d['auth_type'],
                     'bound_iam_role_arn': d['bound_iam_role_arn'],
                     'policies': ', '.join(d['policies'])
             }
@@ -142,7 +142,7 @@ token =
                 # B) They have been changed, and restoring them will
                 #    put incorrect data in Vault
                 # C) Passwords are restored if they don't exist currently
-                #    because Consul data may have been lost and the only
+                #    because Vault data may have been lost and the only
                 #    copy of the password is in the backup
                 new_data = v.client.read(path)
                 if new_data is not None and 'password' in new_data['data']:
@@ -171,16 +171,16 @@ token =
             v.client.delete(prefix + '/' + role)
 
         # Backup AWS-EC2 auth backend roles
-        prefix = 'auth/aws-ec2/role'
+        prefix = 'auth/aws/role'
         existing = v.client.read(prefix + '?list=true')['data']['keys']
-        for role in data['aws-ec2']:
+        for role in data['aws-auth']:
             if role in existing:
                 existing.remove(role)
 
-            print("Restoring aws-ec2 login {}".format(role))
-            v.client.write(prefix + '/' + role, **data['aws-ec2'][role])
+            print("Restoring aws login {}".format(role))
+            v.client.write(prefix + '/' + role, **data['aws-auth'][role])
 
         for role in existing:
-            print("Deleting aws-ec2 login {}".format(role))
+            print("Deleting aws login {}".format(role))
             v.client.delete(prefix + '/' + role)
 

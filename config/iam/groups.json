@@ -1,9 +1,9 @@
 [
   {
     "AttachedManagedPolicies": [
-      "arn:aws:iam::451493790433:policy/aplInstanceOwnerPolicy"
+      "arn:aws:iam::aws:policy/AdministratorAccess"
     ],
-    "GroupName": "aplInstanceOwnerGroup",
+    "GroupName": "aplAdminGroup",
     "GroupPolicyList": [],
     "Path": "/"
   },
@@ -17,32 +17,15 @@
   },
   {
     "AttachedManagedPolicies": [
-      "arn:aws:iam::451493790433:policy/aplChurchDeliveryBucketPolicy"
-    ],
-    "GroupName": "aplChurchDeliveryBucket",
-    "GroupPolicyList": [],
-    "Path": "/"
-  },
-  {
-    "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess",
-      "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetAutoscaleRole",
-      "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetRole",
-      "arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole",
       "arn:aws:iam::aws:policy/AWSBatchFullAccess",
+      "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess",
       "arn:aws:iam::aws:policy/AmazonEC2ContainerServiceFullAccess",
-      "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole"
+      "arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole",
+      "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole",
+      "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetAutoscaleRole",
+      "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetRole"
     ],
     "GroupName": "aplCompute",
-    "GroupPolicyList": [],
-    "Path": "/"
-  },
-  {
-    "AttachedManagedPolicies": [
-      "arn:aws:iam::451493790433:policy/Prod-DynamoDB-DeleteTable-DENY",
-      "arn:aws:iam::451493790433:policy/Prod-RDS-DENY-Delete-Instance"
-    ],
-    "GroupName": "aplDenyProdDelete",
     "GroupPolicyList": [],
     "Path": "/"
   },
@@ -56,20 +39,19 @@
   },
   {
     "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/AdministratorAccess"
+      "arn:aws:iam::==account==:policy/aplInstanceOwnerPolicy"
     ],
-    "GroupName": "aplAdminGroup",
+    "GroupName": "aplInstanceOwnerGroup",
     "GroupPolicyList": [],
     "Path": "/"
   },
   {
     "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/IAMFullAccess",
-      "arn:aws:iam::aws:policy/CloudFrontFullAccess",
+      "arn:aws:iam::==account==:policy/aplCloudFormationFullAccess",
       "arn:aws:iam::aws:policy/AWSCloudTrailFullAccess",
       "arn:aws:iam::aws:policy/AmazonVPCFullAccess",
-      "arn:aws:iam::451493790433:policy/aplTestCloudFormation",
-      "arn:aws:iam::451493790433:policy/aplCloudFormationFullAccess"
+      "arn:aws:iam::aws:policy/CloudFrontFullAccess",
+      "arn:aws:iam::aws:policy/IAMFullAccess"
     ],
     "GroupName": "aplNetworkGroup",
     "GroupPolicyList": [],
@@ -77,7 +59,7 @@
   },
   {
     "AttachedManagedPolicies": [
-      "arn:aws:iam::451493790433:policy/aplBillingGroupPolicy"
+      "arn:aws:iam::==account==:policy/aplBillingGroupPolicy"
     ],
     "GroupName": "aplProjectManagerGroup",
     "GroupPolicyList": [],
@@ -85,8 +67,8 @@
   },
   {
     "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess",
       "arn:aws:iam::aws:policy/AmazonDynamoDBReadOnlyAccess",
+      "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess",
       "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
     ],
     "GroupName": "aplProofReader",
@@ -95,19 +77,11 @@
   },
   {
     "AttachedManagedPolicies": [
+      "arn:aws:iam::==account==:policy/aplCloudFormationFullAccess",
       "arn:aws:iam::aws:policy/AWSSupportAccess",
-      "arn:aws:iam::451493790433:policy/aplCloudFormationFullAccess"
+      "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess"
     ],
     "GroupName": "aplSWDevGroup",
-    "GroupPolicyList": [],
-    "Path": "/"
-  },
-  {
-    "AttachedManagedPolicies": [
-      "arn:aws:iam::aws:policy/ReadOnlyAccess",
-      "arn:aws:iam::451493790433:policy/APLSelfAdminister"
-    ],
-    "GroupName": "readonly",
     "GroupPolicyList": [],
     "Path": "/"
   }

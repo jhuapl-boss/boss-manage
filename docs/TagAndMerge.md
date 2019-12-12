@@ -61,7 +61,6 @@ $ git pull # if you didn't need to clone
 $ git submodule update --remote
 $ git add salt_stack/salt/boss/files/boss.git
 $ git add salt_stack/salt/boss-tools/files/boss-tools.git
-$ git add salt_stack/salt/proofreader-web/files/proofread.git
 $ git add salt_stack/salt/spdb/files/spdb.git
 $ git add salt_stack/salt/ndingest/files/ndingest.git
 $ git add salt_stack/salt/ingest-client/files/ingest-client.git
@@ -154,7 +153,7 @@ in parallel. To check status view the logs at `boss-manage/packer/logs/<ami>.log
 
 ```shell
 $ cd boss-manage
-$ bin/packer.py auth vault consul endpoint cachemanager activities --name <sprint#|release#>
+$ bin/packer.py auth vault endpoint cachemanager activities --name <sprint#|release#>
 $ cd ../packer
 $ packer build -var-file=../config/aws-credentials -var-file=variables/lambda -var-file=../config/aws-bastion -var 'name_suffix=<sprint#|release#>' -var 'force_deregister=true' lambda.packer
 ```
