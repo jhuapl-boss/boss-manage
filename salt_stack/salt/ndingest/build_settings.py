@@ -16,7 +16,9 @@
 Generate the settings.ini for ndingest after bootup.
 """
 
+import json
 import configparser
+import urllib.request
 from spdb.c_lib.ndtype import CUBOIDSIZE
 
 # Location of settings files for ndingest.
@@ -26,6 +28,12 @@ NDINGEST_SETTINGS_FOLDER = '/usr/local/lib/python3/site-packages/ndingest/settin
 NDINGEST_SETTINGS_TEMPLATE = NDINGEST_SETTINGS_FOLDER + '/settings.ini.apl'
 
 BOSS_CONFIG = '/etc/boss/boss.config'
+
+def get_region():
+    url = 'http://169.254.169.254/latest/dynamic/instance-identity/document'
+    doc = urllib.request.urlopen(url).read().decode('utf-8')
+    doc = json.loads(doc)
+    return doc['region']
 
 def create_settings(tmpl_fp, boss_fp):
     """
@@ -41,6 +49,7 @@ def create_settings(tmpl_fp, boss_fp):
 
     nd_config['boss']['domain'] = boss_config['system']['fqdn'].split('.', 1)[1]
 
+    nd_config['aws']['region'] = get_region()
     nd_config['aws']['tile_bucket'] = boss_config['aws']['tile_bucket']
     nd_config['aws']['cuboid_bucket'] = boss_config['aws']['cuboid_bucket']
     nd_config['aws']['tile_index_table'] = boss_config['aws']['tile-index-table']

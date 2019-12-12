@@ -25,6 +25,7 @@ import os
 
 import alter_path
 from lib import aws
+from lib import configuration
 
 def suspend_termination(session, hostname, reverse=False):
     """
@@ -60,28 +61,16 @@ def suspend_termination(session, hostname, reverse=False):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Suspend ASG healthchecks and termination processes or enable them again",
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = configuration.BossParser(description="Suspend ASG healthchecks and termination processes or enable them again",
+                                      formatter_class=argparse.RawDescriptionHelpFormatter)
 
-    parser.add_argument("--aws-credentials", "-a",
-                        metavar="<file>",
-                        default=os.environ.get("AWS_CREDENTIALS"),
-                        type=argparse.FileType('r'),
-                        help="File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
     parser.add_argument("--reverse", "-r",
                         action="store_true",
                         default=False,
                         help="This flag reverses the suspension and puts Termination and HeatlhChecks back online")
-    parser.add_argument("hostname",
-                        help="Hostname of EC2 instances that the target ASG maintains (example: endpoint.integration.boss)")
+    parser.add_hostname(help = "Hostname of the EC2 instances that the target ASG maintains")
 
     args = parser.parse_args()
 
-    if args.aws_credentials is None:
-        parser.print_usage()
-        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
-        sys.exit(1)
-
-    session = aws.create_session(args.aws_credentials)
-    suspend_termination(session, args.hostname, args.reverse)
+    suspend_termination(args.bosslet_config.session, args.hostname, args.reverse)
 

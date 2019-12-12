@@ -33,42 +33,18 @@ logging = bossutils.logger.BossLogger().logger
 
 
 def django_initialize():
-    logging.info("Get migration settings from S3")
-    mm = bossutils.migration_manager.MigrationManager()
-    migration_success = mm.get_migrations()
-    if not migration_success:
-        logging.info("getting migrations from s3 failed.  Skipping makemigrations, migrate")
-        return False
-    else:
-        logging.info("Finished getting migration settings")
+    logging.info("Initializing Django")
+    migrate_cmd = "yes | sudo python3 /srv/www/django/manage.py "
+    # Migrations are include in source code
+    bossutils.utils.execute(migrate_cmd + "migrate", whole=True, shell=True)
+    bossutils.utils.execute(migrate_cmd + "collectstatic --no-input", whole=True, shell=True)
 
-        logging.info("Initializing Django")
-        migrate_cmd = "yes | sudo python3 /srv/www/django/manage.py "
-        bossutils.utils.execute(migrate_cmd + "makemigrations", whole=True, shell=True)
-        bossutils.utils.execute(migrate_cmd + "makemigrations bosscore", whole=True, shell=True)  # will hang if it cannot contact the auth server
-        bossutils.utils.execute(migrate_cmd + "makemigrations bossoidc", whole=True, shell=True)
-        bossutils.utils.execute(migrate_cmd + "makemigrations bossingest", whole=True, shell=True)
-        bossutils.utils.execute(migrate_cmd + "makemigrations bossmeta", whole=True, shell=True)
-        bossutils.utils.execute(migrate_cmd + "makemigrations mgmt", whole=True, shell=True)
-        bossutils.utils.execute(migrate_cmd + "migrate", whole=True, shell=True)
-        bossutils.utils.execute(migrate_cmd + "collectstatic --no-input", whole=True, shell=True)
-
-        bossutils.utils.execute("sudo service uwsgi-emperor reload")
-        bossutils.utils.execute("sudo service nginx restart")
-        logging.info("Finished Initializing Django")
-
-        logging.info("Put migration settings in S3")
-        migration_put_success = mm.put_migrations()
-        if not migration_put_success:
-            logging.error(
-                "At least one migration failed when putting them in s3.")
-        else:
-            logging.info("Migrations")
-        return True
+    bossutils.utils.execute("sudo service uwsgi-emperor reload")
+    bossutils.utils.execute("sudo service nginx restart")
+    logging.info("Finished Initializing Django")
 
 if __name__ == '__main__':
-    sucessful_initialization = django_initialize()
+    django_initialize()
 
     # Since the service is to be run once, disable it
-    if sucessful_initialization:
-        bossutils.utils.stop_firstboot()
+    bossutils.utils.stop_firstboot()

@@ -1,37 +1,27 @@
 {
     "variables": {
-        "aws_access_key": "If the default value is null, then the user variable will be required",
-        "aws_access_key": "",
-        "aws_secret_key": "",
-
         "aws_region": "us-east-1",
 
         "aws_instance_type": "m4.large",
 
         "aws_source_ami": null,
-
-        "aws_force": "Overwrite an existing image",
-        "aws_force": "false",
+        "aws_source_user": null,
 
         "aws_bastion_ip": "IP of the APL bastion server",
         "aws_bastion_ip": "",
+        "aws_bastion_port": "Port on the APL bastion server",
+        "aws_bastion_port": "22",
         "aws_bastion_user": "User name to login to the bastion server",
         "aws_bastion_user": "",
         "aws_bastion_priv_key_file": "Path to the bastion's private key file",
         "aws_bastion_priv_key_file": "",
 
-        "vb_source_path": "The source OVF image to build upon",
-        "vb_source_path": "output/virtualbox-default/virtualbox-default.ovf",
-
-
-
         "name": "The hostname and minion ID of the VM",
         "name": null,
-        "name_suffix": "An optional suffix for the build name",
-        "name_suffix": "",
-
-        "role": "What type of role is the VM filling (web|db|etc)",
-        "role": null,
+        "ami_suffix": "Common suffix for all AMI images",
+        "ami_suffix": null,
+        "ami_version": "An optional suffix for the build name",
+        "ami_version": "",
 
         "commit": "Commit hash of the repository version being built from",
         "commit": "unknown",
@@ -41,35 +31,21 @@
     },
 
     "builders": [{
-        "type": "virtualbox-ovf",
-        "source_path": "{{user `vb_source_path`}}",
-        "guest_additions_mode": "disable",
-        "ssh_username": "microns",
-        "ssh_password": "microns",
-        "shutdown_command": "sudo -S shutdown -P now",
-        "ssh_timeout": "10m",
-        "headless": true,
-        "output_directory": "output/virtualbox-{{user `name`}}",
-        "vm_name": "{{user `name`}}"
-    }, {
         "type": "amazon-ebs",
-        "access_key": "{{user `aws_access_key`}}",
-        "secret_key": "{{user `aws_secret_key`}}",
-        "ssh_username": "ubuntu",
-        "ami_name": "Using the '.boss' suffix to make sure our names are unique in AWS",
-        "ami_name": "{{user `name`}}.boss{{user `name_suffix`}}",
-        "ami_description": "AMI configured for running as a / the {{user `role`}} server",
+        "ssh_username": "{{ user `aws_source_user`}}",
+        "ami_name": "Using the 'ami_suffix' to make sure our names are unique in AWS",
+        "ami_name": "{{user `name`}}{{user `ami_suffix`}}{{user `ami_version`}}",
+        "ami_description": "AMI configured for running as a / the {{user `name`}} server",
         "source_ami": "{{user `aws_source_ami`}}",
-        "force_deregister": "{{user `aws_force`}}",
         "instance_type": "{{user `aws_instance_type`}}",
         "region": "{{user `aws_region`}}",
         "tags": {
-            "Role": "{{user `role`}}",
             "Commit": "{{user `commit`}}",
             "Base AMI": "{{user `aws_source_ami`}}"
         },
         "ssh_bastion_username": "{{user `aws_bastion_user`}}",
         "ssh_bastion_host": "{{user `aws_bastion_ip`}}",
+        "ssh_bastion_port": "{{user `aws_bastion_port`}}",
         "ssh_bastion_private_key_file": "{{user `aws_bastion_priv_key_file`}}",
         "force_deregister" : "{{user `force_deregister`}}"
     }],
@@ -82,8 +58,10 @@
                 "sudo sed -i \"s/`hostname`/{{user `name`}}/\" /etc/hosts",
                 "sudo sh -c 'echo {{user `name`}} > /etc/hostname'",
                 "sudo hostname -F /etc/hostname",
-                "sudo apt-get update",
-                "sudo apt-get -y install curl"
+                "if [[ -n \"`which apt-get 2> /dev/null`\" ]] ; then",
+                "   sudo apt-get update",
+                "   sudo apt-get -y install curl",
+                "fi"
             ]
         },
         {
@@ -95,11 +73,5 @@
             "local_pillar_roots": "../salt_stack/pillar",
             "remote_pillar_roots": "/srv/pillar"
         }
-    ],
-    "post-processors": [{
-        "type": "vagrant",
-        "keep_input_artifact": true,
-        "only": ["virtualbox-ovf"],
-        "output": "output/vagrant-virtualbox-{{user `name`}}.box"
-        }]
+    ]
 }

@@ -27,36 +27,10 @@ from botocore.exceptions import ClientError
 from . import hosts
 from . import aws
 from . import utils
-
-def get_scenario(var, default = None):
-    """Handle getting the appropriate value from a variable using the SCENARIO
-    environmental variable.
-
-    A common method that will currently handle decoding the (potential) dictionary
-    of variable values and selecting the correct on based on the SCENARIO environmental
-    variable.
-
-    If the key defined in SCENARIO doesn't exist in the variable dictionary, the
-    key "default" is used, and if that key is not defined, the default argument
-    passed to the function is used.
-
-    If var is not a dict, then it is returned without any change
-
-    Args:
-        var : The variable to (potentially) figure out the SCENARIO version for
-        default : Default value if var is a dict and don't have a key for the SCENARIO
-
-    Returns
-        object : The variable or the SCENARIO version of the variable
-    """
-    scenario = os.environ["SCENARIO"]
-    if type(var) == dict:
-        var_ = var.get(scenario, None)
-        if var_ is None:
-            var_ = var.get("default", default)
-    else:
-        var_ = var
-    return var_
+from . import console
+from . import constants as const
+from .migrations import MigrationManager
+from .exceptions import BossManageError, BossManageCanceled
 
 def bool_str(val):
     """CloudFormation Template formatted boolean string.
@@ -380,9 +354,7 @@ class CloudFormationConfiguration:
     and launching them.
     """
 
-    # TODO DP: figure out if we can extract the region from the session used to
-    #          create the stack and use a template argument
-    def __init__(self, config, domain, region = "us-east-1"):
+    def __init__(self, config, bosslet_config, version="1"):
         """CloudFormationConfiguration constructor
 
         A domain name is in either <vpc>.<tld> or <subnet>.<vpc>.<tld> format and
@@ -391,22 +363,29 @@ class CloudFormationConfiguration:
         Note: region is used when creating the Hosted Zone for a new VPC.
 
         Args:
+            config (str) : Name of the configuration being constructed
             domain (str) : Domain that the CloudFormation template will work in.
-            region (str) : AWS region that the configuration will be created in.
+            region (optional[str]) : AWS region that the configuration will be created in.
+            version (optional[str]) : Version number for the configuration, used for update migration
         """
         self.resources = {}
         self.parameters = {}
         self.capabilities = None
         self.arguments = []
-        self.region = region
+        self.region = bosslet_config.REGION
         self.keypairs = {}
-        self.stack_name = "".join([x.capitalize() for x in [config, *domain.split('.')]])
 
-        self.vpc_domain = domain
-        self.vpc_subnet = hosts.lookup(domain)
+        self.config = config
+        self.stack_name = bosslet_config.names[config].stack
+        self.stack_version = version
 
-        if self.vpc_subnet is None:
-            raise Exception("'{}' is not a valid stack domain".format(domain))
+        self.bosslet_config = bosslet_config
+        self.session = bosslet_config.session
+        self.hosts = hosts.Hosts(bosslet_config)
+
+        self.vpc_domain = bosslet_config.INTERNAL_DOMAIN
+        self.vpc_subnet = bosslet_config.NETWORK
+
 
     def _create_template(self, description="", indent=None):
         """Create the JSON CloudFormation template from the resources that have
@@ -423,6 +402,31 @@ class CloudFormationConfiguration:
                            "Parameters": self.parameters,
                            "Resources": self.resources}, indent=indent)
 
+    def version(self):
+        """Get the version of this CloudFormationConfiguration object"""
+        return int(self.stack_version)
+
+    def existing_version(self):
+        """Get the version of this CloudFormationConfiguration stack running in AWS
+
+        Note: If the CloudFormation Stack was created before they were versioned the
+              default version (1) will be returned
+
+        Returns:
+            (int|None) : The version of the running stack or None if the stack is not running
+        """
+        client = self.session.client('cloudformation')
+
+        try:
+            response = client.describe_stacks(StackName = self.stack_name)
+            tags = response['Stacks'][0]['Tags']
+            for tag in tags:
+                if tag['Key'] == 'StackVersion':
+                    return int(tag['Value'])
+            return 1 # Default value for Stacks that are not already versioned
+        except ClientError:
+            return None # Stack doesn't exist
+
     def generate(self):
         """Generate the CloudFormation template and arguments files """
         cur_dir = os.path.dirname(os.path.realpath(__file__))
@@ -438,7 +442,8 @@ class CloudFormationConfiguration:
         get_status = lambda r: r['Stacks'][0]['StackStatus']
         response = client.describe_stacks(StackName=name)
         if len(response['Stacks']) == 0:
-            return None
+            msg = "Stack '{}' doesn't exist".format(name)
+            raise BossManageError(msg)
         else:
             print("Waiting for {} ".format(action), end="", flush=True)
             while get_status(response) == process:
@@ -449,7 +454,20 @@ class CloudFormationConfiguration:
 
             return get_status(response)
 
-    def create(self, session, wait = True):
+    def _raise_error(self, status):
+        """A common method for raising an error if create/update/delete didn't
+        result in the expected status. If the status if FAILED then the failures
+        are included in the exception.
+        """
+        msg = "Status of stack '{}' is '{}'".format(self.stack_name, status)
+        causes = None
+
+        if 'FAILED' in status or 'ROLLBACK' in status:
+            causes = self.get_failed_reasons()
+
+        raise BossManageError(msg, causes=causes)
+
+    def create(self, wait = True):
         """Launch the template this object represents in CloudFormation.
 
         Args:
@@ -457,21 +475,23 @@ class CloudFormationConfiguration:
             wait (bool) : If True, wait for the stack to be created, printing
                           status information
 
-        Returns:
-            (bool|None) : If wait is True, the result of launching the stack,
-                          else None
+        Raises:
+            BossManageError: If there was a problem creating the stack
         """
         for argument in self.arguments:
-            if argument["ParameterValue"] is None:
-                raise Exception("Could not determine argument '{}'".format(argument["ParameterKey"]))
+            arg_val = argument['ParameterValue']
+            if arg_val is None:
+                msg = "Could not determine argument '{}'".format(arg_val)
+                raise BossManageError(msg)
 
-        client = session.client('cloudformation')
+        client = self.session.client('cloudformation')
 
         kwargs = {
             "StackName": self.stack_name,
             "TemplateBody": self._create_template(),
             "Parameters": self.arguments,
             "Tags": [
+                {"Key": "StackVersion", "Value": self.stack_version},
                 {"Key": "Commit", "Value": utils.get_commit()}
             ]
         }
@@ -482,24 +502,18 @@ class CloudFormationConfiguration:
         try:
             response = client.create_stack(**kwargs)
         except client.exceptions.AlreadyExistsException:
-            print('{} already exists, aborting.'.format(self.stack_name))
-            return None
+            msg = "Stack '{}' already exists".format(self.stack_name)
+            raise BossManageError(msg)
 
-        rtn = None
         if wait:
             status = self._poll(client, self.stack_name, 'create', 'CREATE_IN_PROGRESS')
 
-            if status is None:
-                print("Problem launching stack")
-            elif status == 'CREATE_COMPLETE':
+            if status == 'CREATE_COMPLETE':
                 print("Created stack '{}'".format(self.stack_name))
-                rtn = True
             else:
-                print("Status of stack '{}' is '{}'".format(self.stack_name, status))
-                rtn = False
-        return rtn
+                self._raise_error(status)
 
-    def update(self, session, wait = True):
+    def update(self, wait = True):
         """Update the template this object represents in CloudFormation.
 
         Args:
@@ -508,20 +522,39 @@ class CloudFormationConfiguration:
                           status information
 
         Returns:
-            (bool|None) : If wait is True, the result of launching the stack,
-                          else None
+            bool: If there were migrations applied
+
+        Raises:
+            BossManageCanceled: If the update was canceled
+            BossManageError: If there was a problem updating the stack
         """
         for argument in self.arguments:
-            if argument["ParameterValue"] is None:
-                raise Exception("Could not determine argument '{}'".format(argument["ParameterKey"]))
+            arg_val = argument['ParameterValue']
+            if arg_val is None:
+                msg = "Could not determine argument '{}'".format(arg_val)
+                raise BossManageError(msg)
 
-        client = session.client('cloudformation')
+        client = self.session.client('cloudformation')
+        migrations = MigrationManager(self.config, self.existing_version(), self.version())
+
+        # Save the migration progress in case there is an exception in one
+        # The "update-migration" command will allow the user to continue executing
+        # migrations from where they failed
+        migration_progress = const.repo_path('cloud_formation', 'configs', 'migrations', self.config, 'progress')
+        with open(migration_progress, 'w') as fh:
+            fh.write(str(migrations.cur_ver))
+
+        def update_stack_version(self, migration_file):
+            with open(migration_progress, 'w') as fh:
+                fh.write(str(migration_file.stop))
+        migrations.add_callback(post = update_stack_version)
 
         kwargs = {
             "StackName": self.stack_name,
             "TemplateBody": self._create_template(),
             "Parameters": self.arguments,
             "Tags": [
+                {"Key": "StackVersion", "Value": self.stack_version},
                 {"Key": "Commit", "Value": utils.get_commit()}
             ]
         }
@@ -529,9 +562,10 @@ class CloudFormationConfiguration:
         if self.capabilities is not None:
             kwargs['Capabilities'] = self.capabilities 
 
-        disable_preview = str(os.environ.get("DISABLE_PREVIEW"))
+        disable_preview = str(self.bosslet_config.disable_preview)
         disable_preview = disable_preview.lower() in ('yes', 'true', 'y', 't')
         if disable_preview:
+            migrations.pre_update(self.bosslet_config)
             response = client.update_stack(**kwargs)
         else:
             commit = utils.get_commit()
@@ -549,8 +583,7 @@ class CloudFormationConfiguration:
 
                 if response['Status'] != 'CREATE_COMPLETE':
                     print("ChangeSet status is {}".format(response['Status']))
-                    print("Reason: {}".format(response['StatusReason']))
-                    raise Exception()
+                    raise BossManageError(response['StatusReason'])
 
                 fmt = "{:<10}{:<30}{:<50}{:<45}{:<14}{}"
                 print(fmt.format(
@@ -574,41 +607,39 @@ class CloudFormationConfiguration:
                             ", ".join(change['Scope'])
                         ))
 
-                resp = input("Apply Update? [N/y] ")
-                if len(resp) == 0 or resp[0] not in ('y', 'Y'):
-                    raise Exception()
+                if not console.confirm('Apply Update?', default = False):
+                    raise BossManageCanceled()
                 else:
+                    migrations.pre_update(self.bosslet_config)
                     response = client.execute_change_set(
                         ChangeSetName = 'h' + commit,
                         StackName = self.stack_name
                     )
             except:
-                print("Canceled")
                 client.delete_change_set(
                     ChangeSetName = 'h' + commit,
                     StackName = self.stack_name
                 )
-                return
+                raise
 
-        rtn = None
         if wait:
             status = self._poll(client, self.stack_name, 'update', 'UPDATE_IN_PROGRESS')
 
-            if status is None:
-                print("Problem launching stack")
-            elif status == 'UPDATE_COMPLETE':
+            if status == 'UPDATE_COMPLETE':
                 print("Updated stack '{}'".format(self.stack_name))
-                rtn = True
             elif status == 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS':
                 status = self._poll(client, self.stack_name, 'update cleanup', 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS')
                 print("Updated stack '{}'".format(self.stack_name))
-                rtn = True
             else:
-                print("Status of stack '{}' is '{}'".format(self.stack_name, status))
-                rtn = False
-        return rtn
+                self._raise_error(status)
 
-    def delete(self, session, wait = True):
+        migrations.post_update(self.bosslet_config)
+
+        os.remove(migration_progress)
+
+        return migrations.has_migrations
+
+    def delete(self, wait = True):
         """Deletes the given stack from CloudFormation.
 
         Initiates the stack delete and waits for it to finish.  config and domain
@@ -620,32 +651,43 @@ class CloudFormationConfiguration:
             wait (bool) : If True, wait for the stack to be deleted, printing
                           status information
 
-        Returns:
-            (bool|None) : If wait is True, the result of launching the stack,
-                          else None
+        Raises:
+            BossManageError: If there was a problem deleting the stack
         """
 
-        client = session.client("cloudformation")
+        client = self.session.client("cloudformation")
         client.delete_stack(StackName = self.stack_name)
 
-        rtn = None
         if wait:
             try:
                 status = self._poll(client, self.stack_name, 'delete', 'DELETE_IN_PROGRESS')
 
-                if status is None:
-                    print("Problem deleting stack")
-                elif status == 'DELETE_COMPLETE':
+                if status == 'DELETE_COMPLETE':
                     print("Deleted stack '{}'".format(self.stack_name))
-                    rtn = True
                 else:
-                    print("Status of stack '{}' is '{}'".format(self.stack_name, status))
-                    rtn = False
+                    self._raise_error(status)
             except ClientError:
                 # Stack doesn't exist anymore
                 print(" done")
-                rtn = True
-        return rtn
+
+    def get_failed_reasons(self):
+        client = self.session.client("cloudformation")
+
+        events = []
+        args = {'StackName': self.stack_name}
+        while 'NextToken' not in args or args['NextToken'] is not None:
+            resp = client.describe_stack_events(**args)
+
+            events.extend(['{}: {}'.format(e['LogicalResourceId'], e['ResourceStatusReason'])
+                           for e in resp['StackEvents']
+                           if e['ResourceStatus'].endswith('_FAILED')])
+
+            if 'NextToken' in resp:
+                args['NextToken'] = resp['NextToken']
+            else:
+                args['NextToken'] = None
+
+        return events
 
     def add_arg(self, arg):
         """Add an Arg class instance to the internal configuration.
@@ -702,7 +744,7 @@ class CloudFormationConfiguration:
             }
         }
 
-    def find_vpc(self, session, key="VPC"):
+    def find_vpc(self, key="VPC"):
         """Lookup a VPC's ID and add it to the configuration as an argument
 
         VPC name is derived fromt he domain given to the constructor
@@ -712,7 +754,7 @@ class CloudFormationConfiguration:
             key (str) : Unique name for the resource in the template
         """
 
-        vpc_id = aws.vpc_id_lookup(session, self.vpc_domain)
+        vpc_id = aws.vpc_id_lookup(self.session, self.vpc_domain)
         vpc = Arg.VPC(key, vpc_id, "ID of the VPC")
         self.add_arg(vpc)
         return vpc_id
@@ -734,7 +776,7 @@ class CloudFormationConfiguration:
             "Type" : "AWS::EC2::Subnet",
             "Properties" : {
                 "VpcId" : vpc,
-                "CidrBlock" : hosts.lookup(name),
+                "CidrBlock" : self.hosts.lookup(name),
                 "Tags" : [
                     {"Key" : "Stack", "Value" : Ref("AWS::StackName") },
                     {"Key" : "Name", "Value" : name }
@@ -745,7 +787,7 @@ class CloudFormationConfiguration:
         if az is not None:
             self.resources[key]["Properties"]["AvailabilityZone"] = az
 
-    def add_all_azs(self, session, lambda_compatible_only=False):
+    def add_all_subnets(self):
         """Add Internal and External subnets for each availability zone.
 
         For each availability zone in the connected region, create an Internal
@@ -753,8 +795,6 @@ class CloudFormationConfiguration:
         run across all zones within the region.
 
         Args:
-            session (Session) : Boto3 session used to lookup availability zones
-            lambda_compatible_only (bool): only return AZs that work with Lambda.
 
         Returns:
             (tuple) : Tuple of two lists (internal, external) that contain the
@@ -762,7 +802,7 @@ class CloudFormationConfiguration:
         """
         internal = []
         external = []
-        for az, sub in aws.azs_lookup(session, lambda_compatible_only):
+        for az, sub in aws.azs_lookup(self.bosslet_config):
             name = sub.capitalize() + "InternalSubnet"
             self.add_subnet(name, sub + "-internal." + self.vpc_domain, az = az)
             internal.append(Ref(name))
@@ -773,16 +813,44 @@ class CloudFormationConfiguration:
 
         return (internal, external)
 
-    def find_all_availability_zones(self, session, lambda_compatible_only=False):
-        """Add template arguments for each internal/external availability zone subnet.
+    def add_all_lambda_subnets(self):
+        """Add Lambda specific internal subnets.
 
-        A companion method to add_all_azs(), that will add to the current template
-        configuration arguments for each internal and external subnet that exist
-        in the current region.
+        Needed as the large number of Lambda executions can quickly use up all
+        of the IP address in the regular internal subnets.
+
+        For each lambda subnet allocated in lib.hosts create a subnet, distributed
+        evenly over the lambda compatible availability zones
 
         Args:
-            session (Session) : Boto3 session used to lookup availability zones
-            lambda_compatible_only (bool): only return AZs that work with Lambda.
+
+        Returns:
+            (list) : List of template references for each of the added subnets
+        """
+        internal = []
+
+        # transforms [(AZ_Name, AZ_Letter)] -> ([AZ_Name], [AZ_Letter])
+        azs = list(zip(*aws.azs_lookup(self.bosslet_config, compatibility='lambda')))[0]
+        print("Lambda AZs: {}".format(azs))
+        subnets = [x for x in hosts.SUBNETS if x.startswith('lambda')]
+
+        for i in range(len(subnets)):
+            key = "LambdaSubnet{}".format(i)
+            self.add_subnet(key, subnets[i] + "." + self.vpc_domain, az = azs[i % len(azs)])
+            internal.append(Ref(key))
+
+        return internal
+
+
+    def find_all_subnets(self, compatibility=None):
+        """Add template arguments for each internal/external availability zone subnet.
+
+        A companion method to add_all_subnets(), that will either add a reference to
+        the subnets currently in the configuration or lookup the subnet ids and add an
+        argument for each subnet that exists in the current region.
+
+        Args:
+            compatibility (str|None): Availibility Zone usage down selection
         Returns:
             (tuple) : Tuple of two lists (internal, external) that contain the
                       template argument names for each of the added subnet arguments
@@ -790,26 +858,64 @@ class CloudFormationConfiguration:
         internal = []
         external = []
 
-        for az, sub in aws.azs_lookup(session, lambda_compatible_only):
+        for az, sub in aws.azs_lookup(self.bosslet_config, compatibility):
             name = sub.capitalize() + "InternalSubnet"
-            domain = sub + "-internal." + self.vpc_domain
-            id = aws.subnet_id_lookup(session, domain)
-            if id is None:
-                print("Subnet {} doesn't exist, not using.".format(domain))
-            else:
-                self.add_arg(Arg.Subnet(name, id))
+            if name in self.resources:
                 internal.append(Ref(name))
+            else:
+                domain = sub + "-internal." + self.vpc_domain
+                id = aws.subnet_id_lookup(self.session, domain)
+                if id is None:
+                    print("Subnet {} doesn't exist, not using.".format(domain))
+                else:
+                    self.add_arg(Arg.Subnet(name, id))
+                    internal.append(Ref(name))
 
             name = sub.capitalize() + "ExternalSubnet"
-            domain = sub + "-external." + self.vpc_domain
-            id = aws.subnet_id_lookup(session, domain)
-            if id is None:
-                print("Subnet {} doesn't exist, not using.".format(domain))
-            else:
-                self.add_arg(Arg.Subnet(name, id))
+            if name in self.resources:
                 external.append(Ref(name))
+            else:
+                domain = sub + "-external." + self.vpc_domain
+                id = aws.subnet_id_lookup(self.session, domain)
+                if id is None:
+                    print("Subnet {} doesn't exist, not using.".format(domain))
+                else:
+                    self.add_arg(Arg.Subnet(name, id))
+                    external.append(Ref(name))
 
         return (internal, external)
+
+    def find_all_lambda_subnets(self):
+        """Add template arguments for each internal lambda subnet.
+
+        A companion method to add_all_lambda_subnets(), that will either add a reference
+        to the subnets currently in the configuration or lookup the subnet ids and add an
+        argument for each subnet that exists in the current region.
+
+        Args:
+            compatibility (str|None): Availibility Zone usage down selection
+        Returns:
+            (tuple) : Tuple of two lists (internal, external) that contain the
+                      template argument names for each of the added subnet arguments
+        """
+        internal = []
+
+        subnets = [x for x in hosts.SUBNETS if x.startswith('lambda')]
+
+        for i in range(len(subnets)):
+            key = "LambdaSubnet{}".format(i)
+            if key in self.resources:
+                internal.append(Ref(key))
+            else:
+                domain = subnets[i] + "." + self.vpc_domain
+                id = aws.subnet_id_lookup(self.session, domain)
+                if id is None:
+                    print("Subnet {} doesn't exist, not using.".format(domain))
+                else:
+                    self.add_arg(Arg.Subnet(key, id))
+                    internal.append(Ref(key))
+
+        return internal
 
     def add_endpoint(self, key, service, route_tables, vpc="VPC"):
         self.resources[key] = {
@@ -817,7 +923,7 @@ class CloudFormationConfiguration:
             "Properties" : {
                 #"PolicyDocument" : JSON object, # allow full access
                 "RouteTableIds" : route_tables,
-                "ServiceName" : 'com.amazonaws.us-east-1.{}'.format(service),
+                "ServiceName" : 'com.amazonaws.{}.{}'.format(self.region, service),
                 "VpcId" : {"Ref": vpc},
             }
         }
@@ -870,7 +976,7 @@ class CloudFormationConfiguration:
             "Type" : "AWS::EC2::Instance",
             "Properties" : {
                 "ImageId" : ami,
-                "InstanceType" : get_scenario(type_, "t2.micro"),
+                "InstanceType" : type_,
                 "KeyName" : keypair,
                 "SourceDestCheck": bool_str(iface_check),
                 "Tags" : [
@@ -925,13 +1031,6 @@ class CloudFormationConfiguration:
             storage (int|string) : The storage size of the database (in GB)
             security_groups (None|list) : A list of SecurityGroup IDs or Refs
         """
-        scenario = os.environ["SCENARIO"]
-        multi_az = {
-            "development": "false",
-            "production": "true",
-            "ha-development": "true",
-        }.get(scenario, "false")
-
         hostname_ = hostname.replace('.','-')
 
         self.resources[key] = {
@@ -941,8 +1040,8 @@ class CloudFormationConfiguration:
                 "Engine" : "mysql",
                 "LicenseModel" : "general-public-license",
                 "EngineVersion" : "5.6.34",
-                "DBInstanceClass" : get_scenario(type_, "db.t2.micro"),
-                "MultiAZ" : multi_az,
+                "DBInstanceClass" : type_,
+                "MultiAZ" : "true",
                 "StorageType" : "standard",
                 "AllocatedStorage" : str(storage),
                 "DBInstanceIdentifier" : hostname_,
@@ -953,7 +1052,9 @@ class CloudFormationConfiguration:
                 "DBName" : db_name,
                 "Port" : port,
                 "StorageEncrypted" : "false"
-            }
+            },
+
+            "DeletionPolicy": "Delete" # By default CF creates a snapshot
         }
 
         self.resources[key + "SubnetGroup"] = {
@@ -1019,8 +1120,8 @@ class CloudFormationConfiguration:
         Args:
             key (str) : Unique name (within the configuration) for this instance
             name (str) : DynamoDB Table name to create
-            attributes (dict) : Dictionary of {'AttributeName' : 'AttributeType', ...}
-            key_schema (dict) : Dictionary of {'AttributeName' : 'KeyType', ...}
+            attributes (list[tuple]) : List of tuples containing [('AttributeName', 'AttributeType'), ...]
+            key_schema (list[tuple]) : List of tuples containing [('AttributeName', 'KeyType'), ...]
             throughput (tuple) : Tuple of (ReadCapacity, WriteCapacity)
                                  ReadCapacity is the minimum number of consistent reads of items per second
                                               before Amazon DynamoDB balances the loads
@@ -1028,12 +1129,12 @@ class CloudFormationConfiguration:
                                                before Amazon DynamoDB balances the loads
         """
         attr_defs = []
-        for key_ in attributes:
-            attr_defs.append({"AttributeName": key_, "AttributeType": attributes[key_]})
+        for key_, attr in attributes:
+            attr_defs.append({"AttributeName": key_, "AttributeType": attr})
 
         key_schema_ = []
-        for key_ in key_schema:
-            key_schema_.append({"AttributeName": key_, "KeyType": key_schema[key_]})
+        for key_, schema in key_schema:
+            key_schema_.append({"AttributeName": key_, "KeyType": schema})
 
         self.resources[key] = {
             "Type" : "AWS::DynamoDB::Table",
@@ -1068,7 +1169,7 @@ class CloudFormationConfiguration:
             "Type" : "AWS::ElastiCache::CacheCluster",
             "Properties" : {
                 #"AutoMinorVersionUpgrade" : "false", # defaults to true - Indicates that minor engine upgrades will be applied automatically to the cache cluster during the maintenance window.
-                "CacheNodeType" : get_scenario(type_, "cache.t2.micro"),
+                "CacheNodeType" : type_,
                 "CacheSubnetGroupName" : Ref(key + "SubnetGroup"),
                 "Engine" : "redis",
                 "EngineVersion" : version,
@@ -1109,13 +1210,13 @@ class CloudFormationConfiguration:
             clusters (int|string) : Number of cluster instances to create (1 - 5)
             parameters (dict): Key/Values of Redis configuration parameters
         """
-        clusters = int(get_scenario(clusters, 1))
+        clusters = int(clusters)
         self.resources[key] =  {
             "Type" : "AWS::ElastiCache::ReplicationGroup",
             "Properties" : {
                 "AutomaticFailoverEnabled" : bool_str(clusters > 1),
                 #"AutoMinorVersionUpgrade" : "false", # defaults to true - Indicates that minor engine upgrades will be applied automatically to the cache cluster during the maintenance window.
-                "CacheNodeType" : get_scenario(type_, "cache.m3.medium"),
+                "CacheNodeType" : type_,
                 "CacheSubnetGroupName" : Ref(key + "SubnetGroup"),
                 "Engine" : "redis",
                 "EngineVersion" : version,
@@ -1315,10 +1416,135 @@ class CloudFormationConfiguration:
             }
         }
 
+    def add_app_loadbalancer(self, key, name, listeners, vpc_id=None, instances=None, subnets=None, security_groups=None,
+                         healthcheck_path="/ping/", public=True, internal_dns=False, depends_on=None ):
+        """
+        Add an Application LoadBalancer to the configuration
+
+        Args:
+            key (str) : Unique name for the resource in the template
+            name (str) : The name to give this elb
+            listeners (list) : A list of tuples for the elb
+                               (elb_port, instance_port, protocol [, ssl_cert_id])
+                                   elb_port (str) : The port for the elb to listening on
+                                   instance_port (str) : The port on the instance that the elb sends traffic to
+                                   protocol (str) : The protocol used, ex: HTTP, HTTPS
+                                   ssl_cert_id (Optional string) : The AWS ID of the SSL cert to use
+            vpc_id (None|str) : Required unless directing traffic to a lambda
+            instances (None|list) : A list of Instance IDs or Refs to attach to the LoadBalancer
+            subnets (None|list) : A list of Subnet IDs or Refs to attach the LoadBalancer to
+            security_groups (None|list) : A list of SecurityGroup IDs or Refs to apply to the LoadBalancer
+            healthcheck_path (str) : The path used for for health checks Ex: "/alive/"
+            public (bool) : If the ELB is public facing or internal
+            internal_dns (bool) : If the ELB should have an internal Router53 entry
+            depends_on (None|string|list): A unique name or list of unique names of resources within the
+                                           configuration and is used to determine the launch order of resources
+
+        Returns:
+            (list) : List of CloudFormation template keys of the target groups created.
+        """
+
+        target_group_keys = []
+
+        for ind, listener in enumerate(listeners):
+            target_group_key = "{}TargetGroup".format(key)
+            target_group_keys.append(target_group_key)
+
+            self.resources[target_group_key] = {
+                "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+                "Properties": {
+                    "HealthCheckEnabled": True,
+                    "HealthCheckPath": healthcheck_path,
+                    "HealthCheckIntervalSeconds": 30,
+                    "HealthCheckTimeoutSeconds": 5,
+                    "HealthyThresholdCount": 2,
+                    "UnhealthyThresholdCount": 5,
+                    "Protocol": "HTTP",
+                    "Port": listener[1],
+                    "TargetType": "instance"
+                }
+            }
+
+            if vpc_id is not None:
+                self.resources[target_group_key]["Properties"]["VpcId"] = vpc_id
+
+            listener_props = {
+                "LoadBalancerArn": Ref(key),
+                "Port": str(listener[0]),
+                "Protocol": listener[2],
+                "DefaultActions": [ {
+                    "Type": "forward",
+                    "TargetGroupArn": Ref(target_group_key)
+                } ]
+                #"InstancePort": str(listener[1]),
+                #"SslPolicy": 'probably dont need to specify',
+                #"PolicyNames": [key + "Policy"],
+            }
+
+            using_https = len(listener) == 4 and listener[3] is not None
+            if using_https:
+                listener_props["Certificates"] = [ { "CertificateArn": listener[3] } ]
+
+            listener_key = "{}Listener{}".format(key, ind)
+            self.resources[listener_key] = {
+                "Type": "AWS::ElasticLoadBalancingV2::Listener",
+                "Properties": listener_props
+            }
+
+            if using_https:
+                # Redirect all requests to port 443.
+                redirect_action = {
+                    "Type": "redirect",
+                    "RedirectConfig": {
+                        "Protocol": "HTTPS",
+                        "Port": "443",
+                        "Host": "#{host}",
+                        "Path": "/#{path}",
+                        "Query": "#{query}",
+                        "StatusCode": "HTTP_301"
+                    }
+                }
+                self.resources["{}Listener{}Redirect".format(key, ind)] = {
+                    "Type": "AWS::ElasticLoadBalancingV2::Listener",
+                    "Properties": {
+                        "LoadBalancerArn": Ref(key),
+                        "DefaultActions": [redirect_action],
+                        "Port": "80",
+                        "Protocol": "HTTP"
+                    }
+                }
+
+
+        self.resources[key] = {
+            "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+            "Properties": {
+                "Type": "application",
+                "Name": name.replace(".", "-"),  #elb names can't have periods in them
+                "Scheme": "internet-facing" if public else "internal",
+                "Tags": [
+                    {"Key": "Stack", "Value": Ref("AWS::StackName")}
+                ]
+            }
+        }
+
+        if security_groups is not None:
+            self.resources[key]["Properties"]["SecurityGroups"] = security_groups
+        if subnets is not None:
+            self.resources[key]["Properties"]["Subnets"] = subnets
+        if depends_on is not None:
+            self.resources[key]["DependsOn"] = depends_on
+
+        # Most ELB front ASGs that are generating their own DNS records
+        if internal_dns:
+            self._add_record_cname(key, name, elb = True)
+
+        return target_group_keys
+
+
     def add_loadbalancer(self, key, name, listeners, instances=None, subnets=None, security_groups=None,
                          healthcheck_target="HTTP:80/ping/", public=True, internal_dns=False, depends_on=None ):
         """
-        Add LoadBalancer to the configuration
+        Add a Classic LoadBalancer to the configuration
 
         Args:
             key (str) : Unique name for the resource in the template
@@ -1396,7 +1622,8 @@ class CloudFormationConfiguration:
 
     def add_autoscale_group(self, key, hostname, ami, keypair, subnets=[Ref("Subnet")], type_="t2.micro", public_ip=False,
                             security_groups=[], user_data=None, min=1, max=1, elb=None, notifications=None,
-                            role=None, health_check_grace_period=30, support_update=True, detailed_monitoring=False, depends_on=None):
+                            role=None, health_check_grace_period=30, support_update=True, detailed_monitoring=False,
+                            target_group_arns=None, depends_on=None):
         """Add an AutoScalingGroup to the configuration
 
         Args:
@@ -1407,16 +1634,17 @@ class CloudFormationConfiguration:
             type_ (str) : The instance type to create
             public_ip (bool) : Should the instances gets public IP addresses
             security_groups (list) : A list of SecurityGroup IDs or Refs to apply to the instances
-            user_data (None|string) : A string of user-data to give to the instance when launching
-            min (int|string) : The minimimum number of instances in the AutoScalingGroup
-            max (int|string) : The maximum number of instances in the AutoScalingGroup
-            elb (None|string) : The LoadBalancer ID or Ref to attach the AutoScalingGroup to
-            notifications (None|List|string) : list or single topic ARN or Ref to send ASG notifications to
-            role (None|string) : Role name to use when creating instances
+            user_data (None|str) : A string of user-data to give to the instance when launching
+            min (int|str) : The minimimum number of instances in the AutoScalingGroup
+            max (int|str) : The maximum number of instances in the AutoScalingGroup
+            elb (None|str) : The LoadBalancer ID or Ref to attach the AutoScalingGroup to
+            notifications (None|List|str) : list or single topic ARN or Ref to send ASG notifications to
+            role (None|str) : Role name to use when creating instances
             health_check_grace_period (int) : grace period in seconds to wait before checking newly created instances.
             support_update (bool) : If the ASG should include RollingUpdate UpdatePolicy
             detailed_monitoring (bool) : Enable detailed monitoring of the instances. False means 5 minute statistics.
-            depends_on (None|string|list): A unique name or list of unique names of resources within the
+            target_group_arns (None|str|list): Place instances in the given target group(s) (used with app load balancers).
+            depends_on (None|str|list): A unique name or list of unique names of resources within the
                                            configuration and is used to determine the launch order of resources
         """
 
@@ -1428,13 +1656,13 @@ class CloudFormationConfiguration:
         self.resources[key] = {
             "Type" : "AWS::AutoScaling::AutoScalingGroup",
             "Properties" : {
-                "DesiredCapacity" : get_scenario(min, 1), # Initial capacity, will min size also ensure the size on startup?
+                "DesiredCapacity" : min, # Initial capacity, will min size also ensure the size on startup?
                 "HealthCheckType" : "EC2" if elb is None else "ELB",
                 "HealthCheckGracePeriod" : health_check_grace_period, # seconds
                 "LaunchConfigurationName" : Ref(key + "Configuration"),
                 "LoadBalancerNames" : [] if elb is None else [elb],
-                "MaxSize" : str(get_scenario(max, 1)),
-                "MinSize" : str(get_scenario(min, 1)),
+                "MaxSize" : str(max),
+                "MinSize" : str(min),
                 "Tags" : [
                     {"Key" : "Stack", "Value" : Ref("AWS::StackName"), "PropagateAtLaunch": "true" },
                     {"Key" : "Name", "Value" : hostname, "PropagateAtLaunch": "true" }
@@ -1446,7 +1674,7 @@ class CloudFormationConfiguration:
         if support_update:
             self.resources[key]["UpdatePolicy"] = {
                 "AutoScalingRollingUpdate" : {
-                    "MinInstancesInService" : str(get_scenario(min, 1) - 1), # Restart one instance at a time
+                    "MinInstancesInService" : str(min - 1), # Restart one instance at a time
                     "MaxBatchSize": "1",
                     #"WaitOnResourceSignals": "true", # need to have instances signal ready...
                     #"PauseTime": "PT5M" # 5 minutes
@@ -1472,6 +1700,9 @@ class CloudFormationConfiguration:
                 } for topic in notifications
             ]
 
+        if target_group_arns is not None:
+            self.resources[key]["Properties"]["TargetGroupARNs"] = target_group_arns
+
         if depends_on is not None:
             self.resources[key]["DependsOn"] = depends_on
 
@@ -1482,7 +1713,7 @@ class CloudFormationConfiguration:
                 #"EbsOptimized" : Boolean, EBS I/O optimized
                 "ImageId" : ami,
                 "InstanceMonitoring" : detailed_monitoring, # CloudWatch Monitoring...
-                "InstanceType" : get_scenario(type_, "t2.micro"),
+                "InstanceType" : type_,
                 "KeyName" : keypair,
                 "SecurityGroups" : security_groups,
                 "UserData" : "" if user_data is None else { "Fn::Base64" : user_data }
@@ -1563,6 +1794,8 @@ class CloudFormationConfiguration:
             access_control (optional[string]): A canned access control list (see Canned ACL in S3 docs).
             life_cycle_config (optional[dict]): Life cycle configuration object.
             notification_config (optional[dict]): Optionally send notification to lamba function/SQS/SNS.
+            encryption (optional[dict]): Optional Server Side Encryption Configuration information for protecting
+                                         data in the S3 bucket
             tags (optional[dict]): Optional key-value pairs to add to bucket.
             depends_on (optional[string]): Optional key of resource bucket depends on.
 
@@ -1592,35 +1825,6 @@ class CloudFormationConfiguration:
 
         if tags is not None:
             self.resources[key]['Properties']['Tags'] = tags
-
-
-    def add_iam_policy_to_role(self, key, resource_arn, roles, actions):
-        """
-        Add an IAM policy to a role or multiple roles.
-
-        Args:
-                key (string): Unique name for the resource in the template.
-                resource_arn (str): Resource to grant role permissions to.
-                roles (list[str]): Roles to grant permissions to.
-                actions (list): List of strings for the types of actions to allow.
-        """
-        self.resources[key] = {
-           "Type": "AWS::IAM::Policy",
-           "Properties": {
-              "PolicyName": "S3TablePutItem",
-              "PolicyDocument": {
-                 "Version" : "2012-10-17",
-                 "Statement": [
-                    { 
-                        "Effect": "Allow",
-                        "Action": actions,
-                        "Resource": resource_arn
-                    }
-                 ]
-              },
-              "Roles": roles
-           }
-        }
 
 
     def add_s3_bucket_policy(self, key, bucket_name, action, principal):
@@ -1733,7 +1937,7 @@ class CloudFormationConfiguration:
             "Properties" : {
                 "Code": code,
                 "Description": description,
-                "FunctionName": name.replace('.', '-'),
+                "FunctionName": name,
                 "Handler": handler,
                 "MemorySize": memory,
                 "Role": role,
@@ -1853,6 +2057,37 @@ class CloudFormationConfiguration:
                 'Type': 'CNAME',
                 'ResourceRecords': [cname_value],
                 'TTL': ttl,
+            }
+        }
+
+    def add_public_dns(self, target_key, public_hostname, elb=True):
+        """Add a CNAME RecordSet to the configuration
+
+        Adds a CNAME RecordSet to the EXTERNAL_DOMAIN Route53 Hosted Zone
+
+        Args:
+            target_key (str) : Unique name for the resource in the template to create the RecordSet for
+            public_hostname (str) : The DNS hostname to map to the resource
+            elb (bool) : The key is an ELB
+        """
+        address_key = None
+        if elb:
+            address_key = "DNSName"
+
+        if address_key is None:
+            raise Exception("Unknown type of CNAME record to create")
+
+        zone = self.bosslet_config.EXTERNAL_DOMAIN + "."
+        target = { "Fn::GetAtt" : [ target_key, address_key ] }
+
+        self.resources[target_key + "Record"] = {
+            "Type": "AWS::Route53::RecordSet",
+            "Properties": {
+                "HostedZoneName": zone,
+                'Name': public_hostname,
+                'Type': 'CNAME',
+                'ResourceRecords': [target],
+                'TTL': 300,
             }
         }
 
@@ -1985,7 +2220,7 @@ class CloudFormationConfiguration:
             "Properties": {
                 "DisplayName": name,
                 "Subscription": [{"Endpoint": ep, "Protocol": pt} for pt, ep in subscriptions],
-                "TopicName": topic.replace('.', '-')
+                "TopicName": topic,
             }
         }
 
@@ -2102,6 +2337,60 @@ class CloudFormationConfiguration:
         if description is not None:
             self.resources[key]["Properties"]["Description"] = description
 
+    def add_kms_key(self, key, alias, key_users, user_actions):
+        """Add a KMS Key
+
+        Note: KMS Key permissions are a little different from the rest of AWS
+              resources. User's must be given permission to use a key and by
+              default they don't have permissions.
+
+        Args:
+            key (str): Unique name for the resource in the template
+            alias (str): Name of the key to be created
+            key_users (str|list[str]): ARN or list or ARNs of the users with permission
+                                       to use the key
+            user_actions (list[str]): List of KMS actions that the given user(s) are allows
+                                      to perform with the key
+        """
+        account_id = self.bosslet_config.ACCOUNT_ID
+
+        self.resources[key] = {
+            "Type": "AWS::KMS::Key",
+            "Properties": {
+                "Description": "KMS Key for {}".format(alias),
+                "KeyPolicy": {
+                    "Id": alias,
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "Enable IAM User Permissions",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": "arn:aws:iam::{}:root".format(account_id)
+                            },
+                            "Action": "kms:*",
+                            "Resource": "*"
+                        },
+                        {
+                            "Sid": "Allow use of the key",
+                            "Effect": "Allow",
+                            "Principal": { "AWS": key_users },
+                            "Action": user_actions,
+                            "Resource": "*"
+                        },
+                    ]
+                }
+            }
+        }
+
+        self.resources[key + "Alias"] = {
+            "Type": "AWS::KMS::Alias",
+            "Properties": {
+                "AliasName": "alias/" + alias.replace('.', '-'),
+                "TargetKeyId": Ref(key),
+            }
+        }
+
     def add_data_pipeline(self, key, name, objects, description="", depends_on=None):
         """Add a Data Pipeline definition
 
@@ -2124,6 +2413,18 @@ class CloudFormationConfiguration:
                 "ParameterValues" : [],
                 "PipelineObjects" : objects,
                 "PipelineTags" : [],
+            }
+        }
+
+        if depends_on is not None:
+            self.resources[key]['DependsOn'] = depends_on
+
+    def add_custom_resource(self, key, name, token, depends_on=None, **properties):
+        self.resources[key] = {
+            "Type": "Custom::{}".format(name),
+            "Properties": {
+                "ServiceToken": token,
+                **properties
             }
         }
 

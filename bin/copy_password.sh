@@ -1,12 +1,12 @@
 #!/bin/sh
 
 usage() {
-echo "Usage: $0 <521.boss> <secret/path> [<key>]"
+echo "Usage: $0 <bosslet> <secret/path> [<key>]"
 echo ""
 echo "Under the hood bastion.py is called, so make sure your environmental"
 echo "variables are setup correctly for it to connect to the target domain"
 echo ""
-echo "       <521.boss>     Name of target stack"
+echo "       <bosslet>      Name of bosslet configuration file"
 echo "       <secret/path>  Vault path to read data from"
 echo "       <key>          Key at path to copy data into the system clip board"
 }
@@ -16,7 +16,7 @@ if [ "$#" -lt 2 ] ; then
     exit 1
 fi
 
-DOMAIN=$1
+BOSSLET=$1
 SECRET=$2
 KEY=${3:-"password"}
 CB=""
@@ -37,4 +37,4 @@ if [ -z "$CB" ] ; then
     exit 1
 fi
 
-python3 bastion.py vault.$DOMAIN vault-read $SECRET | ./pq .data.$KEY | $CB
+python3 bastion.py vault.$BOSSLET vault-read $SECRET | ./pq .data.$KEY | $CB

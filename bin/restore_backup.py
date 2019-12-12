@@ -18,16 +18,14 @@
 A script that manually creates Data Pipelines to restore a backup
 """
 
-import argparse
 import sys
 import os
+import random
 
 import alter_path
 from lib import aws
-from lib import constants as const
-from lib.names import AWSNames
-from lib.external import ExternalCalls
 from lib.datapipeline import DataPipeline, Ref
+from lib.configuration import BossParser
 
 def list_s3_bucket(session, bucket, prefix):
     client = session.client('s3')
@@ -40,49 +38,25 @@ def list_s3_bucket(session, bucket, prefix):
 
     return dirs, files
 
-def consul_pipeline(session, domain, directory):
-    # DP NOTE: Currently having issues with Consul restore
-    #          For a restore certain kv paths shouldn't be restored
-    #          and all Vault instances must be shutdown, so they are not
-    #          interacting with Consul during the restore
-    #
-    # See
-    # https://groups.google.com/forum/#!msg/vault-tool/nTj0V9hC31E/0VT3Qq_CDQAJ
-    # https://groups.google.com/forum/#!msg/vault-tool/ISCbNmQVXms
-    names = AWSNames(domain)
-    # XXX: AZ `E` is incompatible with T2.Micro instances (used by backup)
-    internal_subnet = aws.subnet_id_lookup(session, 'b-' + names.internal)
+def subnet_id_lookup(bosslet_config):
+    # DP NOTE: During implementation there was/is an availability zone that
+    #          could not run the T2.Micro instances used by this Data Pipeline
+    azs = aws.azs_lookup(bosslet_config, 'datapipeline')
+    az = random.choice(azs)[1] + '-'
 
-    s3_backup = "s3://backup." + domain + "/" + directory
-    s3_log = "s3://backup." + domain + "/restore-logs/"
-    cmd = "/usr/local/bin/consulate --api-host consul.{} kv restore -b -f ${{INPUT1_STAGING_DIR}}/export.json".format(domain)
+    internal_subnet = aws.subnet_id_lookup(bosslet_config.session,
+                                           az + bosslet_config.names.internal.subnet)
+    return internal_subnet
 
-    _, data = list_s3_bucket(session, "backup." + domain, directory + "/vault")
-    if len(data) == 0:
-        print("No consul data backed up on {}, skipping restore".format(directory))
-        return None
+def vault_pipeline(bosslet_config, directory):
+    internal_subnet = subnet_id_lookup(bosslet_config)
 
-    pipeline = DataPipeline(fmt="DP", log_uri = s3_log, resource_role="backup")
-    pipeline.add_shell_command("ConsulRestore",
-                               cmd,
-                               source = Ref("ConsulBucket"),
-                               runs_on = Ref("ConsulInstance"))
-    pipeline.add_ec2_instance("ConsulInstance",
-                              subnet = internal_subnet,
-                              image = aws.ami_lookup(session, "backup.boss")[0])
-    pipeline.add_s3_bucket("ConsulBucket", s3_backup + "/consul")
-    return pipeline
+    names = bosslet_config.names
+    s3_backup = "s3://" + names.backup.s3 + "/" + directory
+    s3_log = "s3://" + names.backup.s3 + "/restore-logs/"
+    cmd = "/usr/local/bin/python3 ~/vault.py restore {}".format(bosslet_config.INTERNAL_DOMAIN)
 
-def vault_pipeline(session, domain, directory):
-    names = AWSNames(domain)
-    # XXX: AZ `E` is incompatible with T2.Micro instances (used by backup)
-    internal_subnet = aws.subnet_id_lookup(session, 'b-' + names.internal)
-
-    s3_backup = "s3://backup." + domain + "/" + directory
-    s3_log = "s3://backup." + domain + "/restore-logs/"
-    cmd = "/usr/local/bin/python3 ~/vault.py restore {}".format(domain)
-
-    _, data = list_s3_bucket(session, "backup." + domain, directory + "/vault")
+    _, data = list_s3_bucket(bosslet_config.session, names.backup.s3, directory + "/vault")
     if len(data) == 0:
         print("No vault data backed up on {}, skipping restore".format(directory))
         return None
@@ -94,7 +68,7 @@ def vault_pipeline(session, domain, directory):
                                runs_on = Ref("VaultInstance"))
     pipeline.add_ec2_instance("VaultInstance",
                               subnet = internal_subnet,
-                              image = aws.ami_lookup(session, "backup.boss")[0])
+                              image = aws.ami_lookup(bosslet_config, names.backup.ami)[0])
     pipeline.add_s3_bucket("VaultBucket", s3_backup + "/vault")
     return pipeline
 
@@ -120,42 +94,45 @@ def ddb_delete_data(session, table_name):
             key = { k: v for k,v in item.items() if k in keys }
             tbl.delete_item(Key = key)
 
-def ddb_pipeline(session, domain, directory):
-    s3_backup = "s3://backup." + domain + "/" + directory
-    s3_log = "s3://backup." + domain + "/restore-logs/"
+def ddb_pipeline(bosslet_config, directory):
+    names = bosslet_config.names
+    s3_backup = "s3://" + names.backup.s3 + "/" + directory
+    s3_log = "s3://" + names.backup.s3 + "/restore-logs/"
 
     pipeline = DataPipeline(fmt="DP", log_uri = s3_log)
-    pipeline.add_emr_cluster("RestoreCluster")
+    pipeline.add_emr_cluster("RestoreCluster", region = bosslet_config.REGION)
 
-    tables, _ = list_s3_bucket(session, "backup." + domain, directory + "/DDB")
+    tables, _ = list_s3_bucket(bosslet_config.session, names.backup.s3, directory + "/DDB")
     for table in tables:
         name = table.split('.', 1)[0]
+        if name == 'vault':
+            name = 'VaultData'
         pipeline.add_s3_bucket(name + "Bucket", s3_backup + "/DDB/" + table)
         pipeline.add_ddb_table(name, table)
         pipeline.add_emr_copy(name+"Copy",
                               Ref(name + "Bucket"),
                               Ref(name),
-                              Ref("RestoreCluster"),
+                              runs_on = Ref("RestoreCluster"),
+                              region = bosslet_config.REGION,
                               export=False)
 
     for table in tables:
         name = table.split('.', 1)[0]
-        resp = input("Delete existing data in {}? [y/N] ".format(name))
+        resp = input("Delete existing data in {} table? [y/N] ".format(name))
         if resp and len(resp) > 0 and resp[0].lower() == 'y':
-            ddb_delete_data(session, table)
+            ddb_delete_data(bosslet_config.session, table)
 
     return pipeline
 
-def rds_pipeline(session, domain, directory, component, rds_name):
-    names = AWSNames(domain)
-    # XXX: AZ `E` is incompatible with T2.Micro instances (used by backup)
-    subnet = aws.subnet_id_lookup(session, 'b-' + names.internal)
+def rds_pipeline(bosslet_config, directory, component, rds_name):
+    names = bosslet_config.names
+    subnet = subnet_id_lookup(bosslet_config)
 
-    s3_backup = "s3://backup." + domain + "/" + directory
-    s3_log = "s3://backup." + domain + "/restore-logs/"
+    s3_backup = "s3://" + names.backup.s3 + "/" + directory
+    s3_log = "s3://" + names.backup.s3 + "/restore-logs/"
 
 
-    _, data = list_s3_bucket(session, "backup." + domain, directory + "/RDS/" + rds_name)
+    _, data = list_s3_bucket(bosslet_config.session, names.backup.s3, directory + "/RDS/" + rds_name)
     if len(data) == 0:
         print("No {} table data backed up on {}, skipping restore".format(component, directory))
         return None
@@ -167,42 +144,31 @@ def rds_pipeline(session, domain, directory, component, rds_name):
                                runs_on = Ref("RDSInstance"))
     pipeline.add_ec2_instance("RDSInstance",
                               subnet = subnet,
-                              image = aws.ami_lookup(session, "backup.boss")[0])
+                              image = aws.ami_lookup(bosslet_config, names.backup.ami)[0])
     pipeline.add_s3_bucket("RDSBucket", s3_backup + "/RDS/" + rds_name)
 
     return pipeline
 
-def endpoint_rds_pipeline(session, domain, directory):
-    names = AWSNames(domain)
-
-    return rds_pipeline(session,
-                        domain,
+def endpoint_rds_pipeline(bosslet_config, directory):
+    return rds_pipeline(bosslet_config,
                         directory,
                         "Endpoint",
-                        names.endpoint_db)
+                        bosslet_config.names.endpoint_db.rds)
 
-def auth_rds_pipeline(session, domain, directory):
-    names = AWSNames(domain)
-
-    return rds_pipeline(session,
-                        domain,
+def auth_rds_pipeline(bosslet_config, directory):
+    return rds_pipeline(bosslet_config,
                         directory,
                         "Auth",
-                        names.auth_db)
+                        bosslet_config.names.auth_db.rds)
 
 if __name__ == '__main__':
-    types = ['consul', 'vault', 'dynamo', 'endpoint', 'auth']
-    parser = argparse.ArgumentParser(description = "Script the restoration of a backup")
-    parser.add_argument("--aws-credentials", "-a",
-                        metavar = "<file>",
-                        default = os.environ.get("AWS_CREDENTIALS"),
-                        type = argparse.FileType('r'),
-                        help = "File with credentials to use when connecting to AWS (default: AWS_CREDENTIALS)")
+    types = ['vault', 'dynamo', 'endpoint', 'auth']
+    parser = BossParser(description = "Script the restoration of a backup")
     parser.add_argument("--ami-version",
                         metavar = "<ami-version>",
                         default = "latest",
                         help = "The AMI version to use when selecting images (default: latest)")
-    parser.add_argument("domain_name", help="Domain in which to execute the configuration (example: subnet.vpc.boss)")
+    parser.add_bosslet()
     parser.add_argument("backup_date", help="Year and week of the backup to restore (format: YYYY-ww")
     parser.add_argument("type",
                         metavar = "<type>",
@@ -211,11 +177,8 @@ if __name__ == '__main__':
                         help = "Type(s) of data to restore (choices: {})".format("|".join(types)))
 
     args = parser.parse_args()
+    bosslet_config = args.bosslet_config
 
-    if args.aws_credentials is None:
-        parser.print_usage()
-        print("Error: AWS credentials not provided and AWS_CREDENTIALS is not defined")
-        sys.exit(1)
     if args.type:
         for t in args.type:
             if t not in types:
@@ -223,16 +186,12 @@ if __name__ == '__main__':
                 print("Error: <type> can only include ({})".format("|".join(types)))
                 sys.exit(1)
 
-    os.environ["AMI_VERSION"] = args.ami_version
-    session = aws.create_session(args.aws_credentials)
+    bosslet_config.ami_version = args.ami_version
 
     pipeline_ids = []
-    pipeline_args = (session, args.domain_name, args.backup_date)
+    pipeline_args = (bosslet_config, args.backup_date)
     print("Creating and activating restoration data pipelines")
     for name, build in [
-                        # Currently having issues with Consul restore
-                        #('consul', consul_pipeline),
-
                         # NOTE: in some scenarios vault data may need to be be
                         #       restored before the other restores are executed
                         ('vault', vault_pipeline),
@@ -248,20 +207,20 @@ if __name__ == '__main__':
         if pipeline is None:
             continue
 
-        id = aws.create_data_pipeline(session,
-                                      name + '-restore.' + args.domain_name,
+        id = aws.create_data_pipeline(bosslet_config.session,
+                                      name + '-restore.' + bosslet_config.INTERNAL_DOMAIN
                                       pipeline)
         if id is None:
             print("Problem creating {} pipeline, cannot restore".format(name))
             continue
 
-        aws.activate_data_pipeline(session, id)
+        aws.activate_data_pipeline(bosslet_config.session, id)
         pipeline_ids.append(id)
 
     print("Pipelines all activated, waiting for restore to finish...")
     # Cannot currently find a method to query pipeline execution status that will
     # tell us when they are finished
-    input("Press any key to delete pipelines")
+    input("Press any key to delete pipelines, after verifying that they have finished")
 
     for id in pipeline_ids:
-        aws.delete_data_pipeline(session, id)
+        aws.delete_data_pipeline(bosslet_config.session, id)

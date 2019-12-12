@@ -1,5 +1,0 @@
-{
-    "name": "endpoint-test",
-    "role": "endpoint",
-    "aws_force": "true"
-}

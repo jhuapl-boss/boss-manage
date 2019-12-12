@@ -21,33 +21,41 @@ from .constants import repo_path
 sys.path.append(repo_path('lib', 'heaviside.git'))
 import heaviside
 
+class BossVisitor(heaviside.ast.StateVisitor):
+    def __init__(self, bosslet_config):
+        self.domain = bosslet_config.INTERNAL_DOMAIN.replace('.', '-')
 
-class BossStateMachine(heaviside.StateMachine):
+    def handle_task(self, task):
+        service = task.service.value.lower()
+        if service in ('lambda', 'activity'):
+            task.arn = task.arn + '-' + self.domain
 
-    def __init__(self, name, domain, session):
-        super().__init__(name, session=session)
-
-        if domain:
-            self.domain = domain.replace('.', '-')
-        self.__translate = self._translate
-
-        def _translate(type_, function):
-            return self.__translate(type_, "{}-{}".format(function, self.domain))
-        self._translate = _translate
-
-def create(session, name, domain, sfn_file, role):
+def create(bosslet_config, name, sfn_file, role):
     filepath = repo_path('cloud_formation', 'stepfunctions', sfn_file)
     filepath = Path(filepath)
 
-    machine = BossStateMachine(name, domain, session)
+    machine = heaviside.StateMachine(name, session = bosslet_config.session)
+    machine.add_visitor(BossVisitor(bosslet_config))
 
     if machine.arn is not None:
         print("StepFunction '{}' already exists, not creating".format(name))
     else:
         machine.create(filepath, role)
 
-def delete(session, name):
-    machine = BossStateMachine(name, None, session)
+def update(bosslet_config, name, sfn_file):
+    filepath = repo_path('cloud_formation', 'stepfunctions', sfn_file)
+    filepath = Path(filepath)
+
+    machine = heaviside.StateMachine(name, session = bosslet_config.session)
+    machine.add_visitor(BossVisitor(bosslet_config))
+
+    if machine.arn is None:
+        raise Exception("Step Function '{}' doesn't exist...".format(name))
+    else:
+        machine.update(filepath)
+
+def delete(bosslet_config, name):
+    machine = heaviside.StateMachine(name, session = bosslet_config.session)
     machine.delete()
     # DP ???: remove activity ARNs when deleting the step function or when removing the activity code
 
