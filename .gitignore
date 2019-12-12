@@ -80,7 +80,7 @@ vault/private/
 # Scylr
 config/set_scalyr_vars.sh
 */scalyr-cfg.json
-salt_stack/pillar/scalyr.sls
+salt_stack/pillar/scalyr.sls*
 
 # Keycloack Stuff
 salt_stack/salt/keycloak/files/keycloak-*Final.tar.gz
