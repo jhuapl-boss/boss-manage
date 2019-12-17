@@ -18,6 +18,7 @@ DEPENDENCIES = ['core']
 Create the redis configuration which consists of
   * redis cluster for cache
   * redis cluster for cache-state
+  # redis cluster for cache-throttle
   * redis for session key 
 
 The redis configuration creates cache and cache-state redis clusters for the
@@ -70,6 +71,15 @@ def create_config(bosslet_config):
                                      internal_subnets,
                                      [sgs[names.internal.sg]],
                                      type_=const.REDIS_SESSION_TYPE,
+                                     version="3.2.4",
+                                     clusters=1)
+
+    if const.REDIS_THROTTLE_TYPE is not None:
+        config.add_redis_replication("CacheThrottle",
+                                     names.cache_throttle.redis,
+                                     internal_subnets,
+                                     [sgs[names.internal.sg]],
+                                     type_=const.REDIS_THROTTLE_TYPE,
                                      version="3.2.4",
                                      clusters=1)
 

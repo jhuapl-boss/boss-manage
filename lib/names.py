@@ -152,6 +152,8 @@ class AWSNames(object):
                           'type': 'redis'},
         'cache_state': {'name': 'cache-state',
                         'type': 'redis'},
+        'cache_throttle': {'name': 'cache-throttle',
+                           'type': 'redis'},
         'cloudwatch': {'type': 'stack'},
         'consul_monitor': {'name': 'consulMonitor',
                            'types': 'lambda_'},
