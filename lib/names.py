@@ -130,8 +130,6 @@ class AWSNames(object):
         'sfn': format_capitalize, # StepFunction
         'cw': format_dash, # CloudWatch Rule
         'key': None, # KMS Key
-
-        'zip': lambda x: x.lower() + '.zip', # lambda code files
     }
 
     RESOURCES = {
@@ -153,7 +151,7 @@ class AWSNames(object):
         'cache_state': {'name': 'cache-state',
                         'type': 'redis'},
         'cache_throttle': {'name': 'cache-throttle',
-                           'type': 'redis'},
+                           'types': ['redis', 'lambda_', 'cw']},
         'cloudwatch': {'type': 'stack'},
         'consul_monitor': {'name': 'consulMonitor',
                            'types': 'lambda_'},
@@ -195,8 +193,6 @@ class AWSNames(object):
                            'types': ['sqs', 'lambda_']},
         'downsample_volume': {'name': 'downsample.volume',
                               'type': 'lambda_'},
-        'dynamodb_autoscale': {'name': 'dynamodb_autoscale',
-                               'type': 'zip'},
         'dynamolambda': {'type': 'stack'},
         'dynamo_lambda': {'name': 'dynamoLambda',
                           'type': 'lambda_'},
@@ -275,7 +271,7 @@ class AWSNames(object):
         'meta': {'name': 'bossmeta',
                  'type': 'ddb'},
         'multi_lambda': {'name': 'multiLambda',
-                         'types': ['lambda_', 'zip']},
+                         'type': 'lambda_'},
         'query_deletes': {'name': 'Query.Deletes',
                           'type': 'sfn'},
         'redis': {'type': 'stack'},

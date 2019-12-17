@@ -144,6 +144,7 @@ def build_dependency_graph(action, bosslet_config, modules):
         for config, module in reordered[:]:
             if config in existing:
                 # If the config already exists, don't try to create it again
+                console.debug('Not executing create on {} as it already exists'.format(config))
                 reordered.remove((config, module))
 
     # Remove configs that don't need to be deleted / updated / etc
@@ -152,6 +153,7 @@ def build_dependency_graph(action, bosslet_config, modules):
             if config not in existing:
                 # If the config doesn't exist, don't try to delete it again
                 # If the config doesn't exist, don't try to update it
+                console.debug("Not executing {} on {} as it doesn't exist".format(action, config))
                 reordered.remove((config, module))
 
         if action == "delete": # Delete in reverse order

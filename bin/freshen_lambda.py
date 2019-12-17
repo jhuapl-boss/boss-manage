@@ -23,7 +23,7 @@ but a full rebuild of the entire zip file isn't required.
 
 import alter_path
 from lib import configuration
-from lib.lambdas import freshen_lambda
+from lib.lambdas import freshen_lambda, lambda_dirs
 
 if __name__ == '__main__':
     parser = configuration.BossParser(description = "Script for freshening lambda " +
@@ -31,11 +31,22 @@ if __name__ == '__main__':
                                       "from a file, provide the filename prepended " +
                                       "with an '@'",
                                       fromfile_prefix_chars = '@')
+    parser.add_argument('--code',
+                        action='store_true',
+                        help='The lambda_name is the name of the lambda directory ' +
+                             'used to built the code zip. All lambdas that used the ' +
+                             'code zip will be updated')
     parser.add_bosslet()
     parser.add_argument('lambda_name',
                         help='Name of lambda function to freshen.')
 
     args = parser.parse_args()
 
-    freshen_lambda(args.bosslet_config, args.lambda_name)
+    if args.code:
+        lambda_names = [k for k, v in lambda_dirs(args.bosslet_config).items()
+                          if v == args.lambda_name]
+    else:
+        lambda_names = [args.lambda_name]
 
+    for lambda_name in lambda_names:
+        freshen_lambda(args.bosslet_config, lambda_name)

@@ -31,10 +31,11 @@ if __name__ == '__main__':
                                       'with an `@`.',
                                       fromfile_prefix_chars = '@')
     parser.add_bosslet()
+    parser.add_argument('lambda_name')
     parser.add_argument('--save-path', '-p', 
                         default='.',
                         help='Where to save the lambda zip file.')
 
     args = parser.parse_args()
 
-    download_lambda_zip(args.bosslet_config, args.save_path)
+    download_lambda_zip(args.bosslet_config, args.lambda_name, args.save_path)

@@ -44,6 +44,7 @@ import json
 import uuid
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
+from urllib.error import HTTPError
 
 def create_config(bosslet_config, db_config={}):
     names = bosslet_config.names
@@ -355,14 +356,22 @@ def post_init(bosslet_config):
     resp = json.loads(urlopen(req).read().decode('utf-8'))
 
     # Make an API call that will log the boss admin into the endpoint
+    # and create the Large Ingest Group
     call.check_url(uri + '/ping', 60)
     headers = {
         'Authorization': 'Bearer {}'.format(resp['access_token']),
     }
-    api_uri = uri + '/latest/collection'
-    req = Request(api_uri, headers = headers)
-    resp = json.loads(urlopen(req).read().decode('utf-8'))
-    print("Collections: {}".format(resp))
+    # NOTE: group name must match value at boss.git/django/bosscore/constants.py:INGEST_GRP
+    api_uri = uri + '/latest/groups/bossingest'
+    req = Request(api_uri, headers = headers, method='POST')
+    try:
+        resp = urlopen(req)
+        print("Boss Ingest Group: {}".format(resp))
+    except HTTPError as ex:
+        if ex.code == 404:
+            print("Boss Ingest Group already exists")
+        else:
+            raise
 
 def update(bosslet_config):
     with bosslet_config.call.vault() as vault:

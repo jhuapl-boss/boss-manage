@@ -161,12 +161,9 @@ def create_config(bosslet_config, lookup=True):
     config.add_lambda("DownsampleVolumeLambda",
                       names.downsample_volume.lambda_,
                       lambda_role,
-                      s3=(bosslet_config.LAMBDA_BUCKET,
-                          names.multi_lambda.zip,
-                          "downsample_volume.handler"),
+                      handler="downsample_volume.handler",
                       timeout=120,
                       memory=1024,
-                      runtime='python3.6',
                       dlq = Ref('DownsampleDLQ'))
 
     config.add_sns_topic("DownsampleDLQ",

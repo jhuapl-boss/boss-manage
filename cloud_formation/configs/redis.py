@@ -24,11 +24,21 @@ Create the redis configuration which consists of
 The redis configuration creates cache and cache-state redis clusters for the
 BOSS system. redis configuration is in a separate file to improve the update process
 """
+import json
 
 from lib.cloudformation import CloudFormationConfiguration, Arg, Ref, Arn
 from lib import aws
+from lib import console
 from lib import constants as const
+from lib.lambdas import load_lambdas_on_s3, freshen_lambda
 
+# The timezone offset (standard time) of AWS regions to UTC/GMT
+TIMEZONE_OFFSET = {
+    'us-east-1': 5,
+    'us-east-2': 5,
+    'us-west-1': 8,
+    'us-west-2': 8,
+}
 
 def create_config(bosslet_config):
     names = bosslet_config.names
@@ -75,6 +85,10 @@ def create_config(bosslet_config):
                                      clusters=1)
 
     if const.REDIS_THROTTLE_TYPE is not None:
+        vpc_id = config.find_vpc()
+        internal_sg = aws.sg_lookup(session, vpc_id, names.internal.sg)
+        lambda_subnets, _ = config.find_all_subnets(compatibility = 'lambda')
+
         config.add_redis_replication("CacheThrottle",
                                      names.cache_throttle.redis,
                                      internal_subnets,
@@ -82,6 +96,39 @@ def create_config(bosslet_config):
                                      type_=const.REDIS_THROTTLE_TYPE,
                                      version="3.2.4",
                                      clusters=1)
+
+        config.add_lambda("CacheThrottleLambda",
+                          names.cache_throttle.lambda_,
+                          aws.role_arn_lookup(session, 'lambda_basic_execution'),
+                          description="Reset Boss throttling metrics",
+                          security_groups=[internal_sg],
+                          subnets=lambda_subnets,
+                          handler='index.handler',
+                          timeout=120,
+                          memory=1024)
+
+        # Schedule the lambda to be executed at midnight for the timezone where the bosslet is located
+        hour = TIMEZONE_OFFSET.get(bosslet_config.REGION, 0)
+        schedule = 'cron(0 {} * * ? *)'.format(hour)
+        config.add_cloudwatch_rule('CacheThrottleReset',
+                                   name=names.cache_throttle.cw,
+                                   description='Reset the current Boss throttling metrics',
+                                   targets=[
+                                       {
+                                           'Arn': Arn('CacheThrottleLambda'),
+                                           'Id': names.cache_throttle.lambda_,
+                                           'Input': json.dumps({
+                                                'host': names.cache_throttle.redis
+                                            }),
+                                       },
+                                   ],
+                                   schedule=schedule,
+                                   depends_on=['CacheThrottleLambda'])
+
+        config.add_lambda_permission('CacheThrottlePerms',
+                                     names.cache_throttle.lambda_,
+                                     principal='events.amazonaws.com',
+                                     source=Arn('CacheThrottleReset'))
 
     return config
 
@@ -93,13 +140,29 @@ def generate(bosslet_config):
 
 
 def create(bosslet_config):
+    if const.REDIS_THROTTLE_TYPE is not None:
+        pre_init(bosslet_config)
+
     config = create_config(bosslet_config)
     config.create()
 
+def pre_init(bosslet_config):
+    load_lambdas_on_s3(bosslet_config, bosslet_config.names.cache_throttle.lambda_)
+
 def update(bosslet_config):
+    if const.REDIS_THROTTLE_TYPE is not None:
+        rebuild_lambdas = console.confirm("Rebuild lambdas", default=True)
+    else:
+        rebuild_lambdas = False
+
+    if rebuild_lambdas:
+        pre_init(bosslet_config)
+
     config = create_config(bosslet_config)
     config.update()
 
+    if rebuild_lambdas:
+        freshen_lambda(bosslet_config, bosslet_config.names.cache_throttle.lambda_)
 
 def delete(bosslet_config):
     config = CloudFormationConfiguration('redis', bosslet_config)
