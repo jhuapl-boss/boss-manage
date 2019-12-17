@@ -44,6 +44,7 @@ import json
 import uuid
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
+from urllib.error import HTTPError
 
 def create_config(bosslet_config, db_config={}):
     names = bosslet_config.names
@@ -73,10 +74,15 @@ def create_config(bosslet_config, db_config={}):
     else:
         # Don't create a Redis server for dev stacks.
         user_data["aws"]["cache-session"] = ''
+    if const.REDIS_THROTTLE_TYPE is not None:
+        user_data["aws"]["cache-throttle"] = names.cache_throttle.redis
+    else:
+        user_data["aws"]["cache-throttle"] = ''
 
     ## cache-db and cache-stat-db need to be in user_data for lambda to access them.
     user_data["aws"]["cache-db"] = "0"
     user_data["aws"]["cache-state-db"] = "0"
+    user_data["aws"]["cache-throttle-db"] = "0"
     user_data["aws"]["cache-session-db"] = "0"
     user_data["aws"]["meta-db"] = names.meta.ddb
 
@@ -277,6 +283,7 @@ def create(bosslet_config):
     with bosslet_config.call.vault() as vault:
         vault.write(const.VAULT_ENDPOINT, secret_key = str(uuid.uuid4()))
         vault.write(const.VAULT_ENDPOINT_DB, **db_config)
+        vault.write(const.VAULT_ENDPOINT_THROTTLE, config = json.dumps(const.THROTTLE))
 
         dns = bosslet_config.names.public_dns("api")
         uri = "https://{}".format(dns)
@@ -349,14 +356,22 @@ def post_init(bosslet_config):
     resp = json.loads(urlopen(req).read().decode('utf-8'))
 
     # Make an API call that will log the boss admin into the endpoint
+    # and create the Large Ingest Group
     call.check_url(uri + '/ping', 60)
     headers = {
         'Authorization': 'Bearer {}'.format(resp['access_token']),
     }
-    api_uri = uri + '/latest/collection'
-    req = Request(api_uri, headers = headers)
-    resp = json.loads(urlopen(req).read().decode('utf-8'))
-    print("Collections: {}".format(resp))
+    # NOTE: group name must match value at boss.git/django/bosscore/constants.py:INGEST_GRP
+    api_uri = uri + '/latest/groups/bossingest'
+    req = Request(api_uri, headers = headers, method='POST')
+    try:
+        resp = urlopen(req)
+        print("Boss Ingest Group: {}".format(resp))
+    except HTTPError as ex:
+        if ex.code == 404:
+            print("Boss Ingest Group already exists")
+        else:
+            raise
 
 def update(bosslet_config):
     with bosslet_config.call.vault() as vault:
@@ -365,6 +380,11 @@ def update(bosslet_config):
     config = create_config(bosslet_config, db_config)
 
     config.update()
+
+    # DP NOTE: If there is a migration error then throttling will not be updated...
+    print("Updating Throttling Config")
+    with bosslet_config.call.vault() as vault:
+        vault.write(const.VAULT_ENDPOINT_THROTTLE, config = json.dumps(const.THROTTLE))
 
 def delete(bosslet_config):
     session = bosslet_config.session

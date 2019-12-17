@@ -45,12 +45,9 @@ def create_config(bosslet_config):
     config.add_lambda("CopyCuboidLambda",
                       names.copy_cuboid_lambda.lambda_,
                       Ref("LambdaCacheExecutionRole"),
-                      s3=(bosslet_config.LAMBDA_BUCKET,
-                          names.multi_lambda.zip,
-                          "copy_cuboid_lambda.handler"),
+                      handler="copy_cuboid_lambda.handler",
                       timeout=60,
                       memory=128,
-                      runtime='python3.6',
                       dlq=Arn(names.copy_cuboid_dlq.sqs))
 
     return config
