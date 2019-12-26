@@ -1070,7 +1070,7 @@ class CloudFormationConfiguration:
 
         self._add_record_cname(key, hostname, rds = True)
 
-    def add_dynamo_table_from_json(self, key, name, KeySchema, AttributeDefinitions, ProvisionedThroughput, GlobalSecondaryIndexes=None, TimeToLiveSpecification=None):
+    def add_dynamo_table_from_json(self, key, name, KeySchema, AttributeDefinitions, ProvisionedThroughput, GlobalSecondaryIndexes=None, TimeToLiveSpecification=None, BillingMode=None):
         """Add DynamoDB table to the configuration using DynamoDB's calling convention.
 
         Example:
@@ -1110,6 +1110,9 @@ class CloudFormationConfiguration:
 
         if TimeToLiveSpecification is not None:
             self.resources[key]["Properties"]["TimeToLiveSpecification"] = TimeToLiveSpecification
+
+        if BillingMode is not None:
+            self.resources[key]["Properties"]["BillingMode"] = BillingMode
 
     def add_dynamo_table(self, key, name, attributes, key_schema, throughput):
         """Add an DynamoDB Table to the configuration
