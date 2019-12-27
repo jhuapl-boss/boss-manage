@@ -121,8 +121,7 @@ wait
 
 #Checkout the right branch
 cd boss-manage/
-#git checkout integration
-git checkout refactor
+git checkout integration
 
 #Install all requirements
 git submodule init
