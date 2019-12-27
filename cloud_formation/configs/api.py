@@ -25,6 +25,9 @@ MIGRATION CHANGELOG:
     Version 2: Public DNS updates
                * Replaced manually created public Route53 DNS records with
                  CloudFormation maintained records
+    Version 3: Bossingest group
+               * Added code to automatically call Boss API to create
+                 'bossingest' group
 """
 
 # Redis dependency is because of Django session storage
@@ -119,7 +122,7 @@ def create_config(bosslet_config, db_config={}):
     # Prepare user data for parsing by CloudFormation.
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
 
-    config = CloudFormationConfiguration('api', bosslet_config, version="2")
+    config = CloudFormationConfiguration('api', bosslet_config, version="3")
     keypair = bosslet_config.SSH_KEY
 
     vpc_id = config.find_vpc()
