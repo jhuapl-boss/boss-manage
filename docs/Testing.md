@@ -33,8 +33,14 @@ sudo -E python3 manage.py test -- -c inttest.cfg
 ```
 	output should say 55 Tests OK with 7 skipped tests
 
-##### Test the ndingest library.
+#### SPDB Integration Tests 
+```shell
+cd /usr/local/lib/python3.5/site-packages/spdb
+sudo nose2
+sudo nose2 -c inttest.cfg
+```
 
+##### Test the ndingest library.
 ```shell
 # Manual install for now.  Will likely remove use of pytest in the future.
 sudo pip3 install pytest
@@ -155,3 +161,14 @@ Ran x tests in x.xxxs.
 
 OK
 ```
+
+#### Run Ingest Tests
+
+* cd ingest-test
+* run python3 ./setup_test.py
+* Copy the export and and ingest run commands 
+* cd ../ingest-client
+* paste the copied commands above.
+    this should start loading the ingest data
+* cd back to the ingest-test directory
+* python3 validate_ingest.py

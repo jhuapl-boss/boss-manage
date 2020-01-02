@@ -20,35 +20,8 @@ AMIs for sprintXX.  These instructions are still valid however I tend build prod
 only after the process is finished to I copy the latest AMIs and label them sprintXX.  It is not unusual to discover an 
 error during the update process that causes a code change and a rebuild of an AMI.
 
-## AWS Credentials File
-Make sure your:
-**boss-manage/config/aws_credentials** file contains the production account keys
-**boss-manage/vault/private/vault_aws_credentials** file contains the production vault account keys
-**boss-manage/config/set_var.sh** should have SSH_KEY=theboss-prod-20161009.pem
-
-### Scalyr Environment Setup
-Set the environment variables necessary to add Scalyr monitoring of AWS instance
-health checks.  The Scalyr values may be obtained from this page:
-https://www.scalyr.com/keys
-
-Login information was distributed in an encrypted email.
-
-Here's a sample script for setting these values:
-
-```shell
-#!/bin/bash
-
-export scalyr_readconfig_token='some key string'
-export scalyr_writeconfig_token='another key string'
-```
-
-Create this script and save it (config/set_scalyr_vars.sh) for the next time you do the integration test build.  Run this script like so:
-
-```shell
-source ../config/set_scalyr_vars.sh
-```
 ## Turn on Maintenance Mode
-In boss-manage/cloud_formation run:
+In boss-manage/bin/ run:
 ```shell
 python3 ./maintenance.py on production.boss
 ```
@@ -74,7 +47,7 @@ or copy the latest AMIs from the console to become sprintXX (this way is faster 
 
 ```shell
 $ cd boss-manage.git/bin
-$ ./bastion.py vault.production.boss vault-export path/to//file
+$ ./bastion.py vault.production.boss vault-export path/to/file
 ```
 
 ### Updating IAM
@@ -246,169 +219,7 @@ add them back into the ProductionMicronsMailingList Topic in SNS.
 Go Into Cloudwatch Rules and make sure the **deleteEventRule.production.boss** is disabled
 
 # Testing
-
-### Run unit tests on Endpoint
-If you are following these instructions for the integration development environment, skip the
-export RUN_HIGH_MEM_TESTS line.  That line runs a few tests that need >2.5GB of memory
-to run and will fail in the integration environment
-
-```shell
-cd boss-manage.git/bin
-./bastion.py endpoint.production.boss ssh
-export RUN_HIGH_MEM_TESTS=true
-cd /srv/www/django
-sudo -E python3 manage.py test
-```
-	output should say Ran XXX tests.
-
-## Integration Tests
-After the integration instance is launched the following tests need to be run,
-results recorded, and developers notified of any problems.
-
-### Endpoint Django Integration Tests
-
-Test While Logged onto the Endpoint VM
-```shell
-export RUN_HIGH_MEM_TESTS=true
-cd /srv/www/django
-sudo -E python3 manage.py test -- -c inttest.cfg
-```
-	output should say XXX Tests OK with 7 skipped tests
-
-#### SPDB Integration Tests 
-Test while logged onto the Endpoint VM 
-```shell
-cd /usr/local/lib/python3.5/site-packages/spdb
-sudo nose2
-sudo nose2 -c inttest.cfg
-```
-
-##### 
-Test while logged onto the Endpoint VM
-```shell
-# Manual install for now.  Will likely remove use of pytest in the future.
-sudo -H pip3 install pytest
-cd /usr/local/lib/python3/site-packages/ndingest
-# Use randomized queue names and prepend 'test_' to bucket/index names.
-export NDINGEST_TEST=1
-pytest -c test_apl.cfg
-```
-
-### Cachemanager Integration Tests
-Test the ndingest library.
-#### Test While Logged onto the Cachemanager VM
-
-```shell
-cd /srv/salt/boss-tools/files/boss-tools.git/cachemgr
-sudo nose2
-sudo nose2 -c inttest.cfg
-```
-	there is currently issues with some of the tests not getting setup correctly. cache-DB and cache-state-db need to be manutally set to 1.
-	or the tests hang.
-
-
-#### Test Using Intern From a Client
-
-intern integration tests should be run from your local workstation or a VM
-**not** running within the production VPC.
-
-First ensure intern is current:
-
-```shell
-# Clone the repository if you do not already have it.
-git clone https://github.com/jhuapl-boss/intern.git
-
-# Otherwise update with `pull`.
-# git pull
-
-# Make the repository the current working directory.
-cd intern
-
-# Check out the integration branch.
-# If there is no current integration branch, use master.
-git checkout integration
-
-# Ensure dependencies are current.
-sudo pip3 install -r requirements.txt
-```
-
-##### Setup new user for testing  (don't use bossadmin for this)
-In your browser, open https://api.theboss.io/vX.Y/token
-
-Your browser should be redirected to the KeyCloak login page.
-Create a new account and return to the token page.
-This token will be copied-pasted into the intern config file.
-
-then logout and login as bossadmin
-Go to boss console 
-https://api.production.theboss.io and give your new user
-* resource-manager
-* user-manager
-
-SSO -> Manager Users, select your user and add the roles
-
-```shell
-mkdir ~/.intern
-EDITOR ~/.intern/intern.cfg
-```
-
-In your text editor, copy and paste the text config values below. Replace all
-all tokens with the token displayed in your browser.
-
-```
-[Project Service]
-protocol = https
-host = api.theboss.io
-# Replace with your token.
-token = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-[Metadata Service]
-protocol = https
-host = api.theboss.io
-# Replace with your token.
-token = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-[Volume Service]
-protocol = https
-host = api.theboss.io
-# Replace with your token.
-token = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-```
-Additionally, create a copy of `~/.intern/intern.cfg` as `test.cfg` in the intern
-repository directory.
-
-##### Run Intern Integration Tests
-
-Finally, open a shell and run the integration tests:
-
-```shell
-# Go to the location of your cloned intern repository.
-cd intern.git
-python3 -m unittest discover -p int_test*
-```
-
-Output should say:
-
-```
-Ran x tests in x.xxxs.
-
-OK
-```
-
-#### Run Ingest Tests
-
-* cd ingest-test
-* run python3 ./setup_test.py
-* Copy the export and and ingest run commands 
-* cd ../ingest-client
-* paste the copied commands above.
-    this should start loading the ingest data
-* cd back to the ingest-test directory
-* python3 validate_ingest.py
-
-
-### Automated Tests
-To be filled out
+See [Testing.md](Testing.md) for running tests on the updated stack.
 
 ### Manual Checks
 * https://api.theboss.io/ping/
@@ -424,7 +235,7 @@ If not copy the latest versions with the sprintXX label.
 Its best to create new hash versions of the AMIs like this:
 ```shell
 $ cd boss-manage/bin
-$  ./packer.py auth vault endpoint cachemanager
+$  ./packer.py <bosslet.config> auth vault endpoint cachemanager
 ```
 And then copy the latest AMIs from the console to become sprintXX 
 (this way developers can get the latest AMIs without explicitly specifying sprintXX)

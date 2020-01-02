@@ -5,6 +5,13 @@
 # using the cloudformation library. Once the template is built it can
 # be created, updated, and deleted.
 #
+"""
+Module level comment with information about what this config creates
+
+MIGRATION CHANGELOG:
+    Version 1: Initial version of the config
+"""
+# For more information on config versioning and migrations read migrations/README.md
 
 # A list of other configuration files that this file depends upon
 # either because this file uses AWS resources created in it as a
@@ -33,7 +40,7 @@ def create_config(bosslet_config):
 
     # const.* are constants, including the scenario overlay (if selected at runtime)
 
-    config = CloudFormationConfiguration('<name of config file>', bosslet_config)
+    config = CloudFormationConfiguration('<name of config file>', bosslet_config, version="1")
 
     # create Cloud Formation template by calling `config.add_*` methods
 

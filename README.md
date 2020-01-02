@@ -2,7 +2,7 @@ boss-manage
 ===========
 
 This repository contains code for creating all of the infrastructure needed by
-the [Boss](https://github.com/aplmicrons/boss) repository.
+the [Boss](https://github.com/jhuapl-boss/boss) repository.
 
 Components:
 
@@ -20,22 +20,21 @@ Components:
 
 ## Getting Started
 
-The Packer and CloudFormation scripts expect to be run from a machine with SSH
-access to AWS. If you try to run this code from a location without this access
-nothing will work.
+For full instructions on how to configure everything needed to get a Boss instance
+running, read the [Install Guide](docs/InstallGuide.md).
 
 ## Python Libraries
 
-The Vault and CloudFormation scripts make use of two Python libraries. To
-install them run the following commands.
+The boss-manage scripts and utilities make use of a minimal number of 3rd party
+Python3 libraries. To install them run the following command.
 
 `pip3 install -r requirements.txt`
 
 ## Subrepositories
 
-When building new machine images with Packer (either VBox or AWS AMI),
-SaltStack expects the boss and boss-tools repositories to be checked
-out to specific directories within the SaltStack directory structure.
+When building new AWS AMIs with Packer, SaltStack expects the boss and
+boss-tools repositories to be checked out to specific directories within
+the SaltStack directory structure.
 
 Follow the directions in the [Submodules](docs/Submodules.md) help file to
 correctly setup the submodules of boss-manage.
@@ -50,24 +49,19 @@ when connecting to the Vault server. To make sure these connections are
 successful make sure that the private key for the selected keypair exists as
 `~/.ssh/<keypair>.pem` and has file permissions `400` / `-r--------`.
 
-For the bastion.py and ssh.py scripts you need to either pass the keypair
-file to use as a command line argument or you can export it as an environment
-variable.
-
-`export SSH_KEY=~/.ssh/<keypair>.pem`
-
 ## AWS Credentials
 
-All of the scripts are written to make use of the same AWS credentials file,
-so that they only need to be specified in one location. This file is the Packer
-AWS credentials file (`packers/variables/aws-credentials.example`). If this
-file contains your private and secret key then you can point the other scripts
-(cloudformation.py, bastion.py, ssh.py) at it or you can export it as an
-environment variable.
+AWS API keys are loaded using the boto3 profile name given in the Bosslet
+configuration passed to the script / utility being executed.
 
-For example: `export AWS_CREDENTIALS=../packer/variables/aws-credentials`
+## Bosslet Configuration
 
-**Note:** Relative file paths are from the location of the script being executed.
+All boss-manage code makes use of a single configuration object, called a
+bosslet config. The configuration object is based on a file created by the
+user and containing all of the information describing the Boss instance that
+should be created or acted upon.
+
+For more information see [config/README.md](config/README.md)
 
 ## Legal
 

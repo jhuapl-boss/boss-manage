@@ -14,7 +14,6 @@ following
 ```shell
 $ git checkout integration
 $ git pull
-$ git submodule init
 $ git submodule update --remote
 $ git add salt_stack/salt/boss/files/boss.git
 $ git add salt_stack/salt/boss-tools/files/boss-tools.git
@@ -30,25 +29,6 @@ $ git push
 
 Once the boss-manage.git repository submodules are pointed at the latest
 integration code, we need to rebuild the AMIs before we launch them.
-
-## Scalyr Write API Key
-
-Before AMIs can be built, the Scalyr API key needs to be set in the Salt pillar.
-Log into https://scalyr.com and click on the account name in the upper right.
-Select API Keys from the dropdown.  Copy the `Write Logs` key to the clipboard.
-At the time of writing (20Oct2017), there are two `Write Logs` keys.  Use the
-bottom-most one.  The first one will be deleted, soon.
-
-In a text editor, create `boss-manage/salt-stack/pillar/scalyr.sls`:
-
-```
-#  Scalyr API Key - this file has secret data so isn't part of the repo
-scalyr:
-  log_key: <paste key here>
-```
-
-Paste the key from the clipboard so that it replaces `<paste key here>`
-
 
 ### Running Packer
 Make sure that the Packer executable is either in $PATH (you can call it by just

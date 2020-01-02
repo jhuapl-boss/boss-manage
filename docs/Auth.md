@@ -31,7 +31,7 @@ It is an OIDC Provider and allows the different applications to authenticate to 
 
 Keycloak provides a REST API that allows the BOSS admin page to make changes to
 Keycloak on behalf of authorized users. Actions can include creating/maintaining/
-deleting users, groups, and roles.
+deleting users and roles.
 
 Keycloak can also allow thirdparty authentication services (like Github.com) that
 use OIDC to be the authentication source for a user, eliminating the need for a
@@ -78,9 +78,9 @@ and will expire when the Keycloak session expires. The boss-oidc Django plugin
 (using the drf-oidc-auth plugin) is responsible for verifying the token.
 
 The second is specific to the BOSS API. It uses local Django Rest Framework tokens
-that do not expire. To get an API token a user must log into the BOSS API admin
-pannel and generate a token. From the admin pennal the user can also revoke their
-token. Currently the token admin page resides at https://api.theboss.io/token/
+that do not expire. To get an API token a user must log into the BOSS API management
+site and generate a token. From the management site the user can also revoke their
+token. Currently the token admin page resides at https://api.theboss.io/latest/mgmt/token/
 
 The reason for the implementing the Django Rest Framework tokens is because we
 want to support non-expiring API tokens. Keycloak backed tokens will eventually
@@ -120,8 +120,8 @@ def request(url, params = None, headers = {}, method = None, convert = urlencode
         print(e)
         return e.read().decode("utf-8")
 
-token = "xxxxxxxxxxxxxxxxxxxxxxxxxxxx" # replace with token obtained from https://api.theboss.io/token/
-response = request("https://api.theboss.io/v0.3/info/collections",
+token = "xxxxxxxxxxxxxxxxxxxxxxxxxxxx" # replace with token obtained from https://api.theboss.io/latest/mgmt/token/
+response = request("https://api.theboss.io/latest/info/collections",
                     headers={
                         "Authorization": "Token " + token,
                         "Content-Type": "application/x-www-form-urlencoded",
