@@ -121,8 +121,7 @@ wait
 
 #Checkout the right branch
 cd boss-manage/
-#git checkout integration
-git checkout refactor
+git checkout integration
 
 #Install all requirements
 git submodule init
@@ -186,6 +185,7 @@ set +e
 
 #Endpoint tests:
 echo 'Performing tests...'
+$PYTHON ./bastion.py endpoint.auto-build-test.boss ssh-cmd "sudo python3 -m pip install -r /srv/salt/spdb/files/spdb.git/requirements-test.txt"
 $PYTHON ./bastion.py endpoint.auto-build-test.boss ssh-cmd "cd /srv/www/django && python3 manage.py test" # python3 manage.py test -- -c inttest.cfg
 
 #ndingest library

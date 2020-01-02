@@ -1,0 +1,2 @@
+# Ignore the staging directory for lambda builds
+staging
