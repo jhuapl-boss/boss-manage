@@ -46,3 +46,4 @@ THROTTLE:
     groups: # Group specific throttling. All groups limits that apply to a user are
             # selected and the highest limit is used
         public: null
+    default_user: null # Throttling if a user doesn't match users or groups
