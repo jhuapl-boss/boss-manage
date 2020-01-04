@@ -30,7 +30,8 @@ import os
 import bossutils
 
 bossutils.utils.set_excepthook()
-logging = bossutils.logger.BossLogger().logger
+bossutils.logger.configure()
+logging = bossutils.logger.bossLogger()
 
 def configure_scalyr():
     """
