@@ -1,11 +1,11 @@
 [submodule "salt_stack/salt/boss-tools/files/boss-tools.git"]
 	path = salt_stack/salt/boss-tools/files/boss-tools.git
 	url = ../boss-tools.git
-	branch = integration	
+	branch = logging_updates	
 [submodule "salt_stack/salt/boss/files/boss.git"]
 	path = salt_stack/salt/boss/files/boss.git
 	url = ../boss.git
-	branch = integration
+	branch = logging_updates
 [submodule "salt_stack/salt/spdb/files/spdb.git"]
 	path = salt_stack/salt/spdb/files/spdb.git
 	url = ../spdb.git
