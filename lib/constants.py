@@ -16,6 +16,9 @@ import os
 import sys
 import yaml
 
+from . import console
+from .exceptions import BossManageError
+
 ##################
 # Scenario Support
 def load_scenario(scenario):
@@ -28,19 +31,17 @@ def load_scenario(scenario):
         path = repo_path("cloud_formation", "scenarios", file)
 
         if not os.path.exists(path):
-            print("Scenario file '{}' doesn't exist".format(path))
-            return
+            raise BossManageError("Scenario file '{}' doesn't exist".format(path))
 
         try:
             with open(path, 'r') as fh:
                 config = yaml.full_load(fh.read())
         except Exception as ex:
-            print("Problem loading scenario file")
-            print(ex)
+            raise BossManageError("Problem loading scenario file")
 
         for key in config:
             if key not in d:
-                print("Warning: Scenario variable {} is new".format(key))
+                console.warning("Scenario variable {} is new".format(key))
             d[key] = config[key]
 
 
