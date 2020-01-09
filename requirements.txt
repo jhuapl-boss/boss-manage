@@ -1,7 +1,7 @@
 boto3>=1.4.3
 botocore>=1.4.93
 hvac>=0.8.1
-PyYaml
+PyYaml>=5.2
 mysql-connector-python
 pyminifier
 funcparserlib
