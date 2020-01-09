@@ -176,6 +176,7 @@ def create_config(bosslet_config, lookup=True):
                       lambda_role,
                       const.DOWNSAMPLE_DLQ_LAMBDA,
                       handler='index.handler',
+                      runtime='python3.7',
                       timeout=10)
 
     config.add_lambda_permission('DownsampleDLQLambdaExecute',
