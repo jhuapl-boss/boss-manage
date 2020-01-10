@@ -1,5 +1,5 @@
 include:
-    - python.python35
+    - python.python37
     - boss-tools.bossutils
     - aws.boto3
     - spdb

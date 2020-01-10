@@ -1,5 +1,5 @@
 include:
-    - python.python35
+    - python.python37
     - python.pip
 
 jsonschema:
@@ -7,5 +7,5 @@ jsonschema:
         - name: jsonschema==2.5.1
         - bin_env: /usr/local/bin/pip3
         - require:
-            - sls: python.python35
+            - sls: python.python37
             - sls: python.pip

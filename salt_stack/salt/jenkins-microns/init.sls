@@ -1,6 +1,6 @@
 include:
     - git
-    - python.python35
+    - python.python37
 # Install 2.7.x pip so Salt's pip module can run.
     - python.pip
     - jenkins

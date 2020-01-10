@@ -1,6 +1,6 @@
 # Install ingest-client into site-packages.
 include:
-    - python.python35
+    - python.python37
 
 ingest-prerequirements:
     pkg.installed:
@@ -39,4 +39,4 @@ ingest-client-lib:
         - file_mode: 755
         - dir_mode: 755
         - require:
-            - sls: python.python35
+            - sls: python.python37

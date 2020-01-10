@@ -1,5 +1,5 @@
 include:
-    - python.python35
+    - python.python37
     - vault.client
     - aws.boto3
 
@@ -13,7 +13,7 @@ python-lib:
         - file_mode: 755
         - dir_mode: 755
         - require:
-            - sls: python.python35
+            - sls: python.python37
 
 bossutils-firstboot:
     file.managed:

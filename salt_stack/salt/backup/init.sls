@@ -1,5 +1,5 @@
 include:
-    - python.python35
+    - python.python37
     - python.pip
     - mysql.client
     - boss-tools.bossutils

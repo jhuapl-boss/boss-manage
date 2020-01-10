@@ -39,7 +39,7 @@ base:
         - jenkins-microns
 
     'workstation*':
-        - python.python35
+        - python.python37
         - git
         - vault.client
         - aws.boto3

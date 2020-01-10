@@ -1,5 +1,5 @@
 include:
-    - python.python35
+    - python.python37
     - python.pip
     - boss-tools.bossutils
     - heaviside
@@ -22,7 +22,7 @@ activites-lib:
         - name: pymysql
         - bin_env: /usr/local/bin/pip3
         - require:
-            - sls: python.python35
+            - sls: python.python37
             - sls: python.pip
 
 manager-service:

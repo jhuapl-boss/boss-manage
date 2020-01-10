@@ -2,7 +2,7 @@
 
 include:
   - python.pip
-  - python.python35
+  - python.python37
 
 python3-nose2:
   pip.installed:
@@ -12,4 +12,4 @@ python3-nose2:
       # Currently require pip from Python 2.x for Salt's pip state.
       - sls: python.pip
       # python35 installs pip3.
-      - sls: python.python35
+      - sls: python.python37

@@ -1,5 +1,5 @@
 include:
-    - python.python35
+    - python.python37
 
 spdb-prerequirements:
     pkg.installed:
@@ -32,4 +32,4 @@ spdb-lib:
         - name: /srv/salt/spdb/files/spdb.git/
         - require:
             - pkg: spdb-prerequirements
-            - sls: python.python35
+            - sls: python.python37

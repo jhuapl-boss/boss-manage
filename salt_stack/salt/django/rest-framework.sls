@@ -1,5 +1,5 @@
 include:
-    - python.python35
+    - python.python37
     - python.pip
 
 rest_framework:
@@ -7,7 +7,7 @@ rest_framework:
         - name: djangorestframework==3.3.1
         - bin_env: /usr/local/bin/pip3
         - require:
-            - sls: python.python35
+            - sls: python.python37
             - sls: python.pip
     file.managed:
         - name: /tmp/rest_framework.patch
