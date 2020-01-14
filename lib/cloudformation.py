@@ -1886,7 +1886,7 @@ class CloudFormationConfiguration:
             })
 
 
-    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python2.7", reserved_executions=None, dlq=None, layers=None):
+    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python3.7", reserved_executions=None, dlq=None, layers=None):
         """Create a Python Lambda
 
         Args:
@@ -1905,7 +1905,7 @@ class CloudFormationConfiguration:
             subnets (None|list) : List of ids of subnets to grant the lambda access to
             depends_on (None|str|list) : A unique name or list of unique names of resources within the
                                             configuration and is used to determine the launch order of resources
-            runtime (optional[str]) : Lambda runtime to use.  Defaults to "python2.7".
+            runtime (optional[str]) : Lambda runtime to use.  Defaults to "python3.7".  Ignored if handler is not None, but file and s3 are None.
             reserved_executions (optional[int]): Number of reserved concurrent executions for the lambda.
             dlq (optional[str]): ARN of dead letter queue.  Defaults to None.
             layers (optional[list[str]]): List of lambda layer ARNs with version

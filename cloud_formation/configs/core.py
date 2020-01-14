@@ -210,6 +210,7 @@ def create_config(bosslet_config):
                       const.DNS_LAMBDA,
                       handler="index.handler",
                       timeout=10,
+                      runtime='python3.7',
                       depends_on="DNSZone")
 
     config.add_lambda_permission("DNSLambdaExecute", Ref("DNSLambda"))

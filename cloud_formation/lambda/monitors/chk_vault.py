@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-
 from datetime import datetime
-from urllib2 import urlopen, HTTPError
 import json
 import boto3
+from urllib.request import urlopen
+from urllib.error import HTTPError
+
 
 PROTOCOL = 'http://'
 PORT = ':8200'
