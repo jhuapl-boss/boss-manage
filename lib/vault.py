@@ -459,6 +459,15 @@ class Vault(object):
         client = self.connect(VAULT_TOKEN)
         return client.read(path)
 
+    def list(self, path):
+        """A generic method for listing data from Vault.
+
+        Args:
+            path (string) : Vault path to list data from
+        """
+        client = self.connect(VAULT_TOKEN)
+        return client.list(path)
+
     def delete(self, path):
         """A generic method for deleting data from Vault.
 

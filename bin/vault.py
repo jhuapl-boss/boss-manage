@@ -205,6 +205,23 @@ def vault_read(vault, path = None):
     results = vault.read(path)
     pprint(results)
 
+def vault_list(vault, path = None):
+    """A generic method for listing data from Vault.
+
+    Command line version of vault-list. If the path is not given, then prompt
+    the user for the path.
+
+    Args:
+        vault (Vault) : Vault connection to use
+        path (string) : Vault path to list data from
+                        if path is None then the user is prompted for the Vault path
+    """
+
+    if path is None:
+        path = input("path: ")
+    results = vault.list(path)
+    pprint(results)
+
 def vault_delete(vault, path = None):
     """A generic method for deleting data from Vault.
 
@@ -263,6 +280,7 @@ COMMANDS = {
     "vault-delete":vault_delete,
     "vault-export": vault_export,
     "vault-import": vault_import,
+    "vault-list": vault_list,
 }
 
 if __name__ == '__main__':
