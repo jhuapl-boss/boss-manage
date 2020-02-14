@@ -15,7 +15,9 @@ export RUN_HIGH_MEM_TESTS=True
 cd /srv/www/django
 sudo -E python3 manage.py test
 ```
-	output should say Ran 257 tests.
+	output should say Ran 328 tests.
+If the number changes often, the important part is that none of the tests should fail.
+
 
 ## Integration Testing
 

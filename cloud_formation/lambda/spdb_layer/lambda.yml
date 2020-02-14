@@ -1,5 +1,5 @@
 name: spdb.layer
-runtime: python3.6
+runtime: python3.7
 is_layer: True
 include:
         salt_stack/salt/spdb/files/spdb.git: python/spdb
