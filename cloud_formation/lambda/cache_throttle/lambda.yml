@@ -1,4 +1,4 @@
 name: cache_throttle
-runtime: python3.6
+runtime: python3.7
 python_packages:
         - requirements.txt
