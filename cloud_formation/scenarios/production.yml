@@ -1,7 +1,8 @@
 # Instance types
 ENDPOINT_TYPE: m5.2xlarge
 RDS_TYPE: db.t2.medium
-REDIS_CACHE_TYPE: cache.m4.10xlarge
+REDIS_CACHE_TYPE: cache.m4.2xlarge
+#REDIS_CACHE_TYPE: cache.m4.10xlarge
 REDIS_SESSION_TYPE: cache.t2.medium
 REDIS_TYPE: cache.m5.xlarge
 CACHE_MANAGER_TYPE: t2.medium
