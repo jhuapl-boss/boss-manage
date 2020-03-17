@@ -51,6 +51,7 @@ def STEP_FUNCTIONS(bosslet_config):
         (names.volumetric_ingest_queue_upload.sfn, 'volumetric_ingest_queue_upload.hsd'),
         (names.resolution_hierarchy.sfn, 'resolution_hierarchy.hsd'),
         #(names.downsample_volume.sfn, 'downsample_volume.hsd'),
+        (names.complete_ingest.sfn, 'complete_ingest.hsd'),
     ]
 
 def create_config(bosslet_config, lookup=True):

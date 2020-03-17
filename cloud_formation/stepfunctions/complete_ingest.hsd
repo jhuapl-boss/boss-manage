@@ -1,0 +1,51 @@
+"""Complete an ingest job.
+
+It is assumed that only one instance of this step function is run for the same
+ingest job.
+
+Args:
+    {
+        'tile_index_table' (str): Name of DynamoDB tile index table.
+        'status' (str): 'complete' | 'deleted'.
+        'region' (str): AWS region to run in.
+        'job': {
+            collection (int): Collection id.
+            experiment (int): Experiment id.
+            channel (int): Channel id.
+            task_id (int): The ingest job's id.
+            resolution (int): Resolution of chunk.
+            ingest_type (int): Tile (0) or volumetric ingest (1).
+            z_chunk_size (int): How many z slices in the chunk.
+            upload_queue (str): Tile upload queue.
+            ingest_queue (str): Tile ingest queue.
+        }
+    }
+"""
+
+Activity('ScanForMissingChunks')
+    """Look for missing chunks from the ingest.
+
+    Scans the tile index in DynamoDB for any chunks that have missing tiles.  If
+    tiles are missing, they are placed back in the upload queue for that ingest
+    job.
+
+    boss-tools/activities/scan_for_missing_chunks.py
+    """
+    retry ['KeyError'] 1 0 1.0
+    retry [] 60 3 2.5
+
+if '$.quit' == False:
+    """If no missing tiles found, clean up the ingest.
+    """
+
+    Activity('IngestCleaner')
+        """Clean up ingest job's AWS resources.
+
+        Deletes all SQS queues used for the ingest.
+        Deletes AWS credentials created for the ingest.
+        Marks the ingest job as complete.
+
+        boss-tools/activities/cleanup_ingest.py
+        """
+        retry ['KeyError'] 1 0 1.0
+        retry [] 60 3 2.5

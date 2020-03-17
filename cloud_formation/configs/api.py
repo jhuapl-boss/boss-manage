@@ -118,6 +118,7 @@ def create_config(bosslet_config, db_config={}):
     user_data['sfn']['volumetric_upload_sfn'] = names.volumetric_ingest_queue_upload.sfn
     user_data['sfn']['downsample_sfn'] = names.resolution_hierarchy.sfn
     user_data['sfn']['index_cuboid_supervisor_sfn'] = names.index_cuboid_supervisor.sfn
+    user_data['sfn']['complete_ingest_sfn'] = names.complete_ingest.sfn
 
     # Prepare user data for parsing by CloudFormation.
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
