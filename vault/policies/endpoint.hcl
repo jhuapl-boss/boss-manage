@@ -25,7 +25,7 @@ path "aws/roles/ingest*" {
 }
 
 path "aws/creds/ingest*" {
-    capabilities = ["create", "update", "delete"]
+    capabilities = ["create", "read", "update", "delete"]
 }
 path "sys/renew/aws/creds/ingest*" {
     policy = "write"
