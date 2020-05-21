@@ -415,8 +415,12 @@ def post_init(bosslet_config):
                 if "users" in realm:
                     del realm["users"]
 
+            # This will fail if the realm already exists, but that's ok.
             print("Uploading BOSS.realm configuration")
-            kc.create_realm(realm)
+            try:
+                kc.create_realm(realm)
+            except Exception as ex:
+                print('Failed to upload Boss.realm config.  Does it already exist? Error message: {}'.format(ex))
 
 def update(bosslet_config):
     # Checks to make sure they update can happen and the user wants to wait the required time
