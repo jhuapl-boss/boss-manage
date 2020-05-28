@@ -31,6 +31,7 @@ base:
 
     'lambda*':
         - lambda-dev
+        - python.python37
 
     'ep-jenkins*':
         - jenkins-microns.endpoint
