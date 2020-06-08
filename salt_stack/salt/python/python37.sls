@@ -35,8 +35,8 @@ python37:
         sudo -H ln -s pip3.7 pip3
         cd /usr/local/lib
         sudo -H ln -s python3.7 python3
-        sudo -H pip3 install --upgrade pip
+        sudo -H /usr/local/lib/pip3 install --upgrade pip
     - cwd: /tmp
     - shell: /bin/bash
     - timeout: 3600 
-#    - unless: test -x /usr/local/bin/python3.7 && test -x /usr/local/bin/pip3.7
+    - unless: test -x /usr/local/bin/python3.7 && test -x /usr/local/bin/pip3.7
