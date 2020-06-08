@@ -7,7 +7,7 @@
 # Redirecting output to /dev/null is essential.  Salt hung when run
 # w/o redirecting output.
 
-python38:
+python37:
   pkg.installed:
     - pkgs:
         - gcc
@@ -15,6 +15,7 @@ python38:
         - bzip2-devel
         - libffi-devel
         - curl
+        
   cmd.run:
     - name: |
         cd /tmp
