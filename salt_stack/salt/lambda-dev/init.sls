@@ -11,6 +11,7 @@
 
 include:
     - node
+    - python.python37
 
 lib-dependencies:
     pkg.installed:
@@ -30,6 +31,11 @@ numpy-blosc-dependencies:
             - atlas-devel
             - gcc
             - gcc-c++
+
+install-thru-pip:
+   pip.installed:
+     - names:
+       - boto3
 
 build-lambda:
     file.managed:
