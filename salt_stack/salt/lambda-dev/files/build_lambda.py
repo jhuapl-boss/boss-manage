@@ -22,6 +22,7 @@ import shlex
 import shutil
 import subprocess
 import pathlib
+import boto3
 
 
 def upload_to_s3(zip_file, target_name, bucket, metadata={}):
