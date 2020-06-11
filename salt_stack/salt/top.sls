@@ -19,7 +19,7 @@ base:
     'endpoint*':
         - boss-tools.bossutils
         - ndingest
-        - django.rest-framework # install first and patch
+        # - django.rest-framework # install first and patch
         - boss.django
         - django.login # patch, expects django to already be installed
         - scalyr

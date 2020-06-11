@@ -1,3 +1,5 @@
+# This is used for our Django 1.x install.  This isn't used for Django 2.x.
+
 include:
     - python.python35
     - python.pip
