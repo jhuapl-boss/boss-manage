@@ -34,6 +34,7 @@ numpy-blosc-dependencies:
 
 install-thru-pip:
    pip.installed:
+     - bin_env: /usr/local/bin/pip3
      - names:
        - boto3
 
