@@ -5,7 +5,6 @@ include:
     - uwsgi.emperor
     - nginx
     - spdb
-    - boss-oidc
 
 django-prerequirements:
     pkg.installed:
