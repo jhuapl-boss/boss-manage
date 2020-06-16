@@ -42,14 +42,10 @@ Currently there are only Django applications that are authenticating to Keycloak
 There are three different plugins that are used to handle difference authentication
 scenarios.
 
-### django-oidc
-The [django-oidc](https://github.com/jhuapl-boss/django-oidc.git) plugin is a BOSS
-fork of a Django plugin that provides session based OIDC authentication. This means
+### mozilla-django-oidc
+A Django plugin that provides session based OIDC authentication. This means
 that is only handles when a user logs into the Django web site and a session is
 created for them.
-
-The BOSS fork of the plugin has a couple of fixes to allow the plugin to run under
-Python 3.
 
 ### drf-oidc-auth
 The [drf-oidc-auth](https://github.com/ByteInternet/drf-oidc-auth) plugin provides
@@ -61,9 +57,15 @@ application using an access token.
 The [boss-oidc](https://github.com/jhuapl-boss/boss-oidc.git) plugin is a custom
 plugin that provides a single configuration function for both the django-oidc and
 drf-oidc-auth plugins. It also provides a some custom authentication hooks by
-extending the existing plugins.
+extending the existing plugins.  It integrates the Boss with KeyCloak and
+mozilla-django-oidc.
 
 ### Patches
+
+June 16, 2020: May still need the login page patch, but it still needs to be updated.
+
+Original text below:
+
 In addition to the different Django auth plugins, there are a couple of patches
 to Django and Django Rest Framework that are applied when AMIs are built. These
 patches help integrate that auth plugins better within Django. The patches do

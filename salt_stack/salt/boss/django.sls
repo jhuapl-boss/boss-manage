@@ -5,6 +5,7 @@ include:
     - uwsgi.emperor
     - nginx
     - spdb
+    - git
 
 django-prerequirements:
     pkg.installed:
