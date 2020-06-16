@@ -35,8 +35,10 @@ numpy-blosc-dependencies:
 install-thru-pip:
    pip.installed:
      - bin_env: /usr/local/bin/pip3
+     - user: ec2-user
      - names:
        - boto3
+       - PyYaml
 
 build-lambda:
     file.managed:
