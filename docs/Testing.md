@@ -1,6 +1,71 @@
 # Boss Testing Guide
 This document covers running unit tests and integration tests within an existing Bosslet.
 
+
+### Copy up dynamo information in spdb for testing
+Now the spdb is a pypi installable it doesn't include the contents of 
+spdb/spdb/spatialdb/dynamo/
+You need to tar up the contents of that directory and use ssh-tunnel to copy it to the endpoint for testing
+```bash
+$ cd spdb/spdb/spatialdb
+$ tar czf /path/to/spdb-spatialdb-dynamo.tar.gz ./dynamo
+$ cd spdb
+$ tar rzf /path/to/spdb-spatialdb-dynamo.tar.gz ./requirements-test.txt
+```
+ 
+To ssh tunnel:
+```bash
+$ boss-manage/bin/bastion.py endpoint.hiderrt1.boss ssh-tunnel
+```
+Connect to localhost:31812 to be forwarded to 10.104.4.18:22
+
+To scp file after tar:
+```.bash
+$ scp -P 31812 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no /path/to/spdb-spatialdb-dynamo.tar.gz ubuntu@localhost:
+```
+
+then untar contents into:
+**/usr/local/lib/python3.5/site-packages/spdb/spatialdb**
+```bash
+$ cd /usr/local/lib/python3.5/site-packages/spdb/spatialdb
+$ tar xf ~/spdb-spatialdb-dynamo.tar.gz
+$ pip3 install -r requirements-test.txt
+```
+
+### Use Test script
+If you want to automate the testing of the following
+* Endpoint Unit Testing
+* Endpoint Integration Testing
+* SPDB Integration Tests
+* Test the ndingest library
+
+cut and paste the following into a test.sh script on the endpoint.
+```bash
+#!/usr/bin/env bash
+
+read -n 1 -p "running in screen?, if not ctrl-c to stop: "
+echo press ctrl-A D if you want to detach from screen
+
+export RUN_HIGH_MEM_TESTS=true
+cd /srv/www/django
+sudo -E python3 manage.py test 2>&1 | tee /home/ubuntu/1_django_unittest.txt
+
+cd /srv/www/django
+sudo -E python3 manage.py test -- -c inttest.cfg 2>&1 | tee /home/ubuntu/2_django_inttest.txt
+
+cd /usr/local/lib/python3.5/site-packages/spdb
+sudo nose2 2>&1 | tee /home/ubuntu/3_spdb_unittest.txt
+sudo nose2 -c inttest.cfg 2>&1 | tee /home/ubuntu/4_spdb_inttest.txt
+
+# Manual install for now.  Will likely remove use of pytest in the future.
+sudo -H pip3 install pytest
+cd /usr/local/lib/python3/site-packages/ndingest
+# Use randomized queue names and prepend 'test_' to bucket/index names.
+export NDINGEST_TEST=1
+pytest -c test_apl.cfg 2>&1 | tee /home/ubuntu/5_ndingest_test.txt
+```
+now look over the log files in the home directory.
+
 ## Unit Testing
 
 ### Run unit tests on Endpoint

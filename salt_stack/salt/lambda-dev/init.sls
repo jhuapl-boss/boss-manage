@@ -32,13 +32,6 @@ numpy-blosc-dependencies:
             - gcc
             - gcc-c++
 
-install-thru-pip:
-   pip.installed:
-     - bin_env: /usr/local/bin/pip3
-     - user: ec2-user
-     - names:
-       - boto3
-       - PyYaml
 
 build-lambda:
     file.managed:
@@ -54,3 +47,11 @@ staging-dir:
         - user: {{ user }}
         - group: {{ user }}
         - dir_mode: 755
+
+pip-installs:
+    cmd.run:
+        - name: |
+            cd /tmp
+            /usr/local/bin/pip3 install boto3 PyYaml
+        - cwd: /tmp
+        - shell: /bin/bash
