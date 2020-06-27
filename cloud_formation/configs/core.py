@@ -333,19 +333,30 @@ def post_init(bosslet_config):
 
         #Check and see if these secrets already exist before we overwrite them with new ones.
         # Write data into Vault
-        # DP TODO: update checks to also verify the passwords / pull the passwords from Vault
-        #          so we don't use a different password in Keycloak then what is stored in Vault
-        if not vault.read(const.VAULT_AUTH):
+        auth_data = vault.read(const.VAULT_AUTH)
+        if not auth_data or 'password' not in auth_data:
             print("Writing {}".format(const.VAULT_AUTH))
             vault.write(const.VAULT_AUTH, password = password, username = username, client_id = "admin-cli")
+        else:
+            password = auth_data['password']
 
-        if not vault.read(const.VAULT_REALM):
-            print("Writing {}".format(const.VAULT_REALM))
-            vault.write(const.VAULT_REALM, username = realm_username, password = realm_password, client_id = "endpoint")
-
-        if not vault.read(const.VAULT_KEYCLOAK):
+        keycloak_data = vault.read(const.VAULT_KEYCLOAK)
+        if not keycloak_data or 'password' not in keycloak_data:
             print("Updating {}".format(const.VAULT_KEYCLOAK))
             vault.update(const.VAULT_KEYCLOAK, password = password, username = username, client_id = "admin-cli", realm = "master")
+        else:
+            if password != keycloak_data['password']:
+                # If there is no password match, then re-write the password for the admin-cli so that they match.
+                password = keycloak_data['password']
+                print("Re-writing {}".format(const.VAULT_AUTH))
+                vault.write(const.VAULT_AUTH, password = password, username = username, client_id = "admin-cli")
+
+        realm_data = vault.read(const.VAULT_REALM)
+        if not realm_data or 'password' not in realm_data:
+            print("Writing {}".format(const.VAULT_REALM))
+            vault.write(const.VAULT_REALM, username = realm_username, password = realm_password, client_id = "endpoint")
+        else:
+            realm_password = realm_data['password']
 
         if not vault.read(const.VAULT_KEYCLOAK_DB):
             print("Writing {}".format(const.VAULT_KEYCLOAK_DB))
@@ -374,6 +385,7 @@ def post_init(bosslet_config):
 
     with call.ssh(names.auth.dns) as ssh:
         print("Creating initial Keycloak admin user")
+        # This fails if the user already exists, but execution will continue.
         ssh("/srv/keycloak/bin/add-user.sh -r master -u {} -p {}".format(username, password))
 
         print("Restarting Keycloak")
@@ -403,8 +415,12 @@ def post_init(bosslet_config):
                 if "users" in realm:
                     del realm["users"]
 
+            # This will fail if the realm already exists, but that's ok.
             print("Uploading BOSS.realm configuration")
-            kc.create_realm(realm)
+            try:
+                kc.create_realm(realm)
+            except Exception as ex:
+                print('Failed to upload Boss.realm config.  Does it already exist? Error message: {}'.format(ex))
 
 def update(bosslet_config):
     # Checks to make sure they update can happen and the user wants to wait the required time

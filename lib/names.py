@@ -277,6 +277,8 @@ class AWSNames(object):
         'redis': {'type': 'stack'},
         'resolution_hierarchy': {'name': 'Resolution.Hierarchy',
                                  'type': 'sfn'},
+        'complete_ingest': {'name': 'Ingest.CompleteIngest',
+                                    'type': 'sfn'},
         's3flush': {'name': 'S3flush',
                     'type': 'sqs'},
         's3_index': {'name': 's3index',
