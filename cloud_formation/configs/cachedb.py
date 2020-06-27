@@ -292,14 +292,14 @@ def create_config(bosslet_config, user_data=None):
                       names.tile_uploaded.lambda_,
                       Ref("LambdaCacheExecutionRole"),
                       handler='tile_uploaded_lambda.handler',
-                      timeout=5,
+                      timeout=120,
                       memory=1024)
     config.add_lambda("TileIngestLambda",
                       names.tile_ingest.lambda_,
                       Ref("LambdaCacheExecutionRole"),
                       handler='tile_ingest_lambda.handler',
-                      timeout=30,
-                      memory=1536)
+                      timeout=8*60+30,
+                      memory=1792)
     config.add_lambda("DeleteTileObjsLambda",
                       names.delete_tile_objs.lambda_,
                       Ref("LambdaCacheExecutionRole"),
@@ -325,8 +325,8 @@ def create_config(bosslet_config, user_data=None):
                       names.volumetric_ingest_queue_upload_lambda.lambda_,
                       Ref("LambdaCacheExecutionRole"),
                       handler='ingest_queue_upload_volumetric_lambda.handler',
-                      timeout=120,
-                      memory=1024)
+                      timeout=15*60,
+                      memory=3008)
 
     if creating_ingest_bucket:
         config.add_lambda_permission(
