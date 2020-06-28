@@ -165,7 +165,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if "all" in args.config:
-        args.config = CONFIGS
+        args.config = ["activities", "auth", "cachemanager", "endpoint", "vault"]  # All but backup and lambda
 
     if args.bosslet_config.OUTBOUND_BASTION:
         bastion_config = """-var 'aws_bastion_ip={}'
