@@ -287,7 +287,7 @@ if __name__ == '__main__':
         constants.load_scenario(bosslet_config.scenario)
 
         if args.config_name == ['all']:
-            configs = config_names
+            configs = ['core', 'redis', 'api', 'cachedb', 'activities', 'cloudwatch', 'dynamolambda']
         else:
             configs = args.config_name
 
