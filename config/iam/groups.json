@@ -9,6 +9,7 @@
   },
   {
     "AttachedManagedPolicies": [
+      "arn:aws:iam::==account==:policy/aplChangeOwnPassword",
       "arn:aws:iam::aws:policy/AmazonEC2FullAccess"
     ],
     "GroupName": "aplBasicUser",
@@ -77,6 +78,7 @@
   },
   {
     "AttachedManagedPolicies": [
+      "arn:aws:iam::==account==:policy/aplChangeOwnPassword",
       "arn:aws:iam::==account==:policy/aplCloudFormationFullAccess",
       "arn:aws:iam::aws:policy/AWSSupportAccess",
       "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess"
