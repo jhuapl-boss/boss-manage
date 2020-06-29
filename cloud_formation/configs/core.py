@@ -133,7 +133,7 @@ def create_config(bosslet_config):
                                           ('Key', 'S')],
                             key_schema = [('Path', 'HASH'),
                                           ('Key', 'RANGE')],
-                            throughput = (5, 5))
+                            ondemand = True)
 
     user_data = UserData()
     user_data["system"]["fqdn"] = names.vault.dns
