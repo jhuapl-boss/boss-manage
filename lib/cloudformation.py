@@ -1160,12 +1160,12 @@ class CloudFormationConfiguration:
         }
 
         if throughput is not None:
-            self.resources[key]['ProvisionedThroughput'] = {
+            self.resources[key]['Properties']['ProvisionedThroughput'] = {
                 "ReadCapacityUnits" : int(throughput[0]),
                 "WriteCapacityUnits" : int(throughput[1])
             }
         elif ondemand:
-            self.resources[key]['BillingMode'] = 'PAY_PER_REQUEST'
+            self.resources[key]['Properties']['BillingMode'] = 'PAY_PER_REQUEST'
         else:
             raise BossManageError('Must either specify throughput or ondemand=True')
 
