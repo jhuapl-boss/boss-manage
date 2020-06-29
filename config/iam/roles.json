@@ -13,6 +13,7 @@
       "Version": "2012-10-17"
     },
     "AttachedManagedPolicies": [
+      "arn:aws:iam::==account==:policy/Delete-Ingest-Policies",
       "arn:aws:iam::==account==:policy/aplDeleteCuboid",
       "arn:aws:iam::==account==:policy/aplPopulateUploadQueue",
       "arn:aws:iam::==account==:policy/aplResolutionHierarchy",
