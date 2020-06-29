@@ -797,5 +797,20 @@
       "Version": "2012-10-17"
     },
     "PolicyName": "aplVaultPolicy"
+  },
+  {
+    "Path": "/",
+    "PolicyDocument": {
+      "Statement": [
+        {
+          "Action": "iam:DeletePolicy",
+          "Effect": "Allow",
+          "Resource": "arn:aws:iam::==account==:policy/ingest/*",
+          "Sid": "VisualEditor0"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "PolicyName": "Delete-Ingest-Policies"
   }
 ]
