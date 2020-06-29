@@ -1139,7 +1139,7 @@ class CloudFormationConfiguration:
         Raises:
             (BossManageError): If throughput is not None and ondemand == True or if neither specified.
         """
-        if throughtput is not None and ondemand:
+        if throughput is not None and ondemand:
             raise BossManageError('Cannot specify throughput and ondemand')
 
         attr_defs = []
