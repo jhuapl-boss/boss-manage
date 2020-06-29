@@ -1,13 +1,13 @@
 # Install ingest-client into site-packages.
 include:
-    - python.python35
+    - python.python3
 
 ingest-prerequirements:
     pkg.installed:
         - pkgs:
             # Needed for Pillow to compile (in requirements.txt)
             - libjpeg-dev
-            - libopenjpeg-dev
+            #- libopenjpeg-dev
 
 # Install moto dependency separately.  Salt sets LC_ALL=C which breaks
 # install of httpretty due to a Unicode error.  Unfortunately, can't
@@ -16,22 +16,21 @@ ingest-prerequirements:
 # env_vars.  This will probably be fixed in a new version of Salt (newer
 # than 8/2015).  See https://github.com/saltstack/salt/issues/19924 and
 # https://github.com/saltstack/salt/pull/29340.
-ingest-httpretty:
-    cmd.run:
-        - name: |
-            export LC_ALL=en_US.UTF-8
-            sudo /usr/local/bin/pip3 install httpretty==0.8.10
+#ingest-httpretty:
+#    cmd.run:
+#        - name: |
+#            export LC_ALL=en_US.UTF-8
+#            sudo /usr/local/bin/pip3 install httpretty==0.8.10
 
 ingest-client-lib:
     pip.installed:
-        - bin_env: /usr/local/bin/pip3
         - requirements: salt://ingest-client/files/ingest-client.git/requirements.txt
         - require:
             - pkg: ingest-prerequirements
-            - cmd: ingest-httpretty
+            #- cmd: ingest-httpretty
 
     file.recurse:
-        - name: /usr/local/lib/python3/site-packages/ingestclient
+        - name: /usr/lib/python3/dist-packages/ingestclient
         - source: salt://ingest-client/files/ingest-client.git/ingestclient
         - include_empty: true
         - user: root
@@ -39,4 +38,4 @@ ingest-client-lib:
         - file_mode: 755
         - dir_mode: 755
         - require:
-            - sls: python.python35
+            - sls: python.python3

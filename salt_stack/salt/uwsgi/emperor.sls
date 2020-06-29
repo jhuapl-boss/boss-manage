@@ -1,14 +1,13 @@
 include:
-    - python.python35
-    - python.pip
+    - python.python3
+    - python.pip3
 
 uwsgi:
     pip.installed:
-        - name: uwsgi==2.0.12
-        - bin_env: /usr/local/bin/pip3
+        - name: uwsgi==2.0.19.1
         - require:
-            - sls: python.python35
-            - sls: python.pip
+            - sls: python.python3
+            - sls: python.pip3
 
 uwsgi-init.d:
     file.managed:

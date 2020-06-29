@@ -20,9 +20,9 @@ base:
         - boss-tools.bossutils
         - ndingest
         - boss.django
-        - django.login # patch, expects django to already be installed
-        - scalyr
-        - scalyr.update_host
+        #- django.login # patch, expects django to already be installed
+        #- scalyr
+        #- scalyr.update_host
         - git
         - ingest-client.ingest
         - chrony

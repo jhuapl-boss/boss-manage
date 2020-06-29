@@ -1,11 +1,11 @@
 include:
-    - python.python35
+    - python.python3
     - vault.client
     - aws.boto3
 
 python-lib:
     file.recurse:
-        - name: /usr/local/lib/python3/site-packages/bossutils
+        - name: /usr/lib/python3/dist-packages/bossutils
         - source: salt://boss-tools/files/boss-tools.git/bossutils
         - include_empty: true
         - user: root
@@ -13,7 +13,7 @@ python-lib:
         - file_mode: 755
         - dir_mode: 755
         - require:
-            - sls: python.python35
+            - sls: python.python3
 
 bossutils-firstboot:
     file.managed:
