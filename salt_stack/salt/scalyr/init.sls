@@ -7,7 +7,7 @@
         # Manually add Scalyr to package repo.
         cmd.run:
             - name: |
-                VERSION="1.2.1"
+                VERSION="1.2.2"
                 wget -q https://www.scalyr.com/scalyr-repo/stable/latest/scalyr-repo-bootstrap_${VERSION}_all.deb
                 sudo dpkg -r scalyr-repo scalyr-repo-bootstrap # Remove old repo defs.
                 sudo dpkg -i scalyr-repo-bootstrap_${VERSION}_all.deb
@@ -31,7 +31,7 @@
         service.running:
             - name: scalyr-agent-2
 
-    {% for logs, path in scalyr.log_config_files.iteritems() %}
+    {% for logs, path in scalyr.log_config_files.items() %}
     scalyr_copy_log_config_{{ logs }}:
         file.managed:
             - name: /etc/scalyr-agent-2/agent.d/{{ logs }}.json
