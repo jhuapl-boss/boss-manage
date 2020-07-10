@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/bin/python3
 
 # Copyright 2016 The Johns Hopkins University Applied Physics Laboratory
 #
@@ -28,6 +28,7 @@
 # Setup the exception hook to log errors thrown during execution
 import os
 import bossutils
+from time import sleep
 
 bossutils.utils.set_excepthook()
 logging = bossutils.logger.BossLogger().logger
@@ -43,8 +44,20 @@ def configure_scalyr():
     file = "/usr/sbin/scalyr-agent-2-config"
     if os.path.exists(file):
         logging.info("Setting host name for Scalyr.")
-        cfg = bossutils.configuration.BossConfig()
-        host = cfg["system"]["fqdn"]
+        tries = 0
+        while tries < 3:
+            try:
+                cfg = bossutils.configuration.BossConfig()
+                host = cfg["system"]["fqdn"]
+                break
+            except Exception as ex:
+                logging.error("Failed getting hostname: {}".format(ex))
+                tries += 1
+                sleep(5)
+        else:
+            logging.error("Could not get hostname - giving up")
+            return
+
         returncode = bossutils.utils.execute(
             "{} --set-server-host {}".format(file, host))
         if returncode != 0:
