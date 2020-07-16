@@ -1,5 +1,5 @@
 include:
-    - python.python35
+    - python.python3
 
 scipy-prerequirements:
     pkg.installed:
@@ -13,7 +13,6 @@ scipy-prerequirements:
 
 scipy-lib:
     pip.installed:
-        - bin_env: /usr/local/bin/pip3
         - pkgs:
             - scipy
         - require:

@@ -8,7 +8,7 @@ daemon:
 download:
     file.managed:
         - name: /tmp/keycloak.tar.gz
-        - source: http://downloads.jboss.org/keycloak/1.9.1.Final/keycloak-1.9.1.Final.tar.gz
+        - source: https://downloads.jboss.org/keycloak/1.9.1.Final/keycloak-1.9.1.Final.tar.gz
 #            - salt://keycloak/files/keycloak-1.9.1.Final.tar.gz
 #            - http://downloads.jboss.org/keycloak/1.9.1.Final/keycloak-1.9.1.Final.tar.gz
         - source_hash: md5=7c1b23e3a8346ba5fd42a20b5602dd61

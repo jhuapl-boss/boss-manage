@@ -1,6 +1,6 @@
 include:
-    - python.python35
-    - python.pip
+    - python.python3
+    - python.pip3
     - boss-tools.bossutils
     - heaviside
     - python.winpdb
@@ -20,10 +20,9 @@ activity-files:
 activites-lib:
     pip.installed:
         - name: pymysql
-        - bin_env: /usr/local/bin/pip3
         - require:
-            - sls: python.python35
-            - sls: python.pip
+            - sls: python.python3
+            - sls: python.pip3
 
 manager-service:
     file.managed:
@@ -32,6 +31,7 @@ manager-service:
         - user: root
         - group: root
         - mode: 555
+        - makedirs: true
         - require:
             - file: activity-files
 

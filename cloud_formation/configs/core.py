@@ -426,7 +426,7 @@ def update(bosslet_config):
     # Checks to make sure they update can happen and the user wants to wait the required time
     if not bosslet_config.AUTH_RDS:
         print("Cannot update Auth server as it is not using an external database")
-        print("Updating the Auth server would loose all Keycloak information")
+        print("Updating the Auth server would lose all Keycloak information")
         raise BossManageError("Configuration doesn't support 'update'")
 
     config = create_config(bosslet_config)
