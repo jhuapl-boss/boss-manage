@@ -338,7 +338,7 @@ class SSHConnection(object):
             upload_ = parse_upload(input("[u]pload / [D]ownload: ").strip())
 
         with self.scps() as cmd:
-            return cmd(local_file, remote_file, upload)
+            return cmd(local_file, remote_file, upload_)
 
     @contextmanager
     def cmds(self):
