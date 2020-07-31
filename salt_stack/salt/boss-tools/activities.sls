@@ -26,12 +26,20 @@ activites-lib:
 
 manager-service:
     file.managed:
-        - name: /etc/init/activity-manager.conf
+        - name: /lib/systemd/system/activity-manager.service
         - source: salt://boss-tools/files/activity-manager
         - user: root
         - group: root
-        - mode: 555
+        - mode: 444
         - makedirs: true
         - require:
             - file: activity-files
+    cmd.run:
+        - name: systemctl daemon-reload
+        - user: root
 
+activity-manager:
+    service.running:
+        - enable: true
+        - require:
+            - file: manager-service
