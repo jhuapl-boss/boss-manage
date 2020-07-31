@@ -118,7 +118,8 @@ def create_config(bosslet_config):
                                            'Arn': Arn('CacheThrottleLambda'),
                                            'Id': names.cache_throttle.lambda_,
                                            'Input': json.dumps({
-                                                'host': names.cache_throttle.redis
+                                                'host': names.cache_throttle.redis,
+                                                'ageOffDays': 30 
                                             }),
                                        },
                                    ],
