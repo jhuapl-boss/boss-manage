@@ -200,7 +200,7 @@ def update_lambda_code(bosslet_config):
             resp = client.update_function_code(
                 FunctionName=lambda_name,
                 S3Bucket=bosslet_config.LAMBDA_BUCKET,
-                S3Key=code_zip(bosslet_config, config['name']),
+                S3Key=code_zip(bosslet_config, config),
                 Publish=True)
             print(resp)
         except botocore.exceptions.ClientError as ex:
