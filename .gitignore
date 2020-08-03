@@ -99,3 +99,6 @@ cloud_formation/configs/dynamo_config.template
 # config migrations 
 progress
 
+# VSCode
+.vscode
+
