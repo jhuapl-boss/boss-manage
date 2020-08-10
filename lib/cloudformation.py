@@ -1119,20 +1119,29 @@ class CloudFormationConfiguration:
         if BillingMode is not None:
             self.resources[key]["Properties"]["BillingMode"] = BillingMode
 
-    def add_dynamo_table(self, key, name, attributes, key_schema, throughput):
+    def add_dynamo_table(self, key, name, attributes, key_schema, throughput=None, ondemand=False):
         """Add an DynamoDB Table to the configuration
+
+        Note that either throughput or ondemand must be provided, but not both.
 
         Args:
             key (str) : Unique name (within the configuration) for this instance
             name (str) : DynamoDB Table name to create
             attributes (list[tuple]) : List of tuples containing [('AttributeName', 'AttributeType'), ...]
             key_schema (list[tuple]) : List of tuples containing [('AttributeName', 'KeyType'), ...]
-            throughput (tuple) : Tuple of (ReadCapacity, WriteCapacity)
+            throughput (tuple) : Tuple of (ReadCapacity, WriteCapacity).  Defaults to None.
                                  ReadCapacity is the minimum number of consistent reads of items per second
                                               before Amazon DynamoDB balances the loads
                                  WriteCapacity is the minimum number of consistent writes of items per second
                                                before Amazon DynamoDB balances the loads
+            ondemand (boolean) : Defaults to False.  Use ondemand provisioning
+
+        Raises:
+            (BossManageError): If throughput is not None and ondemand == True or if neither specified.
         """
+        if throughput is not None and ondemand:
+            raise BossManageError('Cannot specify throughput and ondemand')
+
         attr_defs = []
         for key_, attr in attributes:
             attr_defs.append({"AttributeName": key_, "AttributeType": attr})
@@ -1146,13 +1155,19 @@ class CloudFormationConfiguration:
             "Properties" : {
                 "TableName" : name,
                 "AttributeDefinitions" : attr_defs,
-                "KeySchema" : key_schema_,
-                "ProvisionedThroughput" : {
-                    "ReadCapacityUnits" : int(throughput[0]),
-                    "WriteCapacityUnits" : int(throughput[1])
-                }
+                "KeySchema" : key_schema_
             }
         }
+
+        if throughput is not None:
+            self.resources[key]['Properties']['ProvisionedThroughput'] = {
+                "ReadCapacityUnits" : int(throughput[0]),
+                "WriteCapacityUnits" : int(throughput[1])
+            }
+        elif ondemand:
+            self.resources[key]['Properties']['BillingMode'] = 'PAY_PER_REQUEST'
+        else:
+            raise BossManageError('Must either specify throughput or ondemand=True')
 
     def add_redis_cluster(self, key, hostname, subnets, security_groups, type_="cache.t2.micro", port=6379, version="2.8.24"):
         """Add a Redis ElastiCache cluster to the configuration

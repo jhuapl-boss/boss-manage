@@ -71,6 +71,8 @@
         "aplPopulateUploadQueue",
         "aplResolutionHierarchy",
         "aplUploadCertificatePolicy",
-        "aplVaultPolicy"
+        "aplVaultPolicy",
+        "Delete-Ingest-Policies",
+        "aplChangeOwnPassword"
     ]
 }

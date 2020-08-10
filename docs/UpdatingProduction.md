@@ -114,6 +114,14 @@ $ ./cloudformation.py update production.boss core
 *Note: The cloudformation.py script will automatically use the latest created AMIs
 that are named with a commit hash.  If you want to use specific AMIs use the **--ami-version***
 
+If the vault policies were updated, this has only happened once since our inception
+run the post-init command on core.
+
+```shell script
+$ ./cloudformation.py post-init production.boss core
+```
+Vault policies were updated when adding userthrottle and ingest-complete PRs.
+
 After completion check that vault still works, look for password:
 ```shell
 ./bastion.py vault.production.boss vault-read secret/auth/realm
@@ -185,7 +193,12 @@ For *idindexing* run update
 ```shell
 $ ./cloudformation.py update production.boss idindexing
 ```
+If it has problems run 
 
+```shell
+$ ./cloudformation.py delete production.boss idindexing
+$ ./cloudformation.py create production.boss idindexing
+```
 
 For *dynamolambda* delete and create the cloud formation stacks again.  It is fast and does not support update
 
