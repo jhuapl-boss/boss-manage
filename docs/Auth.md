@@ -56,7 +56,7 @@ application using an access token.
 ### boss-oidc
 The [boss-oidc](https://github.com/jhuapl-boss/boss-oidc.git) plugin is a custom
 plugin that provides a single configuration function for both the django-oidc and
-drf-oidc-auth plugins. It also provides a some custom authentication hooks by
+drf-oidc-auth plugins. It also provides some custom authentication hooks by
 extending the existing plugins.  It integrates the Boss with KeyCloak and
 mozilla-django-oidc.
 
