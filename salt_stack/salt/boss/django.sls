@@ -1,11 +1,12 @@
 include:
-    - python.python35
-    - python.pip
+    - python.python3
+    - python.pip3
+    - python.python3-dev
     - boss-tools.bossutils
     - uwsgi.emperor
     - nginx
     - spdb
-    - boss-oidc
+    - git
 
 django-prerequirements:
     pkg.installed:
@@ -16,7 +17,6 @@ django-prerequirements:
 
 django-requirements:
     pip.installed:
-        - bin_env: /usr/local/bin/pip3
         - requirements: salt://boss/files/boss.git/requirements.txt
         - exists_action: w
         - require:

@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/bin/python3
 
 # Copyright 2016 The Johns Hopkins University Applied Physics Laboratory
 #
@@ -81,12 +81,13 @@ def set_hostname():
     logging.info("Calling hostname")
     bossutils.utils.execute("hostname -F /etc/hostname")
 
-    logging.info("Updating /etc/resolvconf/resolv.conf.d/base")
-    with open("/etc/resolvconf/resolv.conf.d/base", "a") as fh:
-        fh.write("\nsearch {}\n".format(domain))
+    RESOLVE_FILE = '/etc/systemd/resolved.conf'
+    logging.info("Updating " + RESOLVE_FILE)
+    with open(RESOLVE_FILE, "a") as fh:
+        fh.write("\nDomains={}\n".format(domain))
 
     logging.info("Regenerating resolv.conf")
-    bossutils.utils.execute("resolvconf -u")
+    bossutils.utils.execute("systemctl restart systemd-resolved.service")
 
 if __name__ == '__main__':
     logging.info("CONFIG_FILE = \"{}\"".format(bossutils.configuration.CONFIG_FILE))

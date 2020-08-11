@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/bin/python3
 
 # Copyright 2016 The Johns Hopkins University Applied Physics Laboratory
 #

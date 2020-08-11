@@ -14,9 +14,24 @@
 # DEBUG NOTE: Add `-o /tmp/vault.log` to the ARGS variable and restart the
 #             the service to get a logfile with the stdout/stderr from Vault
 
-IP=`ifconfig eth0 | awk '/inet addr/{print substr($2,6)}'`
-KEY=`grep kms_key /etc/boss/boss.config | cut -d'=' -f2 | tr -d [:blank:]`
-TBL=`grep ddb_table /etc/boss/boss.config | cut -d'=' -f2 | tr -d [:blank:]`
+# Get IP address from output of command `ip` (should be the interface not named
+# `lo`:
+#
+# lo               UNKNOWN        127.0.0.1/8
+# eth0             UP             10.103.5.163/24
+#
+IP=`ip -4 -br address | grep -v lo | awk '{print substr($3, 1, index($3, "/") - 1)}'`
+
+BOSS_CONFIG=/etc/boss/boss.config
+
+until [ -e $BOSS_CONFIG ]
+do
+    # Wait for boss.config file to be created.
+    sleep 1
+done
+
+KEY=`grep kms_key $BOSS_CONFIG | cut -d'=' -f2 | tr -d [:blank:]`
+TBL=`grep ddb_table $BOSS_CONFIG | cut -d'=' -f2 | tr -d [:blank:]`
 ARGS="-N -n vault -u root -r
       -e VAULT_ADVERTISE_ADDR=http://$IP:8200
       -e VAULT_AWSKMS_SEAL_KEY_ID=$KEY
@@ -25,12 +40,14 @@ ARGS="-N -n vault -u root -r
 case "$1" in
  start)
    # start the vault server
+   echo "Starting Vault on ip: $IP"
    daemon $ARGS -- vault server -config=/etc/vault/vault.cfg
    ;;
  stop)
    daemon $ARGS --stop
    ;;
  restart)
+   echo "Restarting Vault on ip: $IP"
    daemon $ARGS --restart
    ;;
  status)

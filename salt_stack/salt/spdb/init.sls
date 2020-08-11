@@ -1,5 +1,5 @@
 include:
-    - python.python35
+    - python.python3
 
 spdb-prerequirements:
     pkg.installed:
@@ -10,7 +10,7 @@ spdb-prerequirements:
             - libfreetype6-dev
             - liblcms2-dev
             - libwebp-dev
-            - libopenjpeg-dev
+            #- libopenjpeg-dev
 
 # Install moto dependency separately.  Salt sets LC_ALL=C which breaks
 # install of httpretty due to a Unicode error.  Unfortunately, can't
@@ -19,17 +19,32 @@ spdb-prerequirements:
 # env_vars.  This will probably be fixed in a new version of Salt (newer
 # than 8/2015).  See https://github.com/saltstack/salt/issues/19924 and
 # https://github.com/saltstack/salt/pull/29340.
-httpretty:
-    cmd.run:
-        - name: |
-            export LC_ALL=en_US.UTF-8
-            sudo /usr/local/bin/pip3 install httpretty==0.8.10
+#httpretty:
+#    cmd.run:
+#        - name: |
+#            export LC_ALL=en_US.UTF-8
+#            sudo /usr/local/bin/pip3 install httpretty==0.8.10
+
+# During testing with the Docker Ubuntu 20.04 image, wheel was too old to
+# complete the spdb and blosc installs.
+wheel-upgrade:
+    pip.installed:
+        - name: wheel
+        - upgrade: True
+        - require:
+            - sls: python.python3
 
 spdb-lib:
     pip.installed:
-        - bin_env: /usr/local/bin/pip3
-          # DP HACK: Cannot use salt:// with pip.installed, so assume the base directory
+        # DP HACK: Cannot use salt:// with pip.installed, so assume the base directory
         - name: /srv/salt/spdb/files/spdb.git/
         - require:
             - pkg: spdb-prerequirements
-            - sls: python.python35
+            - sls: python.python3
+
+spdb-test-requirements:
+    pip.installed:
+        - requirements: salt://spdb/files/spdb.git/requirements-test.txt
+        - exists_action: w
+        - require:
+            - sls: python.python3

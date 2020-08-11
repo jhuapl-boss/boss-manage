@@ -55,19 +55,15 @@
             "type": "Install cURL so that salt-masterless can bootstrap Salt",
             "type": "shell",
             "inline": [
-                "sudo sed -i \"s/`hostname`/{{user `name`}}/\" /etc/hosts",
-                "sudo sh -c 'echo {{user `name`}} > /etc/hostname'",
-                "sudo hostname -F /etc/hostname",
-                "if [[ -n \"`which apt-get 2> /dev/null`\" ]] ; then",
-                "   sudo apt-get update",
-                "   sudo apt-get -y install curl",
-                "fi"
+                "sudo apt-get update",
+                "sudo apt-get -y install curl"
             ]
         },
         {
             "type": "salt-masterless",
+            "disable_sudo": false,
             "skip_bootstrap": false,
-            "bootstrap_args": "-R archive.repo.saltstack.com -i {{user `name`}} stable 2015.8",
+            "bootstrap_args": "-i {{user `name`}} stable 3001",
             "local_state_tree": "../salt_stack/salt",
             "remote_state_tree": "/srv/salt",
             "local_pillar_roots": "../salt_stack/pillar",

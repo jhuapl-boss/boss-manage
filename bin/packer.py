@@ -90,7 +90,10 @@ def locate_ami(session):
 
     client = session.client('ec2')
     response = client.describe_images(Filters=[
-                    {"Name": "owner-id", "Values": ["099720109477"]},
+                    # Owner: Canonical
+                    {"Name": "owner-id", "Values": ["679593333241"]},
+                    # Owner: AWS
+                    #{"Name": "owner-id", "Values": ["099720109477"]},
                     {"Name": "virtualization-type", "Values": ["hvm"]},
                     {"Name": "root-device-type", "Values": ["ebs"]},
                     {"Name": "architecture", "Values": ["x86_64"]},
@@ -100,7 +103,8 @@ def locate_ami(session):
                ])
 
     images = response['Images']
-    images = [i for i in images if contains(i['Name'], ('hvm-ssd', '14.04', 'server'))]
+    #images = [i for i in images if contains(i['Name'], ('hvm-ssd', '14.04', 'server'))]
+    images = [i for i in images if contains(i['Name'], ('hvm-ssd', '20.04', 'server'))]
     images.sort(key=lambda x: x["CreationDate"], reverse=True)
 
     if len(images) == 0:

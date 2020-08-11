@@ -1,5 +1,5 @@
 include:
-    - python.python35
+    - python.python3
 
 winpdb:
   file.managed:
