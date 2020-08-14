@@ -386,7 +386,7 @@ def post_init(bosslet_config):
     with call.ssh(names.auth.dns) as ssh:
         print("Creating initial Keycloak admin user")
         # This fails if the user already exists, but execution will continue.
-        ssh("/srv/keycloak/bin/add-user.sh -r master -u {} -p {}".format(username, password))
+        ssh("/srv/keycloak/bin/add-user-keycloak.sh -r master -u {} -p {}".format(username, password))
 
         print("Restarting Keycloak")
         ssh("sudo service keycloak stop")
