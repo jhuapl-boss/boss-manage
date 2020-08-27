@@ -29,6 +29,13 @@
 
         "consentRequired": false,
         "publicClient": true,
+        "defaultClientScopes": [
+            "web-origins",
+            "role_list",
+            "roles",
+            "profile",
+            "email"
+        ],
 
         "directAccessGrantsEnabled": true
     },{
@@ -46,6 +53,14 @@
 
         "directAccessGrantsEnabled": true
     }],
+
+    "defaultDefaultClientScopes": [
+        "email",
+        "web-origins",
+        "role_list",
+        "roles",
+        "profile"
+    ],
 
     "roles": {
         "realm":[
