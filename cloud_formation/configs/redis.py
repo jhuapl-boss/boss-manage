@@ -108,8 +108,9 @@ def create_config(bosslet_config):
                           memory=1024)
 
         # Schedule the lambda to be executed at midnight for the timezone where the bosslet is located
+        # on the first day of the month
         hour = TIMEZONE_OFFSET.get(bosslet_config.REGION, 0)
-        schedule = 'cron(0 {} * * ? *)'.format(hour)
+        schedule = 'cron(0 {} 1 * ? *)'.format(hour)
         config.add_cloudwatch_rule('CacheThrottleReset',
                                    name=names.cache_throttle.cw,
                                    description='Reset the current Boss throttling metrics',
@@ -118,8 +119,7 @@ def create_config(bosslet_config):
                                            'Arn': Arn('CacheThrottleLambda'),
                                            'Id': names.cache_throttle.lambda_,
                                            'Input': json.dumps({
-                                                'host': names.cache_throttle.redis,
-                                                'ageOffDays': 30 
+                                                'host': names.cache_throttle.redis
                                             }),
                                        },
                                    ],
