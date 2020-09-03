@@ -13,23 +13,13 @@
 # limitations under the License.
 
 import redis
-from datetime import datetime, timedelta
 
 def handler(event, context):
-    ageOffDays = 30  # default
-    if 'ageOffDays' in event:
-        ageOffDays = int(event['ageOffDays'])
-    oldestDate = datetime.today() - timedelta(days=ageOffDays)
-    print("Aging off metrics dated {} and older".format(datetime.date(oldestDate)))
-    
-    # look for keys older than ageOffDays
+    print("Deleting data from {}".format(event['host']))
+
     conn = redis.StrictRedis(event['host'], 6379, 0)
-    
-    while True:
-        datePattern = "*{}*".format(datetime.date(oldestDate))
-        keys = conn.keys(pattern=datePattern)
-        if not keys:
-            break
+    keys = conn.keys()
+    if len(keys) > 0:
         conn.delete(*keys)
-        print("Deleted keys: {}".format(keys))
-        oldestDate -= timedelta(days=1)
+
+    print("Deleted keys: {}".format(keys))
