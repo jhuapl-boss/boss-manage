@@ -8,7 +8,7 @@ A new team member will need to provide them access to the following:
 3. Access to the [JHUAPL Boss](https://github.com/jhuapl-boss) repository to pull and make code commits.
 
 # Development Envrionment
-The [Installation Guide](./InstallGuide.md) is geared to installing BossDB in new AWS subscription. It covers many of the topics you won't need to get into right now. This **onboarding guide** will highlight what you need to do to get up and running quickly.
+The [Installation Guide](./InstallGuide.md) is geared to installing BossDB in new AWS subscription. It covers many of the topics you won't need to get into right now. This **onboarding guide** will highlight what you need to do to get up and running quickly.  However any Python virtual environment may be used, so used whatever you are comfortable using.
 
 ## Choose your Python Distribution
 This guide assumes you have installed anaconda for python 3. You can download the installer for your platform from [Anaconda](https://www.anaconda.com/products/individual). 
