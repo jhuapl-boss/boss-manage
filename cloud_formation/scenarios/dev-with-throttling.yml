@@ -1,21 +1,21 @@
 # Instance types
-ENDPOINT_TYPE: m5.2xlarge
-RDS_TYPE: db.t2.medium
-REDIS_CACHE_TYPE: cache.m4.2xlarge
-REDIS_SESSION_TYPE: cache.t2.medium
-REDIS_THROTTLE_TYPE: cache.t2.medium
-REDIS_TYPE: cache.m5.xlarge
-CACHE_MANAGER_TYPE: t2.medium
-VAULT_TYPE: m5.large
-ACTIVITIES_TYPE: r5.xlarge
-AUTH_TYPE: m5.xlarge
+ENDPOINT_TYPE: t2.medium
+RDS_TYPE: db.t2.micro
+REDIS_CACHE_TYPE: cache.t2.small
+REDIS_SESSION_TYPE: null # Not used for dev
+REDIS_THROTTLE_TYPE: cache.t2.small # Now testing
+REDIS_TYPE: cache.t2.small
+CACHE_MANAGER_TYPE: t2.micro
+VAULT_TYPE: t3.micro
+ACTIVITIES_TYPE: m5.large
+AUTH_TYPE: t2.micro
 
 # Cluster / ASG sizes
 AUTH_CLUSTER_SIZE: 1
 VAULT_CLUSTER_SIZE: 1
 ENDPOINT_CLUSTER_MIN: 1
-ENDPOINT_CLUSTER_MAX: 60
-REDIS_CLUSTER_SIZE: 2
+ENDPOINT_CLUSTER_MAX: 1
+REDIS_CLUSTER_SIZE: 1
 
 # Memory Size
 REDIS_RESERVED_MEMORY_PERCENT: 25
@@ -37,5 +37,5 @@ THROTTLE:
         bossadmin: 
             egress: null
     groups:
-        public: 
-            egress: null
+        public:
+            egress: null 
