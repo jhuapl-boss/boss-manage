@@ -39,6 +39,7 @@ MIGRATION CHANGELOG:
                Public DNS updates
                * Replaced manually created public Route53 DNS records with
                  CloudFormation maintained records
+    Version 3: Use Keycloak 11.0.0
 """
 
 DEPENDENCIES = None
@@ -87,7 +88,7 @@ def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnet
 
 def create_config(bosslet_config):
     """Create the CloudFormationConfiguration object."""
-    config = CloudFormationConfiguration('core', bosslet_config, version="2")
+    config = CloudFormationConfiguration('core', bosslet_config, version="3")
     session = bosslet_config.session
     keypair = bosslet_config.SSH_KEY
     names = bosslet_config.names
@@ -306,6 +307,7 @@ def create(bosslet_config):
     post_init(bosslet_config)
 
 def post_init(bosslet_config):
+
     session = bosslet_config.session
     call = bosslet_config.call
     names = bosslet_config.names
@@ -348,8 +350,8 @@ def post_init(bosslet_config):
             if password != keycloak_data['password']:
                 # If there is no password match, then re-write the password for the admin-cli so that they match.
                 password = keycloak_data['password']
-                print("Re-writing {}".format(const.VAULT_AUTH))
-                vault.write(const.VAULT_AUTH, password = password, username = username, client_id = "admin-cli")
+                print("Re-writing {}".format(const.VAULT_KEYCLOAK))
+                vault.write(const.VAULT_KEYCLOAK, password = password, username = username, client_id = "admin-cli")
 
         realm_data = vault.read(const.VAULT_REALM)
         if not realm_data or 'password' not in realm_data:

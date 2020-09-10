@@ -1,4 +1,4 @@
-# Copyright 2016 The Johns Hopkins University Applied Physics Laboratory
+# Copyright 2020 The Johns Hopkins University Applied Physics Laboratory
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ class KeyCloakClient:
         """KeyCloakClient constructor
 
         Args:
-            url_base (string) : The base URL to prepend to all request URLs
+            url_base (str) : The base URL to prepend to all request URLs
             verify_ssl (bool) : Whether or not to verify HTTPS certs
         """
         self.url_base = url_base
@@ -59,7 +59,7 @@ class KeyCloakClient:
         """Make a request to the Keycloak server.
 
         Args:
-            url (string) : REST API URL to query (appended to url_base from constructor)
+            url (str) : REST API URL to query (appended to url_base from constructor)
             params (None|dict) : None or a dict or key values that will be passed
                                  to the convert argument to produce a string
             headers (dict) : Dictionary of HTTP headers
@@ -103,9 +103,9 @@ class KeyCloakClient:
         An error will be printed if login failed
 
         Args:
-            username (string) : Keycloak username
-            password (string) : Keycloak password
-            client_id (string) : Keycloak Client ID to authenticate with
+            username (str) : Keycloak username
+            password (str) : Keycloak password
+            client_id (str) : Keycloak Client ID to authenticate with
         """
         if username is None:
             username = self.username
@@ -206,8 +206,8 @@ class KeyCloakClient:
             Note: User must be logged into Keycloak first
 
         Args:
-            realm_name (string) : Name of the realm to look in for the client
-            client_id (string) : Client ID of client configuration to retrieve
+            realm_name (str) : Name of the realm to look in for the client
+            client_id (str) : Client ID of client configuration to retrieve
 
         Returns:
             (None|dict) : None if the client couldn't be located or the JSON
@@ -235,7 +235,7 @@ class KeyCloakClient:
             Note: User must be logged into Keycloak first
 
         Args:
-            realm_name (string) : Name of the realm
+            realm_name (str) : Name of the realm
             client (dict) : JSON dictory configuration for the updated realm client
         """
         resp = self.request(
@@ -259,8 +259,8 @@ class KeyCloakClient:
             Note: User must be logged into Keycloak first
 
         Args:
-            realm_name (string) : Name of the realm
-            client_id (string) : Client ID of client configuration to retrieve
+            realm_name (str) : Name of the realm
+            client_id (str) : Client ID of client configuration to retrieve
             additions (dict) : dictionary of additions, each entry's key should
                                correspond to a client key and that entry's (singular)
                                value will be appended to the client's property.
@@ -281,9 +281,9 @@ class KeyCloakClient:
             Note: User must be logged into Keycloak first
 
         Args:
-            realm_name (string) : Name of the realm
-            client_id (string) : Client ID of client configuration to retrieve
-            uri (string) : URL to add to the client's list of valid redirect URLs
+            realm_name (str) : Name of the realm
+            client_id (str) : Client ID of client configuration to retrieve
+            uri (str) : URL to add to the client's list of valid redirect URLs
         """
         self.append_list_properties(realm_name, client_id, {"redirectUris": uri})
 
@@ -293,8 +293,8 @@ class KeyCloakClient:
             Note: User must be logged into Keycloak first
 
         Args:
-            realm_name (string) : Name of the realm
-            client_id (string) : Client ID of client configuration to retrieve
+            realm_name (str) : Name of the realm
+            client_id (str) : Client ID of client configuration to retrieve
 
         Returns:
             (dict) : contains keys
@@ -307,3 +307,59 @@ class KeyCloakClient:
         auth_header = "Authorization: Bearer {}".format(self.token["access_token"])
         return {"url": installation_endpoint, "headers": auth_header}
 
+    def get_client_scopes(self, realm_name):
+        """Gets all client scopes associated with the realm
+
+            Note: User must be logged into Keycloak first
+            
+            Keycloak docs of the return value may not be accurate but included
+            for reference
+
+        Args:
+            realm_name (str) : Name of the realm
+
+        Returns:
+            (array[dict]): An array of client scopes (https://www.keycloak.org/docs-api/11.0/rest-api/index.html#_clientscoperepresentation)
+        """
+        headers = {
+            "Authorization": "Bearer " + self.token["access_token"],
+            "Content-Type": "application/json",
+        }
+        return self.request(f'/auth/admin/realms/{realm_name}/client-scopes', headers=headers)
+
+    def add_default_client_scopes(self, realm_name, client_id, scopes):
+        """Add the given scopes the client.
+
+        Args:
+            realm_name (str) : Name of the realm
+            client_id (str) : Client ID of client configuration to retrieve
+            scopes (list[str]) : Scopes to add to the client
+
+        Raises:
+            (KeyCloakScopeNotFoundError): if a requested scope not found
+        """
+        client_dict = self.get_client(realm_name, client_id)
+        _id = client_dict['id']
+
+        all_scopes = self.get_client_scopes(realm_name)
+        # Need to use id of scope, not its name, so map name to id.
+        scope_map = {}
+        for scope in all_scopes:
+            if scope['name'] in scopes:
+                scope_map[scope['name']] = scope['id']
+                if len(scope_map) == len(scopes):
+                    break
+
+        if len(scope_map) != len(scopes):
+            found = set(scope_map.keys())
+            want = set(scopes)
+            missing = [s for s in want.difference(found)]
+            raise exceptions.KeyCloakScopeNotFoundError(f'Could not find these scopes:, {", ".join(missing)}')
+
+        headers = {
+            "Authorization": "Bearer " + self.token["access_token"],
+            "Content-Type": "application/json",
+        }
+        for s_id in scope_map.values():
+            self.request(f'/auth/admin/realms/{realm_name}/clients/{_id}/default-client-scopes/{s_id}',
+                         headers=headers, method='PUT')
