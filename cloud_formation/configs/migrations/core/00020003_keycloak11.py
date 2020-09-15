@@ -15,6 +15,7 @@
 from lib.keycloak import KeyCloakClient
 from lib import constants as const
 import json
+import time
 
 def post_update(bosslet_config):
     call = bosslet_config.call
@@ -30,7 +31,24 @@ def post_update(bosslet_config):
 
     username = 'admin'
     password = auth_data['password']
-    print(password)
+
+    # Ensure Keycloak available.
+    call.check_keycloak(const.TIMEOUT_KEYCLOAK)
+
+    with call.ssh(names.auth.dns) as ssh:
+        print("Restore Keycloak admin user")
+        ssh("/srv/keycloak/bin/add-user-keycloak.sh -r master -u {} -p {}".format(username, password))
+
+        print("Restarting Keycloak")
+        ssh("sudo service keycloak stop")
+        time.sleep(2)
+        ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
+                                      # make sure the process is actually killed
+        time.sleep(3)
+        ssh("sudo service keycloak start")
+
+    print("Waiting for Keycloak to restart")
+    call.check_keycloak(const.TIMEOUT_KEYCLOAK)
 
     print('Tunneling to Keycloak server')
     with call.tunnel(names.auth.dns, 8080) as port:
