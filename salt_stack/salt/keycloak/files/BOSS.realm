@@ -17,42 +17,30 @@
 
     "accessTokenLifespan": 600,
 
-    "clients": [{
-        "enabled": true,
-        "protocol": "openid-connect",
+    "clients": [
+        {
+            "enabled": true,
+            "protocol": "openid-connect",
 
-        "clientId": "endpoint",
-        "name": "BOSS Endpoint",
-        "description": "BOSS Endpoint OpenID Connect Client",
+            "clientId": "endpoint",
+            "name": "BOSS Endpoint",
+            "description": "BOSS Endpoint OpenID Connect Client",
 
-        "redirectUris": ["/openid/callback/login/","/openid/callback/logout/"],
+            "redirectUris": ["/openid/callback/login/","/openid/callback/logout/"],
 
-        "consentRequired": false,
-        "publicClient": true,
-        "defaultClientScopes": [
-            "web-origins",
-            "role_list",
-            "roles",
-            "profile",
-            "email"
-        ],
+            "consentRequired": false,
+            "publicClient": true,
+            "defaultClientScopes": [
+                "web-origins",
+                "role_list",
+                "roles",
+                "profile",
+                "email"
+            ],
 
-        "directAccessGrantsEnabled": true
-    },{
-        "enabled": true,
-        "protocol": "openid-connect",
-
-        "clientId": "church",
-        "name": "BOSS Church",
-        "description": "BOSS Church team OpenID Connect Client",
-
-        "redirectUris": ["/openid/callback/login/","/openid/callback/logout/"],
-
-        "consentRequired": false,
-        "publicClient": true,
-
-        "directAccessGrantsEnabled": true
-    }],
+            "directAccessGrantsEnabled": true
+        }
+    ],
 
     "defaultDefaultClientScopes": [
         "email",
