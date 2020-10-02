@@ -6,12 +6,74 @@ in the function because StepFunctions cannot compare
 two JsonPath values.
 """
 
-while '$.res_lt_max' == true:
-    """WhileResolutionLessThanMax
-    """
-    Activity('DownsampleChannel')
-        """RunDownSampleActivity
+Activity('CheckDownsampleQueue')
+    """CheckDownsampleQueue
 
         boss-tools/activities/resolution_hierarchy.py
+    """
+
+if '$.start_downsample' == true:
+    Activity('UpdateDownsampleStatus')
+        """SetInProgressStatus
+
+            Set downsample status to IN_PROGRESS in MySQL DB
+
+            boss-tools/activities/resolution_hierarchy.py
         """
-        retry [] 60 3 2.5
+
+    while '$.res_lt_max' == true:
+        """WhileResolutionLessThanMax
+        """
+        Activity('DownsampleChannel')
+            """RunDownSampleActivity
+
+            boss-tools/activities/resolution_hierarchy.py
+            """
+            retry [] 60 3 2.5
+            catch []: '$.result'
+                Pass()
+                    """AddFailedStatus
+
+                    Set failed status as status for next state.
+                    """
+                    result: '$.status'
+                    data:
+                        { "status": "FAILED" }
+
+                Activity('UpdateDownsampleStatus')
+                    """SetFailedStatus
+                    """
+
+                Fail('Exception', 'Downsample failed')
+                    """DownsampleFailed
+                    """
+
+    Activity('DeleteDownsampleJob')
+        """DeleteJobFromQueue
+
+            boss-tools/activities/resolution_hierarchy.py
+        """
+        retry [] 5 3 2
+
+    Activity('UpdateDownsampleStatus')
+        """SetDownsampledStatus
+
+            Set channel as downsampled in DB.
+
+            boss-tools/activities/resolution_hierarchy.py
+        """
+
+    Lambda('startSfnLambda')
+        """StartNewSfnInstance
+
+        Start a new instance of this step function.
+
+        start_sfn_lambda.py
+        """
+        retry [
+            'StateMachineDoesNotExist', 
+            'InvalidArn',
+            'KeyError',
+            'TypeError'
+        ] 1 0 1.0
+        retry [] 60 3 2.0

@@ -167,9 +167,12 @@ def create_config(bosslet_config, lookup=True):
                       memory=1024,
                       dlq = Ref('DownsampleDLQ'))
 
+    # This dead letter queue behavior uses a lambda to put failed lambda
+    # executions into a dlqs created specifically for each downsample job.
+    # There is a separate dlq for each resolution.
     config.add_sns_topic("DownsampleDLQ",
-                         names.downsample_dlq.sqs,
-                         names.downsample_dlq.sqs,
+                         names.downsample_dlq.sns,
+                         names.downsample_dlq.sns,
                          [('lambda', Arn('DownsampleDLQLambda'))])
 
     config.add_lambda('DownsampleDLQLambda',

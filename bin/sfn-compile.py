@@ -44,9 +44,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     try:
-        machine = heaviside.compile(Path(args.file),
-                                    translate = heaviside.create_translate(args.region, args.account),
-                                    indent=3)
+        machine = heaviside.compile(Path(args.file), indent=3)
         args.output.write(machine)
         sys.exit(0)
     except heaviside.exceptions.CompileError as ex:

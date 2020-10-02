@@ -189,8 +189,13 @@ class AWSNames(object):
         'delete_tile_objs': {'name': 'deleteTileObjsLambda',
                              'type': 'lambda_'},
         'dns': {'types': ['sns', 'lambda_']},
+        # This is for failed lambda executions during a downsample.  The failed
+        # executions get placed in dead letter queues created for each downsample
+        # job.  Each job has a separate queue for each resolution.
         'downsample_dlq': {'name': 'downsample-dlq',
-                           'types': ['sqs', 'lambda_']},
+                           'types': ['sns', 'lambda_']},
+        'downsample_queue': {'name': 'downsample-queue',
+                             'types': ['sqs']},
         'downsample_volume': {'name': 'downsample.volume',
                               'type': 'lambda_'},
         'dynamolambda': {'type': 'stack'},
