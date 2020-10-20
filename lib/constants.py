@@ -104,8 +104,6 @@ VAULT_KEYCLOAK_DB = "secret/keycloak/db"
 VAULT_ENDPOINT = "secret/endpoint/django"
 VAULT_ENDPOINT_DB = "secret/endpoint/django/db"
 VAULT_ENDPOINT_AUTH = "secret/endpoint/auth"
-VAULT_ENDPOINT_THROTTLE = "secret/endpoint/throttle"
-
 
 ########################
 # Service Check Timeouts
@@ -119,7 +117,6 @@ ENDPOINT_TYPE = "t2.micro"
 RDS_TYPE = "db.t2.micro"
 REDIS_CACHE_TYPE = "cache.t2.micro"
 REDIS_SESSION_TYPE = None
-REDIS_THROTTLE_TYPE = None
 REDIS_TYPE = "cache.t2.micro"
 CACHE_MANAGER_TYPE = "t2.micro"
 VAULT_TYPE = "t2.micro"
@@ -139,34 +136,6 @@ REDIS_CLUSTER_SIZE = 1
 #################
 # Resource Memory
 REDIS_RESERVED_MEMORY_PERCENT = 25
-
-########################
-# Throttle Configuration
-THROTTLE = {
-    # For system / apis if not provided no throttling will happen
-    'system': None,
-    'apis': {
-        'cutout_egress': None,
-        'cutout_ingress': None,
-        'image_egress': None,
-        'tile_egress': None,
-    },
-
-    # For a user if no rules match then no throttling will happen
-    # All matching rules are collected and the largest will be used
-    # ??? Do we want to be able to have rules where a user has a lower limit
-    #     than the groups they are apart of? (abusive user?)
-    'users': {
-        'bossadmin': None,
-    },
-    'groups': {
-        'public': None,
-    },
-
-    # user / group default?
-    # Should a more specific user / group be allowed to be lower then the default?
-}
-
 
 ########################
 # Machine Configurations

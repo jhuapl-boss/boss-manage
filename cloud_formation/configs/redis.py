@@ -84,53 +84,6 @@ def create_config(bosslet_config):
                                      version="3.2.4",
                                      clusters=1)
 
-    if const.REDIS_THROTTLE_TYPE is not None:
-        vpc_id = config.find_vpc()
-        internal_sg = aws.sg_lookup(session, vpc_id, names.internal.sg)
-        lambda_subnets, _ = config.find_all_subnets(compatibility = 'lambda')
-
-        config.add_redis_replication("CacheThrottle",
-                                     names.cache_throttle.redis,
-                                     internal_subnets,
-                                     [sgs[names.internal.sg]],
-                                     type_=const.REDIS_THROTTLE_TYPE,
-                                     version="3.2.4",
-                                     clusters=1)
-
-        config.add_lambda("CacheThrottleLambda",
-                          names.cache_throttle.lambda_,
-                          aws.role_arn_lookup(session, 'lambda_basic_execution'),
-                          description="Reset Boss throttling metrics",
-                          security_groups=[internal_sg],
-                          subnets=lambda_subnets,
-                          handler='index.handler',
-                          timeout=120,
-                          memory=1024)
-
-        # Schedule the lambda to be executed at midnight for the timezone where the bosslet is located
-        # on the first day of the month
-        hour = TIMEZONE_OFFSET.get(bosslet_config.REGION, 0)
-        schedule = 'cron(0 {} 1 * ? *)'.format(hour)
-        config.add_cloudwatch_rule('CacheThrottleReset',
-                                   name=names.cache_throttle.cw,
-                                   description='Reset the current Boss throttling metrics',
-                                   targets=[
-                                       {
-                                           'Arn': Arn('CacheThrottleLambda'),
-                                           'Id': names.cache_throttle.lambda_,
-                                           'Input': json.dumps({
-                                                'host': names.cache_throttle.redis
-                                            }),
-                                       },
-                                   ],
-                                   schedule=schedule,
-                                   depends_on=['CacheThrottleLambda'])
-
-        config.add_lambda_permission('CacheThrottlePerms',
-                                     names.cache_throttle.lambda_,
-                                     principal='events.amazonaws.com',
-                                     source=Arn('CacheThrottleReset'))
-
     return config
 
 
@@ -141,9 +94,6 @@ def generate(bosslet_config):
 
 
 def create(bosslet_config):
-    if const.REDIS_THROTTLE_TYPE is not None:
-        pre_init(bosslet_config)
-
     config = create_config(bosslet_config)
     config.create()
 
@@ -151,10 +101,7 @@ def pre_init(bosslet_config):
     load_lambdas_on_s3(bosslet_config, bosslet_config.names.cache_throttle.lambda_)
 
 def update(bosslet_config):
-    if const.REDIS_THROTTLE_TYPE is not None:
-        rebuild_lambdas = console.confirm("Rebuild lambdas", default=True)
-    else:
-        rebuild_lambdas = False
+    rebuild_lambdas = False
 
     if rebuild_lambdas:
         pre_init(bosslet_config)

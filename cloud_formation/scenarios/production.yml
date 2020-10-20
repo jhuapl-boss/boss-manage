@@ -3,7 +3,6 @@ ENDPOINT_TYPE: m5.2xlarge
 RDS_TYPE: db.t2.medium
 REDIS_CACHE_TYPE: cache.m4.2xlarge
 REDIS_SESSION_TYPE: cache.t2.medium
-REDIS_THROTTLE_TYPE: cache.t2.medium
 REDIS_TYPE: cache.m5.xlarge
 CACHE_MANAGER_TYPE: t2.medium
 VAULT_TYPE: m5.large
@@ -19,23 +18,3 @@ REDIS_CLUSTER_SIZE: 2
 
 # Memory Size
 REDIS_RESERVED_MEMORY_PERCENT: 25
-
-# Throttle Configuration
-THROTTLE:
-    system: 
-        egress: null
-        ingress: null
-    apis:
-        cutout:
-            egress: null
-            ingress: null
-        image:
-            egress: null
-        tile:
-            egress: null
-    users:
-        bossadmin: 
-            egress: null
-    groups:
-        public: 
-            egress: null
