@@ -19,7 +19,7 @@ For every threshold, there is a usage object that tracks the current usage level
 After an initial deployment, there will be no __metric types__ or __thresholds__ defined. As API calls are made, metric types, thresholds, and usage objects will be created automatically. By default, all thresholds are set to unlimited so no throttling will occur. An administrator can set the default limits using the REST API before allowing users access. This will cause automatically created thresholds to use the new default limits for metrics. 
 
 # REST API
-The metric API allows administrators to view metric types, thresholds, and usage objects. Non-admin users can only view their own usage.  Administrators can create and update metric types and thresholds. update limits. It can also be used to change the default limits for system, api, and user metrics.
+The metric API allows administrators to view metric types, thresholds, and usage objects. Non-admin users can only view their own usage objects. Administrators can create and update metric types and thresholds. A metric type can be updated to change the default limit for newly created thresholds. A threshold object can be updated to change the limit and allow a user to continue working.
 
 ## Metric Types
 Each metric type has defaults for system, api, and user level metrics. A limit of -1 means there is no limit.
