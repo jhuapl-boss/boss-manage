@@ -194,7 +194,7 @@ class AWSNames(object):
         # job.  Each job has a separate queue for each resolution.
         'downsample_dlq': {'name': 'downsample-dlq',
                            'types': ['sns', 'lambda_']},
-        'downsample_queue': {'name': 'downsample-queue',
+        'downsample_queue': {'name': 'downsampleQueue',
                              'types': ['sqs']},
         'downsample_volume': {'name': 'downsample.volume',
                               'type': 'lambda_'},
