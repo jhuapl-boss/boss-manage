@@ -8,15 +8,13 @@ daemon:
 download:
     file.managed:
         - name: /tmp/keycloak.tar.gz
-        - source: https://downloads.jboss.org/keycloak/1.9.1.Final/keycloak-1.9.1.Final.tar.gz
-#            - salt://keycloak/files/keycloak-1.9.1.Final.tar.gz
-#            - http://downloads.jboss.org/keycloak/1.9.1.Final/keycloak-1.9.1.Final.tar.gz
-        - source_hash: md5=7c1b23e3a8346ba5fd42a20b5602dd61
+        - source: https://downloads.jboss.org/keycloak/11.0.0/keycloak-11.0.0.tar.gz
+        - source_hash: sha1=398a328a180682ee58b06df148938f5de710f89f
     cmd.run:
         - name: |
             cd /srv/
             tar -x -z -f /tmp/keycloak.tar.gz -C /srv
-            ln -s keycloak-1.9.1.Final keycloak
+            ln -s keycloak-11.0.0 keycloak
         - user: root
         - group: root
 
@@ -65,8 +63,8 @@ mysql-config:
 
 mysql-jar:
     file.managed:
-        - name: /srv/keycloak/modules/system/layers/base/com/mysql/main/mysql-connector-java-5.1.38-bin.jar
-        - source: salt://keycloak/files/mysql-connector-java-5.1.38-bin.jar
+        - name: /srv/keycloak/modules/system/layers/base/com/mysql/main/mysql-connector-java-8.0.21.jar
+        - source: salt://keycloak/files/mysql-connector-java-8.0.21.jar
         - makedirs: True
 
 jgroups-config:
