@@ -63,8 +63,8 @@ def create_config(bosslet_config):
                           name,
                           Ref('LambdaCacheExecutionRole'),
                           handler=handler,
-                          timeout = timeout,
-                          memory = memory)
+                          timeout=timeout,
+                          memory=memory)
 
     add_lambda("indexS3WriterLambda",
                names.index_s3_writer.lambda_,
@@ -99,11 +99,6 @@ def create_config(bosslet_config):
     add_lambda("indexBatchEnqueueCuboidsLambda",
                names.index_batch_enqueue_cuboids.lambda_,
                "batch_enqueue_cuboids_lambda.handler",
-               timeout=60, memory=128)
-
-    add_lambda("startSfnLambda",
-               names.start_sfn.lambda_,
-               "start_sfn_lambda.handler",
                timeout=60, memory=128)
 
     add_lambda("indexFanoutDequeueCuboidKeysLambda",

@@ -167,6 +167,14 @@ def create_config(bosslet_config, lookup=True):
                       memory=1024,
                       dlq = Ref('DownsampleDLQ'))
 
+    start_sfn_lambda_role = aws.role_arn_lookup(session, 'StartStepFcnLambdaRole')
+    config.add_lambda("startSfnLambda",
+               names.start_sfn.lambda_,
+               start_sfn_lambda_role,
+               handler="start_sfn_lambda.handler",
+               timeout=60,
+               memory=128)
+
     # This dead letter queue behavior uses a lambda to put failed lambda
     # executions into a dlqs created specifically for each downsample job.
     # There is a separate dlq for each resolution.
