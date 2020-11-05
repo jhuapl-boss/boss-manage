@@ -4,6 +4,10 @@ DownsampleChannel will increment the resolution and do
 the comparison before finishing. The comparison is done
 in the function because StepFunctions cannot compare
 two JsonPath values.
+
+Required inputs:
+    'queue_url': <URL of SQS queue>,
+    'sfn_arn': <arn of the downsample step fcn (this step fcn!)>
 """
 
 Activity('CheckDownsampleQueue')
@@ -44,6 +48,22 @@ if '$.start_downsample' == true:
                     """SetFailedStatus
                     """
 
+                Lambda('startSfnLambda')
+                    """StartNewSfnInstanceAfterFailure
+
+                    Start a new instance of this step function in case there
+                    are more jobs queued.
+
+                    start_sfn_lambda.py
+                    """
+                    retry [
+                        'StateMachineDoesNotExist', 
+                        'InvalidArn',
+                        'KeyError',
+                        'TypeError'
+                    ] 1 0 1.0
+                    retry [] 60 3 2.0
+
                 Fail('Exception', 'Downsample failed')
                     """DownsampleFailed
                     """
@@ -63,10 +83,19 @@ if '$.start_downsample' == true:
             boss-tools/activities/resolution_hierarchy.py
         """
 
+    Activity('ClearCacheAfterDownsample')
+        """ClearCachedCuboids
+
+            Clear any cuboids from the channel that might have been cached.
+
+            boss-tools/activities/resolution_hierarchy.py
+        """
+
     Lambda('startSfnLambda')
         """StartNewSfnInstance
 
-        Start a new instance of this step function.
+        Start a new instance of this step function in case there
+        are more jobs queued.
 
         start_sfn_lambda.py
         """

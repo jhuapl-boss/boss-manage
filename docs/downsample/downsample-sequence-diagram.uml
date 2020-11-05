@@ -1,6 +1,6 @@
 @startuml
 
-header Last updated 14Oct2020
+header Last updated 05Nov2020
 footer Generated from downsample-sequence-diagram.uml by PlantUML
 title Downsample Sequence Diagram
 
@@ -12,6 +12,7 @@ entity DownsampleLambda as DL
 note over DL: (downsample_volume.py)
 control DownsampleQueue as DQ
 database EndpointDB as DB
+database RedisCache as RC
 
 U->E: POST downsample request
 E->DB: Check if channel downsample already IN_PROGRESS or QUEUED
@@ -35,10 +36,17 @@ alt If job available
         DS->DQ: Refresh visibility timeout of message
         note over DS: downsample_channel()
         DS->>DL: Invoke worker lambdas
+        alt If error
+            DS->DB: Set FAILED status for channel
+            DS->DS: Start new SFN
+            DS->DS: Terminate
+        end
     end
-    DS->DB: Set DOWNSAMPLED status for channel
     note over DS: delete_downsample_job()
     DS->DQ: Delete downsample job
+    DS->DB: Set DOWNSAMPLED status for channel
+    note over DS: clear_cache()
+    DS->RC: Clear any cached cuboids for the downsampled channel
     DS->DS: Start new SFN
 end
 
