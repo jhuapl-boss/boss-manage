@@ -42,9 +42,9 @@ alt If job available
             DS->DS: Terminate
         end
     end
+    DS->DB: Set DOWNSAMPLED status for channel
     note over DS: delete_downsample_job()
     DS->DQ: Delete downsample job
-    DS->DB: Set DOWNSAMPLED status for channel
     note over DS: clear_cache()
     DS->RC: Clear any cached cuboids for the downsampled channel
     DS->DS: Start new SFN
