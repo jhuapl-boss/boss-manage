@@ -5,7 +5,7 @@ include:
 
 ndingest-lib:
     file.recurse:
-        - name: /usr/lib/python3/dist-packages/ndingest
+        - name: /usr/local/lib/python3.8/dist-packages/ndingest
         - source: salt://ndingest/files/ndingest.git
         - include_empty: true
         - user: root
