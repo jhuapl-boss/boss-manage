@@ -22,7 +22,7 @@ import urllib.request
 from spdb.c_lib.ndtype import CUBOIDSIZE
 
 # Location of settings files for ndingest.
-NDINGEST_SETTINGS_FOLDER = '/usr/lib/python3/dist-packages/ndingest/settings'
+NDINGEST_SETTINGS_FOLDER = '/usr/local/lib/python3.8/dist-packages/ndingest/settings'
 
 # Template used for ndingest settings.ini generation.
 NDINGEST_SETTINGS_TEMPLATE = NDINGEST_SETTINGS_FOLDER + '/settings.ini.apl'
