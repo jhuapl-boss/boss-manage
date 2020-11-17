@@ -25,7 +25,29 @@ if '$.start_downsample' == true:
             boss-tools/activities/resolution_hierarchy.py
         """
 
-    while '$.res_lt_max' == true:
+    Pass()
+        """AddSfnArn
+
+            Get running step function's ARN from the Context object.
+        """
+        parameters:
+            exe_sfn_arn.$: "$$.Execution.Id"
+            db_host.$: "$.db_host"
+            sfn_arn.$: "$.sfn_arn"
+            queue_url.$: "$.queue_url"
+            job_receipt_handle.$: "$.job_receipt_handle"
+            channel_id.$: "$.msg.channel_id"
+            msg.$: "$.msg"
+
+    Activity('SetDownsampleArn')
+        """WriteSfnArntoDB
+
+            Write this running step function's ARN to DB
+
+            boss-tools/activities/boss_db.py
+        """
+
+    while '$.msg.res_lt_max' == true:
         """WhileResolutionLessThanMax
         """
         Activity('DownsampleChannel')
@@ -40,11 +62,17 @@ if '$.start_downsample' == true:
 
                     Set failed status as status for next state.
                     """
-                    data:
-                        { "status": "FAILED" }
+                    parameters:
+                        status: "FAILED"
+                        db_host.$: "$.db_host"
+                        sfn_arn.$: "$.sfn_arn"
+                        queue_url.$: "$.queue_url"
+                        channel_id.$: "$.channel_id"
 
                 Activity('UpdateDownsampleStatus')
                     """SetFailedStatus
+
+                        boss-tools/activities/boss_db.py
                     """
 
                 Lambda('startSfnLambda')
@@ -70,17 +98,24 @@ if '$.start_downsample' == true:
     Pass()
         """AddDownsampledStatus
 
-        Set DOWNSAMPLED status as status for next state.
+            Set DOWNSAMPLED status as status for next state.
         """
-        data:
-            { "status": "DOWNSAMPLED" }
+        parameters:
+            status: "DOWNSAMPLED"
+            db_host.$: "$.db_host"
+            sfn_arn.$: "$.sfn_arn"
+            job_receipt_handle.$: "$.job_receipt_handle"
+            queue_url.$: "$.queue_url"
+            lookup_key.$: "$.lookup_key"
+            channel_id.$: "$.channel_id"
+
 
     Activity('UpdateDownsampleStatus')
         """SetDownsampledStatus
 
             Set channel as downsampled in DB.
 
-            boss-tools/activities/resolution_hierarchy.py
+            boss-tools/activities/boss_db.py
         """
 
     Activity('DeleteDownsampleJob')
