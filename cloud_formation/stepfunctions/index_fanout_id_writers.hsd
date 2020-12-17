@@ -45,6 +45,7 @@ map:
         ids.$: "$$.Map.Item.Value"
         cuboid_object_key.$: "$.cuboid_object_key"
         config.$: "$.config"
+        id_index_step_fcn.$: "$.id_index_step_fcn"
     catch []: '$.result'
         Lambda('indexWriteFailedLambda')
             """EnqueueIdsWithMapFailed
