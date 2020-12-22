@@ -2238,7 +2238,7 @@ class CloudFormationConfiguration:
             key (str) : Unique name for the resource in the template
             name (str): Display name of the SNS topic
             topic (str): SNS topic name
-            subscriptions (list): List of tuples containing SNS scriptions to create
+            subscriptions (list): List of tuples containing SNS subscriptions to create
                                   (protocol, endpoint)
         """
         self.resources[key] = {

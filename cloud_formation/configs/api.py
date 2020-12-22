@@ -105,6 +105,7 @@ def create_config(bosslet_config, db_config={}):
     user_data["aws"]["id-index-new-chunk-threshold"] = str(const.DYNAMO_ID_INDEX_NEW_CHUNK_THRESHOLD)
     user_data["aws"]["index-deadletter-queue"] = str(Ref(names.index_deadletter.sqs))
     user_data["aws"]["index-cuboids-keys-queue"] = str(Ref(names.index_cuboids_keys.sqs))
+    user_data["aws"]["downsample-queue"] = str(Ref(names.downsample_queue.sqs))
 
     user_data["auth"]["OIDC_VERIFY_SSL"] = str(bosslet_config.VERIFY_SSL)
     user_data["lambda"]["flush_function"] = names.multi_lambda.lambda_
@@ -147,11 +148,13 @@ def create_config(bosslet_config, db_config={}):
     # Queue that holds S3 object keys of cuboids to be indexed.
     config.add_sqs_queue(names.index_cuboids_keys.sqs, names.index_cuboids_keys.sqs, 120, 20160)
 
-    #config.add_sqs_queue("DeadLetterQueue", names.deadletter.sqs, 30, 20160) DP XXX
     config.add_sqs_queue(names.deadletter.sqs, names.deadletter.sqs, 30, 20160)
 
+    # ToDo: determine if a dlq needed for this queue.
+    # Downsample jobs.
+    config.add_sqs_queue(names.downsample_queue.sqs, names.downsample_queue.sqs, 300, 20160)
+
     max_receives = 3
-    #config.add_sqs_queue("S3FlushQueue", DP XXX
     config.add_sqs_queue(names.s3flush.sqs,
                          names.s3flush.sqs,
                          30,
