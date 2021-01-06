@@ -149,7 +149,10 @@ def get_common_args(bosslet_config):
         },
         "max_write_id_index_lambdas": 599,
         "max_cuboid_fanout": 30,
-        "max_items": 100
+        "max_items": 100,
+        "sqs_url": f'https://queue.amazonaws.com/{account}/{n.index_ids_queue}' ,
+        # Number of object ids to include in a single SQS message.
+        "num_ids_per_msg": 20,
     }
 
     return common_args

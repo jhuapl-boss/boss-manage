@@ -743,6 +743,24 @@ def sqs_delete_all(session, domain):
     for url in resp.get('QueueUrls', []):
         client.delete_queue(QueueUrl=url)
 
+def sqs_lookup_arn(session, queue_name):
+    """Lookup up SQS arn given a name.
+
+    Args:
+        session (Session) : Boto3 session used to lookup information in AWS.
+        queue_name (string) : Name of the queue to lookup.
+
+    Returns:
+        (string) : ARN for the queue.
+
+    Raises:
+        (boto3.ClientError): If queue not found.
+    """
+    client = session.client('sqs')
+    url = sqs_lookup_url(session, queue_name)
+    resp = client.get_queue_attributes(QueueUrl=url, AttributeNames=['QueueArn'])
+    return resp['Attributes']['QueueArn']
+
 def sqs_lookup_url(session, queue_name):
     """Lookup up SQS url given a name.
 

@@ -245,6 +245,8 @@ class AWSNames(object):
                                'types': ['lambda_', 'sfn']},
         'index_get_num_cuboid_keys_msgs': {'name': 'indexGetNumCuboidKeysMsgsLambda',
                                            'type': 'lambda_'},
+        'index_ids_queue': {'name': 'indexIdsQueue',
+                            'type': 'sqs'},
         'index_id_writer': {'name': 'Index.IdWriter',
                             'type': 'sfn'},
         'index_invoke_index_supervisor': {'name': 'indexInvokeIndexSupervisorLambda',
