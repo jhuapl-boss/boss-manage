@@ -136,6 +136,10 @@ def create_config(bosslet_config):
                "load_ids_from_s3_lambda.handler",
                timeout=120, memory=128)
 
+    max_receives = 3
+    config.add_sqs_queue(names.index_ids_queue.sqs, names.index_ids_queue.sqs, 120,
+                         20160, dead=(aws.sqs_lookup_arn(session, names.index_deadletter.sqs), max_receives))
+
     return config
 
 
