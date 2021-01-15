@@ -16,7 +16,10 @@ Sample input:
     "s3_index_table": "s3index.domain.boss",
     "id_index_table": "idIndex.domain.boss",
     "id_index_new_chunk_threshold": 100,
-    "index_deadletter_queue": "https://queue.amazonaws.com/..."
+    # Queue to for "recoverable" failures.  This is the same queue that feeds
+    # the lambda that invokes this step function.
+    "sqs_url": "https://queue.amazonaws.com/...",
+    "index_deadletter_queue": "https://queue.amazonaws.com/...",
     "cuboid_object_key": "...",
     "version": 0,
     "id": "29",
