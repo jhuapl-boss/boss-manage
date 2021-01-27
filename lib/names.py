@@ -229,6 +229,8 @@ class AWSNames(object):
                                   'type': 'sfn'},
         'index_enqueue_cuboids': {'name': 'Index.EnqueueCuboids',
                                   'type': 'sfn'},
+        'index_enqueue_ids': {'name': 'indexEnqueueCuboidIdsLambda',
+                              'type': 'lambda_'},
         'index_fanout_dequeue_cuboid_keys': {'name': 'indexFanoutDequeueCuboidsKeysLambda',
                                              'type': 'lambda_'},
         'index_fanout_dequeue_cuboids': {'name': 'Index.FanoutDequeueCuboids',

@@ -111,6 +111,11 @@ def create_config(bosslet_config):
                "dequeue_cuboid_keys_lambda.handler",
                timeout=60, memory=128)
 
+    add_lambda("indexEnqueueCuboidIdsLambda",
+               names.index_enqueue_ids.lambda_,
+               "enqueue_cuboid_ids_lambda.handler",
+               timeout=60, memory=128)
+
     add_lambda("indexGetNumCuboidKeysMsgsLambda",
                names.index_get_num_cuboid_keys_msgs.lambda_,
                "get_num_msgs_cuboid_keys_queue_lambda.handler",

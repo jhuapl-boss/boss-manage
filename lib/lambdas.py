@@ -80,6 +80,7 @@ def lambda_dirs(bosslet_config):
         n.index_batch_enqueue_cuboids.lambda_: 'multi_lambda',
         n.index_fanout_dequeue_cuboid_keys.lambda_: 'multi_lambda',
         n.index_dequeue_cuboid_keys.lambda_: 'multi_lambda',
+        n.index_enqueue_ids.lambda_: 'multi_lambda',
         n.index_get_num_cuboid_keys_msgs.lambda_: 'multi_lambda',
         n.index_check_for_throttling.lambda_: 'multi_lambda',
         n.index_invoke_index_supervisor.lambda_: 'multi_lambda',
