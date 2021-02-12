@@ -33,11 +33,11 @@ ssl-config:
         - mode: 600
         - names:
             - /etc/ssl/certs/nginx-selfsigned.crt:
-                - source: salt://boss/files/boss.git/nginx-selfsigned.crt
+                - source: salt://boss/files/nginx-selfsigned.crt
             - /etc/ssl/private/nginx-selfsigned.key:
-                - source: salt://boss/files/boss.git/nginx-selfsigned.key
+                - source: salt://boss/files/nginx-selfsigned.key
             - /etc/nginx/dhparam.pem: 
-                - source: salt://boss/files/boss.git/dhparam.pem
+                - source: salt://boss/files/dhparam.pem
 
 nginx-config:
     file.managed:

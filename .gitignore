@@ -65,6 +65,8 @@ packer/output/
 # Private Files
 *.pem
 *.ppk
+*.key
+*.crt
 vault/private/
 
 # Personal Vagrant files
