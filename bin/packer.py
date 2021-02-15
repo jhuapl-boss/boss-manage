@@ -137,7 +137,7 @@ if __name__ == '__main__':
     config_help_names = list(CONFIGS)
     config_help_names.append("all")
     config_help_names.append("lambda")
-    config_help = create_help("config is on of the following: ('all' will build all except 'lambda')", config_help_names)
+    config_help = create_help("config is on of the following: ('all' will build all except 'lambda' and 'backup')", config_help_names)
 
     parser = configuration.BossParser(description = "Script the building of machines images using Packer and SaltStack",
                                       formatter_class=argparse.RawDescriptionHelpFormatter,
