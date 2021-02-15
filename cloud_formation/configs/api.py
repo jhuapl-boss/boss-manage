@@ -173,7 +173,7 @@ def create_config(bosslet_config, db_config={}):
     cert = aws.cert_arn_lookup(session, names.public_dns("api"))
     target_group_keys = config.add_app_loadbalancer("EndpointAppLoadBalancer",
                             names.endpoint_elb.dns,
-                            [("443", "80", "HTTPS", cert)],
+                            [("443", "443", "HTTPS", cert)],
                             vpc_id=vpc_id,
                             subnets=external_subnets_asg,
                             security_groups=[sgs[names.internal.sg], sgs[names.https.sg]],

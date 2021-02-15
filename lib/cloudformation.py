@@ -1470,6 +1470,8 @@ class CloudFormationConfiguration:
             target_group_key = "{}TargetGroup".format(key)
             target_group_keys.append(target_group_key)
 
+            using_https = len(listener) == 4 and listener[3] is not None
+
             self.resources[target_group_key] = {
                 "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
                 "Properties": {
@@ -1479,7 +1481,7 @@ class CloudFormationConfiguration:
                     "HealthCheckTimeoutSeconds": 5,
                     "HealthyThresholdCount": 2,
                     "UnhealthyThresholdCount": 5,
-                    "Protocol": "HTTP",
+                    "Protocol": "HTTPS" if using_https else "HTTP",
                     "Port": listener[1],
                     "TargetType": "instance"
                 }
@@ -1501,7 +1503,6 @@ class CloudFormationConfiguration:
                 #"PolicyNames": [key + "Policy"],
             }
 
-            using_https = len(listener) == 4 and listener[3] is not None
             if using_https:
                 listener_props["Certificates"] = [ { "CertificateArn": listener[3] } ]
 

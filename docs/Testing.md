@@ -53,13 +53,13 @@ sudo -E python3 manage.py test 2>&1 | tee /home/ubuntu/1_django_unittest.txt
 cd /srv/www/django
 sudo -E python3 manage.py test -- -c inttest.cfg 2>&1 | tee /home/ubuntu/2_django_inttest.txt
 
-cd /usr/local/lib/python3.5/site-packages/spdb
+cd /usr/local/lib/python3.8/dist-packages/spdb
 sudo nose2 2>&1 | tee /home/ubuntu/3_spdb_unittest.txt
 sudo nose2 -c inttest.cfg 2>&1 | tee /home/ubuntu/4_spdb_inttest.txt
 
 # Manual install for now.  Will likely remove use of pytest in the future.
 sudo -H pip3 install pytest
-cd /usr/local/lib/python3/site-packages/ndingest
+cd /usr/local/lib/python3.8/dist-packages/ndingest
 # Use randomized queue names and prepend 'test_' to bucket/index names.
 export NDINGEST_TEST=1
 pytest -c test_apl.cfg 2>&1 | tee /home/ubuntu/5_ndingest_test.txt
@@ -102,7 +102,7 @@ sudo -E python3 manage.py test -- -c inttest.cfg
 
 #### SPDB Integration Tests 
 ```shell
-cd /usr/local/lib/python3.5/site-packages/spdb
+cd /usr/local/lib/python3.8/dist-packages/spdb
 sudo nose2
 sudo nose2 -c inttest.cfg
 ```
@@ -111,7 +111,7 @@ sudo nose2 -c inttest.cfg
 ```shell
 # Manual install for now.  Will likely remove use of pytest in the future.
 sudo pip3 install pytest
-cd /usr/local/lib/python3/site-packages/ndingest
+cd /usr/local/lib/python3.8/dist-packages/ndingest
 # Use randomized queue names and prepend 'test_' to bucket/index names.
 export NDINGEST_TEST=1
 pytest -c test_apl.cfg
