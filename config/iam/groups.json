@@ -24,7 +24,7 @@
       "arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole",
       "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole",
       "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetAutoscaleRole",
-      "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetRole"
+      "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetTaggingRole"
     ],
     "GroupName": "aplCompute",
     "GroupPolicyList": [],
