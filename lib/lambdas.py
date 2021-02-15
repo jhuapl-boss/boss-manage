@@ -108,8 +108,7 @@ def lambda_dirs(bosslet_config):
         n.index_load_ids_from_s3.lambda_: 'multi_lambda',
         n.downsample_volume.lambda_: 'multi_lambda',
         n.copy_cuboid_lambda.lambda_: 'multi_lambda',
-        n.dynamo_lambda.lambda_: 'dynamodb-lambda-autoscale',
-        n.cache_throttle.lambda_: 'cache_throttle',
+        n.dynamo_lambda.lambda_: 'dynamodb-lambda-autoscale'
     }
 
 def code_zip(bosslet_config, lambda_config):

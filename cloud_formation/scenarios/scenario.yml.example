@@ -7,7 +7,6 @@ ENDPOINT_TYPE:       # EC2 Instance Type
 RDS_TYPE:            # RDS Instance Type
 REDIS_CACHE_TYPE:    # ElastiCache Instance Type
 REDIS_SESSION_TYPE:  # ElastiCache Instance Type
-REDIS_THROTTLE_TYPE: # ElastiCache Instance Type
 REDIS_TYPE:          # ElastiCache Instance Type
 CACHE_MANAGER_TYPE:  # EC2 Instance Type
 ACTIVITIES_TYPE:     # EC2 Instance Type
@@ -24,26 +23,3 @@ REDIS_CLUSTER_SIZE:   # ElastiCache Redis Replicas
 
 # Memory Size
 REDIS_RESERVED_MEMORY_PERCENT: 25 # ElastiCache Redis Percentage of Memory that is Reserved Memory (recommended to be 25%)
-
-# Throttling
-THROTTLE:
-    # Throttle limits are
-    # null - No throttling
-    # <num><unit> - Limit to the given bytes per day
-    #               <num> is a float
-    #               <unit> is one of K, M, G, T, P for
-    #               kilobytes, megabytes, gigabytes, terabytes, petabytes
-
-    system: null # System wide throttling, allows for creating a limited stack
-    apis: # API specific throttling, allow for restricting parts of the stack
-        cutout_egress: null
-        cutout_ingress: null
-        image_egress: null
-        tile_egress: null
-    users: # User specific throttling, allowing for granting higher or lower limits
-           # then what a user's groups would grant
-        bossadmin: null
-    groups: # Group specific throttling. All groups limits that apply to a user are
-            # selected and the highest limit is used
-        public: null
-    default_user: null # Throttling if a user doesn't match users or groups
