@@ -1140,12 +1140,38 @@ def lambda_arn_lookup(session, lambda_name):
     else:
         return response['Configuration']['FunctionArn']
 
+def lambda_connect_sqs(session, lambda_name, sqs_arn, batch_size=10, enabled=True):
+    """
+    Connects an SQS queue to the lambda function as an event source.  Messages
+    in the queue will be passed to the lambda for processing.
+
+    Args:
+        session (Session): boto3.session.Session object
+        lambda_name (str): name of the lambda function
+        sqs_arn (str): ARN of queue to connect
+        batch_size (int): Number of messages to send to the lambda (max 10)
+        enabled (bool): Whether the connection is on
+    """
+    if session is None:
+        return None
+
+    client = session.client("lambda")
+    try:
+        client.create_event_source_mapping(
+            FunctionName=lambda_name,
+            EventSourceArn=sqs_arn,
+            BatchSize=batch_size,
+            Enabled=enabled)
+    except client.exceptions.ResourceConflictException as ex:
+        print("Warning: failed to connect queue to lambda.  Does connection already exist (printing error below)?")
+        print(f"\t{ex}\n")
+
 def dynamo_scan(session, table_name):
     if session is None:
         return None
     
     client = session.client("dynamodb")
-    response = aws.scan(TableName=table_name)
+    response = client.scan(TableName=table_name)
     if response is None:
         return None
     else:

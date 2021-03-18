@@ -141,7 +141,7 @@ def create_config(bosslet_config):
                "load_ids_from_s3_lambda.handler",
                timeout=120, memory=128)
 
-    max_receives = 3
+    max_receives = 5
     config.add_sqs_queue(names.index_ids_queue.sqs, names.index_ids_queue.sqs, 120,
                          20160, dead=(aws.sqs_lookup_arn(session, names.index_deadletter.sqs), max_receives))
 
@@ -171,7 +171,8 @@ def pre_init(bosslet_config):
 
 
 def post_init(bosslet_config):
-    """Create step functions."""
+    """Create step functions and connect the index id queue to the lambda."""
+    connect_index_ids_queue_to_lambda(bosslet_config)
     role = 'StatesExecutionRole-us-east-1 '
 
     for name, path in STEP_FUNCTIONS(bosslet_config):
@@ -179,10 +180,17 @@ def post_init(bosslet_config):
 
 
 def post_update(bosslet_config):
-    """Create step functions."""
-
+    """Update step functions and connect the index id queue to the lambda."""
+    connect_index_ids_queue_to_lambda(bosslet_config)
     for name, path in STEP_FUNCTIONS(bosslet_config):
         sfn.update(bosslet_config, name, path)
+
+
+def connect_index_ids_queue_to_lambda(bosslet_config):
+    """Connect the index ids queue to the lambda that starts step funcs."""
+    names = bosslet_config.names
+    sqs_arn = aws.sqs_lookup_arn(bosslet_config.session, names.index_ids_queue.sqs)
+    aws.lambda_connect_sqs(bosslet_config.session, names.start_sfn.lambda_, sqs_arn, batch_size=1)
 
 
 def update(bosslet_config):

@@ -92,6 +92,33 @@ while '$.write_id_index_status.done' == False:
         retry ['DynamoClientError'] 1 0 1.0
         # Allow step function managed retries of other errors.
         retry [] 45 2 2.5
+        catch ['DynamoClientError']: '$.result'
+            while '$.done' == False and '$.attempt' < 5:
+                """WhileNotDoneReEnqueuing
+
+                Retry up to 3 times (attempts 1 - 4).
+                """
+                Lambda('indexEnqueueCuboidIdsLambda')
+                    """WriteFailedReEnqueue
+
+                    Write failed; try to put failed ids back on queue.
+                    """
+                    retry ['KeyError'] 1 0 1.0
+                    catch []:
+                        goto "WriteIdFailed"
+                Wait(seconds_path='$.wait_time')
+                    """ReEnqueueBackoffDelay
+
+                    If non-zero, wait before retrying.
+                    """
+            if '$.done' == True:
+                Fail('Exception', 'Dynamo error, but ids put back on queue')
+                    """RecoverableFailure
+
+                    Failed to update Dynamo, but failed ids put back in SQS.
+                    """
+
+            goto "WriteIdFailed"
         catch []: '$.result'
             Lambda('indexWriteFailedLambda')
                 """WriteIdFailed

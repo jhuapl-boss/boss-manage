@@ -50,8 +50,35 @@ map:
     enqueue_cuboids_ids_lambda.py
     """
     iterator:
-        Pass()
-            """ReplaceThisWithLambda"""
+        while '$.done' == False and '$.attempt' < 5:
+            """WhileNotDone
+
+            Retry up to 3 times (attempts 1 - 4).
+            """
+            Lambda('indexEnqueueCuboidIdsLambda')
+                """EnqueueCuboidIds
+
+                enqueue_cuboid_ids_lambda.py
+                """
+                retry ['KeyError'] 1 0 1.0
+                catch []: '$.result'
+                    Lambda('indexWriteFailedLambda')
+                        """EnqueueSomeIdsFailed
+                        """
+                        retry ['KeyError'] 1 0 1.0
+                        retry [] 10 2 2.0
+                        catch []: '$.dlqresult'
+                            Fail('Exception', 'Failed to write to dead letter queue')
+                                """FailedEnqueueIdsToDeadLetterQueue
+                                """
+                    Fail('Exception', 'Failed to enqueue ids')
+                        """FailedEnqueuingIds
+                        """
+            Wait(seconds_path='$.wait_time')
+                """BackoffDelay
+
+                If non-zero, wait before retrying.
+                """
     items_path: "$.id_chunks"
     parameters:
         ids.$: "$$.Map.Item.Value"
@@ -59,8 +86,13 @@ map:
         version.$: "$.version"
         config.$: "$.config"
         id_index_step_fcn.$: "$.id_index_step_fcn"
-        sqs_url.$: "$.sqs_url"
+        sqs_url.$: "$.index_ids_sqs_url"
+        sfn_arn.$: "$.id_index_step_fcn"
         num_ids_per_msg.$: "$.num_ids_per_msg"
+        index_deadletter_queue.$: "$.index_deadletter_queue"
+        wait_time.$: "$.wait_time"
+        done: False
+        attempt: 1
     catch []: '$.result'
         Lambda('indexWriteFailedLambda')
             """EnqueueIdsWithMapFailed

@@ -115,6 +115,7 @@ def get_common_args(bosslet_config):
     account = bosslet_config.ACCOUNT_ID
     sfn_arn_prefix = SFN_ARN_PREFIX_FORMAT.format(bosslet_config.REGION,
                                                   bosslet_config.ACCOUNT_ID)
+    make_sqs_url = lambda account, queue_name : f'https://queue.amazonaws.com/{account}/{queue_name}'
     n = bosslet_config.names
     common_args = {
         "id_supervisor_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_supervisor.sfn),
@@ -134,8 +135,8 @@ def get_common_args(bosslet_config):
             "id_index_table": n.id_index.ddb,
             "s3_flush_queue": 'https://queue.amazonaws.com/{}/{}'.format(account, n.s3flush.sqs),
             "id_index_new_chunk_threshold": NEW_CHUNK_THRESHOLD,
-            "index_deadletter_queue": 'https://queue.amazonaws.com/{}/{}'.format(account, n.index_deadletter.sqs),
-            "index_cuboids_keys_queue": 'https://queue.amazonaws.com/{}/{}'.format(account, n.index_cuboids_keys.sqs)
+            "index_deadletter_queue": make_sqs_url(account, n.index_deadletter.sqs),
+            "index_cuboids_keys_queue": make_sqs_url(account, n.index_cuboids_keys.sqs)
           },
           "kv_config": {
             "cache_host": n.cache.redis,
@@ -150,9 +151,11 @@ def get_common_args(bosslet_config):
         "max_write_id_index_lambdas": 599,
         "max_cuboid_fanout": 30,
         "max_items": 100,
-        "sqs_url": f'https://queue.amazonaws.com/{account}/{n.index_ids_queue}' ,
+        "index_ids_sqs_url": make_sqs_url(account, n.index_ids_queue.sqs),
         # Number of object ids to include in a single SQS message.
         "num_ids_per_msg": 20,
+        "id_chunk_size": 20,
+        "wait_time": 5,
     }
 
     return common_args
@@ -276,7 +279,7 @@ def stop_indexing(bosslet_config):
     cause = 'User initiated abort'
 
     supe_arn = stop_args['id_supervisor_step_fcn']
-    sfn = session.client('stepfunctions')
+    sfn = bosslet_config.session.client('stepfunctions')
 
     print('Stopping Index.Supervisor . . .')
     for arn in get_running_step_fcns(bosslet_config, supe_arn):
