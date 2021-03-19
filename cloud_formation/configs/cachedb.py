@@ -495,7 +495,7 @@ def add_bucket_trigger(session, lambda_name, bucket_name, trigger_id):
     This is done in post-init() because the bucket isn't always
     created during CloudFormation (it may already exist).
 
-    This function's effects should be idempotent because the same id isla
+    This function's effects should be idempotent because the same id is
     used everytime the notification event is added to the bucket.
 
     Args:
