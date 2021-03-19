@@ -37,6 +37,32 @@ Keycloak can also allow thirdparty authentication services (like Github.com) tha
 use OIDC to be the authentication source for a user, eliminating the need for a
 user to make a BOSS specific account.
 
+### Email Configuration
+To enable keycloak users to manage their passwords, we need to setup an email account for keycloak use.
+This configuration can be performed after deploying keycloak.
+These instructions were derived from this [wordpress article](https://codehumsafar.wordpress.com/2018/09/23/keycloak-configure-and-test-email-settings-for-realm/)
+
+You need to have an email account that allows access from _less secure apps_, a [setting available on gmail accounts](https://support.google.com/accounts/answer/6010255?hl=en#zippy=%2Cif-less-secure-app-access-is-on-for-your-account). 
+
+To begin, access the [administration console](https://auth.bossdb.io/auth/) and login using the admin credentials.
+
+You must associate an email account with the keycloak admin user. 
+Click on the Admin user link in the top right and select _Manage account_. 
+Enter the email address and name for the administrator. 
+
+Click on the Reaml Setting for the BOSS realm and select the Email tab.
+There following settings were used for a gmail account:
+
+* Host: smtp.gmail.com
+* Port 587
+* Enable SSL: OFF
+* Enable StartTLS: ON
+* Enable Authentication: ON
+
+You will need to enter your specific values for __From__, __Username__, and __Password__.
+
+Click the _Save_ button and then try the _Test connection_ button. This should send a test email.
+
 ## Django
 Currently there are only Django applications that are authenticating to Keycloak.
 There are three different plugins that are used to handle difference authentication

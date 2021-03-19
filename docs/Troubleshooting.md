@@ -61,7 +61,40 @@
 constant, it means things could start getting bad.  Look for the bottleneck, is a dynamoDB table hitting capacity of throttling?  If we can not fix the problem, we need to lower the number concurrent nodes performers are using to write.  Sometimes we pause the performers for the system to catch up during heavy use.
 
 
+# Troubleshooting on Test Stack
+When integration testing reveals an elusive problem, you may need to debug directly on the Bossdb endpoint.
+
+## Debugging the Bossdb service
+To use the python debugger package pdb, you can follow this guidance.
+
+### Get a shell session on the endpoint
+```boss-manage/bin/bastion.py endpoint.bossdbtest.boss ssh```
+
+### Shutdown nginx
+```sudo service nginx stop```
+
+### Shutdown bossdb django service
+```sudo service uwsgi-emperor stop```
 
 
+### Place pdb in the suspected module
+You need to place the import statement in the module of interest
 
-  
+```import pdb```
+
+Place the following statement in the code where you want to start tracing
+
+```pdb.set_trace()```
+
+### Start the service from the command line
+Navigate to the django code module and start the service.
+
+```
+cd /srv/www/django
+sudo python3 manage.py runserver 0.0.0.0:80
+```
+
+When the service hits the trace code, it will drop out into the debugger. You will need to use pdb commands to navigate.
+
+NOTE: When you shutdown nginx, the rewrite rule for /latest/ to /v1/ will no longer be applied. Rest calls to the endpoint with /latest/ will need to be rewritten to /v1/.
+
