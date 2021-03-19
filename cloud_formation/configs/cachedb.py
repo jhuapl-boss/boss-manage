@@ -293,13 +293,13 @@ def create_config(bosslet_config, user_data=None):
                       Ref("LambdaCacheExecutionRole"),
                       handler='tile_uploaded_lambda.handler',
                       timeout=120,
-                      memory=1024)
+                      memory=2048)
     config.add_lambda("TileIngestLambda",
                       names.tile_ingest.lambda_,
                       Ref("LambdaCacheExecutionRole"),
                       handler='tile_ingest_lambda.handler',
                       timeout=8*60+30,
-                      memory=1792)
+                      memory=3008)
     config.add_lambda("DeleteTileObjsLambda",
                       names.delete_tile_objs.lambda_,
                       Ref("LambdaCacheExecutionRole"),
