@@ -1,6 +1,6 @@
 @startuml
 
-header Last updated 13Feb2020
+header Last updated 19Apr2021
 footer Generated from ingest-complete-missing-chunks-sequence.uml by PlantUML
 title Ingest Completion - Missing Chunks Sequence Diagram
 
@@ -10,7 +10,6 @@ collections DB
 entity SFnWorker as W
 control UploadQueue as UQ
 control TileIndexQueue as TIQ
-control TileErrorQueue as TEQ
 control IngestQueue as IQ
 control TileIndex as TI
 
@@ -23,12 +22,16 @@ E->DB: Confirm wait period expired
 E->UQ: Check for messages
 E->TIQ: Check for messages
 E->IQ: Check for messages
-E->TEQ: Check for messages
 E->DB: Set COMPLETING status
 E->IC: Respond with COMPLETING status
 E->W: Start
 W->TI: Scan for remaining chunks
 W->UQ: Enqueue missing tiles
-W->DB: Set UPLOADING status
+W->TIQ: Enqueue chunks without missing tiles
+alt Only missing chunks (no missing tiles)
+    W->DB: Set WAIT_ON_QUEUES status
+else Missing tiles (could also include missing chunks)
+    W->DB: Set UPLOADING status
+end
 
 @enduml

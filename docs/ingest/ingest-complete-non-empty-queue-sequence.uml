@@ -1,6 +1,6 @@
 @startuml
 
-header Last updated 13Feb2020
+header Last updated 1Apr2021
 footer Generated from ingest-complete-non-empty-queue-sequence.uml by PlantUML
 title Ingest Completion - Non-Empty Queue Sequence Diagram
 
@@ -10,14 +10,12 @@ collections DB
 entity SFnWorker as W
 control UploadQueue as UQ
 control TileIndexQueue as TIQ
-control TileErrorQueue as TEQ
 control IngestQueue as IQ
 
 IC->E: Complete request
 E->UQ: Check for messages
 E->TIQ: Check for messages
 E->IQ: Check for messages
-E->TEQ: Check for messages
 alt Upload Queue Not Empty
     E->DB: Set UPLOADING status
     E->IC: Refuse request and report UPLOADING status
@@ -33,15 +31,12 @@ else All Queues Currently Empty
         E->UQ: Check for messages
         E->TIQ: Check for messages
         E->IQ: Check for messages
-        E->TEQ: Check for messages
         alt Upload Queue Not Empty
             E->DB: Set UPLOADING status
             E->IC: Refuse request and return UPLOADING status
         else Tile Index or Ingest Queues Are Not Empty
             E->DB: Update timestamp (based on visibility timeout\nand number of messages)
             E->IC: Refuse request and return time client should wait\nand WAIT_ON_QUEUES status
-        else Tile Error Queue Is Not Empty
-            E->IC: Refuse request and ????
         end
 end
 
