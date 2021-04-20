@@ -37,6 +37,7 @@ if '$.start_downsample' == true:
             queue_url.$: "$.queue_url"
             job_receipt_handle.$: "$.job_receipt_handle"
             channel_id.$: "$.msg.channel_id"
+            lookup_key.$: "$.msg.lookup_key"
             msg.$: "$.msg"
 
     Activity('SetDownsampleArn')
