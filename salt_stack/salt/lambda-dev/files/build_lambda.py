@@ -22,6 +22,7 @@ import shlex
 import shutil
 import subprocess
 import pathlib
+import importlib
 
 
 
@@ -197,7 +198,12 @@ if __name__ == '__main__':
     #          this can sometimes result in an import error, though
     #          running the script again (after the packages have been
     #          installed) normally works
-    run('python3 -m pip install --user boto3 PyYaml')
+    #run('python3 -m pip install --user boto3 PyYaml')
+    run('python3 -m pip install boto3 PyYaml')
+    # If the above packages were just installed, this makes sure we can import
+    # while still running.
+    importlib.invalidate_caches()
+
     import boto3
     import yaml
 

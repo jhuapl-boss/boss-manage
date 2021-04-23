@@ -1,14 +1,14 @@
 name: multilambda
-runtime: python3.7
+runtime: python3.8
 include:
-        # DP NOTE: The spdb and heaviside repositories are copied into repos/
+        # DP NOTE: The ndingest, spdb, and heaviside repositories are copied into repos/
         #          where pip can install them from
         salt_stack/salt/spdb/files/spdb.git: repos/spdb
         salt_stack/salt/boss-tools/files/boss-tools.git/bossutils: bossutils
         salt_stack/salt/boss-tools/files/boss-tools.git/cloudwatchwrapper: cloudwatchwrapper
         salt_stack/salt/boss-tools/files/boss-tools.git/lambda: lambda
         salt_stack/salt/boss-tools/files/boss-tools.git/lambdautils: lambdautils
-        salt_stack/salt/ndingest/files/ndingest.git: ndingest
+        salt_stack/salt/ndingest/files/ndingest.git: repos/ndingest
         lib/heaviside.git: repos/heaviside
         lib/heaviside.git/requirements.txt: heaviside/requirements.txt
         lib/names.py: bossnames/names.py
@@ -31,21 +31,31 @@ system_packages:
         - gcc-c++
 python_packages:
         - repos/spdb/
+        - repos/ndingest/
         - repos/heaviside/
 manual_commands:
+        - |
+                # Copy settings file for ndingest
+                cp repos/ndingest/ndingest/settings/settings.ini ./ndingest/settings
         - |
                 # Remove repositories used to do install
                 rm -rf repos/
         - | # Should this be a manual command or a list of files to be copied into the staging directory
-                # copy the BLAS libraries into relative directories
-                cp /usr/lib64/atlas/libatlas.so.3 .
-                cp /usr/lib64/atlas/libptf77blas.so.3 .
-                cp /usr/lib64/atlas/libf77blas.so.3 .
-                cp /usr/lib64/atlas/libptcblas.so.3 .
-                cp /usr/lib64/atlas/libcblas.so.3 .
-                cp /usr/lib64/atlas/liblapack.so.3 .
 
-                cp /usr/lib64/libgfortran.so.3 .
+                # Required for spdb's c library.
+                cp /lib64/libgomp.so.1 .
+
+                # copy the BLAS libraries into relative directories
+                # All these libs don't seem to be necessary using AWS's
+                # Python3.8 lambda build Docker image.
+                #cp /usr/lib64/atlas/libatlas.so.3 .
+                #cp /usr/lib64/atlas/libptf77blas.so.3 .
+                #cp /usr/lib64/atlas/libf77blas.so.3 .
+                #cp /usr/lib64/atlas/libptcblas.so.3 .
+                #cp /usr/lib64/atlas/libcblas.so.3 .
+                #cp /usr/lib64/atlas/liblapack.so.3 .
+
+                #cp /usr/lib64/libgfortran.so.3 .
                 cp /usr/lib64/libquadmath.so.0 .
         - |
                 # set the correct log config

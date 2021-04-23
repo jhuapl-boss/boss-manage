@@ -79,6 +79,11 @@ class BossConfiguration(object):
         'SLACK_WEBHOOK_HOST', # Optional
         'SLACK_WEBHOOK_PATH_DYNAMODB_AUTOSCALE', # Conditional, to use Slack integration
         'DYNAMODB_AUTOSCALE_PROVISIONER', # Optional
+
+        # Optional - passed to Docker lambda builder (contains APL SSL
+        # inspection certificate).  Create by appending the APL cert to a copy
+        # of the certs that come with the certifi package (cacert.pem).
+        'CERT_BUNDLE_PATH',
     ]
 
     __DEFAULTS = {
@@ -96,6 +101,7 @@ class BossConfiguration(object):
         'SLACK_WEBHOOK_HOST': 'hooks.slack.com',
         'SLACK_WEBHOOK_PATH_DYNAMODB_AUTOSCALE': None,
         'DYNAMODB_AUTOSCALE_PROVISIONER': 'BossDefaultProvisioners',
+        'CERT_BUNDLE_PATH': None, # Optional
     }
 
     def __init__(self, bosslet, **kwargs):

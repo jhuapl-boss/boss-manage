@@ -32,7 +32,7 @@ import pwd
 import pathlib
 
 # Location of settings files for ndingest.
-NDINGEST_SETTINGS_FOLDER = const.repo_path('salt_stack', 'salt', 'ndingest', 'files', 'ndingest.git', 'settings')
+NDINGEST_SETTINGS_FOLDER = const.repo_path('salt_stack', 'salt', 'ndingest', 'files', 'ndingest.git', 'ndingest', 'settings')
 
 # Template used for ndingest settings.ini generation.
 NDINGEST_SETTINGS_TEMPLATE = NDINGEST_SETTINGS_FOLDER + '/settings.ini.apl'
@@ -242,9 +242,9 @@ def load_lambdas_on_s3(bosslet_config, lambda_name = None, lambda_dir = None):
             console.error("Cannot build a lambda that doesn't use a code zip file")
             return None
 
-    # To prevent rubuilding a lambda code zip multiple times during an individual execution memorize what has been built
+    # To prevent rebuilding a lambda code zip multiple times during an individual execution memorize what has been built
     if lambda_dir in BUILT_ZIPS:
-        console.debug('Lambda code {} has already be build recently, skipping...'.format(lambda_dir))
+        console.debug('Lambda code {} has already built recently, skipping...'.format(lambda_dir))
         return
     BUILT_ZIPS.append(lambda_dir)
 
@@ -293,7 +293,14 @@ def load_lambdas_on_s3(bosslet_config, lambda_name = None, lambda_dir = None):
             os.chdir(cwd)
 
     # Currently any Docker CLI compatible container setup can be used (like podman)
-    CONTAINER_CMD = '{EXECUTABLE} run --rm -it --env AWS_* --volume {HOST_DIR}:/var/task/ lambci/lambda:build-{RUNTIME} {CMD}'
+    CONTAINER_CMD = '{EXECUTABLE} run --rm -it \
+        -e AWS_REGION -e AWS_DEFAULT_REGION -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
+        -e PIP_CERT=/etc/ssl/certs/ca-bundle.crt \
+        -e REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-bundle.crt \
+        -e SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt \
+        --volume {HOST_DIR}:/var/task/ \
+        --volume {CERT_BUNDLE_PATH}:/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:ro \
+        public.ecr.aws/sam/build-{RUNTIME} {CMD}'
 
     BUILD_CMD = 'python3 {PREFIX}/build_lambda.py {DOMAIN} {BUCKET}'
     BUILD_ARGS = {
@@ -333,12 +340,17 @@ def load_lambdas_on_s3(bosslet_config, lambda_name = None, lambda_dir = None):
 
             console.info("calling build lambda on localhost")
         else:
+            # Use Docker container
             BUILD_ARGS['PREFIX'] = '/var/task'
-            CMD = BUILD_CMD.format(**BUILD_ARGS)
+            build_cmd_with_args = BUILD_CMD.format(**BUILD_ARGS)
             CMD = CONTAINER_CMD.format(EXECUTABLE = container_executable,
                                        HOST_DIR = const.repo_path('salt_stack', 'salt', 'lambda-dev', 'files'),
                                        RUNTIME = lambda_config['runtime'],
-                                       CMD = CMD)
+                                       CMD = build_cmd_with_args,
+                                       CERT_BUNDLE_PATH = bosslet_config.CERT_BUNDLE_PATH)
+
+            if bosslet_config.CERT_BUNDLE_PATH is None:
+                raise BossManageError('Cannot run Docker lambda builder w/o CERT_BUNDLE_PATH set in the bosslet config')
 
             if bosslet_config.PROFILE is not None:
                 # Cannot set the profile as the container will not have the credentials file
