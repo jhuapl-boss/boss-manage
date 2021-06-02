@@ -6,6 +6,7 @@ include:
     - uwsgi.emperor
     - nginx
     - spdb
+    - cvdb
     - git
 
 django-prerequirements:
