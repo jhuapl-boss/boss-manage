@@ -1,13 +1,6 @@
 include:
     - python.python3
 
-wheel-upgrade:
-    pip.installed:
-        - name: wheel
-        - upgrade: True
-        - require:
-            - sls: python.python3
-
 cvdb-lib:
     pip.installed:
         - name: /srv/salt/cvdb/files/cvdb.git/
