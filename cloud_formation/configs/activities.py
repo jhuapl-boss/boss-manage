@@ -131,6 +131,8 @@ def create_config(bosslet_config, lookup=True):
     user_data["aws"]["id-index-table"] = names.id_index.ddb
     user_data["aws"]["id-count-table"] = names.id_count_index.ddb
     user_data["aws"]["max_task_id_suffix"] = str(const.MAX_TASK_ID_SUFFIX)
+    user_data["aws"]["tile_ingest_lambda"] = names.tile_ingest.lambda_
+    user_data["aws"]["tile_uploaded_lambda"] = names.tile_uploaded.lambda_
 
     config.add_autoscale_group("Activities",
                                names.activities.dns,
