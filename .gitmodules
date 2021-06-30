@@ -26,3 +26,7 @@
 	path = cloud_formation/lambda/dynamodb-lambda-autoscale
 	url = ../dynamodb-lambda-autoscale.git
 	branch = integration
+[submodule "salt_stack/salt/cvdb/files/cvdb.git"]
+	path = salt_stack/salt/cvdb/files/cvdb.git
+	url = https://github.com/jhuapl-boss/cvdb.git
+	branch = integration
