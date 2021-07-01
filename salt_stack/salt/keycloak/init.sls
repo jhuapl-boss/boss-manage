@@ -8,13 +8,13 @@ daemon:
 download:
     file.managed:
         - name: /tmp/keycloak.tar.gz
-        - source: https://downloads.jboss.org/keycloak/11.0.0/keycloak-11.0.0.tar.gz
-        - source_hash: sha1=398a328a180682ee58b06df148938f5de710f89f
+        - source: https://downloads.jboss.org/keycloak/11.0.3/keycloak-11.0.3.tar.gz
+        - source_hash: sha1=87bae7fd63b49756f54e4e293fb37329f117e30d
     cmd.run:
         - name: |
             cd /srv/
             tar -x -z -f /tmp/keycloak.tar.gz -C /srv
-            ln -s keycloak-11.0.0 keycloak
+            ln -s keycloak-11.0.3 keycloak
         - user: root
         - group: root
 
