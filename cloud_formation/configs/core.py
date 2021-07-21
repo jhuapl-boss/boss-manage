@@ -392,13 +392,8 @@ def post_init(bosslet_config):
         ssh("/srv/keycloak/bin/add-user-keycloak.sh -r master -u {} -p {}".format(username, password))
         time.sleep(10)
 
-        print("Restarting Keycloak")
-        ssh("sudo service keycloak stop")
+        ssh("/srv/keycloak/bin/jboss-cli.sh --connect reload")
         time.sleep(3)
-        ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
-                                      # make sure the process is actually killed
-        time.sleep(3)
-        ssh("sudo service keycloak start")
 
     print("Waiting for Keycloak to restart")
     call.check_keycloak(const.TIMEOUT_KEYCLOAK)
