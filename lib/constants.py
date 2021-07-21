@@ -109,19 +109,21 @@ VAULT_ENDPOINT_AUTH = "secret/endpoint/auth"
 # Service Check Timeouts
 TIMEOUT_VAULT = 120
 TIMEOUT_KEYCLOAK = 150
+AUTH_HEALTH_CHECK_GRACE_PERIOD = 160
 
 
 ########################
 # Machine Instance Types
-ENDPOINT_TYPE = "t2.micro"
-RDS_TYPE = "db.t2.micro"
-REDIS_CACHE_TYPE = "cache.t2.micro"
+ENDPOINT_TYPE = "t3.micro"
+RDS_TYPE = "db.t3.micro"
+RDS_AUTH_TYPE = "db.t3.micro"
+REDIS_CACHE_TYPE = "cache.t3.micro"
 REDIS_SESSION_TYPE = None
-REDIS_TYPE = "cache.t2.micro"
-CACHE_MANAGER_TYPE = "t2.micro"
-VAULT_TYPE = "t2.micro"
-ACTIVITIES_TYPE = "t2.micro"
-AUTH_TYPE = "t2.micro"
+REDIS_TYPE = "cache.t3.micro"
+CACHE_MANAGER_TYPE = "t3.micro"
+VAULT_TYPE = "t3.micro"
+ACTIVITIES_TYPE = "t3.micro"
+AUTH_TYPE = "t3.micro"
 
 
 ########################

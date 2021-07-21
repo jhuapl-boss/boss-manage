@@ -2,24 +2,23 @@
 
 # Instance types
 
-#ENDPOINT_TYPE: m5.2xlarge
 ENDPOINT_TYPE: m5.xlarge
 RDS_TYPE: db.t3.micro
+RDS_AUTH_TYPE: db.t2.micro    # defaulting to t2 because that is what bossdb current has.
 REDIS_CACHE_TYPE: cache.m5.xlarge
-REDIS_SESSION_TYPE: cache.t2.small
-REDIS_THROTTLE_TYPE: cache.t2.small
-REDIS_TYPE: cache.t2.small
+REDIS_SESSION_TYPE: cache.t3.small
+REDIS_THROTTLE_TYPE: cache.t3.small
+REDIS_TYPE: cache.t3.small
 CACHE_MANAGER_TYPE: t3.micro
 VAULT_TYPE: m5.large
 ACTIVITIES_TYPE: r5.xlarge
-#AUTH_TYPE: m5.xlarge
 AUTH_TYPE: m5.xlarge
 
 # Cluster / ASG sizes
 AUTH_CLUSTER_SIZE: 1
 VAULT_CLUSTER_SIZE: 1
 ENDPOINT_CLUSTER_MIN: 1
-ENDPOINT_CLUSTER_MAX: 30
+ENDPOINT_CLUSTER_MAX: 50
 REDIS_CLUSTER_SIZE: 2
 
 # Memory Size

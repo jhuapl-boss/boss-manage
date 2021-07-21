@@ -1044,7 +1044,7 @@ class CloudFormationConfiguration:
             "Properties" : {
                 "Engine" : "mysql",
                 "LicenseModel" : "general-public-license",
-                "EngineVersion" : "5.6.48",
+                "EngineVersion" : "5.6.51",  # was 5.6.48
                 "DBInstanceClass" : type_,
                 "MultiAZ" : "true",
                 "StorageType" : "standard",

@@ -59,7 +59,7 @@ import sys
 import json
 import time
 
-def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, type_="t2.micro", public=True, depends_on=None):
+def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, type_="t3.micro", public=True, depends_on=None):
     security_groups = [Ref("InternalSecurityGroup")]
     config.add_autoscale_group(key,
                                hostname,
@@ -74,6 +74,7 @@ def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnet
                                elb = Ref(key + "LoadBalancer"),
                                notifications = Ref("DNSSNS"),
                                role = role,
+                               health_check_grace_period=const.AUTH_HEALTH_CHECK_GRACE_PERIOD,  # This is needed to give time to Auth server to update AuthDB on first start.
                                depends_on = key + "LoadBalancer")
 
     security_groups.extend(sgs)
@@ -174,7 +175,7 @@ def create_config(bosslet_config):
     USE_DB = bosslet_config.AUTH_RDS
     if USE_DB:
         deps.append("AuthDB")
-        user_data["aws"]["db"] = "keycloak" # flag for init script for which config to use
+        user_data["aws"]["db"] = "keycloak"  # flag for init script for which config to use
 
     cert = aws.cert_arn_lookup(session, names.public_dns('auth'))
     create_asg_elb(config,
@@ -201,8 +202,8 @@ def create_config(bosslet_config):
                           "keycloak",
                           "keycloak",
                           internal_subnets,
-                          type_ = "db.t2.micro",
-                          security_groups = [Ref("InternalSecurityGroup")])
+                          type_=const.RDS_AUTH_TYPE,
+                          security_groups=[Ref("InternalSecurityGroup")])
 
 
     config.add_lambda("DNSLambda",
@@ -379,7 +380,7 @@ def post_init(bosslet_config):
     # Configure Keycloak
     print("Waiting for Keycloak to bootstrap")
     call.check_keycloak(const.TIMEOUT_KEYCLOAK)
-
+    print("Finished waiting for Keycloak to bootstrap")
     #######
     ## DP TODO: Need to find a check so that the master user is only added once to keycloak
     ##          Also need to guard the writes to vault with the admin password
@@ -389,20 +390,16 @@ def post_init(bosslet_config):
         print("Creating initial Keycloak admin user")
         # This fails if the user already exists, but execution will continue.
         ssh("/srv/keycloak/bin/add-user-keycloak.sh -r master -u {} -p {}".format(username, password))
+        time.sleep(10)
 
-        print("Restarting Keycloak")
-        ssh("sudo service keycloak stop")
-        time.sleep(2)
-        ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
-                                      # make sure the process is actually killed
+        ssh("/srv/keycloak/bin/jboss-cli.sh --connect reload")
         time.sleep(3)
-        ssh("sudo service keycloak start")
 
     print("Waiting for Keycloak to restart")
     call.check_keycloak(const.TIMEOUT_KEYCLOAK)
 
     with call.tunnel(names.auth.dns, 8080) as port:
-        URL = "http://localhost:{}".format(port) # TODO move out of tunnel and use public address
+        URL = "http://localhost:{}".format(port)  # TODO move out of tunnel and use public address
 
         with KeyCloakClient(URL, username, password) as kc:
             print("Opening realm file at '{}'".format(const.KEYCLOAK_REALM))

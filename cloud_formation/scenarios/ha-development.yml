@@ -1,13 +1,14 @@
 # Instance types
-ENDPOINT_TYPE: t2.medium
-RDS_TYPE: db.t2.micro
-REDIS_CACHE_TYPE: cache.t2.small
-REDIS_SESSION_TYPE: cache.t2.small
-REDIS_TYPE: cache.t2.small
-CACHE_MANAGER_TYPE: t2.micro
+ENDPOINT_TYPE: t3.medium
+RDS_TYPE: db.t3.micro
+RDS_AUTH_TYPE: db.t3.micro
+REDIS_CACHE_TYPE: cache.t3.small
+REDIS_SESSION_TYPE: cache.t3.small
+REDIS_TYPE: cache.t3.small
+CACHE_MANAGER_TYPE: t3.micro
 VAULT_TYPE: t3.large
 ACTIVITIES_TYPE: m5.large
-AUTH_TYPE: t2.micro
+AUTH_TYPE: t3.micro
 
 # Cluster / ASG sizes
 AUTH_CLUSTER_SIZE: 1
