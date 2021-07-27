@@ -23,7 +23,7 @@ Sample input:
     "cuboid_object_key": "...",
     "version": 0,
     "id": "29",
-    "wait_secs": 0
+    #"wait_secs": 0
 }
 """
 
@@ -37,13 +37,13 @@ version: '1.0'
 # All of the values above should be factored into the timeout setting.
 timeout: 3600
 
-Wait(seconds_path='$.wait_secs')
-    """StartUpPause
-    
-    This will normally be a 0s wait.  This exists so that we can allow
-    Dynamo to scale up when starting this step function with the contents of
-    the deadletter queue.
-    """
+#Wait(seconds_path='$.wait_secs')
+#    """StartUpPause
+#    
+#    This will normally be a 0s wait.  This exists so that we can allow
+#    Dynamo to scale up when starting this step function with the contents of
+#    the deadletter queue.
+#    """
 
 Pass()
     """InitStatus
