@@ -16,11 +16,14 @@ Sample input:
     "s3_index_table": "s3index.domain.boss",
     "id_index_table": "idIndex.domain.boss",
     "id_index_new_chunk_threshold": 100,
-    "index_deadletter_queue": "https://queue.amazonaws.com/..."
+    # Queue to for "recoverable" failures.  This is the same queue that feeds
+    # the lambda that invokes this step function.
+    "sqs_url": "https://queue.amazonaws.com/...",
+    "index_deadletter_queue": "https://queue.amazonaws.com/...",
     "cuboid_object_key": "...",
     "version": 0,
     "id": "29",
-    "wait_secs": 0
+    #"wait_secs": 0
 }
 """
 
@@ -34,13 +37,13 @@ version: '1.0'
 # All of the values above should be factored into the timeout setting.
 timeout: 3600
 
-Wait(seconds_path='$.wait_secs')
-    """StartUpPause
-    
-    This will normally be a 0s wait.  This exists so that we can allow
-    Dynamo to scale up when starting this step function with the contents of
-    the deadletter queue.
-    """
+#Wait(seconds_path='$.wait_secs')
+#    """StartUpPause
+#    
+#    This will normally be a 0s wait.  This exists so that we can allow
+#    Dynamo to scale up when starting this step function with the contents of
+#    the deadletter queue.
+#    """
 
 Pass()
     """InitStatus
@@ -89,6 +92,33 @@ while '$.write_id_index_status.done' == False:
         retry ['DynamoClientError'] 1 0 1.0
         # Allow step function managed retries of other errors.
         retry [] 45 2 2.5
+        catch ['DynamoClientError']: '$.result'
+            while '$.done' == False and '$.attempt' < 5:
+                """WhileNotDoneReEnqueuing
+
+                Retry up to 3 times (attempts 1 - 4).
+                """
+                Lambda('indexEnqueueCuboidIdsLambda')
+                    """WriteFailedReEnqueue
+
+                    Write failed; try to put failed ids back on queue.
+                    """
+                    retry ['KeyError'] 1 0 1.0
+                    catch []:
+                        goto "WriteIdFailed"
+                Wait(seconds_path='$.wait_time')
+                    """ReEnqueueBackoffDelay
+
+                    If non-zero, wait before retrying.
+                    """
+            if '$.done' == True:
+                Fail('Exception', 'Dynamo error, but ids put back on queue')
+                    """RecoverableFailure
+
+                    Failed to update Dynamo, but failed ids put back in SQS.
+                    """
+
+            goto "WriteIdFailed"
         catch []: '$.result'
             Lambda('indexWriteFailedLambda')
                 """WriteIdFailed
