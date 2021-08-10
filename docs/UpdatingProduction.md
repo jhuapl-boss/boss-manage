@@ -1,4 +1,4 @@
-# Updating the existing Production stack
+# Updating the existing bossdb stack
 
 This guide helps walk you through the different steps that need to happen 
 to update an existing production stack with the latest code.
@@ -23,7 +23,7 @@ error during the update process that causes a code change and a rebuild of an AM
 ## Turn on Maintenance Mode
 In boss-manage/bin/ run:
 ```shell
-python3 ./maintenance.py on production.boss
+python3 ./maintenance.py on bossdb.boss
 ```
 In can take up to 10 to 15 minutes for DNS to be updated externally.
 Use: dig api.theboss.io
