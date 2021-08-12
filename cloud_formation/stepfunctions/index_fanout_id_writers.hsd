@@ -31,6 +31,8 @@ Lambda('indexLoadIdsFromS3Lambda')
     catch []: '$.result'
         Lambda('indexWriteFailedLambda')
             """LoadIdsFailed
+
+            write_index_failed_lambda.py
             """
             retry ['KeyError'] 1 0 1.0
             retry [] 10 2 2.0
@@ -64,6 +66,8 @@ map:
                 catch []: '$.result'
                     Lambda('indexWriteFailedLambda')
                         """EnqueueSomeIdsFailed
+
+                        write_index_failed_lambda.py
                         """
                         retry ['KeyError'] 1 0 1.0
                         retry [] 10 2 2.0
@@ -87,15 +91,15 @@ map:
         config.$: "$.config"
         id_index_step_fcn.$: "$.id_index_step_fcn"
         sqs_url.$: "$.index_ids_sqs_url"
-        sfn_arn.$: "$.id_index_step_fcn"
         num_ids_per_msg.$: "$.num_ids_per_msg"
-        index_deadletter_queue.$: "$.index_deadletter_queue"
         wait_time.$: "$.wait_time"
         done: False
         attempt: 1
     catch []: '$.result'
         Lambda('indexWriteFailedLambda')
             """EnqueueIdsWithMapFailed
+
+            write_index_failed_lambda.py
             """
             retry ['KeyError'] 1 0 1.0
             retry [] 10 2 2.0

@@ -1,0 +1,33 @@
+@startuml
+
+header Last updated 11Aug2021
+footer Generated from Index.IdWriter.uml by PlantUML
+title Index.FanoutIdWriters Step Function Diagram
+
+[*] --> InitStatus
+InitStatus --> WhileNotDone
+InitStatus: Add initial values: done, delay, retries_left
+WhileNotDone --> BackoffDelay: Not done
+WhileNotDone --> [*]: Done
+BackoffDelay: Delay may be 0s
+BackoffDelay --> WriteIdIndex
+WriteIdIndex: Write id to DynamoDB idIndex table
+WriteIdIndex: write_id_index_lambda.py
+WriteIdIndex --> WhileNotDone: Done
+WriteIdIndex --> AddDoneFlag: Retries exceeded but\nhit a recoverable error
+WriteIdIndex --> WriteIdFailed: Non-recoverable error
+AddDoneFlag: Add done flag required by WriteFailedReEnqueue
+AddDoneFlag --> AddAttemptCount
+AddAttemptCount: Add attempt flag required by WriteFailedReEnqueue
+AddAttemptCount --> WhileNotDoneReEnqueuing
+WhileNotDoneReEnqueuing --> WriteFailedReEnqueue: Not done and attempt < 5
+WhileNotDoneReEnqueuing --> WriteIdFailed: Too many attempts
+WriteFailedReEnqueue: Put ids back in SQS queue
+WriteFailedReEnqueue: enqueue_cuboid_ids_lambda.py
+WriteFailedReEnqueue --> WhileNotDoneReEnqueuing: Done
+WhileNotDoneReEnqueuing --> RecoverableFailure: Done - successfully returned\nunwritten ids to queue
+WriteFailedReEnqueue --> WhileNotDoneReEnqueuing: Attempt failed
+RecoverableFailure --> [*]
+WriteIdFailed --> [*]
+
+@enduml

@@ -11,10 +11,8 @@ the indexSupervisorCuboid step function, directly.
 
 Sample input:
 {
-    "id_count_table": "idCount.domain.boss",
-    "cuboid_bucket": "cuboids.domain.boss",
-    "s3_index_table": "s3index.domain.boss",
-    "id_index_table": "idIndex.domain.boss",
+    # spdb config object
+    "config": { },
     "id_index_new_chunk_threshold": 100,
     # Queue to for "recoverable" failures.  This is the same queue that feeds
     # the lambda that invokes this step function.
@@ -92,7 +90,32 @@ while '$.write_id_index_status.done' == False:
         retry ['DynamoClientError'] 1 0 1.0
         # Allow step function managed retries of other errors.
         retry [] 45 2 2.5
-        catch ['DynamoClientError']: '$.result'
+        catch [
+                'ConditionalCheckFailedException',
+                'DynamoClientError',
+                'InternalServerError',
+                'LimitExceededException',
+                'ProvisionedThroughputExceededException',
+                'ResourceInUseException'
+            ]: '$.result'
+            Pass()
+                """AddDoneFlag
+
+                Add done field needed by enqueue_cuboid_ids_lambda.py
+                """
+                result: '$.done'
+                data:
+                    false
+
+            Pass()
+                """AddAttemptCount
+
+                Add attempt field needed by enqueue_cuboid_ids_lambda.py
+                """
+                result: '$.attempt'
+                data:
+                    1
+
             while '$.done' == False and '$.attempt' < 5:
                 """WhileNotDoneReEnqueuing
 
@@ -102,6 +125,8 @@ while '$.write_id_index_status.done' == False:
                     """WriteFailedReEnqueue
 
                     Write failed; try to put failed ids back on queue.
+
+                    enqueue_cuboid_ids_lambda.py
                     """
                     retry ['KeyError'] 1 0 1.0
                     catch []:
@@ -112,7 +137,7 @@ while '$.write_id_index_status.done' == False:
                     If non-zero, wait before retrying.
                     """
             if '$.done' == True:
-                Fail('Exception', 'Dynamo error, but ids put back on queue')
+                Success()
                     """RecoverableFailure
 
                     Failed to update Dynamo, but failed ids put back in SQS.
@@ -123,7 +148,7 @@ while '$.write_id_index_status.done' == False:
             Lambda('indexWriteFailedLambda')
                 """WriteIdFailed
 
-                write_id_index_lambda.py
+                write_index_failed_lambda.py
                 """
                 retry ['KeyError'] 1 0 1.0
                 retry [] 10 2 2.0

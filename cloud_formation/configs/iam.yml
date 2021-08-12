@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Outputs:
+  startStepFcnLambdaRole:
+    Description: Role for starting step functions from a lambda
+    Value: !GetAtt StartStepFcnLambdaRole.Arn
+    Export:
+      Name: startStepFcnLambdaRole
+
+Resources:
+  StartStepFcnLambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "sts:AssumeRole"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+      ManagedPolicyArns:
+        # StartStepFunction and LambdaSqsEventSource policies attach themselves
+        # to this role.
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+
+  StartStepFunction:
+    Type: "AWS::IAM::Policy"
+    Properties:
+        PolicyName: "StartStepFunction"
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Action:
+                - "states:StartExecution"
+              Resource: !Sub "arn:aws:states:*:${AWS::AccountId}:stateMachine:*"
+        Roles:
+          - !Ref StartStepFcnLambdaRole
+
+  LambdaSqsEventSource:
+    # Give a lambda permission to use any SQS queue as an event source that
+    # lives in the same account.
+    Type: "AWS::IAM::Policy"
+    Properties:
+        PolicyName: "LambdaSqsEventSource"
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Action:
+                - "sqs:ReceiveMessage"
+                - "sqs:DeleteMessage"
+                - "sqs:GetQueueAttributes"
+              Resource: !Sub "arn:aws:sqs:*:${AWS::AccountId}:*"
+        Roles:
+          - !Ref StartStepFcnLambdaRole
