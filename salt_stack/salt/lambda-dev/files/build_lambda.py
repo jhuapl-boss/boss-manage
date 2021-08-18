@@ -73,8 +73,20 @@ def unzip(zippath, path):
         zippath (str): Path to the zip file
         path (str): Directory which to unzip into
     """
-    fzip = zipfile.ZipFile(zippath, 'r')
-    fzip.extractall(path)
+    with zipfile.ZipFile(zippath, 'r') as fzip:
+        for info in fzip.infolist():
+            if info.external_attr == 2716663808:
+                # Create symlink:
+                # http://www.mail-archive.com/python-list@python.org/msg34223.html
+                target = fzip.read(info)
+                os.symlink(target, os.path.join(path, info.filename))
+            else:
+                full_path = fzip.extract(info, path)
+                # Restore permissions:
+                # https://www.burgundywall.com/post/preserving-file-perms-with-python-zipfile-module
+                perms = info.external_attr >> 16
+                os.chmod(full_path, perms)
+    
 
 def load_config(staging_dir):
     """Load the lambda configuration file from the given directory
