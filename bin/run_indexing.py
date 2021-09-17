@@ -148,8 +148,6 @@ def get_common_args(bosslet_config):
             "cache_state_host": n.cache_state.redis,
           }
         },
-        "max_write_id_index_lambdas": 599,
-        "max_cuboid_fanout": 30,
         "max_items": 100,
         "index_ids_sqs_url": make_sqs_url(account, n.index_ids_queue.sqs),
         # Number of object ids to include in a single SQS message.

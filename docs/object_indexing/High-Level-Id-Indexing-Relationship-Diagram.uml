@@ -1,0 +1,33 @@
+@startuml
+title  "High Level Id Indexing Component Relationships""
+header Last updated 9Sep2021
+footer Generated from High-Level-Id-Indexing-Relationship-Diagram.uml by PlantUML
+
+!include <awslib/AWSCommon>
+!include <awslib/Database/DynamoDB>
+!include <awslib/Storage/S3Bucket>
+!include <awslib/ApplicationIntegration/SQS>
+!include <awslib/ApplicationIntegration/StepFunctions>
+
+DynamoDB(S3Index, "S3Index", "")
+DynamoDB(IdIndex, "IdIndex", "")
+StepFunctions(FindCuboids, "Find Cuboids", "")
+StepFunctions(FanoutEnqueue, "FanoutEnqueue", "")
+StepFunctions(EnqueueCuboids, "EnqueueCuboids", "")
+SQS(CuboidSqs, "Cuboid Keys Queue", "")
+StepFunctions(CuboidSupervisor, "CuboidSupervisor", "")
+SQS(IndexIdsSqs, "Index Ids Queue", "")
+StepFunctions(WriteId, "WriteId", "")
+S3Bucket(CuboidBucket, "Cuboid Bucket", "")
+
+FindCuboids --> FanoutEnqueue : Starts
+FindCuboids --- S3Index : Gets cuboids belonging to channel
+FanoutEnqueue --> EnqueueCuboids : Starts Many
+EnqueueCuboids --> CuboidSqs : Adds cuboid object keys
+CuboidSqs --> CuboidSupervisor : Starts Many
+CuboidSupervisor --- CuboidBucket : Get cuboid
+CuboidSupervisor --> IndexIdsSqs : Enqueue cuboid ids
+IndexIdsSqs --> WriteId : Starts Many
+CuboidSupervisor --> S3Index : Writes ids to cuboid's id-set
+WriteId --> IdIndex : Adds cuboid object key to id's set of cuboids
+@enduml

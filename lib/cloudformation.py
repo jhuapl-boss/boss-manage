@@ -371,6 +371,7 @@ class CloudFormationConfiguration:
         """
         self.resources = {}
         self.parameters = {}
+        self.outputs = None
         self.capabilities = None
         self.arguments = []
         self.region = bosslet_config.REGION
@@ -398,10 +399,17 @@ class CloudFormationConfiguration:
         Returns:
             (str) : The JSON formatted CloudFormation template
         """
-        return json.dumps({"AWSTemplateFormatVersion" : "2010-09-09",
-                           "Description" : description,
-                           "Parameters": self.parameters,
-                           "Resources": self.resources}, indent=indent)
+        template = {
+            "AWSTemplateFormatVersion" : "2010-09-09",
+            "Description" : description,
+            "Parameters": self.parameters,
+            "Resources": self.resources
+        }
+
+        if self.outputs is not None:
+            template["Outputs"] = self.outputs
+
+        return json.dumps(template, indent=indent)
 
     def version(self):
         """Get the version of this CloudFormationConfiguration object"""
@@ -703,6 +711,24 @@ class CloudFormationConfiguration:
         if arg.key not in self.parameters:
             self.parameters[arg.key] = arg.parameter
             self.arguments.append(arg.argument)
+
+    def add_output(self, logical_id, value, export_name, desc):
+        """Add an output so the resource may be imported by another CloudFormation template.
+
+        Args:
+            logical_id (str): Name used in template.
+            value (dict|str): Value returned by output.  Pass a dict if using a CloudFormation intrinsic function.
+            export_name (str): Name other templates use to import output.
+            desc (str): Output description.
+        """
+        if self.outputs is None:
+            self.outputs = {}
+
+        self.outputs[logical_id] = {
+            "Description": desc,
+            "Value": value,
+            "Export": { "Name": export_name },
+        }
 
     def add_capabilities(self, caps):
         """Add capabilities to the configuration.
@@ -2023,6 +2049,29 @@ class CloudFormationConfiguration:
 
         if depends_on is not None:
             self.resources[key]['DependsOn'] = depends_on
+
+    def add_lambda_event_source(self, key, event_source_arn, function_name,
+                                batch_size=None, enabled=True):
+        """Connect lambda to an event source.
+
+        Args:
+            key (str) : Unique name for the resource in the template.
+            event_source_arn (str): Arn of the event source to connect to lambda.
+            function_name (str): Name of lambda function to connect.
+            batch_size (Optional[int]): If not provided, default depends on event source type.
+            enabled (Optional[bool]): Defaults to enabled.
+        """
+        self.resources[key] = {
+            "Type": "AWS::Lambda::EventSourceMapping",
+            "Properties": {
+                "Enabled": enabled,
+                "EventSourceArn": event_source_arn,
+                "FunctionName": function_name,
+            }
+        }
+
+        if batch_size is not None:
+            self.resources[key]["Properties"]["BatchSize"] = batch_size
 
     def _add_record_cname(self, key, hostname, vpc=Ref("VPC"), ttl="300", rds=False, cluster=False, replication=False, ec2=False, elb=False):
         """Add a CNAME RecordSet to the configuration

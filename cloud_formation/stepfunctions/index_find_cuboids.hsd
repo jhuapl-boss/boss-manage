@@ -38,6 +38,11 @@ Inputs:
     "max_items": int,                   # Max items to retrieve from Dynamo at a time.
     "index_enqueue_cuboids_step_fcn": "arn:...",
     "lookup_key": "..."             # collection&exp&chan&res
+    "index_ids_sqs_url": "...",
+    # Number of object ids to include in a single SQS message.
+    "num_ids_per_msg": 20,
+    "id_chunk_size": 20,
+    "wait_time": 5,
 }
 """
 
@@ -100,6 +105,10 @@ while '$.status.done' == False:
 
         Starts Index.FanoutEnqueueCuboids.
         The arn is set by the QueryS3IndexTable task state's lambda.
+
+        ToDo: consider using a Map state and Step Function SQS integration to
+        enqueue cuboid messages.  This should eliminate both Index.FanoutEnqueue
+        and Index.EnqueueCuboids step functions.
         """
         retry [
             'StateMachineDoesNotExist', 
@@ -121,28 +130,6 @@ while '$.status.done' == False:
             Fail('Exception', 'Failed to start fanout enqueuing step function')
                 """FailedFanningOutEnqueue
                 """
-
-# Asynch invoke step function to start indexing.
-Lambda('indexInvokeIndexSupervisorLambda')
-    """StartIndexing
-    
-    invoke_index_supervisor_lambda.py
-    """
-    retry [
-        'StateMachineDoesNotExist', 
-        'InvalidArn',
-        'KeyError',
-        'TypeError'
-    ] 1 0 1.0
-    retry [] 60 3 2.0
-    catch []: '$.result'
-        Fail('Exception', 'Failed to start Index.Supervisor')
-            """FailedStartingIndexSupervisor
-
-            No need to send this to the deadletter queue since indexing
-            has not started.  Just need to start Index.Supervisor to
-            resume where things broke.
-            """
 
 Success()
     """Success

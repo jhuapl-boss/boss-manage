@@ -14,7 +14,7 @@ LoadIdsFailed: write_index_failed_lambda.py
 LoadIdsFailed: Send to deadletter queue
 
 EnqueueIdsWithMap --> EnqueueIdsWithMapFailed: Error running map
-EnqueueIdsWithMap: Divide ids into batches and put in SQS queue
+EnqueueIdsWithMap: Divide ids into batches and put in SQS indexIdsQueue
 EnqueueIdsWithMapFailed --> [*]
 EnqueueIdsWithMapFailed: Send to deadletter queue
 EnqueueIdsWithMapFailed: write_index_failed_lambda.py

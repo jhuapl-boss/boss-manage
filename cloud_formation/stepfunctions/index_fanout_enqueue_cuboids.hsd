@@ -6,6 +6,7 @@ Sample input:
     "id_index_step_fcn": "arn:aws:states:us-east-1:...",
     "batch_enqueue_cuboids_step_fcn": "arn:aws:states:us-east-1:...",
     "fanout_enqueue_cuboids_step_fcn": "arn:aws:states:us-east-1:...",
+    "fanout_id_writers_step_fcn": "arn:aws:states:us-east-1:...",
     "config": {
       "object_store_config": {
         "id_count_table": "idCount.domain.boss",

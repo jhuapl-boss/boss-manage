@@ -2,7 +2,7 @@
 
 header Last updated 11Aug2021
 footer Generated from Index.IdWriter.uml by PlantUML
-title Index.FanoutIdWriters Step Function Diagram
+title Index.IdWriters Step Function Diagram
 
 [*] --> InitStatus
 InitStatus --> WhileNotDone
