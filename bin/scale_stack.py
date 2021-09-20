@@ -31,10 +31,6 @@ def scale_stack(args):
         print("ERROR: Cannot scale down production environment.")
         return
     
-    if args.mode not in ('up', 'down'): 
-        print("ERROR: Incorrect mode. Can only be 'up' or 'down'.")
-        return 
-    
     session = args.bosslet_config.session
     
     ## Scale non-ASG instances, cachemanager and bastion, by stopping/starting them. ##
@@ -75,11 +71,12 @@ if __name__ == '__main__':
     parser = configuration.BossParser(description='Script to scale up or down all EC2 autoscale groups for a BossDB stack.')
     parser.add_bosslet()
     parser.add_argument('mode',
+                        choices=('up', 'down'),
                         help="'up' to set capacities to 1, 'down' to set capacities to 0." )
     parser.add_argument('--asg-only', '-a',
                         action = 'store_true',
                         help = 'Only scale down ASG instances, keep cachemanager and bastion up.', 
-                        default=True)
+                        default=False)
     args = parser.parse_args() 
     scale_stack(args)
 
