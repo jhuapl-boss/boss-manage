@@ -66,7 +66,7 @@ while '$.status.done' == False:
         """
         result: '$.operation'
         data: 
-            ['QueryS3Index']
+            'QueryS3Index'
 
     Lambda('indexFindCuboidsLambda')
         """QueryS3IndexTable
@@ -88,48 +88,47 @@ while '$.status.done' == False:
                 """FailedReadingS3Index
                 """
 
-    Pass()
-        """UpdateOperationFieldStartSfn
-        Simply adds the name of the operation so it can be logged properly in 
-        the deadletter queue in case of a failure when starting the step 
-        function.
+    if '$.num_batches' > 0:
+        """IfNumBatchesGreaterThan0
         """
-        result: '$.operation'
-        data: 
-            ['StartEnqueueCuboidsSfn']
+        Pass()
+            """UpdateOperationFieldSpawnEnqueueSfn
+            Simply adds the name of the operation so it can be logged properly in 
+            the deadletter queue in case of a failure when querying DynamoDB.
+            """
+            result: '$.operation'
+            data: 
+                'Start enqueue cuboids SFN'
 
-    Lambda('startSfnLambda')
-        """AsynchEnqueueCuboids
+        Lambda('startSfnLambda')
+            """AsynchEnqueueCuboids
 
-        start_sfn_lambda.py
+            start_sfn_lambda.py
 
-        Starts Index.FanoutEnqueueCuboids.
-        The arn is set by the QueryS3IndexTable task state's lambda.
+            Starts Index.EnqueueCuboids - sfn_arn input is set by
+            index_find_cuboids_lambda.py.
+            """
+            retry [
+                'StateMachineDoesNotExist', 
+                'InvalidArn',
+                'KeyError',
+                'TypeError'
+            ] 1 0 1.0
+            retry [] 60 3 2.0
+            catch []: '$.result'
+                Lambda('indexWriteFailedLambda')
+                    """FanoutEnqueueFailed
+                    """
+                    retry ['KeyError'] 1 0 1.0
+                    retry [] 10 2 2.0
+                    catch []: '$.dlqresult'
+                        Fail('Exception', 'Failed to write to dead letter queue')
+                            """FailedSendingFanoutToDeadLetterQueue
+                            """
+                Fail('Exception', 'Failed to start fanout enqueuing step function')
+                    """FailedFanningOutEnqueue
+                    """
 
-        ToDo: consider using a Map state and Step Function SQS integration to
-        enqueue cuboid messages.  This should eliminate both Index.FanoutEnqueue
-        and Index.EnqueueCuboids step functions.
-        """
-        retry [
-            'StateMachineDoesNotExist', 
-            'InvalidArn',
-            'KeyError',
-            'TypeError'
-        ] 1 0 1.0
-        retry [] 60 3 2.0
-        catch []: '$.result'
-            Lambda('indexWriteFailedLambda')
-                """FanoutEnqueueFailed
-                """
-                retry ['KeyError'] 1 0 1.0
-                retry [] 10 2 2.0
-                catch []: '$.dlqresult'
-                    Fail('Exception', 'Failed to write to dead letter queue')
-                        """FailedSendingFanoutToDeadLetterQueue
-                        """
-            Fail('Exception', 'Failed to start fanout enqueuing step function')
-                """FailedFanningOutEnqueue
-                """
 
 Success()
     """Success

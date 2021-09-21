@@ -53,6 +53,15 @@ Pass()
         {"done": False, "delay": 0, "retries_left": 3}
 
 
+Pass()
+    """WriteIdsOp
+
+    Indicate currently writing ids to the id index Dynamo table.
+    """
+    result: '$.operation'
+    data:
+        'Write ids to id index Dynamo table'
+
 while '$.write_id_index_status.done' == False:
     """WhileNotDone
     """
@@ -130,6 +139,14 @@ while '$.write_id_index_status.done' == False:
                     """
                     retry ['KeyError'] 1 0 1.0
                     catch []:
+                        Pass()
+                            """AddReenqueueOp
+
+                            Indicate that failure happened trying to re-enqueue ids.
+                            """
+                            result: '$.operation'
+                            data:
+                                'Re-enqueue failed ids in index id queue'
                         goto "WriteIdFailed"
                 Wait(seconds_path='$.wait_time')
                     """ReEnqueueBackoffDelay

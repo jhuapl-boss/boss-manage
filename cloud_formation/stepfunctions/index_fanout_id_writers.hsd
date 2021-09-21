@@ -20,6 +20,16 @@ Expected inputs:
 version: '1.0'
 timeout: 1800
 
+
+Pass()
+    """AddLoadOp
+
+    Indicate we're trying to load ids from S3
+    """
+    result: '$.operation'
+    data:
+        'Load ids from s3index Dynamo table'
+
 Lambda('indexLoadIdsFromS3Lambda')
     """LoadIdsFromS3Index
 
@@ -43,6 +53,14 @@ Lambda('indexLoadIdsFromS3Lambda')
         Fail('Exception', 'Failed loading ids from S3')
             """FailedLoadingFromS3
             """
+Pass()
+    """AddMapOp
+
+    Indicate we're running the map state.
+    """
+    result: '$.operation'
+    data:
+        'Run map on ids in cuboid'
 
 map:
     """EnqueueIdsWithMap
@@ -52,6 +70,15 @@ map:
     enqueue_cuboids_ids_lambda.py
     """
     iterator:
+        Pass()
+            """AddEnqueueOp
+
+            Indicate ids enqueued to SQS.
+            """
+            result: '$.operation'
+            data:
+                'Enqueue ids to index ids queue'
+
         while '$.done' == False and '$.attempt' < 5:
             """WhileNotDone
 
@@ -83,6 +110,7 @@ map:
 
                 If non-zero, wait before retrying.
                 """
+    max_concurrency: 1
     items_path: "$.id_chunks"
     parameters:
         ids.$: "$$.Map.Item.Value"

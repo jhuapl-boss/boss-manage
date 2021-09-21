@@ -101,6 +101,7 @@ map:
                     """FailedSpawning
                     """
 
+    max_concurrency: 1
     items_path: "$.worker_ids"
     parameters:
         worker_id.$: "$$.Map.Item.Value"

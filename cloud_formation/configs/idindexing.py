@@ -34,10 +34,9 @@ def STEP_FUNCTIONS(bosslet_config):
     return [
         (names.index_cuboid_supervisor.sfn, 'index_cuboid_supervisor.hsd'),
         (names.index_id_writer.sfn, 'index_id_writer.hsd'),
+        (names.index_fanout_id_writers.sfn, 'index_fanout_id_writers.hsd'),
         (names.index_find_cuboids.sfn, 'index_find_cuboids.hsd'),
         (names.index_enqueue_cuboids.sfn, 'index_enqueue_cuboids.hsd'),
-        (names.index_fanout_enqueue_cuboids.sfn, 'index_fanout_enqueue_cuboids.hsd'),
-        (names.index_fanout_id_writers.sfn, 'index_fanout_id_writers.hsd'),
     ]
 
 
@@ -81,11 +80,6 @@ def create_config(bosslet_config):
     add_lambda("indexFindCuboidsLambda",
                names.index_find_cuboids.lambda_,
                "index_find_cuboids_lambda.handler",
-               timeout=120, memory=256)
-
-    add_lambda("indexFanoutEnqueueCuboidsKeysLambda",
-               names.index_fanout_enqueue_cuboid_keys.lambda_,
-               "fanout_enqueue_cuboid_keys_lambda.handler",
                timeout=120, memory=256)
 
     add_lambda("indexBatchEnqueueCuboidsLambda",

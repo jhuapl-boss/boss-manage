@@ -118,9 +118,7 @@ def get_common_args(bosslet_config):
     make_sqs_url = lambda account, queue_name : f'https://queue.amazonaws.com/{account}/{queue_name}'
     n = bosslet_config.names
     common_args = {
-        "id_supervisor_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_supervisor.sfn),
         "id_cuboid_supervisor_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_cuboid_supervisor.sfn),
-        "index_dequeue_cuboids_step_fcn":'{}{}'.format(sfn_arn_prefix, n.index_dequeue_cuboids.sfn),
         "id_index_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_id_writer.sfn),
         "batch_enqueue_cuboids_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_enqueue_cuboids.sfn),
         "fanout_enqueue_cuboids_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_fanout_enqueue_cuboids.sfn),
