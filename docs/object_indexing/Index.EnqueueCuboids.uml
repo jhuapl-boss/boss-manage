@@ -1,0 +1,30 @@
+@startuml
+
+header Last updated 21Sep2021
+footer Generated from Index.EnqueueCuboids.uml by PlantUML
+title Index.EnqueueCuboids Step Function Diagram
+
+[*] --> UpdateOperationFieldMap
+UpdateOperationFieldMap: Add inputs as status
+UpdateOperationFieldMap --> EnqueueCuboidKeysMap
+
+state EnqueueCuboidKeysMap {
+    [*] --> WhileStillEnqueuing
+
+    WhileStillEnqueuing --> BatchEnqueueCuboids : not done
+    WhileStillEnqueuing --> [*] : done
+
+    BatchEnqueueCuboids: batch_enqueue_cuboids_lambda
+    BatchEnqueueCuboids --> EnqueueCuboidKeyFailed : error enqueuing
+    BatchEnqueueCuboids --> WhileStillEnqueuing
+
+    EnqueueCuboidKeyFailed: send inputs to index deadletter queue
+    EnqueueCuboidKeyFailed --> [*]
+}
+
+EnqueueCuboidKeysMap --> EnqueueCuboidKeysWithMapFailed : error with map state
+
+EnqueueCuboidKeysWithMapFailed: send inputs to index deadletter queue
+EnqueueCuboidKeysWithMapFailed --> [*]
+
+@enduml

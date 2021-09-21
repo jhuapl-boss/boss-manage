@@ -1,0 +1,39 @@
+@startuml
+
+header Last updated 21Sep2021
+footer Generated from Index.CuboidSupervisor.uml by PlantUML
+title Index.CuboidSupervisor Step Function Diagram
+
+[*] --> UpdateOperationFieldS3Write
+
+UpdateOperationFieldS3Write: operation = WriteS3Index state
+UpdateOperationFieldS3Write --> WriteS3Index
+
+WriteS3Index: write_s3_lambda_index.py
+WriteS3Index --> S3WriteFailed : error
+WriteS3Index --> UpdateOperationFieldGiveOutWorkMap
+
+S3WriteFailed: send inputs to index deadletter queue
+S3WriteFailed --> [*]
+
+UpdateOperationFieldGiveOutWorkMap: operation = GiveOutWork map state
+UpdateOperationFieldGiveOutWorkMap --> GiveOutWorkMap
+
+state GiveOutWorkMap {
+    [*] --> StartIndexIdWriters
+
+    StartIndexIdWriters: start FanoutIdWriters SFN
+    StartIndexIdWriters: start_sfn_lambda.py
+    StartIndexIdWriters --> FailedSpawningIdWriterCreatorToDeadLetterQueue : error
+    StartIndexIdWriters --> [*]
+
+    FailedSpawningIdWriterCreatorToDeadLetterQueue: send inputs to index deadletter queue
+    FailedSpawningIdWriterCreatorToDeadLetterQueue --> [*]
+}
+
+GiveOutWorkMap --> GiveOutWorkToDeadLetterQueue : error
+
+GiveOutWorkToDeadLetterQueue: send inputs to index deadletter queue
+GiveOutWorkToDeadLetterQueue --> [*]
+
+@enduml

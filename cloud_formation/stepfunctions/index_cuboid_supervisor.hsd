@@ -48,6 +48,15 @@ version: '1.0'
 # and the Wait setting of the while loop.
 timeout: 3600
 
+Pass()
+    """UpdateOperationFieldS3Write
+    Simply adds the name of the operation so it can be logged properly in 
+    the deadletter queue in case of a failure when starting the lambda. 
+    """
+    result: '$.operation'
+    data: 
+        'WriteS3Index state'
+
 Lambda('indexS3WriterLambda')
     """WriteS3Index
 
@@ -72,6 +81,15 @@ Lambda('indexS3WriterLambda')
             """FailedUpdatingS3Index
             """
 
+Pass()
+    """UpdateOperationFieldGiveOutWorkMap
+    Simply adds the name of the operation so it can be logged properly in 
+    the deadletter queue in case of a failure when entering the map state. 
+    """
+    result: '$.operation'
+    data: 
+        'GiveOutWork map state'
+
 map:
     """GiveOutWork
 
@@ -80,7 +98,7 @@ map:
     """
     iterator:
         Lambda('startSfnLambda')
-            """StartIndexIdWriter
+            """StartIndexIdWriters
 
             start_sfn_lambda.py
             """
@@ -116,6 +134,7 @@ map:
         num_ids_per_worker.$: "$.num_ids_per_worker"
         id_chunk_size.$: "$.id_chunk_size"
         wait_time.$: "$.wait_time"
+        operation: "Start FanoutIdWriters SFN"
 
     catch []: '$.result'
         Lambda('indexWriteFailedLambda')

@@ -35,14 +35,13 @@ version: '1.0'
 timeout: 300
 
 Pass()
-    """UpdateOperationFieldStartSfn
+    """UpdateOperationFieldMap
     Simply adds the name of the operation so it can be logged properly in 
-    the deadletter queue in case of a failure when starting the step 
-    function.
+    the deadletter queue in case of a failure when starting the map state. 
     """
     result: '$.operation'
     data: 
-        ['EnqueueCuboidsKeysMap']
+        'EnqueueCuboidsKeysMap'
 
 map:
     """EnqueueCuboidKeysMap

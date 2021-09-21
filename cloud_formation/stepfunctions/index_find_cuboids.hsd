@@ -117,7 +117,7 @@ while '$.status.done' == False:
             retry [] 60 3 2.0
             catch []: '$.result'
                 Lambda('indexWriteFailedLambda')
-                    """FanoutEnqueueFailed
+                    """StartEnqueueFailedToDeadletterQueue
                     """
                     retry ['KeyError'] 1 0 1.0
                     retry [] 10 2 2.0
@@ -126,7 +126,7 @@ while '$.status.done' == False:
                             """FailedSendingFanoutToDeadLetterQueue
                             """
                 Fail('Exception', 'Failed to start fanout enqueuing step function')
-                    """FailedFanningOutEnqueue
+                    """FailedStartEnqueue
                     """
 
 
