@@ -168,7 +168,7 @@ class Vault(object):
                 self.connect(VAULT_TOKEN).sys.list_enabled_audit_devices()
                 return True
             except hvac.exceptions.InternalServerError as ex:
-                if str(ex) == 'local node not active but active cluster node not found':
+                if str(ex).startswith('local node not active but active cluster node not found'):
                     return False
                 raise
 

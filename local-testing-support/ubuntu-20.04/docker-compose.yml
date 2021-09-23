@@ -1,0 +1,22 @@
+# Start a bash session with this container with this command:
+# docker-compose run --rm ubuntu /bin/bash
+#
+# After opening a bash shell in the container, test Salt configuration of an
+# endpoint with this command:
+# salt-call --local state.highstate --file-root=/srv/salt --pillar-root=/srv/pillar --id=endpoint
+
+version: "3"
+services:
+  ubuntu:
+    image: ubuntu-20.04-salt-3001:latest
+    volumes:
+      # Set these paths to your salt and pillar folders.
+      - /Users/giontc1/Documents/MICrONS/boss-manage/salt_stack/salt:/srv/salt
+      - /Users/giontc1/Documents/MICrONS/boss-manage/salt_stack/pillar:/srv/pillar
+    ports:
+      - "8000:80"
+    networks:
+      - default
+
+networks:
+  default:

@@ -51,6 +51,7 @@ def STEP_FUNCTIONS(bosslet_config):
         (names.volumetric_ingest_queue_upload.sfn, 'volumetric_ingest_queue_upload.hsd'),
         (names.resolution_hierarchy.sfn, 'resolution_hierarchy.hsd'),
         #(names.downsample_volume.sfn, 'downsample_volume.hsd'),
+        (names.complete_ingest.sfn, 'complete_ingest.hsd'),
     ]
 
 def create_config(bosslet_config, lookup=True):
@@ -130,6 +131,8 @@ def create_config(bosslet_config, lookup=True):
     user_data["aws"]["id-index-table"] = names.id_index.ddb
     user_data["aws"]["id-count-table"] = names.id_count_index.ddb
     user_data["aws"]["max_task_id_suffix"] = str(const.MAX_TASK_ID_SUFFIX)
+    user_data["aws"]["tile_ingest_lambda"] = names.tile_ingest.lambda_
+    user_data["aws"]["tile_uploaded_lambda"] = names.tile_uploaded.lambda_
 
     config.add_autoscale_group("Activities",
                                names.activities.dns,
@@ -166,9 +169,20 @@ def create_config(bosslet_config, lookup=True):
                       memory=1024,
                       dlq = Ref('DownsampleDLQ'))
 
+    start_sfn_lambda_role = aws.role_arn_lookup(session, 'StartStepFcnLambdaRole')
+    config.add_lambda("startSfnLambda",
+               names.start_sfn.lambda_,
+               start_sfn_lambda_role,
+               handler="start_sfn_lambda.handler",
+               timeout=60,
+               memory=128)
+
+    # This dead letter queue behavior uses a lambda to put failed lambda
+    # executions into a dlqs created specifically for each downsample job.
+    # There is a separate dlq for each resolution.
     config.add_sns_topic("DownsampleDLQ",
-                         names.downsample_dlq.sqs,
-                         names.downsample_dlq.sqs,
+                         names.downsample_dlq.sns,
+                         names.downsample_dlq.sns,
                          [('lambda', Arn('DownsampleDLQLambda'))])
 
     config.add_lambda('DownsampleDLQLambda',
@@ -176,6 +190,7 @@ def create_config(bosslet_config, lookup=True):
                       lambda_role,
                       const.DOWNSAMPLE_DLQ_LAMBDA,
                       handler='index.handler',
+                      runtime='python3.7',
                       timeout=10)
 
     config.add_lambda_permission('DownsampleDLQLambdaExecute',

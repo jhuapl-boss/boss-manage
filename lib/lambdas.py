@@ -108,8 +108,7 @@ def lambda_dirs(bosslet_config):
         n.index_load_ids_from_s3.lambda_: 'multi_lambda',
         n.downsample_volume.lambda_: 'multi_lambda',
         n.copy_cuboid_lambda.lambda_: 'multi_lambda',
-        n.dynamo_lambda.lambda_: 'dynamodb-lambda-autoscale',
-        n.cache_throttle.lambda_: 'cache_throttle',
+        n.dynamo_lambda.lambda_: 'dynamodb-lambda-autoscale'
     }
 
 def code_zip(bosslet_config, lambda_config):
@@ -200,7 +199,7 @@ def update_lambda_code(bosslet_config):
             resp = client.update_function_code(
                 FunctionName=lambda_name,
                 S3Bucket=bosslet_config.LAMBDA_BUCKET,
-                S3Key=code_zip(bosslet_config, config['name']),
+                S3Key=code_zip(bosslet_config, config),
                 Publish=True)
             print(resp)
         except botocore.exceptions.ClientError as ex:

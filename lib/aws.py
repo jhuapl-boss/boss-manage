@@ -635,7 +635,7 @@ def cloudfront_public_lookup(session, hostname):
 
 
 def elb_public_lookup(session, hostname):
-    """Lookup the Public DNS name for a ELB
+    """Lookup the Public DNS name for a ELB.  Now searches for both classic and application ELBs
 
     Args:
         session (Session|None) : Boto3 session used to lookup information in AWS
@@ -649,14 +649,20 @@ def elb_public_lookup(session, hostname):
     if session is None:
         return None
 
-    client = session.client('elb')
-    responses = client.describe_load_balancers()
-
     hostname_ = hostname.replace(".", "-")
 
+    client = session.client('elb')
+    responses = client.describe_load_balancers()
     for response in responses["LoadBalancerDescriptions"]:
         if response["LoadBalancerName"].startswith(hostname_):
             return response["DNSName"]
+
+    client = session.client('elbv2')
+    responses_v2 = client.describe_load_balancers()
+    for response in responses_v2["LoadBalancers"]:
+        if response["LoadBalancerName"].startswith(hostname_):
+            return response["DNSName"]
+
     return None
 
 

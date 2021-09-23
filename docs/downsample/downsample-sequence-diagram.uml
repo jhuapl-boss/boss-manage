@@ -1,0 +1,53 @@
+@startuml
+
+header Last updated 05Nov2020
+footer Generated from downsample-sequence-diagram.uml by PlantUML
+title Downsample Sequence Diagram
+
+actor User as U
+entity Endpoint as E
+entity DownsampleSFN as DS
+note over DS: Runs on activity server\n(resolution_hierarchy.py)
+entity DownsampleLambda as DL
+note over DL: (downsample_volume.py)
+control DownsampleQueue as DQ
+database EndpointDB as DB
+database RedisCache as RC
+
+U->E: POST downsample request
+E->DB: Check if channel downsample already IN_PROGRESS or QUEUED
+alt If in progress or queued
+    E->U: Return 409
+else Channel not being downsampled
+    E->DB: Set QUEUED status
+    E->>DQ: Enqueue downsample request
+    E->DS: Check for running worker
+    alt If no workers running
+        E->>DS: Start SFN
+    end
+    E->U: Return 201 status
+end
+
+note over DS: check_downsample_queue()
+DS->DQ: Get downsample job 
+alt If job available
+    DS->DB: Set IN_PROGRESS status for channel
+    loop While not done creating resolutions
+        DS->DQ: Refresh visibility timeout of message
+        note over DS: downsample_channel()
+        DS->>DL: Invoke worker lambdas
+        alt If error
+            DS->DB: Set FAILED status for channel
+            DS->DS: Start new SFN
+            DS->DS: Terminate
+        end
+    end
+    DS->DB: Set DOWNSAMPLED status for channel
+    note over DS: delete_downsample_job()
+    DS->DQ: Delete downsample job
+    note over DS: clear_cache()
+    DS->RC: Clear any cached cuboids for the downsampled channel
+    DS->DS: Start new SFN
+end
+
+@enduml

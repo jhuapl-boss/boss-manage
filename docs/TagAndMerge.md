@@ -153,9 +153,7 @@ in parallel. To check status view the logs at `boss-manage/packer/logs/<ami>.log
 
 ```shell
 $ cd boss-manage
-$ bin/packer.py auth vault endpoint cachemanager activities --name <sprint#|release#>
-$ cd ../packer
-$ packer build -var-file=../config/aws-credentials -var-file=variables/lambda -var-file=../config/aws-bastion -var 'name_suffix=<sprint#|release#>' -var 'force_deregister=true' lambda.packer
+$ bin/packer.py <bosslet.config> auth vault endpoint cachemanager activities lambda --name <sprint#|release#>
 ```
 
 

@@ -1,0 +1,37 @@
+@startuml
+
+header Last updated 19Apr2021
+footer Generated from ingest-job-states.uml by PlantUML
+title Ingest Job States
+
+state Normal {
+    [*] --> PREPARING
+
+    PREPARING -> UPLOADING : upload queue populated
+
+    UPLOADING -> WAIT_ON_QUEUES : complete req
+
+    WAIT_ON_QUEUES : Sets timestamp in DB on first complete req
+    WAIT_ON_QUEUES --> COMPLETING : complete req &&\nqueues empty after n secs
+    WAIT_ON_QUEUES -> UPLOADING : upload queue not empty
+
+    COMPLETING -> COMPLETE : all complete steps done
+    COMPLETING -> UPLOADING : missing tiles found\nduring complete process
+    COMPLETING -> WAIT_ON_QUEUES : only missing chunks found\nduring complete process
+}
+
+Normal --> Error
+Normal --> Delete : cancel request
+
+state Error {
+    [*] --> FAILED
+}
+
+Error --> Delete : cancel request
+
+state Delete {
+    [*] --> DELETED
+}
+
+
+@enduml

@@ -65,6 +65,8 @@ packer/output/
 # Private Files
 *.pem
 *.ppk
+*.key
+*.crt
 vault/private/
 
 # Personal Vagrant files
@@ -98,4 +100,7 @@ cloud_formation/configs/dynamo_config.template
 
 # config migrations 
 progress
+
+# VSCode
+.vscode
 

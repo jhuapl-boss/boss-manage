@@ -1,4 +1,4 @@
-# Copyright 2016 The Johns Hopkins University Applied Physics Laboratory
+# Copyright 2020 The Johns Hopkins University Applied Physics Laboratory
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -103,6 +103,9 @@ class KeyCloakLoginError(KeyCloakError):
     def __init__(self, target, username):
         message = "Could not login to Keycloak at {} with username {}".format(target, username)
         super(KeyCloakLoginError, self).__init__(None, message)
+
+class KeyCloakScopeNotFoundError(Exception):
+    pass
 
 class VaultError(Exception):
     pass

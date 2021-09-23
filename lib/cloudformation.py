@@ -1044,7 +1044,7 @@ class CloudFormationConfiguration:
             "Properties" : {
                 "Engine" : "mysql",
                 "LicenseModel" : "general-public-license",
-                "EngineVersion" : "5.6.34",
+                "EngineVersion" : "5.6.51",  # was 5.6.48
                 "DBInstanceClass" : type_,
                 "MultiAZ" : "true",
                 "StorageType" : "standard",
@@ -1119,20 +1119,29 @@ class CloudFormationConfiguration:
         if BillingMode is not None:
             self.resources[key]["Properties"]["BillingMode"] = BillingMode
 
-    def add_dynamo_table(self, key, name, attributes, key_schema, throughput):
+    def add_dynamo_table(self, key, name, attributes, key_schema, throughput=None, ondemand=False):
         """Add an DynamoDB Table to the configuration
+
+        Note that either throughput or ondemand must be provided, but not both.
 
         Args:
             key (str) : Unique name (within the configuration) for this instance
             name (str) : DynamoDB Table name to create
             attributes (list[tuple]) : List of tuples containing [('AttributeName', 'AttributeType'), ...]
             key_schema (list[tuple]) : List of tuples containing [('AttributeName', 'KeyType'), ...]
-            throughput (tuple) : Tuple of (ReadCapacity, WriteCapacity)
+            throughput (tuple) : Tuple of (ReadCapacity, WriteCapacity).  Defaults to None.
                                  ReadCapacity is the minimum number of consistent reads of items per second
                                               before Amazon DynamoDB balances the loads
                                  WriteCapacity is the minimum number of consistent writes of items per second
                                                before Amazon DynamoDB balances the loads
+            ondemand (boolean) : Defaults to False.  Use ondemand provisioning
+
+        Raises:
+            (BossManageError): If throughput is not None and ondemand == True or if neither specified.
         """
+        if throughput is not None and ondemand:
+            raise BossManageError('Cannot specify throughput and ondemand')
+
         attr_defs = []
         for key_, attr in attributes:
             attr_defs.append({"AttributeName": key_, "AttributeType": attr})
@@ -1146,13 +1155,19 @@ class CloudFormationConfiguration:
             "Properties" : {
                 "TableName" : name,
                 "AttributeDefinitions" : attr_defs,
-                "KeySchema" : key_schema_,
-                "ProvisionedThroughput" : {
-                    "ReadCapacityUnits" : int(throughput[0]),
-                    "WriteCapacityUnits" : int(throughput[1])
-                }
+                "KeySchema" : key_schema_
             }
         }
+
+        if throughput is not None:
+            self.resources[key]['Properties']['ProvisionedThroughput'] = {
+                "ReadCapacityUnits" : int(throughput[0]),
+                "WriteCapacityUnits" : int(throughput[1])
+            }
+        elif ondemand:
+            self.resources[key]['Properties']['BillingMode'] = 'PAY_PER_REQUEST'
+        else:
+            raise BossManageError('Must either specify throughput or ondemand=True')
 
     def add_redis_cluster(self, key, hostname, subnets, security_groups, type_="cache.t2.micro", port=6379, version="2.8.24"):
         """Add a Redis ElastiCache cluster to the configuration
@@ -1455,6 +1470,8 @@ class CloudFormationConfiguration:
             target_group_key = "{}TargetGroup".format(key)
             target_group_keys.append(target_group_key)
 
+            using_https = len(listener) == 4 and listener[3] is not None
+
             self.resources[target_group_key] = {
                 "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
                 "Properties": {
@@ -1464,7 +1481,7 @@ class CloudFormationConfiguration:
                     "HealthCheckTimeoutSeconds": 5,
                     "HealthyThresholdCount": 2,
                     "UnhealthyThresholdCount": 5,
-                    "Protocol": "HTTP",
+                    "Protocol": "HTTPS" if using_https else "HTTP",
                     "Port": listener[1],
                     "TargetType": "instance"
                 }
@@ -1486,7 +1503,6 @@ class CloudFormationConfiguration:
                 #"PolicyNames": [key + "Policy"],
             }
 
-            using_https = len(listener) == 4 and listener[3] is not None
             if using_https:
                 listener_props["Certificates"] = [ { "CertificateArn": listener[3] } ]
 
@@ -1886,7 +1902,7 @@ class CloudFormationConfiguration:
             })
 
 
-    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python2.7", reserved_executions=None, dlq=None, layers=None):
+    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python3.7", reserved_executions=None, dlq=None, layers=None):
         """Create a Python Lambda
 
         Args:
@@ -1905,7 +1921,7 @@ class CloudFormationConfiguration:
             subnets (None|list) : List of ids of subnets to grant the lambda access to
             depends_on (None|str|list) : A unique name or list of unique names of resources within the
                                             configuration and is used to determine the launch order of resources
-            runtime (optional[str]) : Lambda runtime to use.  Defaults to "python2.7".
+            runtime (optional[str]) : Lambda runtime to use.  Defaults to "python3.7".  Ignored if handler is not None, but file and s3 are None.
             reserved_executions (optional[int]): Number of reserved concurrent executions for the lambda.
             dlq (optional[str]): ARN of dead letter queue.  Defaults to None.
             layers (optional[list[str]]): List of lambda layer ARNs with version
@@ -2223,7 +2239,7 @@ class CloudFormationConfiguration:
             key (str) : Unique name for the resource in the template
             name (str): Display name of the SNS topic
             topic (str): SNS topic name
-            subscriptions (list): List of tuples containing SNS scriptions to create
+            subscriptions (list): List of tuples containing SNS subscriptions to create
                                   (protocol, endpoint)
         """
         self.resources[key] = {

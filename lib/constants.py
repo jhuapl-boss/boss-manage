@@ -16,6 +16,9 @@ import os
 import sys
 import yaml
 
+from . import console
+from .exceptions import BossManageError
+
 ##################
 # Scenario Support
 def load_scenario(scenario):
@@ -28,19 +31,17 @@ def load_scenario(scenario):
         path = repo_path("cloud_formation", "scenarios", file)
 
         if not os.path.exists(path):
-            print("Scenario file '{}' doesn't exist".format(path))
-            return
+            raise BossManageError("Scenario file '{}' doesn't exist".format(path))
 
         try:
             with open(path, 'r') as fh:
                 config = yaml.full_load(fh.read())
         except Exception as ex:
-            print("Problem loading scenario file")
-            print(ex)
+            raise BossManageError("Problem loading scenario file")
 
         for key in config:
             if key not in d:
-                print("Warning: Scenario variable {} is new".format(key))
+                console.warning("Scenario variable {} is new".format(key))
             d[key] = config[key]
 
 
@@ -103,27 +104,26 @@ VAULT_KEYCLOAK_DB = "secret/keycloak/db"
 VAULT_ENDPOINT = "secret/endpoint/django"
 VAULT_ENDPOINT_DB = "secret/endpoint/django/db"
 VAULT_ENDPOINT_AUTH = "secret/endpoint/auth"
-VAULT_ENDPOINT_THROTTLE = "secret/endpoint/throttle"
-
 
 ########################
 # Service Check Timeouts
 TIMEOUT_VAULT = 120
 TIMEOUT_KEYCLOAK = 150
+AUTH_HEALTH_CHECK_GRACE_PERIOD = 160
 
 
 ########################
 # Machine Instance Types
-ENDPOINT_TYPE = "t2.micro"
-RDS_TYPE = "db.t2.micro"
-REDIS_CACHE_TYPE = "cache.t2.micro"
+ENDPOINT_TYPE = "t3.micro"
+RDS_TYPE = "db.t3.micro"
+RDS_AUTH_TYPE = "db.t3.micro"
+REDIS_CACHE_TYPE = "cache.t3.micro"
 REDIS_SESSION_TYPE = None
-REDIS_THROTTLE_TYPE = None
-REDIS_TYPE = "cache.t2.micro"
-CACHE_MANAGER_TYPE = "t2.micro"
-VAULT_TYPE = "t2.micro"
-ACTIVITIES_TYPE = "t2.micro"
-AUTH_TYPE = "t2.micro"
+REDIS_TYPE = "cache.t3.micro"
+CACHE_MANAGER_TYPE = "t3.micro"
+VAULT_TYPE = "t3.micro"
+ACTIVITIES_TYPE = "t3.micro"
+AUTH_TYPE = "t3.micro"
 
 
 ########################
@@ -138,34 +138,6 @@ REDIS_CLUSTER_SIZE = 1
 #################
 # Resource Memory
 REDIS_RESERVED_MEMORY_PERCENT = 25
-
-########################
-# Throttle Configuration
-THROTTLE = {
-    # For system / apis if not provided no throttling will happen
-    'system': None,
-    'apis': {
-        'cutout_egress': None,
-        'cutout_ingress': None,
-        'image_egress': None,
-        'tile_egress': None,
-    },
-
-    # For a user if no rules match then no throttling will happen
-    # All matching rules are collected and the largest will be used
-    # ??? Do we want to be able to have rules where a user has a lower limit
-    #     than the groups they are apart of? (abusive user?)
-    'users': {
-        'bossadmin': None,
-    },
-    'groups': {
-        'public': None,
-    },
-
-    # user / group default?
-    # Should a more specific user / group be allowed to be lower then the default?
-}
-
 
 ########################
 # Machine Configurations

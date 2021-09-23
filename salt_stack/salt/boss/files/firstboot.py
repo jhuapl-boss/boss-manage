@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/bin/python3
 
 # Copyright 2016 The Johns Hopkins University Applied Physics Laboratory
 #
@@ -29,7 +29,8 @@
 import bossutils
 
 bossutils.utils.set_excepthook()
-logging = bossutils.logger.BossLogger().logger
+bossutils.logger.configure()
+logging = bossutils.logger.bossLogger()
 
 
 def django_initialize():

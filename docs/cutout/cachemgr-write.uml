@@ -1,0 +1,36 @@
+@startuml
+
+header Last updated 02Mar2020
+footer Generated from cachemgr-write.uml by PlantUML
+title Cutout Write Sequence As Seen by the Cache Manager's Delayed Write Daemon
+
+actor CacheMgr as CM
+control FlushQueue as FQ
+entity StateCache as SC
+entity KVIOCache as KC
+entity FlushLambda as FL
+collections CuboidBucket as CB
+
+CM->SC: Get DELAYED-WRITE keys
+loop for each DELAYED-WRITE key
+    CM->SC: Check PAGEOUT set for cuboid
+    alt If DELAYED-WRITE key not in PAGEOUT set
+        CM->SC: Try add WRITE-CUBOID key to PAGEOUT set
+        alt Successfully added to PAGEOUT set
+            CM->FQ: Enqueue cuboid for writing to S3
+            CM->>FL: Async invoke lambda
+            FL->FQ: Get message with keys for cuboid to write to S3
+            FL->KC: Get actual cuboid data (removes DELAYED-WRITE and RESOURCE keys during this step)
+            FL->CB: Write cuboid
+            FL->KC: If cuboid has a CACHE-KEY, update its data
+            FL->KC: Remove cuboid's WRITE-CUBOID key
+            FL->SC: Remove WRITE-CUBOID key from PAGEOUT set
+            FL->FQ: Remove message
+        end
+    end
+end
+
+@enduml
+
+
+

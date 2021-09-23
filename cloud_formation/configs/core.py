@@ -39,6 +39,7 @@ MIGRATION CHANGELOG:
                Public DNS updates
                * Replaced manually created public Route53 DNS records with
                  CloudFormation maintained records
+    Version 3: Use Keycloak 11.0.0
 """
 
 DEPENDENCIES = None
@@ -58,7 +59,7 @@ import sys
 import json
 import time
 
-def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, type_="t2.micro", public=True, depends_on=None):
+def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnets, esubnets, listeners, check, sgs=[], role = None, type_="t3.micro", public=True, depends_on=None):
     security_groups = [Ref("InternalSecurityGroup")]
     config.add_autoscale_group(key,
                                hostname,
@@ -73,6 +74,7 @@ def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnet
                                elb = Ref(key + "LoadBalancer"),
                                notifications = Ref("DNSSNS"),
                                role = role,
+                               health_check_grace_period=const.AUTH_HEALTH_CHECK_GRACE_PERIOD,  # This is needed to give time to Auth server to update AuthDB on first start.
                                depends_on = key + "LoadBalancer")
 
     security_groups.extend(sgs)
@@ -87,7 +89,7 @@ def create_asg_elb(config, key, hostname, ami, keypair, user_data, size, isubnet
 
 def create_config(bosslet_config):
     """Create the CloudFormationConfiguration object."""
-    config = CloudFormationConfiguration('core', bosslet_config, version="2")
+    config = CloudFormationConfiguration('core', bosslet_config, version="3")
     session = bosslet_config.session
     keypair = bosslet_config.SSH_KEY
     names = bosslet_config.names
@@ -133,7 +135,7 @@ def create_config(bosslet_config):
                                           ('Key', 'S')],
                             key_schema = [('Path', 'HASH'),
                                           ('Key', 'RANGE')],
-                            throughput = (5, 5))
+                            ondemand = True)
 
     user_data = UserData()
     user_data["system"]["fqdn"] = names.vault.dns
@@ -173,7 +175,7 @@ def create_config(bosslet_config):
     USE_DB = bosslet_config.AUTH_RDS
     if USE_DB:
         deps.append("AuthDB")
-        user_data["aws"]["db"] = "keycloak" # flag for init script for which config to use
+        user_data["aws"]["db"] = "keycloak"  # flag for init script for which config to use
 
     cert = aws.cert_arn_lookup(session, names.public_dns('auth'))
     create_asg_elb(config,
@@ -200,8 +202,8 @@ def create_config(bosslet_config):
                           "keycloak",
                           "keycloak",
                           internal_subnets,
-                          type_ = "db.t2.micro",
-                          security_groups = [Ref("InternalSecurityGroup")])
+                          type_=const.RDS_AUTH_TYPE,
+                          security_groups=[Ref("InternalSecurityGroup")])
 
 
     config.add_lambda("DNSLambda",
@@ -210,6 +212,7 @@ def create_config(bosslet_config):
                       const.DNS_LAMBDA,
                       handler="index.handler",
                       timeout=10,
+                      runtime='python3.7',
                       depends_on="DNSZone")
 
     config.add_lambda_permission("DNSLambdaExecute", Ref("DNSLambda"))
@@ -305,6 +308,7 @@ def create(bosslet_config):
     post_init(bosslet_config)
 
 def post_init(bosslet_config):
+
     session = bosslet_config.session
     call = bosslet_config.call
     names = bosslet_config.names
@@ -332,19 +336,30 @@ def post_init(bosslet_config):
 
         #Check and see if these secrets already exist before we overwrite them with new ones.
         # Write data into Vault
-        # DP TODO: update checks to also verify the passwords / pull the passwords from Vault
-        #          so we don't use a different password in Keycloak then what is stored in Vault
-        if not vault.read(const.VAULT_AUTH):
+        auth_data = vault.read(const.VAULT_AUTH)
+        if not auth_data or 'password' not in auth_data:
             print("Writing {}".format(const.VAULT_AUTH))
             vault.write(const.VAULT_AUTH, password = password, username = username, client_id = "admin-cli")
+        else:
+            password = auth_data['password']
 
-        if not vault.read(const.VAULT_REALM):
-            print("Writing {}".format(const.VAULT_REALM))
-            vault.write(const.VAULT_REALM, username = realm_username, password = realm_password, client_id = "endpoint")
-
-        if not vault.read(const.VAULT_KEYCLOAK):
+        keycloak_data = vault.read(const.VAULT_KEYCLOAK)
+        if not keycloak_data or 'password' not in keycloak_data:
             print("Updating {}".format(const.VAULT_KEYCLOAK))
             vault.update(const.VAULT_KEYCLOAK, password = password, username = username, client_id = "admin-cli", realm = "master")
+        else:
+            if password != keycloak_data['password']:
+                # If there is no password match, then re-write the password for the admin-cli so that they match.
+                password = keycloak_data['password']
+                print("Re-writing {}".format(const.VAULT_KEYCLOAK))
+                vault.write(const.VAULT_KEYCLOAK, password = password, username = username, client_id = "admin-cli")
+
+        realm_data = vault.read(const.VAULT_REALM)
+        if not realm_data or 'password' not in realm_data:
+            print("Writing {}".format(const.VAULT_REALM))
+            vault.write(const.VAULT_REALM, username = realm_username, password = realm_password, client_id = "endpoint")
+        else:
+            realm_password = realm_data['password']
 
         if not vault.read(const.VAULT_KEYCLOAK_DB):
             print("Writing {}".format(const.VAULT_KEYCLOAK_DB))
@@ -365,7 +380,7 @@ def post_init(bosslet_config):
     # Configure Keycloak
     print("Waiting for Keycloak to bootstrap")
     call.check_keycloak(const.TIMEOUT_KEYCLOAK)
-
+    print("Finished waiting for Keycloak to bootstrap")
     #######
     ## DP TODO: Need to find a check so that the master user is only added once to keycloak
     ##          Also need to guard the writes to vault with the admin password
@@ -373,21 +388,18 @@ def post_init(bosslet_config):
 
     with call.ssh(names.auth.dns) as ssh:
         print("Creating initial Keycloak admin user")
-        ssh("/srv/keycloak/bin/add-user.sh -r master -u {} -p {}".format(username, password))
+        # This fails if the user already exists, but execution will continue.
+        ssh("/srv/keycloak/bin/add-user-keycloak.sh -r master -u {} -p {}".format(username, password))
+        time.sleep(10)
 
-        print("Restarting Keycloak")
-        ssh("sudo service keycloak stop")
-        time.sleep(2)
-        ssh("sudo killall java") # the daemon command used by the keycloak service doesn't play well with standalone.sh
-                                      # make sure the process is actually killed
+        ssh("/srv/keycloak/bin/jboss-cli.sh --connect reload")
         time.sleep(3)
-        ssh("sudo service keycloak start")
 
     print("Waiting for Keycloak to restart")
     call.check_keycloak(const.TIMEOUT_KEYCLOAK)
 
     with call.tunnel(names.auth.dns, 8080) as port:
-        URL = "http://localhost:{}".format(port) # TODO move out of tunnel and use public address
+        URL = "http://localhost:{}".format(port)  # TODO move out of tunnel and use public address
 
         with KeyCloakClient(URL, username, password) as kc:
             print("Opening realm file at '{}'".format(const.KEYCLOAK_REALM))
@@ -402,14 +414,18 @@ def post_init(bosslet_config):
                 if "users" in realm:
                     del realm["users"]
 
+            # This will fail if the realm already exists, but that's ok.
             print("Uploading BOSS.realm configuration")
-            kc.create_realm(realm)
+            try:
+                kc.create_realm(realm)
+            except Exception as ex:
+                print('Failed to upload Boss.realm config.  Does it already exist? Error message: {}'.format(ex))
 
 def update(bosslet_config):
     # Checks to make sure they update can happen and the user wants to wait the required time
     if not bosslet_config.AUTH_RDS:
         print("Cannot update Auth server as it is not using an external database")
-        print("Updating the Auth server would loose all Keycloak information")
+        print("Updating the Auth server would lose all Keycloak information")
         raise BossManageError("Configuration doesn't support 'update'")
 
     config = create_config(bosslet_config)

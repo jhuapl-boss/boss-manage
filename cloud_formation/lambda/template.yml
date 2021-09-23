@@ -1,13 +1,13 @@
-name: name_of_package # Used in two ways
-                      # (name + '.' + domain + '.zip') to produce the name of the file in S3
-                      # (name + '.' + domain).replace('.', '-') to produce the name of the Lambda Layer
-runtime: lambda_runtime # Build process current tested with python3.6, node8.10
+name: name_of_code_zip # Used in two ways
+                       # (name + '.' + domain + '.zip') to produce the name of the file in S3
+                       # (name + '.' + domain).replace('.', '-') to produce the name of the Lambda Layer
+runtime: lambda_runtime # Build process current tested with python3.6, node10.x
                         # This is also the name of the container image, if building using a container
-is_layer: False # If the package is a layer and should have a new version created by the build process
+is_layer: False # If the code zip is a layer and should have a new version created by the build process
 layers:
-        # List of layers that this package depends on
-        # The package names are the names of the directories under cloud_formation/lambdas/
-        - name_of_layer_package
+        # List of layers that this code zip depends on
+        # The layer names are the names of the directories under cloud_formation/lambdas/
+        - name_of_layer_dir
 include:
         # Mapping of files/directories and the location in the zip file to place them
         # All paths start from the root of the boss-manage repository
@@ -18,24 +18,29 @@ system_packages:
         - gcc
 python_packages:
         # Two formats supported
-        # List of package names or requirements files
+        # List of package names or requirements files or package directory
         #     Install the packages (including those listed in the requirements files)
         #     into the root of the zip file
         - python_package_name
         - path/to/requirements.txt
+        - path/to/package/dir/
 
-        # Mapping of package names or requirements files and the directory they should be installed in
+        # Mapping of package names or requirements files or package dirs and the directory they should be installed in
         python_package_name: subdirectory/
         path/to/requirements.txt: subdirectory/
+        path/to/package/dir/: subdirectory/
 manual_commands:
         # List of bash scripts that needed to be executed, either to build files or move them around
         - |
                 echo "This will be executed as a bash script"
                 echo "Do whatever you need"
                 echo "The cwd is the root of the zip file and is exposed as ${STAGING_DIR}"
-output_file: dist.zip # Used if a manual_command creates the package zip file
+output_file: dist.zip # Used if a manual_command creates the code zip file
                       # If not provided all of the files are zipped up automatically
 
 # DP NOTE: If building a layer all of the files should be placed under a prefix
 #          as described in https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html#configuration-layers-path
 #          for Python based layers this means under the 'python/' directory
+#
+# DP NOTE: Runtime names are listed at https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html
+#          and are the 'Identifier' value

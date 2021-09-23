@@ -1,0 +1,15 @@
+version: "3"
+services:
+  keycloak:
+    image: keycloak-1.9.1:latest
+    ports:
+      - '8080:8080'
+      - '9990:9990'
+    volumes:
+      # Set this to where you unzipped KeyCloak.
+      - /Users/giontc1/Documents/MICrONS/keycloak-1.9.1.Final:/srv/keycloak
+    networks:
+      - default
+
+networks:
+  default:

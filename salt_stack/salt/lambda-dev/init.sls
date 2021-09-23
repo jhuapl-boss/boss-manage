@@ -4,21 +4,14 @@
 
 {% set user = 'ec2-user' %}
 {% set venv_home = '/home/' + user + '/lambdaenv' %}
-{% set spdb_home = venv_home + '/usr/lib/python3.6/site-packages/spdb' %}
-{% set bossutils_home = venv_home + '/usr/lib/python3.6/site-packages/bossutils' %}
-{% set lambda_home = venv_home + '/usr/lib/python3.6/site-packages/lambda' %}
-{% set lambdautils_home = venv_home + '/usr/lib/python3.6/site-packages/lambdautils' %}
+{% set spdb_home = venv_home + '/usr/lib/python3.7/site-packages/spdb' %}
+{% set bossutils_home = venv_home + '/usr/lib/python3.7/site-packages/bossutils' %}
+{% set lambda_home = venv_home + '/usr/lib/python3.7/site-packages/lambda' %}
+{% set lambdautils_home = venv_home + '/usr/lib/python3.7/site-packages/lambdautils' %}
 
 include:
     - node
-
-python36:
-    pkg.installed:
-        - pkgs:
-            - python36
-            - python36-pip
-            - python36-virtualenv
-
+    - python.python37
 
 lib-dependencies:
     pkg.installed:
@@ -39,6 +32,7 @@ numpy-blosc-dependencies:
             - gcc
             - gcc-c++
 
+
 build-lambda:
     file.managed:
         - name: /home/ec2-user/build_lambda.py
@@ -53,3 +47,11 @@ staging-dir:
         - user: {{ user }}
         - group: {{ user }}
         - dir_mode: 755
+
+pip-installs:
+    cmd.run:
+        - name: |
+            cd /tmp
+            /usr/local/bin/pip3 install boto3 PyYaml
+        - cwd: /tmp
+        - shell: /bin/bash

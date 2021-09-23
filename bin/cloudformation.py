@@ -39,7 +39,19 @@ cur_dir = os.path.dirname(os.path.realpath(__file__))
 cf_dir = os.path.normpath(os.path.join(cur_dir, '..', 'cloud_formation'))
 sys.path.append(cf_dir) # Needed for importing CF configs
 
+
 def build_dependency_graph(action, bosslet_config, modules):
+    """
+    Given the list of bossDB modules (CloudFormation Stacks) to be installed and the action (Ex: create, update, delete)
+    figure, create a dependency graph and then order the modules in the correct order (It reverses the order for deletes)
+    Args:
+        action(str):
+        bosslet_config(BossConfiguration): bosslet_config based on a configuration file like hiderrt.boss or bossdb.boss
+        modules(list[(str,module)]: List of tuples (cloudformation stack, module)
+
+    Returns:
+
+    """
     class Node(object):
         """Directed Dependency Graph Node"""
         def __init__(self, name):
@@ -275,7 +287,7 @@ if __name__ == '__main__':
         constants.load_scenario(bosslet_config.scenario)
 
         if args.config_name == ['all']:
-            configs = config_names
+            configs = ['core', 'redis', 'api', 'cachedb', 'activities', 'idindexing', 'cloudwatch', 'dynamolambda']
         else:
             configs = args.config_name
 

@@ -89,18 +89,20 @@ def locate_ami(session):
         return True
 
     client = session.client('ec2')
-    response = client.describe_images(Filters=[
-                    {"Name": "owner-id", "Values": ["099720109477"]},
-                    {"Name": "virtualization-type", "Values": ["hvm"]},
-                    {"Name": "root-device-type", "Values": ["ebs"]},
-                    {"Name": "architecture", "Values": ["x86_64"]},
-                    #{"Name": "platform", "Values": ["Ubuntu"]},
-                    #{"Name": "name", "Values": ["hvm-ssd"]},
-                    #{"Name": "name", "Values": ["14.04"]},
-               ])
+    response = client.describe_images(
+        Filters=[
+            {"Name": "virtualization-type", "Values": ["hvm"]},
+            {"Name": "root-device-type", "Values": ["ebs"]},
+            {"Name": "architecture", "Values": ["x86_64"]},
+        ],
+        # Owner: AWS: 679593333241
+        # Owner: Canonical: 099720109477
+        Owners=['099720109477'])
 
     images = response['Images']
-    images = [i for i in images if contains(i['Name'], ('hvm-ssd', '14.04', 'server'))]
+    #images = [i for i in images if contains(i['Name'], ('hvm-ssd', '14.04', 'server'))]
+    images = [i for i in images if contains(i['Name'], ('hvm-ssd', '20.04', 'server'))]
+    images = [i for i in images if not contains(i['Name'], ('ubuntu-eks'))]
     images.sort(key=lambda x: x["CreationDate"], reverse=True)
 
     if len(images) == 0:
@@ -136,7 +138,7 @@ if __name__ == '__main__':
     config_help_names = list(CONFIGS)
     config_help_names.append("all")
     config_help_names.append("lambda")
-    config_help = create_help("config is on of the following: ('all' will build all except 'lambda')", config_help_names)
+    config_help = create_help("config is on of the following: ('all' will build all except 'lambda' and 'backup')", config_help_names)
 
     parser = configuration.BossParser(description = "Script the building of machines images using Packer and SaltStack",
                                       formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -165,7 +167,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if "all" in args.config:
-        args.config = CONFIGS
+        args.config = ["activities", "auth", "cachemanager", "endpoint", "vault"]  # All but backup and lambda
 
     if args.bosslet_config.OUTBOUND_BASTION:
         bastion_config = """-var 'aws_bastion_ip={}'

@@ -6,7 +6,6 @@ include:
   - ingest-client.ingest
   - boss-tools.bossutils
   - boss.django
-  - boss-oidc
   - mysql
   - dynamodb
   - python.coverage

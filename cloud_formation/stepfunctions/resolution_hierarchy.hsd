@@ -4,14 +4,148 @@ DownsampleChannel will increment the resolution and do
 the comparison before finishing. The comparison is done
 in the function because StepFunctions cannot compare
 two JsonPath values.
+
+Required inputs:
+    'queue_url': <URL of SQS queue>,
+    'sfn_arn': <arn of the downsample step fcn (this step fcn!)>
 """
 
-while '$.res_lt_max' == true:
-    """WhileResolutionLessThanMax
-    """
-    Activity('DownsampleChannel')
-        """RunDownSampleActivity
+Activity('CheckDownsampleQueue')
+    """CheckDownsampleQueue
 
         boss-tools/activities/resolution_hierarchy.py
+    """
+
+if '$.start_downsample' == true:
+    Activity('UpdateDownsampleStatus')
+        """SetInProgressStatus
+
+            Set downsample status to IN_PROGRESS in MySQL DB
+
+            boss-tools/activities/resolution_hierarchy.py
         """
-        retry [] 60 3 2.5
+
+    Pass()
+        """AddSfnArn
+
+            Get running step function's ARN from the Context object.
+        """
+        parameters:
+            exe_sfn_arn.$: "$$.Execution.Id"
+            db_host.$: "$.db_host"
+            sfn_arn.$: "$.sfn_arn"
+            queue_url.$: "$.queue_url"
+            job_receipt_handle.$: "$.job_receipt_handle"
+            channel_id.$: "$.msg.channel_id"
+            lookup_key.$: "$.msg.lookup_key"
+            msg.$: "$.msg"
+
+    Activity('SetDownsampleArn')
+        """WriteSfnArntoDB
+
+            Write this running step function's ARN to DB
+
+            boss-tools/activities/boss_db.py
+        """
+
+    while '$.msg.res_lt_max' == true:
+        """WhileResolutionLessThanMax
+        """
+        Activity('DownsampleChannel')
+            """RunDownSampleActivity
+
+            boss-tools/activities/resolution_hierarchy.py
+            """
+            retry [] 60 3 2.5
+            catch []: '$.result'
+                Pass()
+                    """AddFailedStatus
+
+                    Set failed status as status for next state.
+                    """
+                    parameters:
+                        status: "FAILED"
+                        db_host.$: "$.db_host"
+                        sfn_arn.$: "$.sfn_arn"
+                        queue_url.$: "$.queue_url"
+                        channel_id.$: "$.channel_id"
+
+                Activity('UpdateDownsampleStatus')
+                    """SetFailedStatus
+
+                        boss-tools/activities/boss_db.py
+                    """
+
+                Lambda('startSfnLambda')
+                    """StartNewSfnInstanceAfterFailure
+
+                    Start a new instance of this step function in case there
+                    are more jobs queued.
+
+                    start_sfn_lambda.py
+                    """
+                    retry [
+                        'StateMachineDoesNotExist', 
+                        'InvalidArn',
+                        'KeyError',
+                        'TypeError'
+                    ] 1 0 1.0
+                    retry [] 60 3 2.0
+
+                Fail('Exception', 'Downsample failed')
+                    """DownsampleFailed
+                    """
+
+    Pass()
+        """AddDownsampledStatus
+
+            Set DOWNSAMPLED status as status for next state.
+        """
+        parameters:
+            status: "DOWNSAMPLED"
+            db_host.$: "$.db_host"
+            sfn_arn.$: "$.sfn_arn"
+            job_receipt_handle.$: "$.job_receipt_handle"
+            queue_url.$: "$.queue_url"
+            lookup_key.$: "$.lookup_key"
+            channel_id.$: "$.channel_id"
+
+
+    Activity('UpdateDownsampleStatus')
+        """SetDownsampledStatus
+
+            Set channel as downsampled in DB.
+
+            boss-tools/activities/boss_db.py
+        """
+
+    Activity('DeleteDownsampleJob')
+        """DeleteJobFromQueue
+
+            boss-tools/activities/resolution_hierarchy.py
+        """
+        retry [] 5 3 2
+
+    Activity('ClearCacheAfterDownsample')
+        """ClearCachedCuboids
+
+            Clear any cuboids from the channel that might have been cached.
+
+            boss-tools/activities/resolution_hierarchy.py
+        """
+
+    Lambda('startSfnLambda')
+        """StartNewSfnInstance
+
+        Start a new instance of this step function in case there
+        are more jobs queued.
+
+        start_sfn_lambda.py
+        """
+        retry [
+            'StateMachineDoesNotExist', 
+            'InvalidArn',
+            'KeyError',
+            'TypeError'
+        ] 1 0 1.0
+        retry [] 60 3 2.0

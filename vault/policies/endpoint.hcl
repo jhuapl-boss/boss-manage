@@ -21,23 +21,18 @@ path "secret/keycloak" {
 # Ingest temporary roles/credentials support.
 #############################################
 path "aws/roles/ingest*" {
-    policy = "write"
+    capabilities = ["create", "update", "delete"]
 }
 
 path "aws/creds/ingest*" {
-    policy = "write"
+    capabilities = ["create", "read", "update", "delete"]
 }
-
 path "sys/renew/aws/creds/ingest*" {
     policy = "write"
 }
 
-path "sys/revoke/aws/creds/ingest*" {
-    policy = "write"
-}
-
-path "sys/revoke-prefix/aws/creds/ingest*" {
-    policy = "sudo"
+path "sys/leases/revoke-prefix/aws/creds/ingest*" {
+    capabilities = ["sudo", "update"]
 }
 #################################################
 # End ingest temporary roles/credentials support.

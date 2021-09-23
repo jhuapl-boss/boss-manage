@@ -25,6 +25,9 @@ MIGRATION CHANGELOG:
     Version 2: Public DNS updates
                * Replaced manually created public Route53 DNS records with
                  CloudFormation maintained records
+    Version 3: Bossingest group
+               * Added code to automatically call Boss API to create
+                 'bossingest' group
 """
 
 # Redis dependency is because of Django session storage
@@ -74,10 +77,6 @@ def create_config(bosslet_config, db_config={}):
     else:
         # Don't create a Redis server for dev stacks.
         user_data["aws"]["cache-session"] = ''
-    if const.REDIS_THROTTLE_TYPE is not None:
-        user_data["aws"]["cache-throttle"] = names.cache_throttle.redis
-    else:
-        user_data["aws"]["cache-throttle"] = ''
 
     ## cache-db and cache-stat-db need to be in user_data for lambda to access them.
     user_data["aws"]["cache-db"] = "0"
@@ -102,6 +101,7 @@ def create_config(bosslet_config, db_config={}):
     user_data["aws"]["id-index-new-chunk-threshold"] = str(const.DYNAMO_ID_INDEX_NEW_CHUNK_THRESHOLD)
     user_data["aws"]["index-deadletter-queue"] = str(Ref(names.index_deadletter.sqs))
     user_data["aws"]["index-cuboids-keys-queue"] = str(Ref(names.index_cuboids_keys.sqs))
+    user_data["aws"]["downsample-queue"] = str(Ref(names.downsample_queue.sqs))
 
     user_data["auth"]["OIDC_VERIFY_SSL"] = str(bosslet_config.VERIFY_SSL)
     user_data["lambda"]["flush_function"] = names.multi_lambda.lambda_
@@ -115,11 +115,12 @@ def create_config(bosslet_config, db_config={}):
     user_data['sfn']['volumetric_upload_sfn'] = names.volumetric_ingest_queue_upload.sfn
     user_data['sfn']['downsample_sfn'] = names.resolution_hierarchy.sfn
     user_data['sfn']['index_cuboid_supervisor_sfn'] = names.index_cuboid_supervisor.sfn
+    user_data['sfn']['complete_ingest_sfn'] = names.complete_ingest.sfn
 
     # Prepare user data for parsing by CloudFormation.
     parsed_user_data = { "Fn::Join" : ["", user_data.format_for_cloudformation()]}
 
-    config = CloudFormationConfiguration('api', bosslet_config, version="2")
+    config = CloudFormationConfiguration('api', bosslet_config, version="3")
     keypair = bosslet_config.SSH_KEY
 
     vpc_id = config.find_vpc()
@@ -143,11 +144,13 @@ def create_config(bosslet_config, db_config={}):
     # Queue that holds S3 object keys of cuboids to be indexed.
     config.add_sqs_queue(names.index_cuboids_keys.sqs, names.index_cuboids_keys.sqs, 120, 20160)
 
-    #config.add_sqs_queue("DeadLetterQueue", names.deadletter.sqs, 30, 20160) DP XXX
     config.add_sqs_queue(names.deadletter.sqs, names.deadletter.sqs, 30, 20160)
 
+    # ToDo: determine if a dlq needed for this queue.
+    # Downsample jobs.
+    config.add_sqs_queue(names.downsample_queue.sqs, names.downsample_queue.sqs, 300, 20160)
+
     max_receives = 3
-    #config.add_sqs_queue("S3FlushQueue", DP XXX
     config.add_sqs_queue(names.s3flush.sqs,
                          names.s3flush.sqs,
                          30,
@@ -166,7 +169,7 @@ def create_config(bosslet_config, db_config={}):
     cert = aws.cert_arn_lookup(session, names.public_dns("api"))
     target_group_keys = config.add_app_loadbalancer("EndpointAppLoadBalancer",
                             names.endpoint_elb.dns,
-                            [("443", "80", "HTTPS", cert)],
+                            [("443", "443", "HTTPS", cert)],
                             vpc_id=vpc_id,
                             subnets=external_subnets_asg,
                             security_groups=[sgs[names.internal.sg], sgs[names.https.sg]],
@@ -283,7 +286,6 @@ def create(bosslet_config):
     with bosslet_config.call.vault() as vault:
         vault.write(const.VAULT_ENDPOINT, secret_key = str(uuid.uuid4()))
         vault.write(const.VAULT_ENDPOINT_DB, **db_config)
-        vault.write(const.VAULT_ENDPOINT_THROTTLE, config = json.dumps(const.THROTTLE))
 
         dns = bosslet_config.names.public_dns("api")
         uri = "https://{}".format(dns)
@@ -380,11 +382,6 @@ def update(bosslet_config):
     config = create_config(bosslet_config, db_config)
 
     config.update()
-
-    # DP NOTE: If there is a migration error then throttling will not be updated...
-    print("Updating Throttling Config")
-    with bosslet_config.call.vault() as vault:
-        vault.write(const.VAULT_ENDPOINT_THROTTLE, config = json.dumps(const.THROTTLE))
 
 def delete(bosslet_config):
     session = bosslet_config.session

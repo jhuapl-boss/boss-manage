@@ -1,0 +1,22 @@
+# Instance types
+ENDPOINT_TYPE: t3.medium
+RDS_TYPE: db.t3.micro
+RDS_AUTH_TYPE: db.t3.micro
+REDIS_CACHE_TYPE: cache.t2.small
+REDIS_SESSION_TYPE: null # Not used for dev
+REDIS_TYPE: cache.t3.small
+CACHE_MANAGER_TYPE: t3.micro
+VAULT_TYPE: t3.micro
+ACTIVITIES_TYPE: m5.large
+AUTH_TYPE: t3.micro
+
+# Cluster / ASG sizes
+AUTH_CLUSTER_SIZE: 1
+VAULT_CLUSTER_SIZE: 1
+ENDPOINT_CLUSTER_MIN: 1
+ENDPOINT_CLUSTER_MAX: 1
+REDIS_CLUSTER_SIZE: 1
+
+# Memory Size
+REDIS_RESERVED_MEMORY_PERCENT: 25
+

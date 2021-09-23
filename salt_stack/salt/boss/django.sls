@@ -1,11 +1,13 @@
 include:
-    - python.python35
-    - python.pip
+    - python.python3
+    - python.pip3
+    - python.python3-dev
     - boss-tools.bossutils
     - uwsgi.emperor
     - nginx
     - spdb
-    - boss-oidc
+    - cvdb
+    - git
 
 django-prerequirements:
     pkg.installed:
@@ -16,7 +18,6 @@ django-prerequirements:
 
 django-requirements:
     pip.installed:
-        - bin_env: /usr/local/bin/pip3
         - requirements: salt://boss/files/boss.git/requirements.txt
         - exists_action: w
         - require:
@@ -28,10 +29,26 @@ django-files:
         - source: salt://boss/files/boss.git
         - include_empty: true
 
+ssl-config:
+    file.managed:
+        - mode: 600
+        - names:
+            - /etc/ssl/certs/nginx-selfsigned.crt:
+                - source: salt://boss/files/nginx-selfsigned.crt
+            - /etc/ssl/private/nginx-selfsigned.key:
+                - source: salt://boss/files/nginx-selfsigned.key
+            - /etc/nginx/dhparam.pem: 
+                - source: salt://boss/files/dhparam.pem
+
 nginx-config:
     file.managed:
-        - name: /etc/nginx/sites-available/boss
-        - source: salt://boss/files/boss.git/boss_nginx.conf
+        - names: 
+            - /etc/nginx/sites-available/boss:
+                - source: salt://boss/files/boss.git/boss_nginx.conf
+            - /etc/nginx/snippets/self-signed.conf:
+                - source: salt://boss/files/boss.git/self-signed.conf
+            - /etc/nginx/snippets/ssl-params.conf:
+                - source: salt://boss/files/boss.git/ssl-params.conf
 
 nginx-enable-config:
     file.symlink:

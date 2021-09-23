@@ -9,6 +9,7 @@
   },
   {
     "AttachedManagedPolicies": [
+      "arn:aws:iam::==account==:policy/aplChangeOwnPassword",
       "arn:aws:iam::aws:policy/AmazonEC2FullAccess"
     ],
     "GroupName": "aplBasicUser",
@@ -23,7 +24,7 @@
       "arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole",
       "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole",
       "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetAutoscaleRole",
-      "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetRole"
+      "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetTaggingRole"
     ],
     "GroupName": "aplCompute",
     "GroupPolicyList": [],
@@ -77,6 +78,7 @@
   },
   {
     "AttachedManagedPolicies": [
+      "arn:aws:iam::==account==:policy/aplChangeOwnPassword",
       "arn:aws:iam::==account==:policy/aplCloudFormationFullAccess",
       "arn:aws:iam::aws:policy/AWSSupportAccess",
       "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess"
