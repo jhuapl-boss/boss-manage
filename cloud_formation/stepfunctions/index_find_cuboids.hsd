@@ -5,6 +5,7 @@ Index.FindCuboids
 
 Inputs:
 {
+    "batch_enqueue_cuboids_step_fcn": "arn:aws:states:...",
     "config": {
       "object_store_config": {
         "id_count_table": "idCount.domain.boss",
@@ -28,20 +29,18 @@ Inputs:
         "cache_state_host": "cache-state.domain.boss"
       }
     },
-    "id_supervisor_step_fcn": "arn:aws:states:...",
+    "id_chunk_size": 20,
     "id_cuboid_supervisor_step_fcn": "arn:aws:states:...",
-    "index_dequeue_cuboids_step_fcn": "arn:aws:states:...",
     "id_index_step_fcn": "arn:aws:states:...",
-    "batch_enqueue_cuboids_step_fcn": "arn:aws:states:...",
-    "fanout_enqueue_cuboids_step_fcn": "arn:aws:states:...",
-    "max_cuboid_fanout": int,           # Max number of Index.CuboidSupervisors to fanout at a time.
-    "max_items": int,                   # Max items to retrieve from Dynamo at a time.
-    "index_enqueue_cuboids_step_fcn": "arn:...",
-    "lookup_key": "..."             # collection&exp&chan&res
     "index_ids_sqs_url": "...",
+    "lookup_key": "..."             # collection&exp&chan&res
+    "max_items": int,                   # Max items to retrieve from Dynamo at a time.
     # Number of object ids to include in a single SQS message.
     "num_ids_per_msg": 20,
-    "id_chunk_size": 20,
+    "status": {
+        "done": bool,
+        "lookup_key_n": int,
+    },
     "wait_time": 5,
 }
 """
@@ -51,10 +50,14 @@ timeout: 86400      # 1 day
 
 Pass()
     """Init
+
+    Set query_count to 0 before beginning.  A new instance of this step
+    function starts when query_count > n.  This avoids the 25K max state
+    transition limit when there are huge number of cuboids in a channel.
     """
-    result: '$.status'
+    result: '$.query_count'
     data:
-        {'done': False, 'lookup_key_n': 0}
+        0
 
 while '$.status.done' == False:
     """WhileStillTraversingLookupKeyIndex
@@ -129,7 +132,67 @@ while '$.status.done' == False:
                     """FailedStartEnqueue
                     """
 
+    if '$.query_count' > 100:
+        """IfQueryCountGreaterThan100
+
+        Stay under state transition max by starting a new instance of this
+        step function after 100 queries.
+        """
+        Pass()
+            """UpdateOperationFieldSpawnNewFindCuboidsSfn
+            Adds the name of the operation so it can be logged properly in 
+            the deadletter queue in case of a failure when querying DynamoDB.
+
+            Also sets sfn_arn to this step function so a new instance can be
+            spawned.
+            """
+            parameters:
+                batch_enqueue_cuboids_step_fcn.$: "$.batch_enqueue_cuboids_step_fcn"
+                config.$: "$.config"
+                fanout_id_writers_step_fcn.$: "$.fanout_id_writers_step_fcn"
+                id_chunk_size.$: "$.id_chunk_size"
+                id_cuboid_supervisor_step_fcn.$: "$.id_cuboid_supervisor_step_fcn"
+                id_index_step_fcn.$: "$.id_index_step_fcn"
+                index_ids_sqs_url.$: "$.index_ids_sqs_url"
+                lookup_key.$: "$.lookup_key"
+                max_items.$: "$.max_items"
+                num_ids_per_msg.$: "$.num_ids_per_msg"
+                status.$: "$.status"
+                wait_time.$: "$.wait_time"
+
+                sfn_arn.$: "$$.StateMachine.Id"
+                operation: 'Start new find cuboids SFN'
+
+        Lambda('startSfnLambda')
+            """StartNewFindCuboidsSFN
+
+            start_sfn_lambda.py
+            """
+            retry [
+                'StateMachineDoesNotExist', 
+                'InvalidArn',
+                'KeyError',
+                'TypeError'
+            ] 1 0 1.0
+            retry [] 60 3 2.0
+            catch []: '$.result'
+                Lambda('indexWriteFailedLambda')
+                    """StartNewFindCuboidsToDeadletterQueue
+                    """
+                    retry ['KeyError'] 1 0 1.0
+                    retry [] 10 2 2.0
+                    catch []: '$.dlqresult'
+                        Fail('Exception', 'Failed to write to dead letter queue')
+                            """FailedSendingNewFindCuboidsToDeadLetterQueue
+                            """
+                Fail('Exception', 'Failed to start fanout enqueuing step function')
+                    """FailedStartingNewFindCuboids
+                    """
+        Success()
+            """SentWorkToNewFindCuboidsSFN
+            """
+
 
 Success()
-    """Success
+    """FoundAllCuboids
     """

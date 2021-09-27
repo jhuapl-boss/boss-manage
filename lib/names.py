@@ -217,6 +217,9 @@ class AWSNames(object):
                                         'type': 'lambda_'},
         'index_cuboids_keys': {'name': 'cuboidsKeys',
                                'type': 'sqs'},
+        # This step function invokes the entire object indexing process.
+        'index_start': {'name': 'Index.Start',
+                        'type': 'sfn'},
         'index_cuboid_supervisor': {'name': 'Index.CuboidSupervisor',
                                     'type': 'sfn'},
         'index_deadletter': {'name': 'indexDeadLetter',

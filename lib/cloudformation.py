@@ -1101,7 +1101,7 @@ class CloudFormationConfiguration:
 
         self._add_record_cname(key, hostname, rds = True)
 
-    def add_dynamo_table_from_json(self, key, name, KeySchema, AttributeDefinitions, ProvisionedThroughput, GlobalSecondaryIndexes=None, TimeToLiveSpecification=None, BillingMode=None):
+    def add_dynamo_table_from_json(self, key, name, KeySchema, AttributeDefinitions, ProvisionedThroughput=None, GlobalSecondaryIndexes=None, TimeToLiveSpecification=None, BillingMode=None):
         """Add DynamoDB table to the configuration using DynamoDB's calling convention.
 
         Example:
@@ -1121,9 +1121,10 @@ class CloudFormationConfiguration:
             name (str) : DynamoDB Table name to create
             KeySchema (list) : List of dict of AttributeName / KeyType
             AttributeDefinitions (list) : List of dict of AttributeName / AttributeType
-            ProvisionedThroughput (dictionary) : Dictionary of ReadCapacityUnits / WriteCapacityUnits
+            ProvisionedThroughput (optional[dict]) : Dictionary of ReadCapacityUnits / WriteCapacityUnits
             GlobalSecondaryIndexes (optional[list]): List of dicts representing global secondary indexes.  Defaults to None.
-            TimeToLiveSpecification (opitonal[dict]): Defines TTL attribute and whether it's enabled.
+            TimeToLiveSpecification (optional[dict]): Defines TTL attribute and whether it's enabled.
+            BillingMode (optional[str]): Define billing mode for table.
         """
 
         self.resources[key] = {
@@ -1132,9 +1133,11 @@ class CloudFormationConfiguration:
                 "TableName" : name,
                 "KeySchema" : KeySchema,
                 "AttributeDefinitions" : AttributeDefinitions,
-                "ProvisionedThroughput" : ProvisionedThroughput
             }
         }
+
+        if ProvisionedThroughput is not None:
+            self.resources[key]["Properties"]["ProvisionedThroughput"] = ProvisionedThroughput
 
         if GlobalSecondaryIndexes is not None:
             self.resources[key]["Properties"]["GlobalSecondaryIndexes"] = GlobalSecondaryIndexes

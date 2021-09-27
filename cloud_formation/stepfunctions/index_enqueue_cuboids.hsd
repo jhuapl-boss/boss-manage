@@ -32,7 +32,7 @@ Sample input:
 """
 
 version: '1.0'
-timeout: 300
+timeout: 7200 # 2 hours
 
 Pass()
     """UpdateOperationFieldMap

@@ -32,6 +32,7 @@ DEPENDENCIES = ['activities', 'cachedb']
 def STEP_FUNCTIONS(bosslet_config):
     names = bosslet_config.names
     return [
+        (names.index_start.sfn, 'index_start.hsd'),
         (names.index_cuboid_supervisor.sfn, 'index_cuboid_supervisor.hsd'),
         (names.index_id_writer.sfn, 'index_id_writer.hsd'),
         (names.index_fanout_id_writers.sfn, 'index_fanout_id_writers.hsd'),
@@ -85,12 +86,12 @@ def create_config(bosslet_config):
     add_lambda("indexBatchEnqueueCuboidsLambda",
                names.index_batch_enqueue_cuboids.lambda_,
                "batch_enqueue_cuboids_lambda.handler",
-               timeout=60, memory=128)
+               timeout=120, memory=128)
 
     add_lambda("indexEnqueueCuboidIdsLambda",
                names.index_enqueue_ids.lambda_,
                "enqueue_cuboid_ids_lambda.handler",
-               timeout=60, memory=128)
+               timeout=120, memory=128)
 
     add_lambda("indexLoadIdsFromS3Lambda",
                names.index_load_ids_from_s3.lambda_,

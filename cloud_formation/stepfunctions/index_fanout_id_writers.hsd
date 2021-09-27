@@ -14,6 +14,7 @@ Expected inputs:
     "version": Reserved for future use
     "worker_id": Used to query DynamoDB in parallel
     "id_chunk_size": Number of ids to include in each "chunk" output by load_ids_from_s3_lambda.py
+    "wait_time": Initial number of seconds to wait if enqueuing fails
 }
 """
 
@@ -126,6 +127,9 @@ map:
     catch []: '$.result'
         Lambda('indexWriteFailedLambda')
             """EnqueueIdsWithMapFailed
+
+            If we get here, there's probably at least one other message written
+            to the deadletter queue from a failure running the map's iterator.
 
             write_index_failed_lambda.py
             """

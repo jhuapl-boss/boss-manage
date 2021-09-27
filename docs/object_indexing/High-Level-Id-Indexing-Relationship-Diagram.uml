@@ -1,6 +1,6 @@
 @startuml
 title  "High Level Id Indexing Component Relationships"
-header Last updated 21Sep2021
+header Last updated 24Sep2021
 footer Generated from High-Level-Id-Indexing-Relationship-Diagram.uml by PlantUML
 
 !include <awslib/AWSCommon>
@@ -11,6 +11,7 @@ footer Generated from High-Level-Id-Indexing-Relationship-Diagram.uml by PlantUM
 
 DynamoDB(S3Index, "S3Index", "")
 DynamoDB(IdIndex, "IdIndex", "")
+StepFunctions(Start, "Start", "")
 StepFunctions(FindCuboids, "Find Cuboids", "")
 StepFunctions(EnqueueCuboids, "EnqueueCuboids", "")
 SQS(CuboidSqs, "Cuboid Keys Queue", "")
@@ -20,7 +21,9 @@ StepFunctions(FanoutIdWriters, "FanoutIdWriters", "")
 StepFunctions(IdWriter, "IdWriter", "")
 S3Bucket(CuboidBucket, "Cuboid Bucket", "")
 
+Start --> FindCuboids : Starts
 FindCuboids --> EnqueueCuboids : Starts Many
+FindCuboids --> FindCuboids : Spawns new after 100 S3Index queries
 FindCuboids --- S3Index : Gets cuboids belonging to channel
 EnqueueCuboids --> CuboidSqs : Adds cuboid object keys
 CuboidSqs --> CuboidSupervisor : Starts Many

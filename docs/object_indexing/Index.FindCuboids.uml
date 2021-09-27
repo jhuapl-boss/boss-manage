@@ -1,11 +1,11 @@
 @startuml
 
-header Last updated 21Sep2021
+header Last updated 24Sep2021
 footer Generated from Index.FindCuboids.uml by PlantUML
 title Index.FindCuboids Step Function Diagram
 
 [*] --> Init
-Init: Add inputs as status
+Init: set query_count = 0
 Init --> WhileStillTraversingLookupKeyIndex
 
 WhileStillTraversingLookupKeyIndex --> [*]: Done
@@ -30,9 +30,21 @@ UpdateOperationFieldSpawnEnqueueSfn --> AsynchEnqueueCuboids
 AsynchEnqueueCuboids: start EnqueueCuboids SFN
 AsynchEnqueueCuboids: start_sfn_lambda.py
 AsynchEnqueueCuboids --> StartEnqueueFailedToDeadletterQueue : error starting EnqueueCuboids SFN
-AsynchEnqueueCuboids --> WhileStillTraversingLookupKeyIndex : no error
+AsynchEnqueueCuboids --> IfQueryCountGreaterThan100 : no error
 
 StartEnqueueFailedToDeadletterQueue --> Fail
 
+IfQueryCountGreaterThan100 --> WhileStillTraversingLookupKeyIndex : false
+IfQueryCountGreaterThan100 --> UpdateOperationFieldSpawnNewFindCuboidsSfn : true
+
+UpdateOperationFieldSpawnNewFindCuboidsSfn --> StartNewFindCuboidsSFN
+UpdateOperationFieldSpawnNewFindCuboidsSfn: set operation = Start new find cuboids SFN
+
+StartNewFindCuboidsSFN: start new find cuboids SFN
+StartNewFindCuboidsSFN: start_sfn_lambda.py
+StartNewFindCuboidsSFN --> [*]: Spawned new instance
+StartNewFindCuboidsSFN --> StartNewFindCuboidsToDeadletterQueue : error starting new FindCuboids SFN
+
+StartNewFindCuboidsToDeadletterQueue --> Fail
 @enduml
 
