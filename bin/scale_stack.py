@@ -17,11 +17,26 @@
 """
 Simple script to scale up/down ASG. 
 DO NOT USE ON PRODUCTION. 
+
+Order of scaling up:
+    bastion 
+    vault 
+    activities
+    endpoint
+    cachemanager
+
+Order of scaling down:
+    cachemanager
+    endpoint
+    activities
+    vault
+    bastion
 """
 
 import boto3
-
+import time
 import alter_path
+from botocore.exceptions import ClientError
 from lib import configuration
 
 PRODUCTION = ["bossdb.boss"]
@@ -33,38 +48,96 @@ def scale_stack(args):
     
     session = args.bosslet_config.session
     
-    ## Scale non-ASG instances, cachemanager and bastion, by stopping/starting them. ##
-    if not args.asg_only:
-        client = session.client('ec2')
-        instances = (f"cachemanager.{args.bosslet_name}", f"bastion.{args.bosslet_name}")
-        response = client.describe_instances(Filters=[{"Name":"tag:Name", "Values": instances}])['Reservations']
-        instance_ids = [x['Instances'][0]['InstanceId'] for x in response]
-        if args.mode == 'up':
-            client.start_instances(InstanceIds=instance_ids)
-        else:
-            client.stop_instances(InstanceIds=instance_ids)
+    ### Get instance ids and ASG ids 
 
-    ## Scale ASG instances by setting capacity to 0/1. ## 
-    client = session.client('autoscaling')
-    
-    # Get ASG List
-    response = client.describe_auto_scaling_groups()['AutoScalingGroups']
+    ## EC2 Instances
+    instances = (f"cachemanager.{args.bosslet_name}", f"bastion.{args.bosslet_name}")
+    if not args.asg_only:
+        ec2_client = session.client('ec2')
+        instance_ids = {x: get_instance_id(ec2_client, x) for x in instances}
+
+    ## AutoScalingGroups
+    asg_client = session.client('autoscaling')
+    response = asg_client.describe_auto_scaling_groups()['AutoScalingGroups']
     
     # Filter those that belong to bosslet
     bosslet_id = args.bosslet_name.split('.')[0].lower()
-    bosslet_asg = []
+    bosslet_asg = {}
     for asg in response:
         if bosslet_id in asg['AutoScalingGroupName'].lower() and 'auth' not in asg['AutoScalingGroupName'].lower():
-            bosslet_asg.append(asg)
+            key = asg['AutoScalingGroupName'].split('-')[1].lower()
+            bosslet_asg[key] = asg['AutoScalingGroupName']
 
-    # Adjust desired, max, and min capacity for matched ASGs
-    for asg in bosslet_asg:
-        if args.mode == 'up':
-            client.update_auto_scaling_group(AutoScalingGroupName=asg['AutoScalingGroupName'], MinSize=1, MaxSize=1, DesiredCapacity=1)
-        else: 
-            client.update_auto_scaling_group(AutoScalingGroupName=asg['AutoScalingGroupName'], MinSize=0, MaxSize=0, DesiredCapacity=0)
+    if args.mode == 'up':
+        print("Starting bastion")
+        if not args.asg_only:
+            ec2_client.start_instances(InstanceIds=[instance_ids[f"bastion.{args.bosslet_name}"]])
+            time.sleep(1)
 
+        print("Waiting for bastion to initialize")
+        wait_for_instance(ec2_client, f"bastion.{args.bosslet_name}")
+
+        print("Scaling up vault")
+        asg_client.update_auto_scaling_group(AutoScalingGroupName=bosslet_asg['vault'], MinSize=1, MaxSize=1, DesiredCapacity=1)
+        time.sleep(1)
+
+        print("Waiting for vault to initialize")
+        wait_for_instance(ec2_client, f"vault.{args.bosslet_name}")
+
+        print("Scaling up endpoint") 
+        asg_client.update_auto_scaling_group(AutoScalingGroupName=bosslet_asg['endpoint'], MinSize=1, MaxSize=1, DesiredCapacity=1)
+        time.sleep(1)
+        
+        print("Scaling up activities")
+        asg_client.update_auto_scaling_group(AutoScalingGroupName=bosslet_asg['activities'], MinSize=1, MaxSize=1, DesiredCapacity=1)
+        time.sleep(1)
+
+        print("Starting cachemanager")
+        if not args.asg_only:
+            ec2_client.start_instances(InstanceIds=[instance_ids[f"cachemanager.{args.bosslet_name}"]])
+            time.sleep(1)          
+    else:
+        print("Stopping cachemanager")
+        if not args.asg_only:
+            ec2_client.stop_instances(InstanceIds=[instance_ids[f"cachemanager.{args.bosslet_name}"]])
+            time.sleep(1)
+
+        print("Scaling down activties")
+        asg_client.update_auto_scaling_group(AutoScalingGroupName=bosslet_asg['activities'], MinSize=0, MaxSize=0, DesiredCapacity=0)
+        time.sleep(1)
+
+        print("Scaling down endpoint") 
+        asg_client.update_auto_scaling_group(AutoScalingGroupName=bosslet_asg['endpoint'], MinSize=0, MaxSize=0, DesiredCapacity=0)
+        time.sleep(1)
+
+        print("Scaling down vault")
+        asg_client.update_auto_scaling_group(AutoScalingGroupName=bosslet_asg['vault'], MinSize=0, MaxSize=0, DesiredCapacity=0)
+        time.sleep(1)
+
+        print("Stopping bastion")
+        if not args.asg_only:
+            ec2_client.stop_instances(InstanceIds=[instance_ids[f"bastion.{args.bosslet_name}"]])
+            time.sleep(1)
+        
     
+    print('Done!')
+
+def get_instance_id(ec2_client, instance_name):
+    resp = ec2_client.describe_instances(Filters=[{"Name":"tag:Name", "Values": [instance_name]}])['Reservations']
+    return resp[0]['Instances'][0]['InstanceId']
+
+def wait_for_instance(ec2_client, instance_name):
+    while True:
+        resp = ec2_client.describe_instances(Filters=[{"Name":"tag:Name", "Values": [instance_name]}])['Reservations']
+        try:
+            state = resp[0]['Instances'][0]['State']['Name']
+        except KeyError:
+            time.sleep(1)
+            continue
+
+        if state == 'running':
+            break
+        time.sleep(0.5)
 
 
 if __name__ == '__main__':
