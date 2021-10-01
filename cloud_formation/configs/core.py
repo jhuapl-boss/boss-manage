@@ -202,6 +202,7 @@ def create_config(bosslet_config):
                           "keycloak",
                           "keycloak",
                           internal_subnets,
+			              bosslet_config.RDS_ENGINE_VERSION,
                           type_=const.RDS_AUTH_TYPE,
                           security_groups=[Ref("InternalSecurityGroup")])
 

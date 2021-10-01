@@ -1020,7 +1020,7 @@ class CloudFormationConfiguration:
         self.keypairs[hostname] = keypair
         self._add_record_cname(key, hostname, ec2 = True)
 
-    def add_rds_db(self, key, hostname, port, db_name, username, password, subnets, type_="db.t2.micro", storage="5", security_groups=None):
+    def add_rds_db(self, key, hostname, port, db_name, username, password, subnets, rds_engine_version,  type_="db.t2.micro", storage="5", security_groups=None):
         """Add an RDS DB instance to the configuration
 
         Args:
@@ -1044,7 +1044,7 @@ class CloudFormationConfiguration:
             "Properties" : {
                 "Engine" : "mysql",
                 "LicenseModel" : "general-public-license",
-                "EngineVersion" : "5.6.51",  # was 5.6.48
+                "EngineVersion" : rds_engine_version,  # was 5.6.51
                 "DBInstanceClass" : type_,
                 "MultiAZ" : "true",
                 "StorageType" : "standard",
