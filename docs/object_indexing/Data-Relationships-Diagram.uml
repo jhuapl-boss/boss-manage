@@ -14,7 +14,7 @@ S3Bucket(CuboidBucket, "Cuboid Bucket", "")
 
 S3Index --> CuboidBucket : Has cuboid object keys and ids contained by each cuboid
 IdIndex --> CuboidBucket : Each id contains object keys of cuboids with that id
-IDP --> S3Index : adds ids to cuboid object keys
-IDP --> IdIndex : adds cuboids to ids
+IDP --> S3Index : Adds ids to cuboid object keys
+IDP --> IdIndex : Adds cuboids object keys to ids
 
 @enduml
