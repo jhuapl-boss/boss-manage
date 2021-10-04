@@ -1,0 +1,20 @@
+@startuml
+title  "Id Indexing Data Relationships"
+header Last updated 4Oct2021
+footer Generated from Data-Relationships-Diagram.uml by PlantUML
+
+!include <awslib/AWSCommon>
+!include <awslib/Database/DynamoDB>
+!include <awslib/Storage/S3Bucket>
+
+entity "Id Indexing Process" as IDP
+DynamoDB(S3Index, "S3Index", "")
+DynamoDB(IdIndex, "IdIndex", "")
+S3Bucket(CuboidBucket, "Cuboid Bucket", "")
+
+S3Index --> CuboidBucket : Has cuboid object keys and ids contained by each cuboid
+IdIndex --> CuboidBucket : Each id contains object keys of cuboids with that id
+IDP --> S3Index : adds ids to cuboid object keys
+IDP --> IdIndex : adds cuboids to ids
+
+@enduml
