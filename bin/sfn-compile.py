@@ -42,7 +42,6 @@ if __name__ == '__main__':
                         help="heaviside file to compile")
 
     args = parser.parse_args()
-    print(args)
 
     try:
         machine = heaviside.compile(Path(args.file), region=args.region, account_id=args.account, indent=3)
