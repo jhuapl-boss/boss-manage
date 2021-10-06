@@ -20,12 +20,13 @@ want to put the Boss repo in `~/boss`:
 ```shell
 # Make sure health checks and termination disabled for the endpoint!
 # Clone the repo to the endpoint (fill in your GitHub username in the URL)
-git clone https://<your_username>@github.com/jhuapl-boss/boss
+git clone https://<your_github_username>@github.com/jhuapl-boss/boss
 
 cd boss/django
 
 # Make sure your Git identity is set.  I keep a copy of my dotfiles on GitHub,
-# but here's how to do it manually.
+# but here's how to do it manually. Use your acutal name and email so changes 
+# can be tracked to the correct person.
 git config user.name "Boss Dev"
 git config user.email bossdev@jhuapl.edu
 
@@ -60,7 +61,7 @@ Follow the normal Git workflow for pushing your changes back to GitHub.
 
 ## Cleanup
 
-To restore health checks, run this command from `boss-manage/bin`:
+To restore health checks, run this command from your local `boss-manage/bin`:
 
 ```shell
 python suspend_termination.py --reverse endpoint.shared.boss
