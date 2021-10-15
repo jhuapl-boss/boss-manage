@@ -52,8 +52,8 @@ def scale_stack(args):
 
     ## EC2 Instances
     instances = (f"cachemanager.{args.bosslet_name}", f"bastion.{args.bosslet_name}")
+    ec2_client = session.client('ec2')
     if not args.asg_only:
-        ec2_client = session.client('ec2')
         instance_ids = {x: get_instance_id(ec2_client, x) for x in instances}
 
     ## AutoScalingGroups
@@ -67,6 +67,10 @@ def scale_stack(args):
         if bosslet_id in asg['AutoScalingGroupName'].lower() and 'auth' not in asg['AutoScalingGroupName'].lower():
             key = asg['AutoScalingGroupName'].split('-')[1].lower()
             bosslet_asg[key] = asg['AutoScalingGroupName']
+
+            # Check if any of the ASGs have suspended processes. Abort if they do.
+            if asg['SuspendedProcesses']:
+                raise Exception(f"Suspended Processes set for ASG {asg['AutoScalingGroupName']}. Aborting.")
 
     if args.mode == 'up':
         print("Starting bastion")
@@ -119,7 +123,6 @@ def scale_stack(args):
             ec2_client.stop_instances(InstanceIds=[instance_ids[f"bastion.{args.bosslet_name}"]])
             time.sleep(1)
         
-    
     print('Done!')
 
 def get_instance_id(ec2_client, instance_name):
@@ -127,18 +130,26 @@ def get_instance_id(ec2_client, instance_name):
     return resp[0]['Instances'][0]['InstanceId']
 
 def wait_for_instance(ec2_client, instance_name):
-    while True:
-        resp = ec2_client.describe_instances(Filters=[{"Name":"tag:Name", "Values": [instance_name]}])['Reservations']
-        try:
-            state = resp[0]['Instances'][0]['State']['Name']
-        except KeyError:
-            time.sleep(1)
-            continue
 
-        if state == 'running':
-            break
-        time.sleep(0.5)
+    # Filters out the instances that were previously terminated but have the same name.
+    filters = [
+        {
+            'Name': "tag:Name",
+            'Values': [instance_name], 
+        },
+        {
+            'Name': 'instance-state-name',
+            'Values': ['pending', 'running', 'stopped']
+        }
+    ]
 
+    waiter = ec2_client.get_waiter('instance_running')
+    waiter.wait(
+        Filters= filters,
+        WaiterConfig={
+            'Delay': 5
+        }
+    )
 
 if __name__ == '__main__':
     parser = configuration.BossParser(description='Script to scale up or down all EC2 autoscale groups for a BossDB stack.')
