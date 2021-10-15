@@ -36,15 +36,13 @@ Order of scaling down:
 import boto3
 import time
 import alter_path
-from botocore.exceptions import ClientError
 from lib import configuration
 
 PRODUCTION = ["bossdb.boss"]
 
 def scale_stack(args):
     if args.bosslet_name in PRODUCTION:
-        print("ERROR: Cannot scale down production environment.")
-        return
+        raise Exception("Cannot scale down production environment.")
     
     session = args.bosslet_config.session
     
