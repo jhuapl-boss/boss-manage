@@ -90,6 +90,10 @@ def sql_resource_lookup_key_cursor(bosslet_config, resource_params, cursor):
         cuboid_str(str): Cuboid lookup key.
     """
     collection, experiment, channel = None, None, None
+    if resource_params is None:
+        raise ValueError(
+            "resource_params cannot be None, it must contain either: <coll> | <coll/exp> | <coll/exp/chan>")
+
     resource = resource_params.split("/")
 
     if len(resource) == 0:
@@ -103,7 +107,8 @@ def sql_resource_lookup_key_cursor(bosslet_config, resource_params, cursor):
         if len(resource) > 2:
             channel = resource_params.split("/")[2]
         elif len(resource) > 3:
-            raise Exception("Only provide /coll/exp/chan")
+            raise ValueError(
+                "resource_parms has more then 3 parts.  I can only contain:  <coll> | <coll/exp> | <coll/exp/chan>")
 
     coll_query = "SELECT id FROM collection WHERE name = %s"
     exp_query = "SELECT id FROM experiment WHERE name = %s and collection_id = %s"
@@ -112,9 +117,10 @@ def sql_resource_lookup_key_cursor(bosslet_config, resource_params, cursor):
     if collection is not None:
         cursor.execute(coll_query, (collection,))
         coll_set = cursor.fetchall()
-        if len(coll_set) != 1:  # TODO: Alert the user when there are more than one results
-            raise Exception(
-                "Can't find collection: {}".format(collection))
+        if len(coll_set) < 1:
+            raise ValueError(f"No collection found with the name: {collection}")
+        elif len(coll_set) > 1:
+            raise ValueError(f"Multiple rows with the collection name: {collection}")
         else:
             collection_id = coll_set[0][0]
             format_str = "{}" if len(resource) == 1 else "{}&"
@@ -123,9 +129,10 @@ def sql_resource_lookup_key_cursor(bosslet_config, resource_params, cursor):
     if experiment is not None:
         cursor.execute(exp_query, (experiment, collection_id))
         exp_set = cursor.fetchall()
-        if len(exp_set) != 1:  # TODO: Alert the user when there are more than one results
-            raise Exception(
-                "Can't find experiment: {}".format(experiment))
+        if len(exp_set) < 1:
+            raise ValueError(f"No experiment found with the name: {experiment} in collection {collection}")
+        elif len(exp_set) > 1:
+            raise ValueError(f"Multiple rows with the experiment name: {experiment} in collection {collection}")
         else:
             experiment_id = exp_set[0][0]
             format_str = "{}" if len(resource) == 2 else "{}&"
@@ -134,9 +141,10 @@ def sql_resource_lookup_key_cursor(bosslet_config, resource_params, cursor):
     if channel is not None:
         cursor.execute(chan_query, (channel, experiment_id))
         chan_set = cursor.fetchall()
-        if len(chan_set) != 1:  # TODO: Alert the user when there are more than one results
-            raise Exception(
-                "Can't find channel: {}".format(channel))
+        if len(chan_set) < 1:
+            raise ValueError(f"No channel found with the name: {channel} in experiment {experiment}")
+        elif len(chan_set) > 1:
+            raise ValueError(f"Multiple rows with the channel name: {channel} in experiment {experiment}")
         else:
             channel_id = chan_set[0][0]
             cuboid_str = cuboid_str + "{}".format(channel_id)
