@@ -167,13 +167,17 @@ class ExternalCalls:
         return self.connections[key].tunnel()
 
     @contextmanager
-    def connect_rds(self):
+    def connect_rds(self, return_connection=False):
         """
-        Context manager with established connection to endpoint boss rds
-        Prompts vault to grab credentials
+        Context manager with established connection to endpoint boss rds. Connection can be returned to allow updates
+        and inserts to be committed
+        Queries vault to grab RDS credentials
+
+        Args:
+            return_connection (bool): If True will return both cursor and connection
 
         Returns:
-            cursor object context
+            cursor object context, [connection]
         """
         DB_HOST_NAME = self.names.endpoint_db.rds
         logging.debug("DB Hostname is: {}".format(DB_HOST_NAME))
@@ -190,7 +194,10 @@ class ExternalCalls:
                     port=local_port, database=mysql_params['name']
                 )
                 cursor = sql.cursor()
-                yield cursor
+                if return_connection:
+                    yield cursor, sql
+                else:
+                    yield cursor
             finally:
                 cursor.close()
                 sql.close()
