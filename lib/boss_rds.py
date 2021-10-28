@@ -97,7 +97,7 @@ def sql_resource_lookup_key_cursor(bosslet_config, resource_params, cursor):
     resource = resource_params.split("/")
 
     if len(resource) == 0:
-        raise Exception(
+        raise ValueError(
             "Incorrect number of arguments(Make sure the resource provided has at least a collection to lookup)")
     else:
         if len(resource) > 0:
