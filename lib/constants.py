@@ -81,7 +81,7 @@ SALT_DIR = repo_path('salt_stack', 'salt')
 
 DYNAMO_METADATA_SCHEMA = SALT_DIR + '/boss/files/boss.git/django/bosscore/dynamo_schema.json'
 DYNAMO_S3_INDEX_SCHEMA = SALT_DIR + '/spdb/files/spdb.git/spdb/spatialdb/dynamo/s3_index_table.json'
-DYNAMO_TILE_INDEX_SCHEMA  = SALT_DIR + '/ndingest/files/ndingest.git/nddynamo/schemas/boss_tile_index.json'
+DYNAMO_TILE_INDEX_SCHEMA  = SALT_DIR + '/ndingest/files/ndingest.git/ndingest/nddynamo/schemas/boss_tile_index.json'
 # Max number to append to task id attribute of tile index (used to prevent hot
 # partitions when writing to the task_id_index GSI).
 MAX_TASK_ID_SUFFIX = 100
