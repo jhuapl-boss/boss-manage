@@ -32,37 +32,79 @@ Sample input:
 """
 
 version: '1.0'
-timeout: 300
+timeout: 7200 # 2 hours
 
-while '$.enqueue_done' == False:
-    """WhileStillEnqueuing
+Pass()
+    """UpdateOperationFieldMap
+    Simply adds the name of the operation so it can be logged properly in 
+    the deadletter queue in case of a failure when starting the map state. 
     """
-    Lambda('indexBatchEnqueueCuboidsLambda')
-        """BatchEnqueueCuboids
+    result: '$.operation'
+    data: 
+        'EnqueueCuboidsKeysMap'
 
-        batch_enqueue_cuboids_lambda.py
-        """
-        retry [
-            'QueueDoesNotExist',
-            'UnsupportedOperation',
-            'InvalidAttributeName'
-        ] 1 0 1.0
-        retry [] 45 3 2.0
-        catch []: '$.result'
-            Lambda('indexWriteFailedLambda')
-                """WriteIdFailed
+map:
+    """EnqueueCuboidKeysMap
+    """
+    iterator:
+        while '$.enqueue_done' == False:
+            """WhileStillEnqueuing
+            """
+            Lambda('indexBatchEnqueueCuboidsLambda')
+                """BatchEnqueueCuboids
 
-                Send inputs to the deadletter queue.
+                batch_enqueue_cuboids_lambda.py
                 """
-                retry ['KeyError'] 1 0 1.0
-                retry [] 10 2 2.0
-                catch []:
-                    Fail('Exception', 'Failed to write to dead letter queue')
-                        """FailedSendingToDeadLetterQueue
+                retry [
+                    'QueueDoesNotExist',
+                    'UnsupportedOperation',
+                    'InvalidAttributeName'
+                ] 1 0 1.0
+                retry [] 45 3 2.0
+                catch []: '$.result'
+                    Lambda('indexWriteFailedLambda')
+                        """EnqueueCuboidKeyFailed
+
+                        Send inputs to the deadletter queue.
                         """
-            Fail('Exception', 'Failed to batch enqueue cuboid object keys')
-                """FailedBatchEnqueuing
-                """
+                        retry ['KeyError'] 1 0 1.0
+                        retry [] 10 2 2.0
+                        catch []:
+                            Fail('Exception', 'Failed to write to dead letter queue')
+                                """FailedSendingToDeadLetterQueue
+                                """
+                    Fail('Exception', 'Failed to batch enqueue cuboid object keys')
+                        """FailedBatchEnqueuing
+                        """
+    max_concurrency: 5
+    items_path: "$.obj_keys"
+    parameters:
+        obj_keys.$: "$$.Map.Item.Value"
+        config.$: "$.config"
+        id_cuboid_supervisor_step_fcn.$: "$.id_cuboid_supervisor_step_fcn"
+        fanout_id_writers_step_fcn.$: "$.fanout_id_writers_step_fcn"
+        id_index_step_fcn.$: "$.id_index_step_fcn"
+        index_ids_sqs_url.$: "$.index_ids_sqs_url"
+        num_ids_per_msg.$: "$.num_ids_per_msg"
+        id_chunk_size.$: "$.id_chunk_size"
+        wait_time.$: "$.wait_time"
+        enqueue_done: False
+        operation: "Enqueuing cuboids to cuboids keys queue"
+    catch []: '$.result'
+        Lambda('indexWriteFailedLambda')
+            """EnqueueCuboidKeysWithMapFailed
+
+            write_index_failed_lambda.py
+            """
+            retry ['KeyError'] 1 0 1.0
+            retry [] 10 2 2.0
+            catch []: '$.dlqresult'
+                Fail('Exception', 'Failed to write to dead letter queue')
+                    """FailedEnqueueCuboidKeysWithMapFailedToDeadLetterQueue
+                    """
+        Fail('Exception', 'Failed enqueuing to cuboid keys queue')
+            """FailedEnqueueingCuboidKeys
+            """
 
 Success()
     """Success

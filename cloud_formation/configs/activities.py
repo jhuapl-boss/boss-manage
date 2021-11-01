@@ -169,10 +169,9 @@ def create_config(bosslet_config, lookup=True):
                       memory=1024,
                       dlq = Ref('DownsampleDLQ'))
 
-    start_sfn_lambda_role = aws.role_arn_lookup(session, 'StartStepFcnLambdaRole')
     config.add_lambda("startSfnLambda",
                names.start_sfn.lambda_,
-               start_sfn_lambda_role,
+               {"Fn::ImportValue": "startStepFcnLambdaRole"},
                handler="start_sfn_lambda.handler",
                timeout=60,
                memory=128)

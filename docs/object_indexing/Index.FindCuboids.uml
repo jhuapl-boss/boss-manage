@@ -1,0 +1,50 @@
+@startuml
+
+header Last updated 24Sep2021
+footer Generated from Index.FindCuboids.uml by PlantUML
+title Index.FindCuboids Step Function Diagram
+
+[*] --> Init
+Init: set query_count = 0
+Init --> WhileStillTraversingLookupKeyIndex
+
+WhileStillTraversingLookupKeyIndex --> [*]: Done
+WhileStillTraversingLookupKeyIndex --> UpdateOperationFieldQuery
+
+UpdateOperationFieldQuery: set operation = QueryS3Index
+UpdateOperationFieldQuery --> QueryS3IndexTable
+
+QueryS3IndexTable: index_find_cuboids_lambda.py
+QueryS3IndexTable --> S3ReadFailed: failure reading from DynamoDB
+QueryS3IndexTable --> IfNumBatchesGreaterThan0
+
+S3ReadFailed --> Fail
+S3ReadFailed : send lambda error to index deadletter queue
+
+IfNumBatchesGreaterThan0 --> UpdateOperationFieldSpawnEnqueueSfn : true
+IfNumBatchesGreaterThan0 --> WhileStillTraversingLookupKeyIndex : false
+
+UpdateOperationFieldSpawnEnqueueSfn: set operation = Start enqueue cuboids SFN
+UpdateOperationFieldSpawnEnqueueSfn --> AsynchEnqueueCuboids
+
+AsynchEnqueueCuboids: start EnqueueCuboids SFN
+AsynchEnqueueCuboids: start_sfn_lambda.py
+AsynchEnqueueCuboids --> StartEnqueueFailedToDeadletterQueue : error starting EnqueueCuboids SFN
+AsynchEnqueueCuboids --> IfQueryCountGreaterThan100 : no error
+
+StartEnqueueFailedToDeadletterQueue --> Fail
+
+IfQueryCountGreaterThan100 --> WhileStillTraversingLookupKeyIndex : false
+IfQueryCountGreaterThan100 --> UpdateOperationFieldSpawnNewFindCuboidsSfn : true
+
+UpdateOperationFieldSpawnNewFindCuboidsSfn --> StartNewFindCuboidsSFN
+UpdateOperationFieldSpawnNewFindCuboidsSfn: set operation = Start new find cuboids SFN
+
+StartNewFindCuboidsSFN: start new find cuboids SFN
+StartNewFindCuboidsSFN: start_sfn_lambda.py
+StartNewFindCuboidsSFN --> [*]: Spawned new instance
+StartNewFindCuboidsSFN --> StartNewFindCuboidsToDeadletterQueue : error starting new FindCuboids SFN
+
+StartNewFindCuboidsToDeadletterQueue --> Fail
+@enduml
+

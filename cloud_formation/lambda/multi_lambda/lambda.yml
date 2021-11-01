@@ -10,7 +10,7 @@ include:
         salt_stack/salt/boss-tools/files/boss-tools.git/lambdautils: lambdautils
         salt_stack/salt/ndingest/files/ndingest.git: ndingest
         lib/heaviside.git: repos/heaviside
-        lib/heaviside.git/requirements.txt: heaviside/requirements.txt
+        lib/heaviside.git/requirements.txt: requirements/heaviside/requirements.txt
         lib/names.py: bossnames/names.py
         lib/bucket_object_tags.py: bossnames/bucket_object_tags.py
         lib/__init__.py: bossnames/__init__.py

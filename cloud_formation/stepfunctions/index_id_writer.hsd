@@ -11,16 +11,17 @@ the indexSupervisorCuboid step function, directly.
 
 Sample input:
 {
-    "id_count_table": "idCount.domain.boss",
-    "cuboid_bucket": "cuboids.domain.boss",
-    "s3_index_table": "s3index.domain.boss",
-    "id_index_table": "idIndex.domain.boss",
+    # spdb config object
+    "config": { },
     "id_index_new_chunk_threshold": 100,
-    "index_deadletter_queue": "https://queue.amazonaws.com/..."
+    # Queue to for "recoverable" failures.  This is the same queue that feeds
+    # the lambda that invokes this step function.
+    "sqs_url": "https://queue.amazonaws.com/...",
+    "index_deadletter_queue": "https://queue.amazonaws.com/...",
     "cuboid_object_key": "...",
     "version": 0,
     "id": "29",
-    "wait_secs": 0
+    #"wait_secs": 0
 }
 """
 
@@ -34,13 +35,13 @@ version: '1.0'
 # All of the values above should be factored into the timeout setting.
 timeout: 3600
 
-Wait(seconds_path='$.wait_secs')
-    """StartUpPause
-    
-    This will normally be a 0s wait.  This exists so that we can allow
-    Dynamo to scale up when starting this step function with the contents of
-    the deadletter queue.
-    """
+#Wait(seconds_path='$.wait_secs')
+#    """StartUpPause
+#    
+#    This will normally be a 0s wait.  This exists so that we can allow
+#    Dynamo to scale up when starting this step function with the contents of
+#    the deadletter queue.
+#    """
 
 Pass()
     """InitStatus
@@ -51,6 +52,15 @@ Pass()
     data:
         {"done": False, "delay": 0, "retries_left": 3}
 
+
+Pass()
+    """WriteIdsOp
+
+    Indicate currently writing ids to the id index Dynamo table.
+    """
+    result: '$.operation'
+    data:
+        'Write ids to id index Dynamo table'
 
 while '$.write_id_index_status.done' == False:
     """WhileNotDone
@@ -89,11 +99,73 @@ while '$.write_id_index_status.done' == False:
         retry ['DynamoClientError'] 1 0 1.0
         # Allow step function managed retries of other errors.
         retry [] 45 2 2.5
+        catch [
+                'ConditionalCheckFailedException',
+                'DynamoClientError',
+                'InternalServerError',
+                'LimitExceededException',
+                'ProvisionedThroughputExceededException',
+                'ResourceInUseException'
+            ]: '$.result'
+            Pass()
+                """AddDoneFlag
+
+                Add done field needed by enqueue_cuboid_ids_lambda.py
+                """
+                result: '$.done'
+                data:
+                    false
+
+            Pass()
+                """AddAttemptCount
+
+                Add attempt field needed by enqueue_cuboid_ids_lambda.py
+                """
+                result: '$.attempt'
+                data:
+                    1
+
+            while '$.done' == False and '$.attempt' < 5:
+                """WhileNotDoneReEnqueuing
+
+                Retry up to 3 times (attempts 1 - 4).
+                """
+                Lambda('indexEnqueueCuboidIdsLambda')
+                    """WriteFailedReEnqueue
+
+                    Write failed; try to put failed ids back on queue.
+
+                    enqueue_cuboid_ids_lambda.py
+                    """
+                    retry ['KeyError'] 1 0 1.0
+                    catch []:
+                        Pass()
+                            """AddReenqueueOp
+
+                            Indicate that failure happened trying to re-enqueue ids.
+                            """
+                            result: '$.operation'
+                            data:
+                                'Re-enqueue failed ids in index id queue'
+                        goto "WriteIdFailed"
+                Wait(seconds_path='$.wait_time')
+                    """ReEnqueueBackoffDelay
+
+                    If non-zero, wait before retrying.
+                    """
+            if '$.done' == True:
+                Success()
+                    """RecoverableFailure
+
+                    Failed to update Dynamo, but failed ids put back in SQS.
+                    """
+
+            goto "WriteIdFailed"
         catch []: '$.result'
             Lambda('indexWriteFailedLambda')
                 """WriteIdFailed
 
-                write_id_index_lambda.py
+                write_index_failed_lambda.py
                 """
                 retry ['KeyError'] 1 0 1.0
                 retry [] 10 2 2.0

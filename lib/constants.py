@@ -70,6 +70,11 @@ DOWNSAMPLE_DLQ_LAMBDA = LAMBDA_DIR + '/downsample/dlq.py'
 DELETE_ENI_LAMBDA = LAMBDA_DIR + '/delete-eni/delete_eni.py'
 
 
+#################################
+# CloudFormation Template Outputs
+CUBOID_KEYS_SQS_ARN = 'indexCuboidKeysSqsArn'
+
+
 ########################
 # DynamoDB Table Schemas
 SALT_DIR = repo_path('salt_stack', 'salt')

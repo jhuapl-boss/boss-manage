@@ -1,0 +1,104 @@
+"""State machine that starts the object indexing process for a channel.
+
+Index.Start
+
+Inputs:
+{
+    "batch_enqueue_cuboids_step_fcn": "arn:aws:states:...",
+    "config": {
+      "object_store_config": {
+        "id_count_table": "idCount.domain.boss",
+        "page_in_lambda_function": "multiLambda-domain-boss",
+        "page_out_lambda_function": "multiLambda-domain-boss",
+        "cuboid_bucket": "cuboids.domain.boss",
+        "s3_index_table": "s3index.domain.boss",
+        "id_index_table": "idIndex.domain.boss",
+        "s3_flush_queue": "https://queue.amazonaws.com/...",
+        "id_index_new_chunk_threshold": 100,
+        "index_deadletter_queue": "https://queue.amazonaws.com/...",
+        "index_cuboids_keys_queue": "https://queue.amazonaws.com/..."
+      },
+      "kv_config": {
+        "cache_host": "cache.domain.boss",
+        "read_timeout": 86400,
+        "cache_db": "0"
+      },
+      "state_config": {
+        "cache_state_db": "0",
+        "cache_state_host": "cache-state.domain.boss"
+      }
+    },
+    "fanout_id_writers_step_fcn": "arn:aws:states:...",
+    "id_chunk_size": 20,
+    "id_cuboid_supervisor_step_fcn": "arn:aws:states:...",
+    "id_find_cuboids_step_fcn": "arn:aws:states:...",
+    "id_index_start_step_fcn": "arn:aws:states:...",
+    "id_index_step_fcn": "arn:aws:states:...",
+    "index_ids_sqs_url": "...",
+    "lookup_key": "..."             # collection&exp&chan&res
+    "max_items": int,                   # Max items to retrieve from Dynamo at a time.
+    # Number of object ids to include in a single SQS message.
+    "num_ids_per_msg": 20,
+    "wait_time": 5,
+}
+"""
+
+version: '1.0'
+timeout: 120
+
+Pass()
+    """Init
+
+    Set the Arn so we can start Find Cuboids.
+    Add status object used by Find Cuboids.
+    """
+    parameters:
+        batch_enqueue_cuboids_step_fcn.$: "$.batch_enqueue_cuboids_step_fcn"
+        config.$: "$.config"
+        fanout_id_writers_step_fcn.$: "$.fanout_id_writers_step_fcn"
+        id_chunk_size.$: "$.id_chunk_size"
+        id_cuboid_supervisor_step_fcn.$: "$.id_cuboid_supervisor_step_fcn"
+        id_index_step_fcn.$: "$.id_index_step_fcn"
+        index_ids_sqs_url.$: "$.index_ids_sqs_url"
+        lookup_key.$: "$.lookup_key"
+        max_items.$: "$.max_items"
+        num_ids_per_msg.$: "$.num_ids_per_msg"
+        wait_time.$: "$.wait_time"
+
+        sfn_arn.$: "$.id_find_cuboids_step_fcn"
+        status: {'done': False, 'lookup_key_n': 0}
+
+Lambda('startSfnLambda')
+    """StartFindCuboids
+
+
+    start_sfn_lambda.py
+
+    Starts Index.FindCuboids
+    """
+    retry [
+        'StateMachineDoesNotExist', 
+        'InvalidArn',
+        'KeyError',
+        'TypeError'
+    ] 1 0 1.0
+    retry [] 60 3 2.0
+    catch []: '$.result'
+        Lambda('indexWriteFailedLambda')
+            """StartFindCuboidsFailedToDeadletterQueue
+            """
+            retry ['KeyError'] 1 0 1.0
+            retry [] 10 2 2.0
+            catch []: '$.dlqresult'
+                Fail('Exception', 'Failed to write to dead letter queue')
+                    """FailedSendingToDeadLetterQueue
+                    """
+        Fail('Exception', 'Failed to start find cuboids step function')
+            """FailedStartFindCuboids
+            """
+
+Success()
+    """Success
+    """
+
+

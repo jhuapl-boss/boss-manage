@@ -1,9 +1,35 @@
 """Fanouts Index.IdWriter step functions.  Invoked by the 
 Index.CuboidSupervisor step function.
+
+ToDo: rename this step function to reflect that it's no longer fanning out
+Index.IdWriter sfns.
+
+Expected inputs:
+{
+    "config": spdb config object
+    "id_index_step_fcn": ARN of Index.IdWriter
+    "sqs_url": url of queue that holds jobs for Index.IdWriter
+    "num_ids_per_msg": Max number of ids to include in each job
+    "cuboid_object_key": Write this cuboid's S3 object key to each id
+    "version": Reserved for future use
+    "worker_id": Used to query DynamoDB in parallel
+    "id_chunk_size": Number of ids to include in each "chunk" output by load_ids_from_s3_lambda.py
+    "wait_time": Initial number of seconds to wait if enqueuing fails
+}
 """
 
 version: '1.0'
 timeout: 1800
+
+
+Pass()
+    """AddLoadOp
+
+    Indicate we're trying to load ids from S3
+    """
+    result: '$.operation'
+    data:
+        'Load ids from s3index Dynamo table'
 
 Lambda('indexLoadIdsFromS3Lambda')
     """LoadIdsFromS3Index
@@ -16,6 +42,8 @@ Lambda('indexLoadIdsFromS3Lambda')
     catch []: '$.result'
         Lambda('indexWriteFailedLambda')
             """LoadIdsFailed
+
+            write_index_failed_lambda.py
             """
             retry ['KeyError'] 1 0 1.0
             retry [] 10 2 2.0
@@ -26,68 +54,93 @@ Lambda('indexLoadIdsFromS3Lambda')
         Fail('Exception', 'Failed loading ids from S3')
             """FailedLoadingFromS3
             """
-
 Pass()
-    """UpdateOperationField
-    Simply adds the name of the operation so it can be logged properly in the
-    deadletter queue in case of a failure when fanning out.
+    """AddMapOp
+
+    Indicate we're running the map state.
     """
     result: '$.operation'
-    data: 
-        ['FanoutIdIndexWriters']
-
-Pass()
-    """SetFanoutParameters
-    """
-    result: '$.fanout_params'
     data:
-        {
-            "max_concurrent": 4,
-            "rampup_delay": 4,
-            "rampup_backoff": 0.5,
-            "status_delay": 1
-        }
+        'Run map on ids in cuboid'
 
-while '$.finished' == False:
-    """WhileStillFanningOut
+map:
+    """EnqueueIdsWithMap
+
+    Send ids to SQS queue.
+
+    enqueue_cuboids_ids_lambda.py
     """
-    Lambda('indexFanoutIdWriterLambda')
-        """FanoutAndWriteIdIndex
+    iterator:
+        Pass()
+            """AddEnqueueOp
 
-        fanout_write_id_index_lambda.py
+            Indicate ids enqueued to SQS.
+            """
+            result: '$.operation'
+            data:
+                'Enqueue ids to index ids queue'
 
-        Start a separate step function for each annotation id in the cuboid.  
-        Write that cuboid's morton id to each annotation id in the id index.
-        """
-        retry [
-            'ClientError',
-            'Lambda.ThrottlingException', 
-            'Lambda.TooManyRequestsException',
-            'Lambda.ServiceException',
-            'States.TaskFailed'
-        ] 30 4 3.0
-        catch []: '$.result'
-            Lambda('indexWriteFailedLambda')
-                """FanoutFailed
+        while '$.done' == False and '$.attempt' < 5:
+            """WhileNotDone
+
+            Retry up to 3 times (attempts 1 - 4).
+            """
+            Lambda('indexEnqueueCuboidIdsLambda')
+                """EnqueueCuboidIds
+
+                enqueue_cuboid_ids_lambda.py
                 """
                 retry ['KeyError'] 1 0 1.0
-                retry [] 10 2 2.0
-                catch []: '$.dlqresult'
-                    Fail('Exception', 'Failed to write to dead letter queue')
-                        """FailedSendingFanoutToDeadLetterQueue
+                catch []: '$.result'
+                    Lambda('indexWriteFailedLambda')
+                        """EnqueueSomeIdsFailed
+
+                        write_index_failed_lambda.py
                         """
-            Fail('Exception', 'Failed fanning out write id index step functions')
-                """FailedFanningOut
+                        retry ['KeyError'] 1 0 1.0
+                        retry [] 10 2 2.0
+                        catch []: '$.dlqresult'
+                            Fail('Exception', 'Failed to write to dead letter queue')
+                                """FailedEnqueueIdsToDeadLetterQueue
+                                """
+                    Fail('Exception', 'Failed to enqueue ids')
+                        """FailedEnqueuingIds
+                        """
+            Wait(seconds_path='$.wait_time')
+                """BackoffDelay
+
+                If non-zero, wait before retrying.
                 """
+    max_concurrency: 1
+    items_path: "$.id_chunks"
+    parameters:
+        ids.$: "$$.Map.Item.Value"
+        cuboid_object_key.$: "$.cuboid_object_key"
+        version.$: "$.version"
+        config.$: "$.config"
+        id_index_step_fcn.$: "$.id_index_step_fcn"
+        sqs_url.$: "$.index_ids_sqs_url"
+        num_ids_per_msg.$: "$.num_ids_per_msg"
+        wait_time.$: "$.wait_time"
+        done: False
+        attempt: 1
+    catch []: '$.result'
+        Lambda('indexWriteFailedLambda')
+            """EnqueueIdsWithMapFailed
 
-    if '$.finished' == False:
-        """IfNotFinished
+            If we get here, there's probably at least one other message written
+            to the deadletter queue from a failure running the map's iterator.
 
-        This state exists because wait_secs may not be present when finished
-        set to True.
-        """
-        Wait(seconds_path='$.wait_secs')
-            """WaitAtLeast10Seconds
+            write_index_failed_lambda.py
+            """
+            retry ['KeyError'] 1 0 1.0
+            retry [] 10 2 2.0
+            catch []: '$.dlqresult'
+                Fail('Exception', 'Failed to write to dead letter queue')
+                    """FailedEnqueueIdsWithMapFailedToDeadLetterQueue
+                    """
+        Fail('Exception', 'Failed loading ids from S3')
+            """FailedEnqueueingIds
             """
 
 Success()
