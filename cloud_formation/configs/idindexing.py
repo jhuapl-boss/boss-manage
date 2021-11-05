@@ -105,7 +105,7 @@ def create_config(bosslet_config):
     ids_queue_arn = {"Fn::GetAtt": [names.index_ids_queue.sqs, 'Arn']}
     config.add_lambda_event_source('startIndexIdWriter', ids_queue_arn, names.start_sfn.lambda_, 1)
 
-    cuboid_queue_arn = {"Fn::ImportValue": const.CUBOID_KEYS_SQS_ARN}
+    cuboid_queue_arn = {"Fn::ImportValue": names.index_cuboids_keys.sqs}
     config.add_lambda_event_source('startCuboidSupervisor', cuboid_queue_arn, names.start_sfn.lambda_, 1)
 
     return config
