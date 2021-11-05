@@ -144,7 +144,7 @@ def create_config(bosslet_config, db_config={}):
     # Queue that holds S3 object keys of cuboids to be indexed.
     config.add_sqs_queue(names.index_cuboids_keys.sqs, names.index_cuboids_keys.sqs, 120, 20160)
     config.add_output(names.index_cuboids_keys.sqs, {"Fn::GetAtt": [names.index_cuboids_keys.sqs, 'Arn']},
-                      const.CUBOID_KEYS_SQS_ARN, 'Arn of cuboid keys SQS queue used for object indexing')
+                      names.index_cuboids_keys.sqs, 'Arn of cuboid keys SQS queue used for object indexing')
 
     config.add_sqs_queue(names.deadletter.sqs, names.deadletter.sqs, 30, 20160)
 
