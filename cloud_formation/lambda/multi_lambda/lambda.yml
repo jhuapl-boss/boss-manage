@@ -1,5 +1,5 @@
 name: multilambda
-runtime: python3.8
+runtime: python3.7
 include:
         # DP NOTE: The spdb and heaviside repositories are copied into repos/
         #          where pip can install them from
