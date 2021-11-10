@@ -1877,7 +1877,7 @@ class CloudFormationConfiguration:
             self.resources[key]['Properties']['Tags'] = tags
 
 
-    def add_s3_bucket_policy(self, key, bucket_name, action, principal):
+    def add_s3_bucket_policy(self, key, bucket_name, action, principal, bucket_only=False):
         """Add permissions to an S3 bucket.
 
         Args:
@@ -1885,7 +1885,14 @@ class CloudFormationConfiguration:
             bucket_name (string|dict): Bucket name or CloudFormation instrinsic function to determine name (example: {"Ref": "mybucket"}).
             action (list): List of strings for the types of actions to allow.
             principal (dict): Dictionary identifying the entity given permission to the S3 bucket.
+            bucket_only (Optional[bool]): If True, don't append /* to the bucket name.  Defaults to False.
         """
+
+        bucket_arn = ['arn:aws:s3:::', bucket_name]
+        if not bucket_only:
+            # Actions apply to the bucket's objects.
+            bucket_arn.append('/*')
+
         self.resources[key] = {
             'Type': 'AWS::S3::BucketPolicy',
             'Properties': {
@@ -1895,7 +1902,7 @@ class CloudFormationConfiguration:
                         {
                             'Action': action,
                             'Effect': 'Allow',
-                            'Resource': { 'Fn::Join': ['', ['arn:aws:s3:::', bucket_name, '/*']]},
+                            'Resource': { 'Fn::Join': ['', bucket_arn]},
                             'Principal': principal
                         }
                     ]
@@ -1904,7 +1911,7 @@ class CloudFormationConfiguration:
         }
 
 
-    def append_s3_bucket_policy(self, key, bucket_name, action, principal):
+    def append_s3_bucket_policy(self, key, bucket_name, action, principal, bucket_only=False):
         """Add an additional action-principal pair to a bucket.
 
         Args:
@@ -1912,6 +1919,7 @@ class CloudFormationConfiguration:
             bucket_name (string|dict): Bucket name or CloudFormation instrinsic function to determine name (example: {"Ref": "mybucket"}).
             action (list): List of strings for the types of actions to allow.
             principal (dict): Dictionary identifying the entity given permission to the S3 bucket.
+            bucket_only (Optional[bool]): If True, don't append /* to the bucket name.  Defaults to False.
         """
         if key not in self.resources:
             raise ValueError(key + " doesn't exist, cannot append to")
@@ -1922,11 +1930,16 @@ class CloudFormationConfiguration:
         if self.resources[key]['Properties']['Bucket'] != bucket_name:
             raise ValueError(key + " is not an S3 bucket policy for bucket: " + bucket_name)
 
+        bucket_arn = ['arn:aws:s3:::', bucket_name]
+        if not bucket_only:
+            # Actions apply to the bucket's objects.
+            bucket_arn.append('/*')
+
         self.resources[key]['Properties']['PolicyDocument']['Statement'].append(
             {
                 'Action': action,
                 'Effect': 'Allow',
-                'Resource': { 'Fn::Join': ['', ['arn:aws:s3:::', bucket_name, '/*']]},
+                'Resource': { 'Fn::Join': ['', bucket_arn]},
                 'Principal': principal
             })
 
