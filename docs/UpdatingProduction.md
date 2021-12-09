@@ -1,12 +1,12 @@
-# Updating the existing Production stack
+# Updating the existing bossdb stack
 
 This guide helps walk you through the different steps that need to happen 
-to update an existing production stack with the latest code.
+to update an existing bossdb stack with the latest code.
 
 *Note: This guide assumes that you already have an environment setup and can
 successfully launch CloudFormation configurations.*
 
-You will need to have the latest **boss-manage/vault/private/vault.production.boss** directory to complete these steps 
+You will need to have the latest **boss-manage/vault/private/vault.bossdb.boss** directory to complete these steps 
 
 ## Rebuild and Update Integration
 This is not a mandatory step but it is a good thing to do before the Tag and Merge.
@@ -16,14 +16,14 @@ Integration Stack except for Tag and Merge)
 
 ## Tag and Merge
 Follow the instructions in  [TagAndMerge.md](TagAndMerge.md) to create 
-AMIs for sprintXX.  These instructions are still valid however I tend build production based off of the latest AMIs and
+AMIs for sprintXX.  These instructions are still valid however I tend build bossdb based off of the latest AMIs and
 only after the process is finished to I copy the latest AMIs and label them sprintXX.  It is not unusual to discover an 
 error during the update process that causes a code change and a rebuild of an AMI.
 
 ## Turn on Maintenance Mode
 In boss-manage/bin/ run:
 ```shell
-python3 ./maintenance.py on production.boss
+python3 ./maintenance.py on bossdb.boss
 ```
 In can take up to 10 to 15 minutes for DNS to be updated externally.
 Use: dig api.theboss.io
@@ -47,7 +47,7 @@ or copy the latest AMIs from the console to become sprintXX (this way is faster 
 
 ```shell
 $ cd boss-manage.git/bin
-$ ./bastion.py vault.production.boss vault-export path/to/file
+$ ./bastion.py vault.bossdb.boss vault-export path/to/file
 ```
 
 ### Updating IAM
