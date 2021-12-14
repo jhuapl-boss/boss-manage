@@ -74,7 +74,7 @@ def python_minifiy(file):
         (string): File name of minified file.
 
     Raises:
-        (subprocess.CalledProcessError): on a non-zero return code from pyminifier.
+        (subprocess.CalledProcessError): on a non-zero return code from pyminify.
     """
     file_parts = os.path.splitext(file)
     # The no-rename-locals, no-convert-posargs-to-argsoptions could be removed
