@@ -2,29 +2,59 @@
 This supplement provides guidance to new development team members and helps them navigate through the steps required to setup their local development environment and deploy a development stack.
 
 A new team member will need to provide them access to the following:
-
 1. An AWS IAM account on [bossdbtest](https://redd-bossdbtest.signin.aws.amazon.com/console) with credentials that enable aws cli use
 2. Access to the [APL Microns](https://github.com/aplmicrons) repository. The new user will need a bosslet config created and the ability to download the bosslet-configs project.
-3. Access to the [JHUAPL Boss](https://github.com/jhuapl-boss) repository to pull and make code commits.  This is done by adding the individual to our dev team 
+3. Access to the [JHUAPL Boss](https://github.com/jhuapl-boss) repository to pull and make code commits.  This is done by adding the individual to our dev team
 
-# Development Envrionment
+ # Development Environment
 The [Installation Guide](./InstallGuide.md) is geared to installing BossDB in new AWS subscription. It covers many of the topics you won't need to get into right now. This **onboarding guide** will highlight what you need to do to get up and running quickly.  However any Python virtual environment may be used, so used whatever you are comfortable using.
 
-## Choose your Python Distribution
-This guide assumes you have installed anaconda for python 3. You can download the installer for your platform from [Anaconda](https://www.anaconda.com/products/individual). 
+## Entrust Encrpytion enabled in Outlook
+* Encryption is not setup by default on new computers.
+* If you cannot send and receive encrpyted emails you will need to call the helpdesk and have it setup.
+* You'll need this to receive files needed below.
+
+## Choose a Python Distribution
+1. You can use brew to install Python3.8
+```bash
+ brew install python@3.8
+```
+2. You could also find python3.8 here: https://www.python.org/downloads/mac-osx/
+3. Or use anaconda to install it.  (not recommended)
+
+Make sure Python3.8 is in your path. Type: "python3.8 -V" and see if it finds.  If not add it to your zsh or bash startup files depending on what you are using.
 
 ## Create a python 3.8 virtual environment
-You should setup a virtual environment with python 3.8. This can be easily accomplished by using the conda command to create a virtual environment e.g. 
-`conda create -n bossdb38 python=3.8`
+You can use any virtual environment:  virtualenv, venv, conda.  I recommend virtualenv with virtualenvwrapper, see the URL below.
+Follow: https://stackoverflow.com/questions/49470367/install-virtualenv-and-virtualenvwrapper-on-macos
+1. After following instructions in URL create a new virtual environment
+```bash
+mkvirtualenv -p python3.8  bossdb3.8
+```
+* You can now use **workon** to activate any virtual environment you have created.  
+* **deactivate** will turn off the virtual environement
 
-After creating the virtual environment, you can activate it with the following command:
-`conda activate bossdb38`
+Setup APL Proxy to allow Python and pip to work correctly while on VPN
+
 
 ## Download the code
-For now, you can just clone the boss-manage repository. The other code repositories will be available as git submodules. 
+For now, you can just clone the boss-manage repository. The other code repositories will be available as git submodules.</p> 
+<github_username>  should be replaced with your actually github username
+```bash
+git clone https://<github_username>@github.com/jhuapl-boss/boss-manage.git
+cd boss-manage
+git submodule init 
+git submodule update
+```
 
 ### github account
 You will need a github account in order to be added to the repositories. Make sure you have created ssh keys on your development platform and have added the public key to your github profile.
+
+* github_username will need to be added to the dev group in jhuapl-boss account</p>
+The github_username will also need to be added to: 
+* https://github.com/aplmicrons/bosslet-configs
+* https://github.com/aplmicrons/user-scratch
+
 
 ### pull the code
 See the [Clone Repositories](./InstallGuide.md#Clone_Repositories) section of the install guide for links to the code. With your virtual python environment activated, you should install the boss-manage requirements.
@@ -58,7 +88,7 @@ SSH_KEY = 'name of bastion host pem file'
 ```
 
 ### boto3 SDK
-The boss-manage scripts use the boto3 api to interact with AWS. You need to either create or add to the ~/.aws/credentials file. You should use a section header that matches PROFILE setting in ```./boss-manage/config/custom/apl_developer.py```. The example below should work unless the file content has changed.
+The boss-manage scripts use the boto3 api to interact with AWS. You need to either create or add to the **~/.aws/credentials** file. You should use a section header that matches PROFILE setting in ```./boss-manage/config/custom/apl_developer.py```. The example below should work unless the file content has changed.
 
 ```shell
 [bossdbtest]
@@ -67,6 +97,8 @@ aws_secret_access_key = [Secret access key]
 ```
 ### SSH From Home
 If you are working outside of the APL VPN, you will need to add your IP address to the AWS security group named **SSH From Home**. 
+While off VPN use https://whatismyipaddress.com/ to figure out your IP4 address and give it to whomever is helping you.  They can
+whitelist the IP address on the BossDB AWS Account, you will likely not have direct access to this account.   
 
 # Deploy your stack
 Assuming you have completed all of the previous steps, you can now create your own stack on thebossdev. 
