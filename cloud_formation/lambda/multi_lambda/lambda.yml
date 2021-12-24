@@ -1,10 +1,10 @@
 name: multilambda
 runtime: python3.7
 include:
-        # DP NOTE: The spdb and heaviside repositories are copied into repos/
-        #          where pip can install them from
+        # DP NOTE: The spdb, bossutils (boss-tools), and heaviside repositories
+        #          are copied into repos/ where pip can install them from
         salt_stack/salt/spdb/files/spdb.git: repos/spdb
-        salt_stack/salt/boss-tools/files/boss-tools.git/bossutils: bossutils
+        salt_stack/salt/boss-tools/files/boss-tools.git: repos/boss-tools
         salt_stack/salt/boss-tools/files/boss-tools.git/cloudwatchwrapper: cloudwatchwrapper
         salt_stack/salt/boss-tools/files/boss-tools.git/lambda: lambda
         salt_stack/salt/boss-tools/files/boss-tools.git/lambdautils: lambdautils
@@ -31,6 +31,7 @@ system_packages:
         - gcc-c++
 python_packages:
         - repos/spdb/
+        - repos/boss-tools/bossutils/
         - repos/ndingest/
         - repos/heaviside/
 manual_commands:
@@ -38,7 +39,10 @@ manual_commands:
                 # Copy settings file for ndingest
                 cp repos/ndingest/ndingest/settings/settings.ini ./ndingest/settings
         - |
- 
+                # set the correct log config for bossutils
+                echo configuring logging
+                cp repos/boss-tools/bossutils/src/bossutils/lambda_logger_conf.json ./bossutils/logger_conf.json
+        - |
                 # Remove repositories used to do install
                 rm -rf repos/
         - | # Should this be a manual command or a list of files to be copied into the staging directory
@@ -52,11 +56,6 @@ manual_commands:
 
                 cp /usr/lib64/libgfortran.so.3 .
                 cp /usr/lib64/libquadmath.so.0 .
-        - |
-                # set the correct log config
-                echo configuring logging
-                cd bossutils
-                mv ./lambda_logger_conf.json ./logger_conf.json
         - |
                 # copy the lambda handlers into the root of the package
                 cp lambda/* .
