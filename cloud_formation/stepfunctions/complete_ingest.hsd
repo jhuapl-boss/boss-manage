@@ -22,30 +22,34 @@ Args:
     }
 """
 
-Activity('ScanForMissingChunks')
-    """Look for missing chunks from the ingest.
+if '$.job.ingest_type' == 0:
+    """IfTileIngest"""
 
-    Scans the tile index in DynamoDB for any chunks that have missing tiles.  If
-    tiles are missing, they are placed back in the upload queue for that ingest
-    job.
+    Activity('ScanForMissingChunks')
+        """Look for missing chunks from the ingest.
 
-    boss-tools/activities/scan_for_missing_chunks.py
-    """
-    retry ['KeyError'] 1 0 1.0
-    retry [] 60 3 2.5
+        Scans the tile index in DynamoDB for any chunks that have missing tiles.  If
+        tiles are missing, they are placed back in the upload queue for that ingest
+        job.
 
-if '$.quit' == False:
-    """If no missing tiles found, clean up the ingest.
-    """
-
-    Activity('IngestCleaner')
-        """Clean up ingest job's AWS resources.
-
-        Deletes all SQS queues used for the ingest.
-        Deletes AWS credentials created for the ingest.
-        Marks the ingest job as complete.
-
-        boss-tools/activities/cleanup_ingest.py
+        boss-tools/activities/scan_for_missing_chunks.py
         """
         retry ['KeyError'] 1 0 1.0
         retry [] 60 3 2.5
+
+    if '$.quit' == True:
+        """IfQuitFoundMissingChunks"""
+        Success()
+            """StopFoundMissingChunks"""
+
+Activity('IngestCleaner')
+    """Clean up ingest job's AWS resources.
+
+    Deletes all SQS queues used for the ingest.
+    Deletes AWS credentials created for the ingest.
+    Marks the ingest job as complete.
+
+    boss-tools/activities/cleanup_ingest.py
+    """
+    retry ['KeyError'] 1 0 1.0
+    retry [] 60 3 2.5
