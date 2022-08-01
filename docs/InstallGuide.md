@@ -93,7 +93,7 @@ buffering you may not see the file update with every new line. Tailing the log
 does seem to work (`tail -f packer/logs/<config>.log`)*
 Check for Success or failure with the command below:
 ```shell
-$ grep "artifact" ../packer/logs/*.logs
+$ grep "artifact" ../packer/logs/*.log
 ```
 
 Success looks like this:
@@ -111,7 +111,7 @@ The full Boss system consists multiple CloudFormation templates that build upon 
 
 *Note: If you are building a production level system added the `--scenario production` to the command, or set the `SCENARIO` variable in the Bosslet config. By default the cloudformation.py script will create the Boss resources with the minimal instance sizes available.*
 ```shell
-$ bin/cloudformation.py create <bosslet_config> core redis api cachedb activities cloudwatch dynamolambda
+$ bin/cloudformation.py create <bosslet_config> core redis api cachedb activities cloudwatch
 ```
 
 *Note: The cloudformation.py script will automatically use the latest created AMIs
