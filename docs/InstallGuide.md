@@ -42,7 +42,6 @@ You will need access to the following code repositories on Github:
 * [ndingest.git](https://github.com/jhuapl-boss/ndingest)
 * [ingest-client.git](https://github.com/jhuapl-boss/ingest-client)
 * [heaviside.git](https://github.com/jhuapl-boss/heaviside.git)
-* [dynamodb-lambda-autoscale](https://github.com/jhuapl-boss/dynamodb-lambda-autoscale.git)
 
 To clone these repositories run
 
