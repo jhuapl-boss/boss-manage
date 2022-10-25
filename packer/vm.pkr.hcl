@@ -97,7 +97,7 @@ build {
   }
 
   provisioner "salt-masterless" {
-    bootstrap_args      = "-i ${var.name} stable 3001"
+    bootstrap_args      = "-i ${var.name} stable 3004"
     disable_sudo        = false
     local_pillar_roots  = "../salt_stack/pillar"
     local_state_tree    = "../salt_stack/salt"
