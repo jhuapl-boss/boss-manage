@@ -5,6 +5,11 @@ include:
     - heaviside
     - python.winpdb
 
+activity-update-pip:
+    pip.installed:
+        - name: pip
+        - upgrade: True
+
 activity-files:
     file.recurse:
         - name: /srv/activities

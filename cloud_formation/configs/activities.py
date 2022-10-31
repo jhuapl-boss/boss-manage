@@ -152,7 +152,7 @@ def create_config(bosslet_config, lookup=True):
                       const.INGEST_LAMBDA,
                       handler="index.handler",
                       timeout=60 * 5,
-                      runtime='python3.6',
+                      runtime='python3.7',
                       memory=3008)
 
     config.add_lambda_permission("IngestLambdaExecute", Ref("IngestLambda"))

@@ -1,6 +1,11 @@
 include:
     - python.python3
 
+spdb-update-pip:
+    pip.installed:
+        - name: pip
+        - upgrade: True
+
 spdb-prerequirements:
     pkg.installed:
         - pkgs:
