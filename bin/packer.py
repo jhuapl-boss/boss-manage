@@ -186,7 +186,7 @@ if __name__ == '__main__':
     if aws_profile is not None:
         env_vars['AWS_PROFILE'] = aws_profile
 
-    packer_file = repo_path("packer", "vm.packer")
+    packer_file = repo_path("packer", "vm.pkr.hcl")
 
     packer_logs = repo_path("packer", "logs")
     if not os.path.isdir(packer_logs):
