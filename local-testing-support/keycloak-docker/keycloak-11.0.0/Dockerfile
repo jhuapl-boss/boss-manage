@@ -1,8 +1,8 @@
-# Build a container for running the 11.0.0 version of Keycloak.
+# Build a container for running the 11.0.x version of Keycloak.
 # Assume Keycloak folder mounted as a volume in /srv/keycloak.
 #
 # Build with:
-# docker build -t keycloak-11.0.0 .
+# docker build -t keycloak-11.0.x .
 
 FROM ubuntu:20.04
 

@@ -371,6 +371,7 @@ class CloudFormationConfiguration:
         """
         self.resources = {}
         self.parameters = {}
+        self.outputs = None
         self.capabilities = None
         self.arguments = []
         self.region = bosslet_config.REGION
@@ -398,10 +399,17 @@ class CloudFormationConfiguration:
         Returns:
             (str) : The JSON formatted CloudFormation template
         """
-        return json.dumps({"AWSTemplateFormatVersion" : "2010-09-09",
-                           "Description" : description,
-                           "Parameters": self.parameters,
-                           "Resources": self.resources}, indent=indent)
+        template = {
+            "AWSTemplateFormatVersion" : "2010-09-09",
+            "Description" : description,
+            "Parameters": self.parameters,
+            "Resources": self.resources
+        }
+
+        if self.outputs is not None:
+            template["Outputs"] = self.outputs
+
+        return json.dumps(template, indent=indent)
 
     def version(self):
         """Get the version of this CloudFormationConfiguration object"""
@@ -703,6 +711,24 @@ class CloudFormationConfiguration:
         if arg.key not in self.parameters:
             self.parameters[arg.key] = arg.parameter
             self.arguments.append(arg.argument)
+
+    def add_output(self, logical_id, value, export_name, desc):
+        """Add an output so the resource may be imported by another CloudFormation template.
+
+        Args:
+            logical_id (str): Name used in template.
+            value (dict|str): Value returned by output.  Pass a dict if using a CloudFormation intrinsic function.
+            export_name (str): Name other templates use to import output.
+            desc (str): Output description.
+        """
+        if self.outputs is None:
+            self.outputs = {}
+
+        self.outputs[logical_id] = {
+            "Description": desc,
+            "Value": value,
+            "Export": { "Name": export_name },
+        }
 
     def add_capabilities(self, caps):
         """Add capabilities to the configuration.
@@ -1075,7 +1101,7 @@ class CloudFormationConfiguration:
 
         self._add_record_cname(key, hostname, rds = True)
 
-    def add_dynamo_table_from_json(self, key, name, KeySchema, AttributeDefinitions, ProvisionedThroughput, GlobalSecondaryIndexes=None, TimeToLiveSpecification=None, BillingMode=None):
+    def add_dynamo_table_from_json(self, key, name, KeySchema, AttributeDefinitions, ProvisionedThroughput=None, GlobalSecondaryIndexes=None, TimeToLiveSpecification=None, BillingMode=None):
         """Add DynamoDB table to the configuration using DynamoDB's calling convention.
 
         Example:
@@ -1095,9 +1121,10 @@ class CloudFormationConfiguration:
             name (str) : DynamoDB Table name to create
             KeySchema (list) : List of dict of AttributeName / KeyType
             AttributeDefinitions (list) : List of dict of AttributeName / AttributeType
-            ProvisionedThroughput (dictionary) : Dictionary of ReadCapacityUnits / WriteCapacityUnits
+            ProvisionedThroughput (optional[dict]) : Dictionary of ReadCapacityUnits / WriteCapacityUnits
             GlobalSecondaryIndexes (optional[list]): List of dicts representing global secondary indexes.  Defaults to None.
-            TimeToLiveSpecification (opitonal[dict]): Defines TTL attribute and whether it's enabled.
+            TimeToLiveSpecification (optional[dict]): Defines TTL attribute and whether it's enabled.
+            BillingMode (optional[str]): Define billing mode for table.
         """
 
         self.resources[key] = {
@@ -1106,9 +1133,11 @@ class CloudFormationConfiguration:
                 "TableName" : name,
                 "KeySchema" : KeySchema,
                 "AttributeDefinitions" : AttributeDefinitions,
-                "ProvisionedThroughput" : ProvisionedThroughput
             }
         }
+
+        if ProvisionedThroughput is not None:
+            self.resources[key]["Properties"]["ProvisionedThroughput"] = ProvisionedThroughput
 
         if GlobalSecondaryIndexes is not None:
             self.resources[key]["Properties"]["GlobalSecondaryIndexes"] = GlobalSecondaryIndexes
@@ -1848,7 +1877,7 @@ class CloudFormationConfiguration:
             self.resources[key]['Properties']['Tags'] = tags
 
 
-    def add_s3_bucket_policy(self, key, bucket_name, action, principal):
+    def add_s3_bucket_policy(self, key, bucket_name, action, principal, bucket_only=False):
         """Add permissions to an S3 bucket.
 
         Args:
@@ -1856,7 +1885,14 @@ class CloudFormationConfiguration:
             bucket_name (string|dict): Bucket name or CloudFormation instrinsic function to determine name (example: {"Ref": "mybucket"}).
             action (list): List of strings for the types of actions to allow.
             principal (dict): Dictionary identifying the entity given permission to the S3 bucket.
+            bucket_only (Optional[bool]): If True, don't append /* to the bucket name.  Defaults to False.
         """
+
+        bucket_arn = ['arn:aws:s3:::', bucket_name]
+        if not bucket_only:
+            # Actions apply to the bucket's objects.
+            bucket_arn.append('/*')
+
         self.resources[key] = {
             'Type': 'AWS::S3::BucketPolicy',
             'Properties': {
@@ -1866,7 +1902,7 @@ class CloudFormationConfiguration:
                         {
                             'Action': action,
                             'Effect': 'Allow',
-                            'Resource': { 'Fn::Join': ['', ['arn:aws:s3:::', bucket_name, '/*']]},
+                            'Resource': { 'Fn::Join': ['', bucket_arn]},
                             'Principal': principal
                         }
                     ]
@@ -1875,7 +1911,7 @@ class CloudFormationConfiguration:
         }
 
 
-    def append_s3_bucket_policy(self, key, bucket_name, action, principal):
+    def append_s3_bucket_policy(self, key, bucket_name, action, principal, bucket_only=False):
         """Add an additional action-principal pair to a bucket.
 
         Args:
@@ -1883,6 +1919,7 @@ class CloudFormationConfiguration:
             bucket_name (string|dict): Bucket name or CloudFormation instrinsic function to determine name (example: {"Ref": "mybucket"}).
             action (list): List of strings for the types of actions to allow.
             principal (dict): Dictionary identifying the entity given permission to the S3 bucket.
+            bucket_only (Optional[bool]): If True, don't append /* to the bucket name.  Defaults to False.
         """
         if key not in self.resources:
             raise ValueError(key + " doesn't exist, cannot append to")
@@ -1893,11 +1930,16 @@ class CloudFormationConfiguration:
         if self.resources[key]['Properties']['Bucket'] != bucket_name:
             raise ValueError(key + " is not an S3 bucket policy for bucket: " + bucket_name)
 
+        bucket_arn = ['arn:aws:s3:::', bucket_name]
+        if not bucket_only:
+            # Actions apply to the bucket's objects.
+            bucket_arn.append('/*')
+
         self.resources[key]['Properties']['PolicyDocument']['Statement'].append(
             {
                 'Action': action,
                 'Effect': 'Allow',
-                'Resource': { 'Fn::Join': ['', ['arn:aws:s3:::', bucket_name, '/*']]},
+                'Resource': { 'Fn::Join': ['', bucket_arn]},
                 'Principal': principal
             })
 
@@ -2023,6 +2065,29 @@ class CloudFormationConfiguration:
 
         if depends_on is not None:
             self.resources[key]['DependsOn'] = depends_on
+
+    def add_lambda_event_source(self, key, event_source_arn, function_name,
+                                batch_size=None, enabled=True):
+        """Connect lambda to an event source.
+
+        Args:
+            key (str) : Unique name for the resource in the template.
+            event_source_arn (str): Arn of the event source to connect to lambda.
+            function_name (str): Name of lambda function to connect.
+            batch_size (Optional[int]): If not provided, default depends on event source type.
+            enabled (Optional[bool]): Defaults to enabled.
+        """
+        self.resources[key] = {
+            "Type": "AWS::Lambda::EventSourceMapping",
+            "Properties": {
+                "Enabled": enabled,
+                "EventSourceArn": event_source_arn,
+                "FunctionName": function_name,
+            }
+        }
+
+        if batch_size is not None:
+            self.resources[key]["Properties"]["BatchSize"] = batch_size
 
     def _add_record_cname(self, key, hostname, vpc=Ref("VPC"), ttl="300", rds=False, cluster=False, replication=False, ec2=False, elb=False):
         """Add a CNAME RecordSet to the configuration

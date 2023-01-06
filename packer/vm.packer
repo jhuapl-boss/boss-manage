@@ -7,33 +7,21 @@
         "aws_source_ami": null,
         "aws_source_user": null,
 
-        "aws_bastion_ip": "IP of the APL bastion server",
         "aws_bastion_ip": "",
-        "aws_bastion_port": "Port on the APL bastion server",
         "aws_bastion_port": "22",
-        "aws_bastion_user": "User name to login to the bastion server",
         "aws_bastion_user": "",
-        "aws_bastion_priv_key_file": "Path to the bastion's private key file",
         "aws_bastion_priv_key_file": "",
 
-        "name": "The hostname and minion ID of the VM",
         "name": null,
-        "ami_suffix": "Common suffix for all AMI images",
         "ami_suffix": null,
-        "ami_version": "An optional suffix for the build name",
         "ami_version": "",
-
-        "commit": "Commit hash of the repository version being built from",
         "commit": "unknown",
-
-        "force_deregister": "Force the deregister of AWS AMIs",
         "force_deregister": "false"
     },
 
     "builders": [{
         "type": "amazon-ebs",
         "ssh_username": "{{ user `aws_source_user`}}",
-        "ami_name": "Using the 'ami_suffix' to make sure our names are unique in AWS",
         "ami_name": "{{user `name`}}{{user `ami_suffix`}}{{user `ami_version`}}",
         "ami_description": "AMI configured for running as a / the {{user `name`}} server",
         "source_ami": "{{user `aws_source_ami`}}",
@@ -51,9 +39,7 @@
     }],
 
     "provisioners": [
-        {   "type": "Update the hostname in /etc/hosts, /etc/hostname, and in memory",
-            "type": "Install cURL so that salt-masterless can bootstrap Salt",
-            "type": "shell",
+        {   "type": "shell",
             "inline": [
                 "sudo apt-get update",
                 "sudo apt-get -y install curl"

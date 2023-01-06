@@ -1,0 +1,21 @@
+@startuml
+
+header Last updated 27Sep2021
+footer Generated from Index.Start.uml by PlantUML
+title Index.Start Step Function Diagram
+
+[*] --> Init
+
+Init: set all required parameters
+Init --> StartFindCuboids
+
+StartFindCuboids: start initial Find Cuboids SFN
+StartFindCuboids: start_sfn_lambda.py
+StartFindCuboids --> [*]
+StartFindCuboids --> StartFindCuboidsFailedToDeadletterQueue: error
+
+StartFindCuboidsFailedToDeadletterQueue: send error to deadletter queue
+StartFindCuboidsFailedToDeadletterQueue: write_index_failed_lambda.py
+StartFindCuboidsFailedToDeadletterQueue --> [*]
+
+@enduml

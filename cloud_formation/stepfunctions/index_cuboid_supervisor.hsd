@@ -8,8 +8,6 @@
 Sample input:
 {
     "id_index_step_fcn": "arn:aws:states:us-east-1:...",
-    "cuboid_object_key": "...",
-    "version": 0,
     "config": {
       "object_store_config": {
         "id_count_table": "idCount.domain.boss",
@@ -31,7 +29,16 @@ Sample input:
         "cache_state_db": "0",
         "cache_state_host": "cache-state.domain.boss"
       }
-    }
+    },
+    "cuboid": {
+        "object-key": {"S": str},
+        "version-node": {"N": str},
+    },
+    "fanout_id_writers_step_fcn": str,
+    "index_ids_sqs_url": str,
+    "num_ids_per_msg": int,
+    "id_chunk_size": int,
+    "wait_time": int,
 }
 """
 
@@ -40,6 +47,15 @@ version: '1.0'
 # Timeout based on lambda timeout (120s), retry settings of the lambda task
 # and the Wait setting of the while loop.
 timeout: 3600
+
+Pass()
+    """UpdateOperationFieldS3Write
+    Simply adds the name of the operation so it can be logged properly in 
+    the deadletter queue in case of a failure when starting the lambda. 
+    """
+    result: '$.operation'
+    data: 
+        'WriteS3Index state'
 
 Lambda('indexS3WriterLambda')
     """WriteS3Index
@@ -66,65 +82,76 @@ Lambda('indexS3WriterLambda')
             """
 
 Pass()
-    """UpdateOperationField
-    Simply adds the name of the operation so it can be logged properly in the
-    deadletter queue in case of a failure when fanning out.
+    """UpdateOperationFieldGiveOutWorkMap
+    Simply adds the name of the operation so it can be logged properly in 
+    the deadletter queue in case of a failure when entering the map state. 
     """
     result: '$.operation'
     data: 
-        ['split_cuboid']
+        'GiveOutWork map state'
 
-Pass()
-    """SetSplitCuboidFanoutParameters
+map:
+    """GiveOutWork
+
+    Start up at least 1 IndexIdWriter creator depending on number of workers
+    given.
     """
-    result: '$.fanout_params'
-    data:
-        {
-            "max_concurrent": 4,
-            "rampup_delay": 4,
-            "rampup_backoff": 0.5,
-            "status_delay": 1
-        }
+    iterator:
+        Lambda('startSfnLambda')
+            """StartIndexIdWriters
 
-while '$.finished' == False:
-    """WhileNotDone
-    """
-    Lambda('indexSplitCuboidsLambda')
-        """SplitCuboid
+            start_sfn_lambda.py
+            """
+            retry ['KeyError'] 1 0 1.0
+            catch []: '$.result'
+                Lambda('indexWriteFailedLambda')
+                    """FailedSpawningIdWriterCreatorToDeadLetterQueue
 
-        split_cuboids_lambda.py
+                    write_index_failed_lambda.py
+                    """
+                    retry ['KeyError'] 1 0 1.0
+                    retry [] 10 2 2.0
+                    catch []: '$.dlqresult'
+                        Fail('Exception', 'Failed to write to dead letter queue')
+                            """SpawningIdWriterCreatorToDeadLetterQueueFailed
+                            """
+                Fail('Exception', 'Failed spawning IdWriterCreator')
+                    """FailedSpawning
+                    """
 
-        Split job of writing cuboid's ids into n step functions to ensure data
-        volume stays within step function limits when passing between states.
-        """
-        retry ['KeyError', 'Lambda.ResourceNotFoundException'] 1 0 1.0
-        retry [] 30 4 3.0
-        catch []: '$.result'
-            Lambda('indexWriteFailedLambda')
-                """FanoutFailed
-                """
-                retry ['KeyError'] 1 0 1.0
-                retry [] 10 2 2.0
-                catch []: '$.dlqresult'
-                    Fail('Exception', 'Failed to write to dead letter queue')
-                        """FailedSendingFanoutToDeadLetterQueue
-                        """
-            Fail('Exception', 'Failed fanning out write id index step functions')
-                """FailedFanningOut
-                """
+    max_concurrency: 1
+    items_path: "$.worker_ids"
+    parameters:
+        worker_id.$: "$$.Map.Item.Value"
+        sfn_arn.$: "$.fanout_id_writers_step_fcn"
+        cuboid_object_key.$: "$.cuboid.object-key.S"
+        version.$: "$.cuboid.version-node.N"
+        config.$: "$.config"
+        index_deadletter_queue.$: "$.config.object_store_config.index_deadletter_queue"
+        id_index_step_fcn.$: "$.id_index_step_fcn"
+        index_ids_sqs_url.$: "$.index_ids_sqs_url"
+        num_ids_per_msg.$: "$.num_ids_per_msg"
+        num_ids_per_worker.$: "$.num_ids_per_worker"
+        id_chunk_size.$: "$.id_chunk_size"
+        wait_time.$: "$.wait_time"
+        operation: "Start FanoutIdWriters SFN"
 
+    catch []: '$.result'
+        Lambda('indexWriteFailedLambda')
+            """GiveOutWorkToDeadLetterQueue
 
-    if '$.finished' == False:
-        """IfNotFinished
-
-        This state exists because wait_secs may not be present when finished
-        set to True.
-        """
-        Wait(seconds_path='$.wait_secs')
-            """WaitAtLeast10Seconds
+            write_index_failed_lambda.py
+            """
+            retry ['KeyError'] 1 0 1.0
+            retry [] 10 2 2.0
+            catch []: '$.dlqresult'
+                Fail('Exception', 'Failed to write to dead letter queue')
+                    """FailedGiveOutWorkToDeadLetterQueue
+                    """
+        Fail('Exception', 'Failed spawning IdWriterCreator')
+            """FailedGiveOutToWork
             """
 
 Success()
     """Success
     """
-

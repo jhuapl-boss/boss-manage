@@ -76,7 +76,7 @@ SALT_DIR = repo_path('salt_stack', 'salt')
 
 DYNAMO_METADATA_SCHEMA = SALT_DIR + '/boss/files/boss.git/django/bosscore/dynamo_schema.json'
 DYNAMO_S3_INDEX_SCHEMA = SALT_DIR + '/spdb/files/spdb.git/spdb/spatialdb/dynamo/s3_index_table.json'
-DYNAMO_TILE_INDEX_SCHEMA  = SALT_DIR + '/ndingest/files/ndingest.git/nddynamo/schemas/boss_tile_index.json'
+DYNAMO_TILE_INDEX_SCHEMA  = SALT_DIR + '/ndingest/files/ndingest.git/ndingest/nddynamo/schemas/boss_tile_index.json'
 # Max number to append to task id attribute of tile index (used to prevent hot
 # partitions when writing to the task_id_index GSI).
 MAX_TASK_ID_SUFFIX = 100
@@ -150,7 +150,7 @@ ENDPOINT_DB_CONFIG = {
 
 # NOTE: The boss-mange code assumes that this AMI will be an Amazon AMI
 #       that uses the 'ec2-user' user account
-BASTION_AMI = "amzn-ami-vpc-nat-hvm-2015.03.0.x86_64-ebs"
+BASTION_AMI = "amzn-ami-vpc-nat-hvm-2018.03.0.20210915.x86_64-ebs"
 
 # Configure Squid to allow clustered Vault access, restricted to connections from the Bastion
 BASTION_USER_DATA = """#cloud-config

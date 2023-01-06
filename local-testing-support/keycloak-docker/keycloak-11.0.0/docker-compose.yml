@@ -1,13 +1,15 @@
 version: "3"
 services:
   keycloak:
-    image: keycloak-11.0.0:latest
+    image: keycloak-11.0.x:latest
     ports:
       - '8080:8080'
       - '9990:9990'
     volumes:
-      # Set this to where you unzipped KeyCloak.
-      - /Users/giontc1/Documents/MICrONS/keycloak-11.0.0:/srv/keycloak
+      # Set this to where you unzipped KeyCloak.  Update the path on the LEFT
+      # side of the colon.  The right side is the path in the Docker container
+      # and should not be changed.
+      - /Users/giontc1/Downloads/keycloak-11.0.3:/srv/keycloak
     networks:
       - default
 

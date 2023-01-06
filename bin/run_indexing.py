@@ -115,15 +115,10 @@ def get_common_args(bosslet_config):
     account = bosslet_config.ACCOUNT_ID
     sfn_arn_prefix = SFN_ARN_PREFIX_FORMAT.format(bosslet_config.REGION,
                                                   bosslet_config.ACCOUNT_ID)
+    make_sqs_url = lambda account, queue_name : f'https://queue.amazonaws.com/{account}/{queue_name}'
     n = bosslet_config.names
     common_args = {
-        "id_supervisor_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_supervisor.sfn),
-        "id_cuboid_supervisor_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_cuboid_supervisor.sfn),
-        "index_dequeue_cuboids_step_fcn":'{}{}'.format(sfn_arn_prefix, n.index_dequeue_cuboids.sfn),
-        "id_index_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_id_writer.sfn),
         "batch_enqueue_cuboids_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_enqueue_cuboids.sfn),
-        "fanout_enqueue_cuboids_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_fanout_enqueue_cuboids.sfn),
-        "fanout_id_writers_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_fanout_id_writers.sfn),
         "config": {
           "object_store_config": {
             "id_count_table": n.id_count_index.ddb,
@@ -134,8 +129,8 @@ def get_common_args(bosslet_config):
             "id_index_table": n.id_index.ddb,
             "s3_flush_queue": 'https://queue.amazonaws.com/{}/{}'.format(account, n.s3flush.sqs),
             "id_index_new_chunk_threshold": NEW_CHUNK_THRESHOLD,
-            "index_deadletter_queue": 'https://queue.amazonaws.com/{}/{}'.format(account, n.index_deadletter.sqs),
-            "index_cuboids_keys_queue": 'https://queue.amazonaws.com/{}/{}'.format(account, n.index_cuboids_keys.sqs)
+            "index_deadletter_queue": make_sqs_url(account, n.index_deadletter.sqs),
+            "index_cuboids_keys_queue": make_sqs_url(account, n.index_cuboids_keys.sqs)
           },
           "kv_config": {
             "cache_host": n.cache.redis,
@@ -147,15 +142,23 @@ def get_common_args(bosslet_config):
             "cache_state_host": n.cache_state.redis,
           }
         },
-        "max_write_id_index_lambdas": 599,
-        "max_cuboid_fanout": 30,
-        "max_items": 100
+        "fanout_id_writers_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_fanout_id_writers.sfn),
+        "id_chunk_size": 20,
+        "id_cuboid_supervisor_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_cuboid_supervisor.sfn),
+        "id_find_cuboids_step_fcn": f'{sfn_arn_prefix}{n.index_find_cuboids.sfn}',
+        "id_index_step_fcn": '{}{}'.format(sfn_arn_prefix, n.index_id_writer.sfn),
+        "index_ids_sqs_url": make_sqs_url(account, n.index_ids_queue.sqs),
+        # Max number of cuboid keys to pull from s3index Dynamo table in 1 request.
+        "max_items": 200,
+        # Number of object ids to include in a single SQS message.
+        "num_ids_per_msg": 20,
+        "wait_time": 5,
     }
 
     return common_args
 
 
-def get_find_cuboid_args(bosslet_config, lookup_key):
+def get_start_args(bosslet_config, lookup_key):
     """
     Get all arguments needed to start Index.FindCuboids.
 
@@ -168,7 +171,7 @@ def get_find_cuboid_args(bosslet_config, lookup_key):
 
     sfn_arn_prefix = SFN_ARN_PREFIX_FORMAT.format(bosslet_config.REGION,
                                                   bosslet_config.ACCOUNT_ID)
-    arn = '{}{}'.format(sfn_arn_prefix, bosslet_config.names.index_find_cuboids.sfn)
+    arn = '{}{}'.format(sfn_arn_prefix, bosslet_config.names.index_start.sfn)
 
     find_cuboid_args = get_common_args(bosslet_config)
     find_cuboid_args['lookup_key'] = lookup_key
@@ -202,9 +205,9 @@ def get_running_step_fcns(bosslet_config, arn):
             yield exe['executionArn']
 
 
-def run_find_cuboids(bosslet_config, args):
+def start_indexing(bosslet_config, args):
     """
-    Start Index.FindCuboids.  This step function kicks off the entire indexing
+    Start Index.Start.  This step function kicks off the entire indexing
     process from the beginning.
 
     Args:
@@ -221,78 +224,49 @@ def run_find_cuboids(bosslet_config, args):
                                             channel_params) 
         print('lookup_key is: {}'.format(lookup_key))
 
-    find_cuboid_args = get_find_cuboid_args(bosslet_config,
-                                            lookup_key)
-    #print(find_cuboid_args[1])
+    start_args = get_start_args(bosslet_config, lookup_key)
+    #print(start_args[1])
 
-    print('Starting Index.FindCuboids . . .')
+    print('Starting Index.Start . . .')
     sfn = bosslet_config.session.client('stepfunctions')
     resp = sfn.start_execution(
-        stateMachineArn=find_cuboid_args[0],
-        input=find_cuboid_args[1]
+        stateMachineArn=start_args[0],
+        input=start_args[1]
     )
     print(resp)
 
 
 def resume_indexing(bosslet_config):
     """
-    Resume indexing a channel or channels.  If the CuboidsKeys queue is not
-    empty, indexing will resume on those cuboids identified in that queue.
+    Rework required.  Probably want to reconnect cuboids keys queue and the
+    ids queues to their respective lambdas to resume.
 
     Args:
         bosslet_config (BossConfiguration): Bosslet configuration object
     """
-    resume_args = get_common_args(bosslet_config)
-    resume_args['queue_empty'] = False
-    arn = resume_args['id_supervisor_step_fcn']
-
-    print('Resuming indexing (starting Index.Supervisor) . . .')
-    sfn = bosslet_config.session.client('stepfunctions')
-    resp = sfn.start_execution(
-        stateMachineArn=arn,
-        input=json.dumps(resume_args)
-    )
-    print(resp)
+    #resume_args = get_common_args(bosslet_config)
+    raise NotImplementedError()
 
 
 def stop_indexing(bosslet_config):
     """
-    Stop the indexing process, gracefully.  Index.CuboidSupervisors will not
-    be stopped, so the entire index process will not terminate, immediately.
-    Only the Index.Supervisor and any running Index.DequeueCuboid step 
-    functions will be halted.  This allows the indexing process to be resumed.
+    This needs to be reworked.  Once the cuboid keys queue is populated, the
+    process is going to spawn many more step functions.  Probably want to
+    temporary disable the lambda event source connections of the cuboid keys
+    queue and the ids queue to stop progress.
 
     Args:
         bosslet_config (BossConfiguration): Bosslet configuration object
     """
-    stop_args = get_common_args(bosslet_config)
+    #stop_args = get_common_args(bosslet_config)
 
     # This error could optionally be caught inside a step function if special
     # shutdown behavior required.
-    error = 'ManualAbort'
-    cause = 'User initiated abort'
+    #error = 'ManualAbort'
+    #cause = 'User initiated abort'
 
-    supe_arn = stop_args['id_supervisor_step_fcn']
-    sfn = session.client('stepfunctions')
-
-    print('Stopping Index.Supervisor . . .')
-    for arn in get_running_step_fcns(bosslet_config, supe_arn):
-        print('\tStopping {}'.format(arn))
-        sfn.stop_execution(
-            executionArn=arn,
-            error=error,
-            cause=cause)
-
-    print('Stopping Index.DequeueCuboids . . .')
-    deque_arn = stop_args['index_dequeue_cuboids_step_fcn']
-    for arn in get_running_step_fcns(bosslet_config, deque_arn):
-        print('\tStopping {}'.format(arn))
-        sfn.stop_execution(
-            executionArn=arn,
-            error=error,
-            cause=cause)
-
-    print('Done.')
+    #print('Done.')
+    raise NotImplementedError()
 
 
 def parse_args():
@@ -364,5 +338,5 @@ if __name__ == '__main__':
     elif args.resume:
         resume_indexing(args.bosslet_config)
     else:
-        run_find_cuboids(args.bosslet_config, args)
+        start_indexing(args.bosslet_config, args)
 

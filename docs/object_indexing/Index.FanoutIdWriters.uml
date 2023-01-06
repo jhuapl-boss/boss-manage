@@ -1,0 +1,36 @@
+@startuml
+
+header Last updated 11Aug2021
+footer Generated from Index.FanoutIdWriters.uml by PlantUML
+title Index.FanoutIdWriters Step Function Diagram
+
+[*] --> LoadIdsFromS3Index
+LoadIdsFromS3Index: read from the DynamoDB table s3index\nand get the ids in a cuboid
+LoadIdsFromS3Index: load_ids_from_s3_lambda.py
+LoadIdsFromS3Index --> EnqueueIdsWithMap
+LoadIdsFromS3Index --> LoadIdsFailed: On error
+LoadIdsFailed --> [*]
+LoadIdsFailed: write_index_failed_lambda.py
+LoadIdsFailed: Send to deadletter queue
+
+EnqueueIdsWithMap --> EnqueueIdsWithMapFailed: Error running map
+EnqueueIdsWithMap: Divide ids into batches and put in SQS indexIdsQueue
+EnqueueIdsWithMapFailed --> [*]
+EnqueueIdsWithMapFailed: Send to deadletter queue
+EnqueueIdsWithMapFailed: write_index_failed_lambda.py
+state EnqueueIdsWithMap {
+    [*] --> WhileNotDone
+    WhileNotDone --> EnqueueCuboidIds: Not done
+    WhileNotDone --> [*]: Done
+    EnqueueCuboidIds --> BackoffDelay
+    EnqueueCuboidIds --> EnqueueSomeIdsFailed: On 4 failures
+    EnqueueCuboidIds: enqueue_cuboid_ids_lambda.py
+    EnqueueSomeIdsFailed: Send to deadletter queue
+    EnqueueSomeIdsFailed: write_index_failed_lambda.py
+    EnqueueSomeIdsFailed --> FailedEnqueuingIds
+    FailedEnqueuingIds --> [*]
+    BackoffDelay --> WhileNotDone
+    BackoffDelay: Could be 0 seconds
+}
+
+@enduml

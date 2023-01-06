@@ -22,17 +22,12 @@ from lib import console
 import botocore
 import configparser
 import yaml
-import glob
 import os
 import tempfile
-import subprocess
-import shlex
-import shutil
-import pwd
 import pathlib
 
 # Location of settings files for ndingest.
-NDINGEST_SETTINGS_FOLDER = const.repo_path('salt_stack', 'salt', 'ndingest', 'files', 'ndingest.git', 'settings')
+NDINGEST_SETTINGS_FOLDER = const.repo_path('salt_stack', 'salt', 'ndingest', 'files', 'ndingest.git', 'ndingest', 'settings')
 
 # Template used for ndingest settings.ini generation.
 NDINGEST_SETTINGS_TEMPLATE = NDINGEST_SETTINGS_FOLDER + '/settings.ini.apl'
@@ -71,18 +66,11 @@ def lambda_dirs(bosslet_config):
         n.delete_tile_objs.lambda_: 'multi_lambda',
         n.delete_tile_index_entry.lambda_: 'multi_lambda',
         n.index_s3_writer.lambda_: 'multi_lambda', 
-        n.index_fanout_id_writer.lambda_: 'multi_lambda',
         n.index_write_id.lambda_: 'multi_lambda',
         n.index_write_failed.lambda_: 'multi_lambda',
         n.index_find_cuboids.lambda_: 'multi_lambda',
-        n.index_split_cuboids.lambda_: 'multi_lambda',
-        n.index_fanout_enqueue_cuboid_keys.lambda_: 'multi_lambda',
         n.index_batch_enqueue_cuboids.lambda_: 'multi_lambda',
-        n.index_fanout_dequeue_cuboid_keys.lambda_: 'multi_lambda',
-        n.index_dequeue_cuboid_keys.lambda_: 'multi_lambda',
-        n.index_get_num_cuboid_keys_msgs.lambda_: 'multi_lambda',
-        n.index_check_for_throttling.lambda_: 'multi_lambda',
-        n.index_invoke_index_supervisor.lambda_: 'multi_lambda',
+        n.index_enqueue_ids.lambda_: 'multi_lambda',
         n.index_load_ids_from_s3.lambda_: 'multi_lambda',
         n.start_sfn.lambda_: 'multi_lambda',
         n.copy_cuboid_lambda.lambda_: 'multi_lambda',
@@ -91,23 +79,8 @@ def lambda_dirs(bosslet_config):
         n.tile_uploaded.lambda_: 'multi_lambda',
         n.tile_ingest.lambda_: 'multi_lambda',
         n.delete_tile_index_entry.lambda_: 'multi_lambda',
-        n.index_s3_writer.lambda_: 'multi_lambda',
-        n.index_fanout_id_writer.lambda_: 'multi_lambda',
-        n.index_write_id.lambda_: 'multi_lambda',
-        n.index_write_failed.lambda_: 'multi_lambda',
-        n.index_find_cuboids.lambda_: 'multi_lambda',
-        n.index_fanout_enqueue_cuboid_keys.lambda_: 'multi_lambda',
-        n.index_batch_enqueue_cuboids.lambda_: 'multi_lambda',
         n.start_sfn.lambda_: 'multi_lambda',
-        n.index_fanout_dequeue_cuboid_keys.lambda_: 'multi_lambda',
-        n.index_dequeue_cuboid_keys.lambda_: 'multi_lambda',
-        n.index_get_num_cuboid_keys_msgs.lambda_: 'multi_lambda',
-        n.index_check_for_throttling.lambda_: 'multi_lambda',
-        n.index_invoke_index_supervisor.lambda_: 'multi_lambda',
-        n.index_split_cuboids.lambda_: 'multi_lambda',
-        n.index_load_ids_from_s3.lambda_: 'multi_lambda',
         n.downsample_volume.lambda_: 'multi_lambda',
-        n.copy_cuboid_lambda.lambda_: 'multi_lambda',
         n.dynamo_lambda.lambda_: 'dynamodb-lambda-autoscale'
     }
 
@@ -189,7 +162,6 @@ def update_lambda_code(bosslet_config):
     Args:
         bosslet_config: Bosslet configuration object
     """
-    names = bosslet_config.names
     uses_multilambda = [k for k, v in lambda_dirs(bosslet_config).items()
                           if v == 'multi_lambda']
     config = load_lambda_config('multi_lambda')
@@ -242,9 +214,9 @@ def load_lambdas_on_s3(bosslet_config, lambda_name = None, lambda_dir = None):
             console.error("Cannot build a lambda that doesn't use a code zip file")
             return None
 
-    # To prevent rubuilding a lambda code zip multiple times during an individual execution memorize what has been built
+    # To prevent rebuilding a lambda code zip multiple times during an individual execution memorize what has been built
     if lambda_dir in BUILT_ZIPS:
-        console.debug('Lambda code {} has already be build recently, skipping...'.format(lambda_dir))
+        console.debug('Lambda code {} already built recently, skipping...'.format(lambda_dir))
         return
     BUILT_ZIPS.append(lambda_dir)
 
