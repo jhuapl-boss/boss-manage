@@ -282,8 +282,7 @@ if __name__ == '__main__':
         bosslet_config = configuration.BossConfiguration(args.bosslet_name,
                                                          disable_preview = args.disable_preview,
                                                          ami_version = args.ami_version,
-                                                         scenario = args.scenario,                                                  
-                                                         )
+                                                         scenario = args.scenario)
 
         constants.load_scenario(bosslet_config.scenario)
 
