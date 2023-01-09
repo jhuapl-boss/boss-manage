@@ -1083,7 +1083,8 @@ class CloudFormationConfiguration:
                 "PubliclyAccessible" : "false",
                 "DBName" : db_name,
                 "Port" : port,
-                "StorageEncrypted" : "false"
+                "StorageEncrypted" : "false",
+                "AllowMajorVersionUpgrade": "true"
             },
 
             "DeletionPolicy": "Delete" # By default CF creates a snapshot
