@@ -1,6 +1,8 @@
 boto3>=1.4.3
 botocore>=1.4.93
-hvac>=0.8.1
+# hvac 1.0 incompatible b/c they removed the auth_ec2 function
+# Check https://hvac.readthedocs.io/en/v0.10.9/source/hvac_v1.html#hvac.v1.Client.auth_ec2
+hvac>=0.11.2, <1.0.0
 PyYaml>=5.2
 mysql-connector-python
 python-minifier

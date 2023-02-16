@@ -1,6 +1,12 @@
 include:
     - python.python3
 
+
+cvdb-update-pip:
+    pip.installed:
+        - name: pip
+        - upgrade: True
+
 cvdb-lib:
     pip.installed:
         - name: /srv/salt/cvdb/files/cvdb.git/

@@ -150,7 +150,7 @@ ENDPOINT_DB_CONFIG = {
 
 # NOTE: The boss-mange code assumes that this AMI will be an Amazon AMI
 #       that uses the 'ec2-user' user account
-BASTION_AMI = "amzn-ami-vpc-nat-hvm-2015.03.0.x86_64-ebs"
+BASTION_AMI = "amzn-ami-vpc-nat-hvm-2018.03.0.20210915.x86_64-ebs"
 
 # Configure Squid to allow clustered Vault access, restricted to connections from the Bastion
 BASTION_USER_DATA = """#cloud-config
