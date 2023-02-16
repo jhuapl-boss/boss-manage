@@ -27,7 +27,8 @@ that have "read" access to a resource will get "read_metadata" and groups that h
 to a resource will get all the other metadata permissions. This corresponds with the groupings 
 in the PR description. 
 
-The script uses intern takes a while to run! Recommend running in a screen. 
+The script uses intern takes a while to run! Recommend running in a screen and double check the
+BossDB token present in your intern.cfg file before running!
 """
 
 
