@@ -1,7 +1,38 @@
 #!/usr/bin/env python3
+"""
+BACKGROUND
+We plan to merge an update to group permissions on Boss that separate resource permissions 
+from metadata permissions. Individual permissions added are "read_metadata", "add_metadata",
+"update_metadata", and "delete_metadata". 
+
+https://github.com/jhuapl-boss/boss/pull/107
+
+THE PROBLEM
+While django has migrations for this model change to the resources, individual group permissions
+have to be manually modified such that groups still have access to their resources and metadata.
+
+Without this, resources will be locked and inaccessible since the user groups will not have the 
+necessary permissions to render resource pages.
+
+Furthermore, permission groups such as "admin", "admin+delete" and  "write" will not render 
+correctly in the management console until the individual metadata permissions are added.
+
+THE SOLUTION:
+Running this script will add the appropriate metadata permissions to ALL groups (regular groups 
+'primary' groups) for the resources those groups already have permissions on.
+
+More specifically, it sequentially iterates on every collection, experiment, and channel in 
+BossDB and adds a subset of the the metadata permissions listed in the PR description. Groups
+that have "read" access to a resource will get "read_metadata" and groups that have "add" access
+to a resource will get all the other metadata permissions. This corresponds with the groupings 
+in the PR description. 
+
+The script uses intern takes a while to run! Recommend running in a screen. 
+"""
+
 
 from intern.remote.boss import BossRemote
-from intern.resource.boss.resource import *
+from intern.resource.boss.resource import CollectionResource, ExperimentResource, ChannelResource
 from tqdm.auto import tqdm
 import time
 
