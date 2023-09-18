@@ -26,7 +26,7 @@ from .exceptions import SSHError, SSHTunnelError
 
 # Needed to prevent ssh from asking about the fingerprint from new machines
 SSH_OPTIONS = "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o PubkeyAcceptedKeyTypes=+ssh-rsa -q"
-print(f"SSH Options: SSH_OPTIONS {SSH_OPTIONS}")
+
 TUNNEL_SLEEP = 10 # seconds
 
 def locate_port():

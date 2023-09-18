@@ -8,26 +8,29 @@ spdb/spdb/spatialdb/dynamo/
 You need to tar up the contents of that directory and use ssh-tunnel to copy it to the endpoint for testing
 ```bash
 $ cd spdb/spdb/spatialdb
-$ tar czf /path/to/spdb-spatialdb-dynamo.tar.gz ./dynamo
+$ tar cf /path/to/spdb-spatialdb-dynamo.tar.gz ./dynamo
 $ cd spdb
-$ tar rzf /path/to/spdb-spatialdb-dynamo.tar.gz ./requirements-test.txt
+$ tar rf /path/to/spdb-spatialdb-dynamo.tar.gz ./requirements-test.txt
 ```
  
 To ssh tunnel:
 ```bash
 $ boss-manage/bin/bastion.py endpoint.hiderrt1.boss ssh-tunnel
 ```
+You should see something like this:\
 Connect to localhost:31812 to be forwarded to 10.104.4.18:22
+Note your port number and use it below where I have 31812 in the next command\
+Make sure you have your login pem key in ssh-add or specify it on the next command line with -i 
 
 To scp file after tar:
 ```.bash
-$ scp -P 31812 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no /path/to/spdb-spatialdb-dynamo.tar.gz ubuntu@localhost:
+$ scp -P 31812 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o PubkeyAcceptedKeyTypes=+ssh-rsa /path/to/spdb-spatialdb-dynamo.tar.gz ubuntu@localhost:
 ```
 
 then untar contents into:
-**/usr/local/lib/python3.5/site-packages/spdb/spatialdb**
+**/usr/local/lib/python3.8/dist-packages/spdb/spatialdb**
 ```bash
-$ cd /usr/local/lib/python3.5/site-packages/spdb/spatialdb
+$ cd /usr/local/lib/python3.8/dist-packages/spdb/spatialdb
 $ tar xf ~/spdb-spatialdb-dynamo.tar.gz
 $ pip3 install -r requirements-test.txt
 ```

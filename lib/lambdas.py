@@ -25,6 +25,7 @@ import yaml
 import os
 import tempfile
 import pathlib
+from pprint import pprint
 
 # Location of settings files for ndingest.
 NDINGEST_SETTINGS_FOLDER = const.repo_path('salt_stack', 'salt', 'ndingest', 'files', 'ndingest.git', 'ndingest', 'settings')
@@ -265,9 +266,11 @@ def load_lambdas_on_s3(bosslet_config, lambda_name = None, lambda_dir = None):
             os.chdir(cwd)
 
     # Currently any Docker CLI compatible container setup can be used (like podman)
-    CONTAINER_CMD = '{EXECUTABLE} run --rm -it --env AWS_* --volume {HOST_DIR}:/var/task/ lambci/lambda:build-{RUNTIME} {CMD}'
+    CONTAINER_CMD = '{EXECUTABLE} run --rm -it --env AWS_ACCESS_KEY_ID={AWS_ACCESS_KEY_ID} --env AWS_SECRET_ACCESS_KEY={AWS_SECRET_ACCESS_KEY} --volume {HOST_DIR}:/var/task/ lambci/lambda:build-{RUNTIME} {CMD}'
+    #CONTAINER_CMD = '{EXECUTABLE} run --rm -it --volume {HOST_DIR}:/var/task/ lambci/lambda:build-{RUNTIME} {CMD}'
 
-    BUILD_CMD = 'python3 {PREFIX}/build_lambda.py {DOMAIN} {BUCKET}'
+    #BUILD_CMD = 'python3 {PREFIX}/build_lambda.py {DOMAIN} {BUCKET}'
+    BUILD_CMD = '{PREFIX}/build.sh {DOMAIN} {BUCKET}'
     BUILD_ARGS = {
         'DOMAIN': domain,
         'BUCKET': bosslet_config.LAMBDA_BUCKET,
@@ -305,19 +308,22 @@ def load_lambdas_on_s3(bosslet_config, lambda_name = None, lambda_dir = None):
 
             console.info("calling build lambda on localhost")
         else:
+            # Cannot set the profile as the container will not have the credentials file
+            # So extract the underlying keys and provide those instead
+            creds = bosslet_config.session.get_credentials()
+            env_extras['AWS_ACCESS_KEY_ID'] = creds.access_key
+            env_extras['AWS_SECRET_ACCESS_KEY'] = creds.secret_key
+
             BUILD_ARGS['PREFIX'] = '/var/task'
             CMD = BUILD_CMD.format(**BUILD_ARGS)
+            # needed to add the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY directly on the commandline to get them into the environment.
+            # the env_extras wasn't working.
             CMD = CONTAINER_CMD.format(EXECUTABLE = container_executable,
+                                       AWS_ACCESS_KEY_ID = creds.access_key,
+                                       AWS_SECRET_ACCESS_KEY = creds.secret_key,
                                        HOST_DIR = const.repo_path('salt_stack', 'salt', 'lambda-dev', 'files'),
                                        RUNTIME = lambda_config['runtime'],
                                        CMD = CMD)
-
-            if bosslet_config.PROFILE is not None:
-                # Cannot set the profile as the container will not have the credentials file
-                # So extract the underlying keys and provide those instead
-                creds = bosslet_config.session.get_credentials()
-                env_extras['AWS_ACCESS_KEY_ID'] = creds.access_key
-                env_extras['AWS_SECRET_ACCESS_KEY'] = creds.secret_key
 
             console.info("calling build lambda in {}".format(container_executable))
 
@@ -327,7 +333,6 @@ def load_lambdas_on_s3(bosslet_config, lambda_name = None, lambda_dir = None):
             raise BossManageError("Problem building {} lambda code zip: {}".format(lambda_dir, ex))
         finally:
             os.remove(staging_zip)
-
     else:
         BUILD_ARGS['PREFIX'] = '~'
         CMD = BUILD_CMD.format(**BUILD_ARGS)

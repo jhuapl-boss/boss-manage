@@ -2,9 +2,9 @@
 ENDPOINT_TYPE: t3.medium
 RDS_TYPE: db.t3.micro
 RDS_AUTH_TYPE: db.t3.micro
-REDIS_CACHE_TYPE: cache.t3.small
+REDIS_CACHE_TYPE: cache.t4g.small
 REDIS_SESSION_TYPE: null # Not used for dev
-REDIS_TYPE: cache.t3.small
+REDIS_TYPE: cache.t4g.small
 CACHE_MANAGER_TYPE: t3.micro
 VAULT_TYPE: t3.micro
 ACTIVITIES_TYPE: m5.large
