@@ -7,7 +7,7 @@ A new team member will need to provide them access to the following:
 2. Access to the [APL Microns](https://github.com/aplmicrons) repository. The new user will need a bosslet config created and the ability to download the bosslet-configs project.
 3. Access to the [JHUAPL Boss](https://github.com/jhuapl-boss) repository to pull and make code commits.  This is done by adding the individual to our dev team 
 
-# Development Envrionment
+# Development Environment
 The [Installation Guide](./InstallGuide.md) is geared to installing BossDB in new AWS subscription. It covers many of the topics you won't need to get into right now. This **onboarding guide** will highlight what you need to do to get up and running quickly.  However any Python virtual environment may be used, so used whatever you are comfortable using.
 
 ## Choose your Python Distribution
@@ -124,7 +124,4 @@ Open the secrets.txt file and find the password for **bossadmin** account. An ex
 Use your browser to navigate to your instance of the boss UI. The url will look something like this: https://api-wilsopw1.thebossdev.io/. You will need to replace wilsopw1 with your 5-2-1. 
 
 You should be redirected to the keycloak login page. Enter **bossadmin** as the username and use the password retrieved from vault.
-
-
-
 
