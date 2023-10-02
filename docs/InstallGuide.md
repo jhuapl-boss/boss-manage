@@ -13,7 +13,7 @@ from the root directory of the cloned boss-manage.git repository.*
 
 ### Workstation
 You will need a machine installed with the following software packages:
-* Python 3.7 or later
+* Python 3.8 or later
   - The Boss Manage software can be run within `venv`, `virtualenv`, or `virtualenvwrapper`
 * Packer 1.8.x ([download](https://www.packer.io/)) (add it to your path or in the `boss-manage.git/bin/` directory)
 * Docker Desktop ([download](https://docs.docker.com/desktop/release-notes/))
