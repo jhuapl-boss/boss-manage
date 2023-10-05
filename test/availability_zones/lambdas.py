@@ -42,7 +42,7 @@ config.add_lambda("TestLambda",
                   timeout=10,
                   security_groups=[cloudformation.Ref('InternalSecurityGroup')],
                   subnets=internal_subnets,
-                  runtime='python3.6')
+                  runtime='python3.7')
 
 azs = [sub['Ref'][0] for sub in internal_subnets]
 print('Assigning a lambda to the {} availability zones'.format(azs))

@@ -1,6 +1,11 @@
 include:
     - python.python3
 
+spdb-update-pip:
+    pip.installed:
+        - name: pip
+        - upgrade: True
+
 spdb-prerequirements:
     pkg.installed:
         - pkgs:
@@ -41,6 +46,12 @@ spdb-lib:
         - require:
             - pkg: spdb-prerequirements
             - sls: python.python3
+
+# Need to install pyyaml separatly to avoid problems with other requirements
+spdb-pyyaml:
+    pip.installed:
+        - name: pyyaml
+        - ignore_installed: True
 
 spdb-test-requirements:
     pip.installed:

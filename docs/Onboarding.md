@@ -3,9 +3,9 @@ This supplement provides guidance to new development team members and helps them
 
 A new team member will need to provide them access to the following:
 
-1. An AWS IAM account on [thebossdev](https://thebossdev.signin.aws.amazon.com/console) with credentials that enable aws cli use
+1. An AWS IAM account on [bossdbtest](https://redd-bossdbtest.signin.aws.amazon.com/console) with credentials that enable aws cli use
 2. Access to the [APL Microns](https://github.com/aplmicrons) repository. The new user will need a bosslet config created and the ability to download the bosslet-configs project.
-3. Access to the [JHUAPL Boss](https://github.com/jhuapl-boss) repository to pull and make code commits.
+3. Access to the [JHUAPL Boss](https://github.com/jhuapl-boss) repository to pull and make code commits.  This is done by adding the individual to our dev team 
 
 # Development Envrionment
 The [Installation Guide](./InstallGuide.md) is geared to installing BossDB in new AWS subscription. It covers many of the topics you won't need to get into right now. This **onboarding guide** will highlight what you need to do to get up and running quickly.  However any Python virtual environment may be used, so used whatever you are comfortable using.
@@ -13,12 +13,12 @@ The [Installation Guide](./InstallGuide.md) is geared to installing BossDB in ne
 ## Choose your Python Distribution
 This guide assumes you have installed anaconda for python 3. You can download the installer for your platform from [Anaconda](https://www.anaconda.com/products/individual). 
 
-## Create a python 3.7 virtual environment
-You should setup a virtual environment with python 3.7. This can be easily accomplished by using the conda command to create a virtual environment e.g. 
-`conda create -n bossdb37 python=3.7`
+## Create a python 3.8 virtual environment
+You should setup a virtual environment with python 3.8. This can be easily accomplished by using the conda command to create a virtual environment e.g. 
+`conda create -n bossdb38 python=3.8`
 
 After creating the virtual environment, you can activate it with the following command:
-`conda activate bossdb37`
+`conda activate bossdb38`
 
 ## Download the code
 For now, you can just clone the boss-manage repository. The other code repositories will be available as git submodules. 
@@ -61,7 +61,7 @@ SSH_KEY = 'name of bastion host pem file'
 The boss-manage scripts use the boto3 api to interact with AWS. You need to either create or add to the ~/.aws/credentials file. You should use a section header that matches PROFILE setting in ```./boss-manage/config/custom/apl_developer.py```. The example below should work unless the file content has changed.
 
 ```shell
-[thebossdev]
+[bossdbtest]
 aws_access_key_id = [Access key ID]
 aws_secret_access_key = [Secret access key]
 ```

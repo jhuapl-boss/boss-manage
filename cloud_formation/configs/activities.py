@@ -152,7 +152,7 @@ def create_config(bosslet_config, lookup=True):
                       const.INGEST_LAMBDA,
                       handler="index.handler",
                       timeout=60 * 5,
-                      runtime='python3.6',
+                      runtime='python3.7',
                       memory=3008)
 
     config.add_lambda_permission("IngestLambdaExecute", Ref("IngestLambda"))
@@ -169,10 +169,9 @@ def create_config(bosslet_config, lookup=True):
                       memory=1024,
                       dlq = Ref('DownsampleDLQ'))
 
-    start_sfn_lambda_role = aws.role_arn_lookup(session, 'StartStepFcnLambdaRole')
     config.add_lambda("startSfnLambda",
                names.start_sfn.lambda_,
-               start_sfn_lambda_role,
+               {"Fn::ImportValue": "startStepFcnLambdaRole"},
                handler="start_sfn_lambda.handler",
                timeout=60,
                memory=128)

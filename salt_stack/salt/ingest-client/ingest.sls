@@ -2,6 +2,11 @@
 include:
     - python.python3
 
+ingest-update-pip:
+    pip.installed:
+        - name: pip
+        - upgrade: True
+
 ingest-prerequirements:
     pkg.installed:
         - pkgs:
@@ -21,6 +26,12 @@ ingest-prerequirements:
 #        - name: |
 #            export LC_ALL=en_US.UTF-8
 #            sudo /usr/local/bin/pip3 install httpretty==0.8.10
+
+# Need to install pyyaml separatly to avoid problems with other requirements
+ingest-pyyaml:
+    pip.installed:
+        - name: pyyaml
+        - ignore_installed: True
 
 ingest-client-lib:
     pip.installed:

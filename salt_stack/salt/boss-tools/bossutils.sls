@@ -4,14 +4,9 @@ include:
     - aws.boto3
 
 python-lib:
-    file.recurse:
-        - name: /usr/lib/python3/dist-packages/bossutils
-        - source: salt://boss-tools/files/boss-tools.git/bossutils
-        - include_empty: true
-        - user: root
-        - group: root
-        - file_mode: 755
-        - dir_mode: 755
+    pip.installed:
+        # DP HACK: Cannot use salt:// with pip.installed, so assume the base directory
+        - name: /srv/salt/boss-tools/files/boss-tools.git/bossutils/
         - require:
             - sls: python.python3
 

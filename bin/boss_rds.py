@@ -34,6 +34,7 @@ COMMANDS = {
     "sql-coord-frame-lookup": boss_rds.sql_coordinate_frame_lookup_key,
     "sql-job-ids-lookup": boss_rds.sql_channel_job_ids,
     "sql-get-names-from-lookup-keys": boss_rds.sql_get_names_from_lookup_keys,
+    "sql-rename-collection": boss_rds.sql_rename_collection,
 }
 HELP = {
     "sql-tables",
@@ -42,13 +43,14 @@ HELP = {
     "sql-coord-frame-lookup <coordinate_frame>",
     "sql-job-ids-lookup <coll/exp/channel>",
     'sql-get-names-from-lookup-keys "col1&exp1&chan1" . . . "coln&expn&chann"',
+    "sql-rename-collection old_collection_name new_collection_name",
 }
 
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
     def create_help(header, options):
-        """Create formated help."""
+        """Create formatted help."""
         return "\n" + header + "\n" + \
                "\n".join(map(lambda x: "  " + x, options)) + "\n"
 
@@ -65,12 +67,12 @@ if __name__ == '__main__':
                         help='Run the script quietly, no print statements will be displayed.')
     parser.add_bosslet()
     parser.add_argument("command",
-                        choices = commands,
-                        metavar = "command",
-                        help = "Command to execute")
+                        choices=commands,
+                        metavar="command",
+                        help="Command to execute")
     parser.add_argument("arguments",
-                        nargs = "*",
-                        help = "Arguments to pass to the command")
+                        nargs="*",
+                        help="Arguments to pass to the command")
 
     args = parser.parse_args()
 

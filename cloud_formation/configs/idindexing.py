@@ -14,7 +14,6 @@
 
 import json
 from lib.cloudformation import CloudFormationConfiguration, Ref, Arn, Arg
-from lib.userdata import UserData
 from lib import aws
 from lib import utils
 from lib import console
@@ -33,14 +32,12 @@ DEPENDENCIES = ['activities', 'cachedb']
 def STEP_FUNCTIONS(bosslet_config):
     names = bosslet_config.names
     return [
-        (names.index_supervisor.sfn, 'index_supervisor.hsd'),
+        (names.index_start.sfn, 'index_start.hsd'),
         (names.index_cuboid_supervisor.sfn, 'index_cuboid_supervisor.hsd'),
         (names.index_id_writer.sfn, 'index_id_writer.hsd'),
+        (names.index_fanout_id_writers.sfn, 'index_fanout_id_writers.hsd'),
         (names.index_find_cuboids.sfn, 'index_find_cuboids.hsd'),
         (names.index_enqueue_cuboids.sfn, 'index_enqueue_cuboids.hsd'),
-        (names.index_fanout_enqueue_cuboids.sfn, 'index_fanout_enqueue_cuboids.hsd'),
-        (names.index_dequeue_cuboids.sfn, 'index_dequeue_cuboids.hsd'),
-        (names.index_fanout_id_writers.sfn, 'index_fanout_id_writers.hsd'),
     ]
 
 
@@ -71,11 +68,6 @@ def create_config(bosslet_config):
                "write_s3_index_lambda.handler",
                timeout=120, memory=1024)
 
-    add_lambda("indexFanoutIdWriterLambda",
-               names.index_fanout_id_writer.lambda_,
-               "fanout_write_id_index_lambda.handler",
-               timeout=120, memory=256)
-
     add_lambda("indexWriteIdLambda",
                names.index_write_id.lambda_,
                "write_id_index_lambda.handler",
@@ -91,50 +83,30 @@ def create_config(bosslet_config):
                "index_find_cuboids_lambda.handler",
                timeout=120, memory=256)
 
-    add_lambda("indexFanoutEnqueueCuboidsKeysLambda",
-               names.index_fanout_enqueue_cuboid_keys.lambda_,
-               "fanout_enqueue_cuboid_keys_lambda.handler",
-               timeout=120, memory=256)
-
     add_lambda("indexBatchEnqueueCuboidsLambda",
                names.index_batch_enqueue_cuboids.lambda_,
                "batch_enqueue_cuboids_lambda.handler",
-               timeout=60, memory=128)
+               timeout=120, memory=128)
 
-    add_lambda("indexFanoutDequeueCuboidKeysLambda",
-               names.index_fanout_dequeue_cuboid_keys.lambda_,
-               "fanout_dequeue_cuboid_keys_lambda.handler",
-               timeout=60, memory=128)
-
-    add_lambda("indexDequeueCuboidKeysLambda",
-               names.index_dequeue_cuboid_keys.lambda_,
-               "dequeue_cuboid_keys_lambda.handler",
-               timeout=60, memory=128)
-
-    add_lambda("indexGetNumCuboidKeysMsgsLambda",
-               names.index_get_num_cuboid_keys_msgs.lambda_,
-               "get_num_msgs_cuboid_keys_queue_lambda.handler",
-               timeout=60, memory=128)
-
-    add_lambda("indexCheckForThrottlingLambda",
-               names.index_check_for_throttling.lambda_,
-               "check_for_index_throttling_lambda.handler",
-               timeout=60, memory=128)
-
-    add_lambda("indexInvokeIndexSupervisorLambda",
-               names.index_invoke_index_supervisor.lambda_,
-               "invoke_index_supervisor_lambda.handler",
-               timeout=60, memory=128)
-
-    add_lambda("indexSplitCuboidsLambda",
-               names.index_split_cuboids.lambda_,
-               "split_cuboids_lambda.handler",
+    add_lambda("indexEnqueueCuboidIdsLambda",
+               names.index_enqueue_ids.lambda_,
+               "enqueue_cuboid_ids_lambda.handler",
                timeout=120, memory=128)
 
     add_lambda("indexLoadIdsFromS3Lambda",
                names.index_load_ids_from_s3.lambda_,
                "load_ids_from_s3_lambda.handler",
                timeout=120, memory=128)
+
+    max_receives = 5
+    config.add_sqs_queue(names.index_ids_queue.sqs, names.index_ids_queue.sqs, 120,
+                         20160, dead=(aws.sqs_lookup_arn(session, names.index_deadletter.sqs), max_receives))
+
+    ids_queue_arn = {"Fn::GetAtt": [names.index_ids_queue.sqs, 'Arn']}
+    config.add_lambda_event_source('startIndexIdWriter', ids_queue_arn, names.start_sfn.lambda_, 1)
+
+    cuboid_queue_arn = {"Fn::ImportValue": names.index_cuboids_keys.sqs}
+    config.add_lambda_event_source('startCuboidSupervisor', cuboid_queue_arn, names.start_sfn.lambda_, 1)
 
     return config
 
@@ -162,7 +134,7 @@ def pre_init(bosslet_config):
 
 
 def post_init(bosslet_config):
-    """Create step functions."""
+    """Create step functions and connect the index id queue to the lambda."""
     role = 'StatesExecutionRole-us-east-1 '
 
     for name, path in STEP_FUNCTIONS(bosslet_config):
@@ -170,11 +142,9 @@ def post_init(bosslet_config):
 
 
 def post_update(bosslet_config):
-    """Create step functions."""
-
+    """Update step functions and connect the index id queue to the lambda."""
     for name, path in STEP_FUNCTIONS(bosslet_config):
         sfn.update(bosslet_config, name, path)
-
 
 def update(bosslet_config):
     if console.confirm("Rebuild multilambda", default = True):

@@ -9,6 +9,11 @@ include:
     - cvdb
     - git
 
+django-update-pip:
+    pip.installed:
+        - name: pip
+        - upgrade: True
+
 django-prerequirements:
     pkg.installed:
         - pkgs:

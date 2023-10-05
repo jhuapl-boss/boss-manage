@@ -260,6 +260,9 @@ def create_config(bosslet_config, user_data=None):
         "ingestBucketPolicy", ingest_bucket_name,
         ['s3:GetObject', 's3:PutObject', 's3:PutObjectTagging'],
         { 'AWS': cuboid_import_role})
+    config.append_s3_bucket_policy(
+        "ingestBucketPolicy", ingest_bucket_name,
+        ['s3:ListBucket'], { 'AWS': cuboid_import_role}, bucket_only=True)
 
     config.add_ec2_instance("CacheManager",
                             names.cachemanager.dns,

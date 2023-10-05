@@ -16,12 +16,12 @@
 import os
 import sys
 import time
-import glob
 import zipfile
 import shlex
 import shutil
 import subprocess
 import pathlib
+import importlib
 
 
 
@@ -53,7 +53,6 @@ def create_layer(bucket, target_name, description):
         target_name (string): Name to give the zip_File in S3
         description (string): Metadata to attach to the file
     """
-    session = boto3.session.Session()
     layer_name = target_name[:-4].replace('.', '-') # remove the `.zip`
     
     client = boto3.session.Session().client('lambda')
@@ -210,6 +209,11 @@ if __name__ == '__main__':
     #          running the script again (after the packages have been
     #          installed) normally works
     run('python3 -m pip install --user boto3 PyYaml')
+
+    # If the above packages were just installed, this makes sure we can import
+    # while still running.
+    importlib.invalidate_caches()
+
     import boto3
     import yaml
 
