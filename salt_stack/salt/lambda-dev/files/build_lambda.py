@@ -21,7 +21,8 @@ import shlex
 import shutil
 import subprocess
 import pathlib
-import importlib
+import boto3
+import yaml
 
 
 
@@ -194,31 +195,19 @@ if __name__ == '__main__':
     cur_dir = pathlib.Path(__file__).parent
     os.chdir(cur_dir)
 
-    if len(sys.argv) != 3:
-        print("Usage: {} <domain name> <bucket name>".format(sys.argv[0]))
+    if len(sys.argv) != 4:
+        print("Usage: {} <domain name> <bucket name> <hash file name>".format(sys.argv[0]))
         sys.exit(-1)
 
     domain = sys.argv[1]
     bucket = sys.argv[2]
+    # Name only - no path.
+    hash_file_name = sys.argv[3]
 
-    # Not all AWS Lambda containers have these libraries installed
-    # verify that they are installed before importing them
-    # (This can happen with non-python runtimes)
-    # DP NOTE: using --user in case the script is not run as root
-    #          this can sometimes result in an import error, though
-    #          running the script again (after the packages have been
-    #          installed) normally works
-    run('python3 -m pip install --user boto3 PyYaml')
-
-    # If the above packages were just installed, this makes sure we can import
-    # while still running.
-    importlib.invalidate_caches()
-
-    import boto3
-    import yaml
 
     zip_file = cur_dir / 'staging' / (domain + '.zip')
     staging_dir = cur_dir / 'staging' / domain
+    hash_file = cur_dir / 'staging' / hash_file_name
 
     # Remove the old build directory
     if staging_dir.exists():
@@ -230,23 +219,9 @@ if __name__ == '__main__':
 
     staging_dir.mkdir()
     unzip(zip_file, staging_dir)
-    starting_hash = script_stdout('find . -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum').split()[0]
+    build_hash = hash_file.read_text()
 
     lambda_config = load_config(staging_dir)
-
-    # Check the current hash against the existing S3 object's hash
-    # DP NOTE: This is done as rebuilding twice with the same input hash can result in two different results
-    #          as if dependencies are not competely pinned then there may be a version change in a dependency
-    s3 = boto3.session.Session().client('s3')
-    try:
-        target_name = lambda_config['name'] + '.' + domain + '.zip'
-        resp = s3.head_object(Bucket = bucket, Key = target_name)
-        metadata = resp['Metadata']
-        if metadata['build-hash'] == starting_hash:
-            print("Input hash matches existing S3 object, not rebuilding")
-            sys.exit(0)
-    except Exception:
-        pass # If there was an error with the check just rebuild
 
     print("Building lambda")
 
@@ -316,8 +291,8 @@ if __name__ == '__main__':
 
     # Extracted from boss-tools.git/lambdautils/deploy_lambdas.py as not all lambdas will zip up that file
     # to be included in the build process
-    metadata = {'build-hash': starting_hash} # will become x-amz-meta-build-bash
+    metadata = {'build-hash': build_hash} # will become x-amz-meta-build-hash
     upload_to_s3(output_file, target_name, bucket, metadata)
 
     if lambda_config.get('is_layer', False):
-        create_layer(bucket, target_name, starting_hash)
+        create_layer(bucket, target_name, build_hash)

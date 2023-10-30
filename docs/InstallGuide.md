@@ -13,25 +13,16 @@ from the root directory of the cloned boss-manage.git repository.*
 
 ### Workstation
 You will need a machine installed with the following software packages:
-* Python 3.7 or later
+* Python 3.8 or later
   - The Boss Manage software can be run within `venv`, `virtualenv`, or `virtualenvwrapper`
-* Packer ([download](https://www.packer.io/)) (add it to your path or in the `boss-manage.git/bin/` directory)
+* Packer 1.8.x ([download](https://www.packer.io/)) (add it to your path or in the `boss-manage.git/bin/` directory)
+* Docker Desktop ([download](https://docs.docker.com/desktop/release-notes/))
+  - Contact your department software representative to get a license
 
 Note: The boss-manage software was developed and tested under Linux and Mac. It has not been tested under Windows, including under Windows Subsystem for Linux.
 
 #### Lambda Build
-There are multiple ways to build the lambda code zip files. The standard way is to use an EC2 instance, but the boss-manage code supports building locally using Docker or directly on the machine running the boss-manage code
-
-Requirements for Docker:
-* Docker or Docker CLI compatible container environment (like Podman)
-* Set the environment variable `LAMBDA_BUILD_CONTAINER` to the name of the container command
-  - `export LAMBDA_BUILD_CONTAINER=docker`
-  - Or in the Bosslet config `os.environ['LAMBDA_BUILD_CONTAINER'] = 'docker'`
-
-Requirements for Local Machine:
-* NodeJS ([download](https://nodejs.org/en/download/)) Version 10.X
-* Yum package manager
-  - Lambdas run on Amazon Linux, which is a Red Hat derivative distribution
+Boss builds lambdas via a Docker container.
 
 ## Clone Repositories
 You will need access to the following code repositories on Github:

@@ -18,14 +18,17 @@ from lib import utils
 from lib import constants as const
 from lib import zip
 from lib import console
+from lib.hash import FilesHash
 
 import botocore
+import boto3
 import configparser
 import yaml
 import os
 import tempfile
 import pathlib
 from pprint import pprint
+import hashlib
 
 # Location of settings files for ndingest.
 NDINGEST_SETTINGS_FOLDER = const.repo_path('salt_stack', 'salt', 'ndingest', 'files', 'ndingest.git', 'ndingest', 'settings')
@@ -244,9 +247,11 @@ def load_lambdas_on_s3(bosslet_config, lambda_name = None, lambda_dir = None):
 
     cwd = os.getcwd()
 
+    hasher = FilesHash(get_sha256())
+
     # Copy the lambda files into the zip
     for filename in lambda_dir.glob('*'):
-        zip.write_to_zip(str(filename), zipname, arcname=filename.name)
+        zip.write_to_zip(str(filename), zipname, arcname=filename.name, callback=hasher.add_file)
 
     # Copy the other files that should be included
     if lambda_config.get('include'):
@@ -262,98 +267,78 @@ def load_lambdas_on_s3(bosslet_config, lambda_name = None, lambda_dir = None):
                     # Generate settings.ini file for ndingest.
                     create_ndingest_settings(bosslet_config, tmpl)
 
-            zip.write_to_zip(src_file, zipname, arcname=dst)
+            zip.write_to_zip(src_file, zipname, arcname=dst, callback=hasher.add_file)
             os.chdir(cwd)
 
-    # Currently any Docker CLI compatible container setup can be used (like podman)
-    CONTAINER_CMD = '{EXECUTABLE} run --rm -it --env AWS_ACCESS_KEY_ID={AWS_ACCESS_KEY_ID} --env AWS_SECRET_ACCESS_KEY={AWS_SECRET_ACCESS_KEY} --volume {HOST_DIR}:/var/task/ lambci/lambda:build-{RUNTIME} {CMD}'
-    #CONTAINER_CMD = '{EXECUTABLE} run --rm -it --volume {HOST_DIR}:/var/task/ lambci/lambda:build-{RUNTIME} {CMD}'
+    cmd_parts = [
+        'docker run --rm -it',
+        '-e AWS_ACCESS_KEY_ID={AWS_ACCESS_KEY_ID}',
+        '-e AWS_SECRET_ACCESS_KEY={AWS_SECRET_ACCESS_KEY}',
+        '-e PIP_CERT=/etc/pki/tls/certs/ca-bundle.crt',
+        '-e REQUESTS_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt',
+        '-e SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt',
+        '-e PIP_DEFAULT_TIMEOUT=100',
+        '--volume {HOST_DIR}:/var/task/',
+        '--platform linux/amd64',
+        'lambci/lambda:build-{RUNTIME} {CMD}',
+    ]
+    CONTAINER_CMD = ' '.join(cmd_parts)
 
-    #BUILD_CMD = 'python3 {PREFIX}/build_lambda.py {DOMAIN} {BUCKET}'
-    BUILD_CMD = '{PREFIX}/build.sh {DOMAIN} {BUCKET}'
-    BUILD_ARGS = {
-        'DOMAIN': domain,
-        'BUCKET': bosslet_config.LAMBDA_BUCKET,
-    }
+    staging_target = pathlib.Path(const.repo_path('salt_stack', 'salt', 'lambda-dev', 'files', 'staging'))
+    if not staging_target.exists():
+        staging_target.mkdir()
 
-    # DP NOTE: not sure if this should be in the bosslet_config, as it is more about the local dev
-    #          environment instead of the stack's environment. Different maintainer may have different
-    #          container commands installed.
-    container_executable = os.environ.get('LAMBDA_BUILD_CONTAINER')
-    lambda_build_server = bosslet_config.LAMBDA_SERVER
-    if lambda_build_server is None:
-        staging_target = pathlib.Path(const.repo_path('salt_stack', 'salt', 'lambda-dev', 'files', 'staging'))
-        if not staging_target.exists():
-            staging_target.mkdir()
+    console.debug("Copying build zip to {}".format(staging_target))
+    staging_zip = staging_target / (domain + '.zip')
+    try:
+        zipname.rename(staging_zip)
+    except OSError:
+        # rename only works within the same filesystem
+        # Using the shell version, as using copy +  chmod doesn't always work depending on the filesystem
+        utils.run('mv {} {}'.format(zipname, staging_zip), shell=True)
 
-        console.debug("Copying build zip to {}".format(staging_target))
-        staging_zip = staging_target / (domain + '.zip')
-        try:
-            zipname.rename(staging_zip)
-        except OSError:
-            # rename only works within the same filesystem
-            # Using the shell version, as using copy +  chmod doesn't always work depending on the filesystem
-            utils.run('mv {} {}'.format(zipname, staging_zip), shell=True)
+    zip_hash = hasher.hexdigest
+    if not should_build_lambda(
+        zip_hash,
+        f'{lambda_config["name"]}.{domain}.zip',
+        bosslet_config.LAMBDA_BUCKET
+    ):
+        os.remove(staging_zip)
+        return
 
-        # Provide the AWS Region and Credentials (for S3 upload) via environmental variables
-        env_extras = { 'AWS_REGION': bosslet_config.REGION,
-                       'AWS_DEFAULT_REGION': bosslet_config.REGION }
+    hash_file = staging_target / 'lambda_hash.txt';
+    hash_file.write_text(zip_hash);
 
-        if container_executable is None:
-            BUILD_ARGS['PREFIX'] = const.repo_path('salt_stack', 'salt', 'lambda-dev', 'files')
-            CMD = BUILD_CMD.format(**BUILD_ARGS)
+    # Note that we only provide the name of the hash file w/o the path.  The
+    # build script expects it in the staging folder.
+    BUILD_CMD = f'/var/task/build.sh {domain} {bosslet_config.LAMBDA_BUCKET} {hash_file.name}'
 
-            if bosslet_config.PROFILE is not None:
-                env_extras['AWS_PROFILE'] = bosslet_config.PROFILE
+    # Provide the AWS Region and Credentials (for S3 upload) via environmental variables
+    env_extras = { 'AWS_REGION': bosslet_config.REGION,
+                   'AWS_DEFAULT_REGION': bosslet_config.REGION }
 
-            console.info("calling build lambda on localhost")
-        else:
-            # Cannot set the profile as the container will not have the credentials file
-            # So extract the underlying keys and provide those instead
-            creds = bosslet_config.session.get_credentials()
-            env_extras['AWS_ACCESS_KEY_ID'] = creds.access_key
-            env_extras['AWS_SECRET_ACCESS_KEY'] = creds.secret_key
+    # Cannot set the profile as the container will not have the credentials file
+    # So extract the underlying keys and provide those instead
+    creds = bosslet_config.session.get_credentials()
+    env_extras['AWS_ACCESS_KEY_ID'] = creds.access_key
+    env_extras['AWS_SECRET_ACCESS_KEY'] = creds.secret_key
 
-            BUILD_ARGS['PREFIX'] = '/var/task'
-            CMD = BUILD_CMD.format(**BUILD_ARGS)
-            # needed to add the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY directly on the commandline to get them into the environment.
-            # the env_extras wasn't working.
-            CMD = CONTAINER_CMD.format(EXECUTABLE = container_executable,
-                                       AWS_ACCESS_KEY_ID = creds.access_key,
-                                       AWS_SECRET_ACCESS_KEY = creds.secret_key,
-                                       HOST_DIR = const.repo_path('salt_stack', 'salt', 'lambda-dev', 'files'),
-                                       RUNTIME = lambda_config['runtime'],
-                                       CMD = CMD)
+    # needed to add the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY directly on the commandline to get them into the environment.
+    # the env_extras wasn't working.
+    CMD = CONTAINER_CMD.format(AWS_ACCESS_KEY_ID = creds.access_key,
+                               AWS_SECRET_ACCESS_KEY = creds.secret_key,
+                               HOST_DIR = const.repo_path('salt_stack', 'salt', 'lambda-dev', 'files'),
+                               RUNTIME = lambda_config['runtime'],
+                               CMD = BUILD_CMD)
 
-            console.info("calling build lambda in {}".format(container_executable))
+    console.info("calling build lambda in Docker")
 
-        try:
-            utils.run(CMD, env_extras=env_extras)
-        except Exception as ex:
-            raise BossManageError("Problem building {} lambda code zip: {}".format(lambda_dir, ex))
-        finally:
-            os.remove(staging_zip)
-    else:
-        BUILD_ARGS['PREFIX'] = '~'
-        CMD = BUILD_CMD.format(**BUILD_ARGS)
-
-        lambda_build_server_key = bosslet_config.LAMBDA_SERVER_KEY
-        lambda_build_server_key = utils.keypair_to_file(lambda_build_server_key)
-        ssh_target = SSHTarget(lambda_build_server_key, lambda_build_server, 22, 'ec2-user')
-        bastions = [bosslet_config.outbound_bastion] if bosslet_config.outbound_bastion else []
-        ssh = SSHConnection(ssh_target, bastions)
-
-        console.debug("Copying build zip to lambda-build-server")
-        target_file = '~/staging/{}.zip'.format(domain)
-        ret = ssh.scp(zipname, target_file, upload=True)
-        console.debug("scp return code: " + str(ret))
-
-        os.remove(zipname)
-
-        console.info("calling build lambda on lambda-build-server")
-        ret = ssh.cmd(CMD)
-        if ret != 0:
-            raise BossManageError("Problem building {} lambda code zip: Return code: {}".format(lambda_dir, ret))
+    try:
+        utils.run(CMD, env_extras=env_extras)
+    except Exception as ex:
+        raise BossManageError("Problem building {} lambda code zip: {}".format(lambda_dir, ex))
+    finally:
+        os.remove(staging_zip)
 
 def create_ndingest_settings(bosslet_config, fp):
     """Create the settings.ini file for ndingest.
@@ -451,3 +436,39 @@ def upload_lambda_zip(bosslet_config, path):
                              Body=in_file)
     print(resp)
 
+def get_sha256():
+    """
+    Get an instance of the sha256 hash function.  Because we use this just to
+    determine if we need to rebuild a lambda function, `usedforsecurity` is
+    set to False.
+    """
+    try:
+        sha256 = hashlib.sha256(usedforsecurity=False)
+    except Exception:
+        # usedforsecurity keyword argument added in Python 3.9.
+        sha256 = hashlib.sha256()
+    return sha256
+
+def should_build_lambda(zip_hash: str, lambda_zip_name: str, bucket: str) -> bool:
+    """
+    Compare the hash with the hash of the zip file in S3, if it exists.
+
+    Args:
+        zip_hash: SHA256 hash of the zip file that's sent to the build container.
+        lambda_zip_name: Object key of lambda zip in S3 bucket.
+        bucket: S3 bucket lambda zip lives in.
+
+    Returns:
+        True if lambda should be rebuilt.
+    """
+    s3 = boto3.session.Session().client('s3')
+    try:
+        resp = s3.head_object(Bucket=bucket, Key=lambda_zip_name)
+        metadata = resp['Metadata']
+        if metadata['build-hash'] == zip_hash:
+            print("Input hash matches existing S3 object, not rebuilding")
+            return False
+        return True
+    except Exception:
+        # If there was an error with the check, just rebuild.
+        return True
