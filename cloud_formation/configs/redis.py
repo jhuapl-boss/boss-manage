@@ -62,7 +62,7 @@ def create_config(bosslet_config):
                                  internal_subnets,
                                  [sgs[names.internal.sg]],
                                  type_=const.REDIS_CACHE_TYPE,
-                                 version="3.2.4",
+                                 version="6.2",
                                  clusters=const.REDIS_CLUSTER_SIZE,
                                  parameters=REDIS_PARAMETERS)
 
@@ -71,7 +71,7 @@ def create_config(bosslet_config):
                                  internal_subnets,
                                  [sgs[names.internal.sg]],
                                  type_=const.REDIS_TYPE,
-                                 version="3.2.4",
+                                 version="6.2",
                                  clusters=const.REDIS_CLUSTER_SIZE)
 
     # This one may not be created depending on the scenario type.
@@ -81,7 +81,7 @@ def create_config(bosslet_config):
                                      internal_subnets,
                                      [sgs[names.internal.sg]],
                                      type_=const.REDIS_SESSION_TYPE,
-                                     version="3.2.4",
+                                     version="6.2",
                                      clusters=1)
 
     return config

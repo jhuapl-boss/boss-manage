@@ -39,7 +39,7 @@ to see if DNS has been changed to cloudfront servers.
 You can either create new AMIs:
 ```shell
 $ cd boss-manage/bin
-$  ./packer.py production.boss auth vault endpoint cachemanager activities --name sprintXX
+$  ./packer.py bossdb.boss auth vault endpoint cachemanager activities --name sprintXX
 ```
 or copy the latest AMIs from the console to become sprintXX (this way is faster if the AMIs will end up being the same version of code.)
 
@@ -55,9 +55,9 @@ Verify IAM Policy, Groups and Roles are the latest.  Master IAM scripts are loca
 Make sure your AWS_CREDENTIALS is set for the dev account
 ```shell
 $ cd boss-manage.git/bin
-$ ./iam_utils.py production.boss export groups
-$ ./iam_utils.py production.boss export roles
-$ ./iam_utils.py production.boss export policies
+$ ./iam_utils.py bossdb.boss export groups
+$ ./iam_utils.py bossdb.boss export roles
+$ ./iam_utils.py bossdb.boss export policies
 ```
 this will update the boss-manage.git/config/iam files with the latest changes added
 to the dev account.  I use git diff on the three files to look over the changes.
@@ -84,7 +84,7 @@ Change sets will automatically be generated when doing an update, but doing it t
 way listed below will allow you to dig into the details of any issues.
 
 ```shell
-$ ./cloudformation.py generate production.boss --scenario production core
+$ ./cloudformation.py generate bossdb.boss core
 ```
 Now go to CloudFormation in the console
 * check CoreProductionBoss
@@ -108,7 +108,7 @@ run the following command. You have to wait for each command to finish before
 launching the next configuration as they build upon each other.  
 
 ```shell
-$ ./cloudformation.py update production.boss core
+$ ./cloudformation.py update bossdb.boss core
 ```
 
 *Note: The cloudformation.py script will automatically use the latest created AMIs
@@ -118,19 +118,19 @@ If the vault policies were updated, this has only happened once since our incept
 run the post-init command on core.
 
 ```shell script
-$ ./cloudformation.py post-init production.boss core
+$ ./cloudformation.py post-init bossdb.boss core
 ```
 Vault policies were updated when adding userthrottle and ingest-complete PRs.
 
 After completion check that vault still works, look for password:
 ```shell
-./bastion.py vault.production.boss vault-read secret/auth/realm
+./bastion.py vault.bossdb.boss vault-read secret/auth/realm
 ```
 
 Try to update redis
 
 ```shell
-$ ./cloudformation.py update production.boss redis
+$ ./cloudformation.py update bossdb.boss redis
 ```
 
 If the size is not identical you may have to delete the redis config and create it again.
@@ -139,22 +139,22 @@ there are not *write-cuboid* keys in the cache before deleting it.
 
 ```shell
 $ cd boss-manage.git/bin
-./bastion.py endpoint.production.boss ssh
+./bastion.py endpoint.bossdb.boss ssh
 sudo apt-get install redis-tools
-redis-cli -h cache.production.boss
+redis-cli -h cache.bossdb.boss
 select 0
 keys WRITE-CUBOID*
 ```
 **Only peform this step if the redis update did not work** If no keys come back it is OK to delete the cache. If keys exist, keep checking, the keys 
 should all disappear eventually.  Then delete and create the redis clusters
 ```shell
-$ ./cloudformation.py delete production.boss redis
-$ ./cloudformation.py create production.boss redis
+$ ./cloudformation.py delete bossdb.boss redis
+$ ./cloudformation.py create bossdb.boss redis
 ```
 
 Make another template for api and compare it in cloud formation.
 ```shell
-$ ./cloudformation.py generate production.boss api 
+$ ./cloudformation.py generate bossdb.boss api 
 ```
 
 _WARNING if updating API after sprint18 (7/19/18): We have modified the Global Secondary Indexes (GSI) on the Tile DynamoDB Table. If you try and update the API Cloudformation script, it may fail if it tries to remove an old GSI and add a new one.  You'll receive a failure that only once GSI change can occur at a time.  To resolve this edit the ndingest/nddynamo/schemas/boss_tile_index.json file.  If the GSI in your table is different then the named GSI in DynamoDB, edit this file and remove the GSI completely.  Update API and your GSI will be removed. Now put the GSI back in the boss_tile_index.json file and run API update again.  The new GSI will be created._    
@@ -163,9 +163,9 @@ _WARNING if updating API after sprint18 (7/19/18): We have modified the Global S
 For *api*, *cachedb*, and *activities* update each stack in sequence
 
 ```shell
-$ ./cloudformation.py update production.boss api
-$ ./cloudformation.py update production.boss cachedb
-$ ./cloudformation.py update production.boss activities
+$ ./cloudformation.py update bossdb.boss api
+$ ./cloudformation.py update bossdb.boss cachedb
+$ ./cloudformation.py update bossdb.boss activities
 ```
 
 If cachedb or activities has new lambdas being created for the first time you may get errors like this:
@@ -174,10 +174,10 @@ In which case you'll need to delete and create both cachedb and activities again
 
 Error updated cachedb or activities?  do this step:
 ```shell
-$ ./cloudformation.py delete production.boss cachedb
-$ ./cloudformation.py create production.boss cachedb
-$ ./cloudformation.py delete production.boss activities
-$ ./cloudformation.py create production.boss activities
+$ ./cloudformation.py delete bossdb.boss cachedb
+$ ./cloudformation.py create bossdb.boss cachedb
+$ ./cloudformation.py delete bossdb.boss activities
+$ ./cloudformation.py create bossdb.boss activities
 ```
 
 
@@ -185,32 +185,25 @@ $ ./cloudformation.py create production.boss activities
 For *cloudwatch* it is much faster to update it.  But it is possible to delete and create it. If update doesn't work for some reason.
 
 ```shell
-$ ./cloudformation.py update production.boss cloudwatch
+$ ./cloudformation.py update bossdb.boss cloudwatch
 ```
 
 For *idindexing* run update
 
 ```shell
-$ ./cloudformation.py update production.boss idindexing
+$ ./cloudformation.py update bossdb.boss idindexing
 ```
 If it has problems run 
 
 ```shell
-$ ./cloudformation.py delete production.boss idindexing
-$ ./cloudformation.py create production.boss idindexing
-```
-
-For *dynamolambda* delete and create the cloud formation stacks again.  It is fast and does not support update
-
-```shell
-$ ./cloudformation.py delete production.boss dynamolambda
-$ ./cloudformation.py create production.boss dynamolambda
+$ ./cloudformation.py delete bossdb.boss idindexing
+$ ./cloudformation.py create bossdb.boss idindexing
 ```
 
 ## Get bossadmin password
 ```shell
 cd vault
-./bastion.py vault.production.boss vault-read secret/auth/realm
+./bastion.py vault.bossdb.boss vault-read secret/auth/realm
 ```
 Login to https://api.theboss.io/latest/collection/
 Uses bossadmin and the password you now have to sync bossadmin to django
@@ -218,7 +211,7 @@ Uses bossadmin and the password you now have to sync bossadmin to django
 ## Turn off Maintenance Mode
 In boss-manage/cloud_formation run:
 ```shell
-python3 ./maintenance.py off production.boss
+python3 ./maintenance.py off bossdb.boss
 ```
 In can take up to 10 to 15 minutes for DNS to be updated externally.
 Use: dig api.theboss.io
@@ -229,7 +222,7 @@ Take the list of emails and phone numbers you created earlier and
 add them back into the ProductionMicronsMailingList Topic in SNS.
 
 ### Disable Cloudwatch Delete Rules
-Go Into Cloudwatch Rules and make sure the **deleteEventRule.production.boss** is disabled
+Go Into Cloudwatch Rules and make sure the **deleteEventRule.bossdb.boss** is disabled
 
 # Testing
 See [Testing.md](Testing.md) for running tests on the updated stack.

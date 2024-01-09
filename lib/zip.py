@@ -20,7 +20,7 @@ def zip_directory(directory, name = "lambda"):
     target = os.path.join(tempfile.mkdtemp(), name)
     return shutil.make_archive(target, "zip", directory, directory)
 
-def write_zip_file(full_path, zipfile_instance, arcname=None):
+def write_zip_file(full_path, zipfile_instance, arcname=None, callback=None):
     """
     Writes the directory, file or symbolic link using the zipfile instance
     works with write_to_zip()
@@ -28,6 +28,7 @@ def write_zip_file(full_path, zipfile_instance, arcname=None):
         full_path:  full path to file, dir or symlink
         zipfile_instance: instance of a zipfile created with w or a
         arcname: Name to give the file or directory in the zip archive
+        callback: Optional callback function that's passed the path of each file
 
     Returns:
 
@@ -35,6 +36,7 @@ def write_zip_file(full_path, zipfile_instance, arcname=None):
     if arcname is None:
         arcname = full_path
 
+    callback(full_path)
     if os.path.islink(full_path):
         # based on http://www.mail-archive.com/python-list@python.org/msg34223.html
         zip_info = zipfile.ZipInfo(arcname)
@@ -46,14 +48,15 @@ def write_zip_file(full_path, zipfile_instance, arcname=None):
         zipfile_instance.write(full_path, arcname)
 
 
-def write_to_zip(path, zippath, append=True, arcname=None):
+def write_to_zip(path, zippath, append=True, arcname=None, callback=None):
     """
     will add a file, directory or symlink to a zip file.
     Args:
         path: path to file to be zipped.
         zippath: path to the zip file to be created or added to.
         append: if True write in append mode else create a new file.
-        arcname: Name to give the file or directory in the zip archive
+        arcname: Name to give the file or directory in the zip archive.
+        callback: Optional callback function that's passed the path of each file.
 
     Returns:
         None
@@ -72,12 +75,12 @@ def write_to_zip(path, zippath, append=True, arcname=None):
             for d in dirs:
                 dirname = os.path.join(root, d)
                 dstname = os.path.join(dst, d)
-                write_zip_file(dirname, fzip, dstname)
+                write_zip_file(dirname, fzip, dstname, callback=callback)
             for f in files:
                 filename = os.path.join(root, f)
                 dstname = os.path.join(dst, f)
-                write_zip_file(filename, fzip, dstname)
+                write_zip_file(filename, fzip, dstname, callback=callback)
     else:
-        write_zip_file(path, fzip, arcname)
+        write_zip_file(path, fzip, arcname, callback=callback)
     fzip.close()
 

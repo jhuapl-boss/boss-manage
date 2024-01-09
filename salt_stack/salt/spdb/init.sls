@@ -47,6 +47,12 @@ spdb-lib:
             - pkg: spdb-prerequirements
             - sls: python.python3
 
+# Need to install pyyaml separatly to avoid problems with other requirements
+spdb-pyyaml:
+    pip.installed:
+        - name: pyyaml
+        - ignore_installed: True
+
 spdb-test-requirements:
     pip.installed:
         - requirements: salt://spdb/files/spdb.git/requirements-test.txt

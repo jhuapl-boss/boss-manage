@@ -69,7 +69,7 @@ def get_commit():
     return result.stdout.decode("utf-8").strip()
 
 def execute(cmd, output_file, env={}):
-    """Execuit the given command and redirect STDOUT and STDERR to output_file.
+    """Execute the given command and redirect STDOUT and STDERR to output_file.
     Args:
         cmd (string) : Command to execute
         outpout_file (string) : Name of file to redirect output to

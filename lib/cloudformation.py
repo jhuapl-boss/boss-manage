@@ -1246,7 +1246,7 @@ class CloudFormationConfiguration:
 
         self._add_record_cname(key, hostname, cluster = True)
 
-    def add_redis_replication(self, key, hostname, subnets, security_groups, type_="cache.m3.medium", port=6379, version="2.8.24", clusters=1, parameters={}):
+    def add_redis_replication(self, key, hostname, subnets, security_groups, type_="cache.m3.medium", port=6379, version="6.2", clusters=1, parameters={}):
         """Add a Redis ElastiCache Replication Group to the configuration
 
         Args:
@@ -1296,6 +1296,8 @@ class CloudFormationConfiguration:
                 cache_parameter_group_family = "redis2.8"
             elif version.startswith("3.2"):
                 cache_parameter_group_family = "redis3.2"
+            elif version.startswith("6.2"):
+                cache_parameter_group_family = "redis6.x"
             else:
                 raise Exception("Unknown CacheParameterGroupFamily for Redis version {}".format(version))
 
