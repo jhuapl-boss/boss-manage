@@ -98,7 +98,7 @@ class BossConfiguration(object):
         "SLACK_WEBHOOK_PATH_DYNAMODB_AUTOSCALE": None,
         "DYNAMODB_AUTOSCALE_PROVISIONER": "BossDefaultProvisioners",
         # Update to 8.0.31 once all stacks updated
-        "RDS_ENGINE_VERSION": "5.7.39"
+        "RDS_ENGINE_VERSION": "8.0.35"
     }
 
     def __init__(self, bosslet, **kwargs):
