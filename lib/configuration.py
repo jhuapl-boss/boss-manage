@@ -79,6 +79,7 @@ class BossConfiguration(object):
         'SLACK_WEBHOOK_HOST', # Optional
         'SLACK_WEBHOOK_PATH_DYNAMODB_AUTOSCALE', # Conditional, to use Slack integration
         'DYNAMODB_AUTOSCALE_PROVISIONER', # Optional
+	    'RDS_ENGINE_VERSION' #Optional,
     ]
 
     __DEFAULTS = {
@@ -93,9 +94,11 @@ class BossConfiguration(object):
         "BILLING_TOPIC": "BossBillingList",
         "BILLING_CURRENCY": "USD",
         "ALERT_TOPIC": "BossMailingList",
-        'SLACK_WEBHOOK_HOST': 'hooks.slack.com',
-        'SLACK_WEBHOOK_PATH_DYNAMODB_AUTOSCALE': None,
-        'DYNAMODB_AUTOSCALE_PROVISIONER': 'BossDefaultProvisioners',
+        "SLACK_WEBHOOK_HOST": "hooks.slack.com",
+        "SLACK_WEBHOOK_PATH_DYNAMODB_AUTOSCALE": None,
+        "DYNAMODB_AUTOSCALE_PROVISIONER": "BossDefaultProvisioners",
+        # Update to 8.0.31 once all stacks updated
+        "RDS_ENGINE_VERSION": "8.0.35"
     }
 
     def __init__(self, bosslet, **kwargs):

@@ -226,6 +226,7 @@ def create_config(bosslet_config, db_config={}):
                       db_config.get("user"),
                       db_config.get("password"),
                       internal_subnets,
+		              rds_engine_version = bosslet_config.RDS_ENGINE_VERSION,
                       type_ = const.RDS_TYPE,
                       security_groups=[sgs[names.internal.sg]])
 
