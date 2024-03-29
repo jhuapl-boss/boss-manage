@@ -23,6 +23,7 @@ Author:
 """
 
 import argparse
+import pprint
 import sys
 import os
 import glob
@@ -103,6 +104,7 @@ def locate_ami(session):
     #images = [i for i in images if contains(i['Name'], ('hvm-ssd', '14.04', 'server'))]
     images = [i for i in images if contains(i['Name'], ('hvm-ssd', '20.04', 'server'))]
     images = [i for i in images if not contains(i['Name'], ('ubuntu-eks'))]
+    images = [i for i in images if not contains(i['Name'], ('ubuntu-pro-server'))]
     images.sort(key=lambda x: x["CreationDate"], reverse=True)
 
     if len(images) == 0:
