@@ -113,7 +113,7 @@ def create_config(bosslet_config):
                       const.DELETE_ENI_LAMBDA,
                       handler="index.handler",
                       timeout=180, # 3 minutes, so that there is enough time to wait for the ENI detach to complete
-                      runtime='python3.7') # If the lambda times out CF will retry a couple of times
+                      runtime='python3.11') # If the lambda times out CF will retry a couple of times
 
     user_data = const.BASTION_USER_DATA.format(bosslet_config.NETWORK)
     config.add_ec2_instance("Bastion",
@@ -212,7 +212,7 @@ def create_config(bosslet_config):
                       const.DNS_LAMBDA,
                       handler="index.handler",
                       timeout=10,
-                      runtime='python3.7',
+                      runtime='python3.11',
                       depends_on="DNSZone")
 
     config.add_lambda_permission("DNSLambdaExecute", Ref("DNSLambda"))

@@ -1,5 +1,5 @@
 name: multilambda
-runtime: python3.7
+runtime: python3.11
 include:
         # DP NOTE: The spdb, bossutils (boss-tools), and heaviside repositories
         #          are copied into repos/ where pip can install them from

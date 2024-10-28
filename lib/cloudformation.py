@@ -1946,7 +1946,7 @@ class CloudFormationConfiguration:
             })
 
 
-    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python3.7", reserved_executions=None, dlq=None, layers=None):
+    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python3.11", reserved_executions=None, dlq=None, layers=None):
         """Create a Python Lambda
 
         Args:
