@@ -11,7 +11,7 @@ include:
 
 django-update-pip:
     pip.installed:
-        - name: pip
+        - name: pip==22.3.1
         - upgrade: True
 
 django-prerequirements:
@@ -20,6 +20,7 @@ django-prerequirements:
             - libmysqlclient-dev
             - libffi-dev
             - awscli
+            - patchelf
 
 django-requirements:
     pip.installed:

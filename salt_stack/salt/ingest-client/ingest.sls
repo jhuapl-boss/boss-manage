@@ -4,7 +4,7 @@ include:
 
 ingest-update-pip:
     pip.installed:
-        - name: pip
+        - name: pip==22.3.1
         - upgrade: True
 
 ingest-prerequirements:

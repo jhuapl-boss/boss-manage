@@ -4,7 +4,7 @@ include:
 
 cvdb-update-pip:
     pip.installed:
-        - name: pip
+        - name: pip==22.3.1
         - upgrade: True
 
 cvdb-lib:

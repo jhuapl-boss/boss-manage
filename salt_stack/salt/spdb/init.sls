@@ -3,7 +3,7 @@ include:
 
 spdb-update-pip:
     pip.installed:
-        - name: pip
+        - name: pip==22.3.1
         - upgrade: True
 
 spdb-prerequirements:
@@ -15,6 +15,7 @@ spdb-prerequirements:
             - libfreetype6-dev
             - liblcms2-dev
             - libwebp-dev
+            - patchelf
             #- libopenjpeg-dev
 
 # Install moto dependency separately.  Salt sets LC_ALL=C which breaks
