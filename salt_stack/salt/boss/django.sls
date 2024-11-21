@@ -21,7 +21,6 @@ django-prerequirements:
             - libffi-dev
             - awscli
             - patchelf
-            - uwsgi 
 
 django-requirements:
     pip.installed:

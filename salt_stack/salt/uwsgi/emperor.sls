@@ -2,6 +2,12 @@ include:
     - python.python3
     - python.pip3
 
+uwsgi-prerequirements:
+    pkg.installed:
+        - pkgs:
+            - uwsgi
+            - patchelf 
+
 uwsgi-init.d:
     file.managed:
         - name: /etc/init.d/uwsgi-emperor
