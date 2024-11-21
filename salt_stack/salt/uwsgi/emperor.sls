@@ -2,13 +2,6 @@ include:
     - python.python3
     - python.pip3
 
-uwsgi:
-    pip.installed:
-        - name: uwsgi==2.0.19.1
-        - require:
-            - sls: python.python3
-            - sls: python.pip3
-
 uwsgi-init.d:
     file.managed:
         - name: /etc/init.d/uwsgi-emperor
