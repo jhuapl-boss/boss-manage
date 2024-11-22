@@ -1,7 +1,18 @@
 # Install ndingest into site-packages.
 include:
     - python.python3
+    - python.pip3
+    - python.python3-dev
     - spdb
+
+ndingest-wheel-upgrade:
+    pip.installed:
+        - pkgs:
+            - wheel
+            - setuptools
+        - upgrade: True
+        - require:
+            - sls: python.python3
 
 ndingest-lib:
     pip.installed:

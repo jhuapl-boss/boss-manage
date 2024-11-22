@@ -98,7 +98,7 @@ build {
     # Update the hostname in /etc/hosts, /etc/hostname, and in memory
     # Install cURL so that salt-masterless can bootstrap Salt
     inline = ["sudo apt-get update",
-              "sudo apt-get -y install curl build-essential python3-dev"]
+              "sudo apt-get -y install curl"]
   }
 
   provisioner "file" {

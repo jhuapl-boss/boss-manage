@@ -1,5 +1,7 @@
 include:
     - python.python3
+    - python.pip3
+    - python.python3-dev
 
 spdb-update-pip:
     pip.installed:
@@ -33,9 +35,11 @@ spdb-prerequirements:
 
 # During testing with the Docker Ubuntu 20.04 image, wheel was too old to
 # complete the spdb and blosc installs.
-wheel-upgrade:
+spdb-wheel-upgrade:
     pip.installed:
-        - name: wheel
+        - pkgs:
+            - wheel
+            - setuptools
         - upgrade: True
         - require:
             - sls: python.python3
@@ -47,12 +51,6 @@ spdb-lib:
         - require:
             - pkg: spdb-prerequirements
             - sls: python.python3
-
-# Need to install pyyaml separatly to avoid problems with other requirements
-spdb-pyyaml:
-    pip.installed:
-        - name: pyyaml
-        - ignore_installed: True
 
 spdb-test-requirements:
     pip.installed:

@@ -27,6 +27,15 @@ ingest-prerequirements:
 #            export LC_ALL=en_US.UTF-8
 #            sudo /usr/local/bin/pip3 install httpretty==0.8.10
 
+ingest-wheel-upgrade:
+    pip.installed:
+        - pkgs:
+            - wheel
+            - setuptools
+        - upgrade: True
+        - require:
+            - sls: python.python3
+
 # Need to install pyyaml separatly to avoid problems with other requirements
 ingest-pyyaml:
     pip.installed:
