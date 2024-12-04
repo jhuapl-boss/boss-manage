@@ -7,6 +7,7 @@ include:
 
 ndingest-wheel-upgrade:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         - pkgs:
             - wheel
             - setuptools
@@ -16,6 +17,7 @@ ndingest-wheel-upgrade:
 
 ndingest-lib:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         # DP HACK: Cannot use salt:// with pip.installed, so assume the base directory
         - name: /srv/salt/ndingest/files/ndingest.git/
         - require:

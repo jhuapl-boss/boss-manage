@@ -114,10 +114,8 @@ build {
   provisioner "shell" {
     inline = ["sudo tar -C /srv -xf /tmp/salt_files.tar.gz",
               "sudo chmod +x /tmp/bootstrap-salt.sh",
-              "echo sudo /tmp/bootstrap-salt.sh -P -i ${var.name} stable 3006",
-              "sudo /tmp/bootstrap-salt.sh -i ${var.name} stable 3006",
-              "echo sudo salt-pip install pip==22.3.1",
-              "sudo salt-pip install pip==22.3.1",
+              "echo sudo /tmp/bootstrap-salt.sh -i ${var.name} stable 3007",
+              "sudo /tmp/bootstrap-salt.sh -i ${var.name} stable 3007",
               "echo sudo salt-call --local state.highstate --file-root=/srv/salt --pillar-root=/srv/pillar --id=${var.name}",
               "sudo salt-call --local state.highstate --file-root=/srv/salt --pillar-root=/srv/pillar --id=${var.name}",
               "echo deleting temp files from /tmp",

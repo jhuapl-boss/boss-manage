@@ -17,5 +17,5 @@ include:
 ## TODO: make pip installation part of the Jenkins job, instead.
 intern-sdk:
     pip.installed:
-        - bin_env: /usr/local/bin/pip3
+        - pip_bin: /usr/bin/pip3
         - requirements: salt://jenkins-microns/files/intern-requirements.txt

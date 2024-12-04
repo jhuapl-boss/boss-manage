@@ -4,8 +4,9 @@ include:
 
 ingest-update-pip:
     pip.installed:
-        - name: pip==22.3.1
+        - name: pip
         - upgrade: True
+        - pip_bin: /usr/bin/pip3
 
 ingest-prerequirements:
     pkg.installed:
@@ -29,6 +30,7 @@ ingest-prerequirements:
 
 ingest-wheel-upgrade:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         - pkgs:
             - wheel
             - setuptools
@@ -39,11 +41,13 @@ ingest-wheel-upgrade:
 # Need to install pyyaml separatly to avoid problems with other requirements
 ingest-pyyaml:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         - name: pyyaml
         - ignore_installed: True
 
 ingest-client-lib:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         - requirements: salt://ingest-client/files/ingest-client.git/requirements.txt
         - require:
             - pkg: ingest-prerequirements

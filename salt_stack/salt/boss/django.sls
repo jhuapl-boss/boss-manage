@@ -11,8 +11,9 @@ include:
 
 django-update-pip:
     pip.installed:
-        - name: pip==22.3.1
+        - name: pip
         - upgrade: True
+        - pip_bin: /usr/bin/pip3
 
 django-prerequirements:
     pkg.installed:
@@ -24,6 +25,7 @@ django-prerequirements:
 
 django-requirements:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         - requirements: salt://boss/files/boss.git/requirements.txt
         - exists_action: w
         - require:

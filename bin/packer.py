@@ -102,7 +102,7 @@ def locate_ami(session):
 
     images = response['Images']
     #images = [i for i in images if contains(i['Name'], ('hvm-ssd', '14.04', 'server'))]
-    images = [i for i in images if contains(i['Name'], ('hvm-ssd', '20.04', 'server'))]
+    images = [i for i in images if contains(i['Name'], ('hvm-ssd', '24.04', 'server'))]
     images = [i for i in images if not contains(i['Name'], ('ubuntu-eks'))]
     images = [i for i in images if not contains(i['Name'], ('ubuntu-pro-server'))]
     images.sort(key=lambda x: x["CreationDate"], reverse=True)

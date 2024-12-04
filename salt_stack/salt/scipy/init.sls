@@ -13,6 +13,7 @@ scipy-prerequirements:
 
 scipy-lib:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         - pkgs:
             - scipy
         - require:

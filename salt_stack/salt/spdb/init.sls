@@ -5,8 +5,9 @@ include:
 
 spdb-update-pip:
     pip.installed:
-        - name: pip==22.3.1
+        - name: pip
         - upgrade: True
+        - pip_bin: /usr/bin/pip3
 
 spdb-prerequirements:
     pkg.installed:
@@ -37,6 +38,7 @@ spdb-prerequirements:
 # complete the spdb and blosc installs.
 spdb-wheel-upgrade:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         - pkgs:
             - wheel
             - setuptools
@@ -46,6 +48,7 @@ spdb-wheel-upgrade:
 
 spdb-lib:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         # DP HACK: Cannot use salt:// with pip.installed, so assume the base directory
         - name: /srv/salt/spdb/files/spdb.git/
         - require:
@@ -54,6 +57,7 @@ spdb-lib:
 
 spdb-test-requirements:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         - requirements: salt://spdb/files/spdb.git/requirements-test.txt
         - exists_action: w
         - require:

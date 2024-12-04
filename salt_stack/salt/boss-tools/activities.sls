@@ -7,7 +7,8 @@ include:
 
 activity-update-pip:
     pip.installed:
-        - name: pip==22.3.1
+        - pip_bin: /usr/bin/pip3
+        - name: pip
         - upgrade: True
 
 activity-files:
@@ -24,6 +25,7 @@ activity-files:
 
 activites-lib:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         - name: pymysql
         - require:
             - sls: python.python3
