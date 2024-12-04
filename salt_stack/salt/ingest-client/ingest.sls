@@ -33,7 +33,7 @@ ingest-wheel-upgrade:
         - pip_bin: /usr/bin/pip3
         - pkgs:
             - wheel
-            - setuptools
+#            - setuptools
         - upgrade: True
         - require:
             - sls: python.python3
