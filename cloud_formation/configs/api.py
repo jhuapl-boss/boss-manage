@@ -43,11 +43,13 @@ from lib import console
 from lib import utils
 from lib import constants as const
 
+
 import json
 import uuid
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 from urllib.error import HTTPError
+from pprint import pprint
 
 def create_config(bosslet_config, db_config={}):
     names = bosslet_config.names
@@ -313,7 +315,8 @@ def create(bosslet_config):
         raise
 
     # Outside the try/except so it can be run again if there is an error
-    post_init(bosslet_config)
+    # post_init(bosslet_config)
+
 
 def post_init(bosslet_config):
     call = bosslet_config.call
@@ -331,9 +334,15 @@ def post_init(bosslet_config):
         bossadmin = vault.read("secret/auth/realm")
         auth_uri = vault.read("secret/endpoint/auth")['url']
 
+    # TODO Remove this debug statement
+    print(f"debug: {creds}\n{bossadmin}\n{auth_uri}")
+
     # Verify Keycloak is accessible
     print("Checking for Keycloak availability")
     call.check_keycloak(const.TIMEOUT_KEYCLOAK)
+    print("Finished checking Keycloak availability")
+    pprint(names.auth)
+    pprint(names.auth.dns)
 
     # Add the API servers to the list of OIDC valid redirects
     with call.tunnel(names.auth.dns, 8080) as auth_port:
@@ -341,7 +350,9 @@ def post_init(bosslet_config):
         auth_url = "http://localhost:{}".format(auth_port)
         with KeyCloakClient(auth_url, **creds) as kc:
             # DP TODO: make add_redirect_uri able to work multiple times without issue
+            print("debug: about to add redirect URI")
             kc.add_redirect_uri("BOSS","endpoint", uri + "/*")
+            print("debug: finished adding redirect URI")
 
     # Get the boss admin's bearer token
     headers = {

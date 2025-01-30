@@ -26,6 +26,7 @@ from .vault import Vault
 from .exceptions import SSHError
 from .names import AWSNames
 
+
 def gen_timeout(total, step):
     """Break the total timeout value into steps
     that are a specific size.
@@ -43,6 +44,7 @@ def gen_timeout(total, step):
     if remainder > 0:
         rtn.insert(0, remainder) # Sleep for the partial time first
     return rtn
+
 
 class ExternalCalls:
     """Class that helps with forming connections from the local machine to machines
@@ -230,7 +232,6 @@ class ExternalCalls:
                 else:
                     print("Error establishing SSH tunnel to Vault, waiting")
                     time.sleep(error_sleep)
-
 
     def check_keycloak(self, timeout, exception=True):
         """Keycloak status check to see if Keycloak is accessible

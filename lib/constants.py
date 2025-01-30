@@ -108,7 +108,7 @@ VAULT_ENDPOINT_AUTH = "secret/endpoint/auth"
 ########################
 # Service Check Timeouts
 TIMEOUT_VAULT = 120
-TIMEOUT_KEYCLOAK = 150
+TIMEOUT_KEYCLOAK = 180
 AUTH_HEALTH_CHECK_GRACE_PERIOD = 160
 
 

@@ -112,8 +112,8 @@ def create_config(bosslet_config):
                       aws.role_arn_lookup(session, 'DeleteENI'),
                       const.DELETE_ENI_LAMBDA,
                       handler="index.handler",
-                      timeout=180, # 3 minutes, so that there is enough time to wait for the ENI detach to complete
-                      runtime='python3.11') # If the lambda times out CF will retry a couple of times
+                      timeout=180,  # 3 minutes, so that there is enough time to wait for the ENI detach to complete
+                      runtime='python3.11')  # If the lambda times out CF will retry a couple of times
 
     user_data = const.BASTION_USER_DATA.format(bosslet_config.NETWORK)
     config.add_ec2_instance("Bastion",
@@ -306,7 +306,9 @@ def create(bosslet_config):
     vpc_id = aws.vpc_id_lookup(session, domain)
     aws.rt_name_default(session, vpc_id, "default." + domain)
 
-    post_init(bosslet_config)
+    # TODO Sandy, put this back after debugging
+    # post_init(bosslet_config)
+
 
 def post_init(bosslet_config):
 
@@ -335,11 +337,11 @@ def post_init(bosslet_config):
         except Exception as ex:
             raise BossManageError("Problem initializing Vault: {}".format(str(ex)))
 
-        #Check and see if these secrets already exist before we overwrite them with new ones.
+        # Check and see if these secrets already exist before we overwrite them with new ones.
         # Write data into Vault
         auth_data = vault.read(const.VAULT_AUTH)
         if not auth_data or 'password' not in auth_data:
-            print("Writing {}".format(const.VAULT_AUTH))
+            print("Writing {} to vault".format(const.VAULT_AUTH))
             vault.write(const.VAULT_AUTH, password = password, username = username, client_id = "admin-cli")
         else:
             password = auth_data['password']
@@ -357,7 +359,7 @@ def post_init(bosslet_config):
 
         realm_data = vault.read(const.VAULT_REALM)
         if not realm_data or 'password' not in realm_data:
-            print("Writing {}".format(const.VAULT_REALM))
+            print("Writing {} to vault".format(const.VAULT_REALM))
             vault.write(const.VAULT_REALM, username = realm_username, password = realm_password, client_id = "endpoint")
         else:
             realm_password = realm_data['password']
@@ -387,14 +389,16 @@ def post_init(bosslet_config):
     ##          Also need to guard the writes to vault with the admin password
     #######
 
+    # Sandy TODO: Uncomment this after test on 1/14/2025
     with call.ssh(names.auth.dns) as ssh:
         print("Creating initial Keycloak admin user")
         # This fails if the user already exists, but execution will continue.
         ssh("/srv/keycloak/bin/add-user-keycloak.sh -r master -u {} -p {}".format(username, password))
-        time.sleep(10)
+        time.sleep(5)
 
+        print("Calling Keycloak jboss to reload Keycloak")
         ssh("/srv/keycloak/bin/jboss-cli.sh --connect reload")
-        time.sleep(3)
+        time.sleep(20)
 
     print("Waiting for Keycloak to restart")
     call.check_keycloak(const.TIMEOUT_KEYCLOAK)
@@ -421,6 +425,7 @@ def post_init(bosslet_config):
                 kc.create_realm(realm)
             except Exception as ex:
                 print('Failed to upload Boss.realm config.  Does it already exist? Error message: {}'.format(ex))
+
 
 def update(bosslet_config):
     # Checks to make sure they update can happen and the user wants to wait the required time

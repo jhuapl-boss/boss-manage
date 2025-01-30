@@ -97,7 +97,7 @@ class BossConfiguration(object):
         'SLACK_WEBHOOK_HOST': 'hooks.slack.com',
         'SLACK_WEBHOOK_PATH_DYNAMODB_AUTOSCALE': None,
         'DYNAMODB_AUTOSCALE_PROVISIONER': 'BossDefaultProvisioners',
-        "RDS_ENGINE_VERSION": "8.0.35"
+        'RDS_ENGINE_VERSION': "8.0.35"
     }
 
     def __init__(self, bosslet, **kwargs):
