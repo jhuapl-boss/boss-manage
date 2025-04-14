@@ -1,10 +1,23 @@
 # Install ndingest into site-packages.
 include:
     - python.python3
+    - python.pip3
+    - python.python3-dev
     - spdb
+
+ndingest-wheel-upgrade:
+    pip.installed:
+        - pip_bin: /usr/bin/pip3
+        - pkgs:
+            - wheel
+#            - setuptools
+        - upgrade: True
+        - require:
+            - sls: python.python3
 
 ndingest-lib:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         # DP HACK: Cannot use salt:// with pip.installed, so assume the base directory
         - name: /srv/salt/ndingest/files/ndingest.git/
         - require:

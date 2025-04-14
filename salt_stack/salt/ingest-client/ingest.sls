@@ -6,6 +6,7 @@ ingest-update-pip:
     pip.installed:
         - name: pip
         - upgrade: True
+        - pip_bin: /usr/bin/pip3
 
 ingest-prerequirements:
     pkg.installed:
@@ -27,14 +28,26 @@ ingest-prerequirements:
 #            export LC_ALL=en_US.UTF-8
 #            sudo /usr/local/bin/pip3 install httpretty==0.8.10
 
+ingest-wheel-upgrade:
+    pip.installed:
+        - pip_bin: /usr/bin/pip3
+        - pkgs:
+            - wheel
+#            - setuptools
+        - upgrade: True
+        - require:
+            - sls: python.python3
+
 # Need to install pyyaml separatly to avoid problems with other requirements
 ingest-pyyaml:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         - name: pyyaml
         - ignore_installed: True
 
 ingest-client-lib:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         - requirements: salt://ingest-client/files/ingest-client.git/requirements.txt
         - require:
             - pkg: ingest-prerequirements

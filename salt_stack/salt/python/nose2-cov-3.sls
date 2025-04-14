@@ -7,7 +7,7 @@ include:
 python3-nose2-cov:
   pip.installed:
     - name: {{ python3.nose2_cov_pkg }}
-    - bin_env: /usr/local/bin/pip3
+    - pip_bin: /usr/bin/pip3
     - require:
       # Currently require pip from Python 2.x for Salt's pip state.
       - sls: python.pip

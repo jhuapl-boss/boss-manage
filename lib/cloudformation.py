@@ -978,7 +978,7 @@ class CloudFormationConfiguration:
             }
         }
 
-    def add_ec2_instance(self, key, hostname, ami, keypair, subnet=Ref("Subnet"), type_="t2.micro", iface_check=True, public_ip=False, security_groups=None, user_data=None, meta_data=None, role=None, depends_on=None):
+    def add_ec2_instance(self, key, hostname, ami, keypair, subnet=Ref("Subnet"), type_="t3.micro", iface_check=True, public_ip=False, security_groups=None, user_data=None, meta_data=None, role=None, depends_on=None):
         """Add an EC2 instance to the configuration
 
         Args:
@@ -1046,7 +1046,7 @@ class CloudFormationConfiguration:
         self.keypairs[hostname] = keypair
         self._add_record_cname(key, hostname, ec2 = True)
 
-    def add_rds_db(self, key, hostname, port, db_name, username, password, subnets, type_="db.t2.micro", storage="5", security_groups=None):
+    def add_rds_db(self, key, hostname, port, db_name, username, password, subnets, rds_engine_version="8.0.40", type_="db.t2.micro", storage="5", security_groups=None):
         """Add an RDS DB instance to the configuration
 
         Args:
@@ -1058,6 +1058,7 @@ class CloudFormationConfiguration:
             password (str) : The (plaintext) password for the master username
             subnets (list) : A list of Subnet IDs or Refs across which
                              to create a DB SubnetGroup for the DB Instance to launch into
+            rds_engine_version (str) : Engine Version of the RDS Database
             type_ (str) : The RDS instance type to create
             storage (int|string) : The storage size of the database (in GB)
             security_groups (None|list) : A list of SecurityGroup IDs or Refs
@@ -1070,7 +1071,7 @@ class CloudFormationConfiguration:
             "Properties" : {
                 "Engine" : "mysql",
                 "LicenseModel" : "general-public-license",
-                "EngineVersion" : "5.7.39",  # was 5.6.48
+                "EngineVersion" : rds_engine_version,
                 "DBInstanceClass" : type_,
                 "MultiAZ" : "true",
                 "StorageType" : "standard",
@@ -1946,7 +1947,7 @@ class CloudFormationConfiguration:
             })
 
 
-    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python3.7", reserved_executions=None, dlq=None, layers=None):
+    def add_lambda(self, key, name, role, file=None, handler=None, s3=None, description="", memory=128, timeout=3, security_groups=None, subnets=None, depends_on=None, runtime="python3.11", reserved_executions=None, dlq=None, layers=None):
         """Create a Python Lambda
 
         Args:

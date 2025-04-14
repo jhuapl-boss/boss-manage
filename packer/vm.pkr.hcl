@@ -98,7 +98,7 @@ build {
     # Update the hostname in /etc/hosts, /etc/hostname, and in memory
     # Install cURL so that salt-masterless can bootstrap Salt
     inline = ["sudo apt-get update",
-              "sudo apt-get -y install curl"]
+              "sudo apt-get -y install curl python3-pip"]
   }
 
   provisioner "file" {
@@ -114,8 +114,8 @@ build {
   provisioner "shell" {
     inline = ["sudo tar -C /srv -xf /tmp/salt_files.tar.gz",
               "sudo chmod +x /tmp/bootstrap-salt.sh",
-              "echo sudo /tmp/bootstrap-salt.sh -i ${var.name} stable 3004",
-              "sudo /tmp/bootstrap-salt.sh -i ${var.name} stable 3004",
+              "echo sudo /tmp/bootstrap-salt.sh -i ${var.name} stable 3006",
+              "sudo /tmp/bootstrap-salt.sh -i ${var.name} stable 3006",
               "echo sudo salt-call --local state.highstate --file-root=/srv/salt --pillar-root=/srv/pillar --id=${var.name}",
               "sudo salt-call --local state.highstate --file-root=/srv/salt --pillar-root=/srv/pillar --id=${var.name}",
               "echo deleting temp files from /tmp",

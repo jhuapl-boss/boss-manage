@@ -6,7 +6,7 @@ include:
 coverage:
     pip.installed:
         - name: coverage==4.0.3
-        - bin_env: /usr/local/bin/pip3
+        - pip_bin: /usr/bin/pip3
         - require:
             - sls: python.python35
             - sls: python.pip

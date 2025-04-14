@@ -5,6 +5,7 @@ include:
 
 python-lib:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         # DP HACK: Cannot use salt:// with pip.installed, so assume the base directory
         - name: /srv/salt/boss-tools/files/boss-tools.git/bossutils/
         - require:

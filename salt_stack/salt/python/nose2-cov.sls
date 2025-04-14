@@ -5,5 +5,6 @@ include:
 
   pip.installed:
     - name: {{ python2.nose2_cov_pkg }}
+    - pip_bin: /usr/bin/pip3
     - require:
       - sls: python.pip

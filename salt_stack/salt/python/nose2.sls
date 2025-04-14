@@ -6,5 +6,6 @@ include:
 python2-nose2:
   pip.installed:
     - name: {{ python2.nose2_pkg }}
+    - pip_bin: /usr/bin/pip3
     - require:
       - sls: python.pip

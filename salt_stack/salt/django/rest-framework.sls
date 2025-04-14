@@ -6,6 +6,7 @@ include:
 
 rest_framework:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         - name: djangorestframework==3.3.1
         - bin_env: /usr/local/bin/pip3
         - require:

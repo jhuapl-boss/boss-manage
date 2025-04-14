@@ -57,6 +57,7 @@ class BossConfiguration(object):
         'SCENARIO', # Optional, no default
         'VERIFY_SSL', # Optional
         'AUTH_RDS',
+        'RDS_ENGINE_VERSION', # Optional
         'LAMBDA_BUCKET',
         'LAMBDA_SERVER',
         'LAMBDA_SERVER_KEY',
@@ -96,6 +97,7 @@ class BossConfiguration(object):
         'SLACK_WEBHOOK_HOST': 'hooks.slack.com',
         'SLACK_WEBHOOK_PATH_DYNAMODB_AUTOSCALE': None,
         'DYNAMODB_AUTOSCALE_PROVISIONER': 'BossDefaultProvisioners',
+        'RDS_ENGINE_VERSION': "8.0.35"
     }
 
     def __init__(self, bosslet, **kwargs):

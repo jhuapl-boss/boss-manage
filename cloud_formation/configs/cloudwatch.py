@@ -70,7 +70,7 @@ def create_config(bosslet_config):
                       security_groups=[internal_sg],
                       subnets=lambda_subnets,
                       handler='index.lambda_handler',
-                      runtime='python3.7',
+                      runtime='python3.11',
                       file=const.VAULT_LAMBDA)
 
     # Lambda input data

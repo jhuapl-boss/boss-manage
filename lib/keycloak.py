@@ -14,6 +14,8 @@
 
 import json
 import ssl
+from pprint import pprint
+
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 from urllib.error import HTTPError
@@ -122,6 +124,10 @@ class KeyCloakClient:
         if client_id is None:
             raise Exception("No client_id set")
 
+        print(f"username: '{username}'")
+        print(f"password: '{password}'")
+        print(f"client_id: '{client_id}'")
+
         self.token = self.request(
             "/auth/realms/master/protocol/openid-connect/token",
             params={
@@ -136,8 +142,12 @@ class KeyCloakClient:
         )
 
         if self.token is None:
-            #print("Could not authenticate to KeyCloak Server")
+            print("Could not authenticate to KeyCloak Server.")
             raise exceptions.KeyCloakLoginError(self.url_base, username)
+        else:
+            # TODO SH After Debug remove these if appropriate
+            print("Keycloak token received after login.")
+            pprint(self.token)
 
         return self # DP NOTE: So context manager works correctly
 
@@ -150,7 +160,7 @@ class KeyCloakClient:
         if self.token is None:
             return
 
-        self.request(  # no response
+        logout_response = self.request(  # no response
             "/auth/realms/master/protocol/openid-connect/logout",
             params={
                 "refresh_token": self.token["refresh_token"],
@@ -161,11 +171,16 @@ class KeyCloakClient:
             }
         )
 
+        # TODO SH Delete debug statements
+        print("response from keycloak logout")
+        pprint(logout_response)
+
         self.token = None
 
     def __enter__(self):
         """The start of the context manager, which handles automatically calling logout."""
         if self.token is None:
+            print("Keycloak token is none, logging into keycloak")
             self.login()
         return self
 

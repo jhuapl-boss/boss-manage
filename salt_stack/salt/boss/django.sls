@@ -13,6 +13,7 @@ django-update-pip:
     pip.installed:
         - name: pip
         - upgrade: True
+        - pip_bin: /usr/bin/pip3
 
 django-prerequirements:
     pkg.installed:
@@ -20,9 +21,11 @@ django-prerequirements:
             - libmysqlclient-dev
             - libffi-dev
             - awscli
+            - patchelf
 
 django-requirements:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         - requirements: salt://boss/files/boss.git/requirements.txt
         - exists_action: w
         - require:

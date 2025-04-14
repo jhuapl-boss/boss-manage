@@ -1,10 +1,13 @@
 include:
     - python.python3
+    - python.pip3
+    - python.python3-dev
 
 spdb-update-pip:
     pip.installed:
         - name: pip
         - upgrade: True
+        - pip_bin: /usr/bin/pip3
 
 spdb-prerequirements:
     pkg.installed:
@@ -15,6 +18,7 @@ spdb-prerequirements:
             - libfreetype6-dev
             - liblcms2-dev
             - libwebp-dev
+            - patchelf
             #- libopenjpeg-dev
 
 # Install moto dependency separately.  Salt sets LC_ALL=C which breaks
@@ -32,29 +36,28 @@ spdb-prerequirements:
 
 # During testing with the Docker Ubuntu 20.04 image, wheel was too old to
 # complete the spdb and blosc installs.
-wheel-upgrade:
+spdb-wheel-upgrade:
     pip.installed:
-        - name: wheel
+        - pip_bin: /usr/bin/pip3
+        - pkgs:
+            - wheel
+#            - setuptools
         - upgrade: True
         - require:
             - sls: python.python3
 
 spdb-lib:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         # DP HACK: Cannot use salt:// with pip.installed, so assume the base directory
         - name: /srv/salt/spdb/files/spdb.git/
         - require:
             - pkg: spdb-prerequirements
             - sls: python.python3
 
-# Need to install pyyaml separatly to avoid problems with other requirements
-spdb-pyyaml:
-    pip.installed:
-        - name: pyyaml
-        - ignore_installed: True
-
 spdb-test-requirements:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         - requirements: salt://spdb/files/spdb.git/requirements-test.txt
         - exists_action: w
         - require:

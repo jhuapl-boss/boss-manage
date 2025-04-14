@@ -13,8 +13,18 @@ from the root directory of the cloned boss-manage.git repository.*
 
 ### Workstation
 You will need a machine installed with the following software packages:
-* Python 3.8 or later
+* Python 3.11 
   - The Boss Manage software can be run within `venv`, `virtualenv`, or `virtualenvwrapper`
+  - pip may need to be manually installed for Python 3.11
+    - $ pip install --upgrade setuptools
+    - $ python3 -m ensurepip --upgrade
+    - $ python3 -m pip install --user virtualenv virtualenvwrapper
+    - # if already present
+    - $ pip install --upgrade virtualenv virtualenvwrapper
+    - # you may need to run 
+    - $ virtualenv --upgrade-embed-wheels
+    - 
+    - 
 * Packer 1.8.x ([download](https://www.packer.io/)) (add it to your path or in the `boss-manage.git/bin/` directory)
 * Docker Desktop ([download](https://docs.docker.com/desktop/release-notes/))
   - Contact your department software representative to get a license
@@ -54,6 +64,7 @@ To install the Python packages needed for boss-manage to work, run
 
 ```shell
 pip install -r requirements.txt
+pip install -r heaviside-requirements.txt
 ```
 
 ## Setup AWS Account
@@ -91,7 +102,7 @@ Success looks like this:
 Failure like this
 ==> Builds finished but no artifacts were created.
 
-It can beneficial to check the logs before all the AMIs are completed, 
+It can be beneficial to check the logs before all the AMIs are completed, 
 when issues do occur, they frequently fail early.  Discovering this 
 allows you to relauch packer.py in another terminal for the failed AMIs,
 saving time overall.

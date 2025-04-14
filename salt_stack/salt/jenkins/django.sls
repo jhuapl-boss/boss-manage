@@ -5,8 +5,8 @@ include:
 
 django-jenkins:
     pip.installed:
+        - pip_bin: /usr/bin/pip3
         - name: django-jenkins==0.18.1
-        - bin_env: /usr/local/bin/pip3
         - require:
             - sls: python.python35
             - sls: python.pip

@@ -5,6 +5,7 @@ include:
 
 heaviside:
     pip.installed: # pip dependencies not resolving to our version
-        - editable: git+https://github.com/jhuapl-boss/heaviside.git#egg=heaviside
+        - pip_bin: /usr/bin/pip3
+        - name: git+https://github.com/jhuapl-boss/heaviside.git
         - exists_action: w
 
