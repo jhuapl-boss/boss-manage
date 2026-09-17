@@ -1,0 +1,19 @@
+name: lint
+
+on: [push, pull_request]
+
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install ruff==0.16.8
+      # E9 = syntax errors. Deliberately limited to this one rule so the gate
+      # is green on the current tree: the repo still has 16 F821 (undefined
+      # name) findings that each need a maintainer decision, so F821 is left
+      # out for now rather than merged broken or fixed by guesswork.
+      - name: Check for syntax errors
+        run: ruff check --isolated --select E9 .
