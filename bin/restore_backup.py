@@ -208,7 +208,7 @@ if __name__ == '__main__':
             continue
 
         id = aws.create_data_pipeline(bosslet_config.session,
-                                      name + '-restore.' + bosslet_config.INTERNAL_DOMAIN
+                                      name + '-restore.' + bosslet_config.INTERNAL_DOMAIN,
                                       pipeline)
         if id is None:
             print("Problem creating {} pipeline, cannot restore".format(name))

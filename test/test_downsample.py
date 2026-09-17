@@ -197,7 +197,7 @@ class TestDownsample(object):
 
             'downsample_volume_lambda': LAMBDA_ARN_FORMAT.format(self.bosslet_config.REGION,
                                                                  self.bosslet_config.ACCOUNT_ID,
-                                                                 names.lambda_.downsample_volume)
+                                                                 names.lambda_.downsample_volume),
 
             'test': True,
 
